@@ -111,13 +111,8 @@ const AdminSidebar = () => {
         )}
       </AnimatePresence>
 
-      {/* Desktop Sidebar */}
-      <motion.div
-        className="hidden lg:flex h-screen w-64 bg-gray-900/95 backdrop-blur-xl border-r border-red-800 flex-col fixed left-0 top-0"
-        initial={{ x: -300 }}
-        animate={{ x: 0 }}
-        transition={{ duration: 0.3 }}
-      >
+      {/* Desktop Sidebar - Removed motion */}
+      <div className="hidden lg:flex h-screen w-64 bg-gray-900/95 backdrop-blur-xl border-r border-red-800 flex-col fixed left-0 top-0">
         {/* Desktop Admin Logo */}
         <div className="p-6 border-b border-red-800 bg-gradient-to-r from-red-900/30 to-rose-900/20">
           <Link to="/" className="flex items-center space-x-2">
@@ -158,7 +153,7 @@ const AdminSidebar = () => {
             <span className="font-medium">Logout</span>
           </Button>
         </div>
-      </motion.div>
+      </div>
     </>
   );
 };

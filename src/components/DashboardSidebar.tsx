@@ -116,13 +116,8 @@ const DashboardSidebar: React.FC<SidebarProps> = () => {
         )}
       </AnimatePresence>
 
-      {/* Desktop Sidebar */}
-      <motion.div
-        className="hidden lg:flex h-screen w-64 bg-gray-900/95 backdrop-blur-xl border-r border-gray-800 flex-col fixed left-0 top-0"
-        initial={{ x: -300 }}
-        animate={{ x: 0 }}
-        transition={{ duration: 0.3 }}
-      >
+      {/* Desktop Sidebar - Removed motion */}
+      <div className="hidden lg:flex h-screen w-64 bg-gray-900/95 backdrop-blur-xl border-r border-gray-800 flex-col fixed left-0 top-0">
         {/* Logo */}
         <div className="p-6 border-b border-gray-800 bg-gradient-to-r from-purple-900/30 to-blue-900/20">
           <Link to="/" className="flex items-center space-x-2 group">
@@ -167,7 +162,7 @@ const DashboardSidebar: React.FC<SidebarProps> = () => {
             <span className="font-medium">Sign Out</span>
           </Button>
         </div>
-      </motion.div>
+      </div>
 
       {/* Mobile Overlay */}
       {isMobileOpen && (

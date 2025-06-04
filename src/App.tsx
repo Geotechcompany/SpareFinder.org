@@ -24,6 +24,7 @@ import AuditLogs from '@/pages/admin/AuditLogs';
 import EmailSmtpManagement from '@/pages/admin/EmailSmtpManagement';
 import PaymentManagement from '@/pages/admin/PaymentManagement';
 import AIModelsManagement from '@/pages/admin/AIModelsManagement';
+import AdminLogin from '@/pages/admin/AdminLogin';
 
 const queryClient = new QueryClient();
 
@@ -54,6 +55,7 @@ const App = () => (
             <Route path="/admin/email-smtp" element={<EmailSmtpManagement />} />
             <Route path="/admin/payment-methods" element={<PaymentManagement />} />
             <Route path="/admin/ai-models" element={<AIModelsManagement />} />
+            <Route path="/admin/login" element={<AdminLogin />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
