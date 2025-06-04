@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -25,8 +24,10 @@ import {
 import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
 import ThemeToggle from "@/components/ThemeToggle";
+import { Calendar } from "@/components/ui/calendar";
 
 const Index = () => {
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
   const [hoveredPlan, setHoveredPlan] = useState<string | null>(null);
   const [activeTestimonial, setActiveTestimonial] = useState(0);
 
@@ -525,7 +526,12 @@ const Index = () => {
               </Button>
               <Button size="lg" variant="outline" className="border-white/20 text-white hover:bg-white/10 text-lg px-12 py-4 h-16 backdrop-blur-sm">
                 Schedule Demo
-                <Calendar className="ml-2 w-6 h-6" />
+                <Calendar
+                  mode="single"
+                  selected={selectedDate}
+                  onSelect={setSelectedDate}
+                  className="rounded-md border"
+                />
               </Button>
             </div>
             
