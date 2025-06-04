@@ -12,6 +12,9 @@ import Upload from "./pages/Upload";
 import History from "./pages/History";
 import Billing from "./pages/Billing";
 import Admin from "./pages/Admin";
+import Settings from "./pages/Settings";
+import Notifications from "./pages/Notifications";
+import Profile from "./pages/Profile";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -30,6 +33,9 @@ const App = () => (
           <Route path="/dashboard/upload" element={<Upload />} />
           <Route path="/dashboard/history" element={<History />} />
           <Route path="/dashboard/billing" element={<Billing />} />
+          <Route path="/dashboard/settings" element={<Settings />} />
+          <Route path="/dashboard/notifications" element={<Notifications />} />
+          <Route path="/dashboard/profile" element={<Profile />} />
           <Route path="/admin" element={<Admin />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
