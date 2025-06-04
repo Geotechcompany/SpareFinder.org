@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -62,7 +61,7 @@ const Notifications = () => {
             </div>
           </header>
 
-          <div className="flex-1 p-4 lg:p-8">
+          <div className="flex-1 lg:ml-64 p-4 lg:p-8">
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
