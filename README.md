@@ -1,73 +1,164 @@
-# Welcome to your Lovable project
+# 🔧 SparePart AI – Identify Auto Parts Using AI + Web Intelligence
 
-## Project info
+![SparePart AI Banner](https://your-cdn.com/banner.png)
 
-**URL**: https://lovable.dev/projects/745bf48c-f693-45a3-b1e9-1b8ef9d84e3c
+> Upload a picture of any auto spare part and get accurate details powered by AI and real-time web scraping.
 
-## How can I edit this code?
+SparePart AI is a modern SaaS platform that allows users to identify and learn about automotive spare parts using image uploads. It combines OpenAI’s GPT-4 vision capabilities with live web scraping and a user-friendly dashboard. Subscriptions are handled via Stripe, with a modern, minimalist UX design.
 
-There are several ways of editing your application.
+---
 
-**Use Lovable**
+## 🚀 Features
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/745bf48c-f693-45a3-b1e9-1b8ef9d84e3c) and start prompting.
+- 🔍 **Image Upload** – Upload photos of auto parts for instant analysis
+- 🤖 **AI-Powered Recognition** – OpenAI GPT-4o for intelligent part description, manufacturer, and use cases
+- 🌐 **Web Scraping Fallback** – Augment AI results with real-time scraping from part suppliers
+- 💳 **Stripe Integration** – Subscription-based access (Free, Pro, Enterprise tiers)
+- 👤 **User Dashboard** – Track uploads, view AI results, manage your plan
+- 🛠 **Admin Panel** – Manage users, monitor usage, and audit AI output
+- 📱 **Mobile-Responsive UI** – Minimalist and premium design optimized for all devices
 
-Changes made via Lovable will be committed automatically to this repo.
+---
 
-**Use your preferred IDE**
+## 🧠 Tech Stack
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+| Layer      | Tech                                       |
+|------------|--------------------------------------------|
+| Frontend   | Next.js 14 (App Router), TailwindCSS, shadcn/ui |
+| Backend    | Prisma + PostgreSQL, NextAuth.js, Stripe Webhooks |
+| AI         | OpenAI GPT-4o Vision API                    |
+| Uploads    | UploadThing or Vercel Blob                 |
+| Scraping   | Cheerio + Axios / ScraperAPI               |
+| UI/UX      | Framer Motion, React Hot Toast, SEO        |
+| Hosting    | Vercel (Frontend + Serverless Functions)   |
+| Database   | Neon.tech or Railway                       |
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+---
 
-Follow these steps:
+## 📂 Project Structure
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+🧱 Project Directory Structure
+bash
+CopyEdit
+spare-part-ai/
+├── app/
+│   ├── layout.tsx                  # Global layout
+│   ├── page.tsx                    # Landing page
+│   ├── auth/
+│   │   ├── login/page.tsx
+│   │   └── register/page.tsx
+│   ├── dashboard/
+│   │   ├── layout.tsx             # User dashboard layout
+│   │   ├── page.tsx               # Dashboard home
+│   │   ├── upload/page.tsx
+│   │   ├── history/page.tsx
+│   │   └── billing/page.tsx
+│   ├── admin/
+│   │   ├── layout.tsx
+│   │   └── page.tsx               # Admin dashboard
+│   └── api/
+│       ├── auth/[...nextauth]/route.ts
+│       ├── stripe/webhook/route.ts
+│       ├── upload/route.ts
+│       └── identify/route.ts     # OpenAI + scraping logic
+│
+├── components/
+│   ├── ui/                        # shadcn/ui components
+│   ├── UploadForm.tsx
+│   ├── Sidebar.tsx
+│   ├── Topbar.tsx
+│   └── AuthForm.tsx
+│
+├── lib/
+│   ├── auth.ts                    # NextAuth config
+│   ├── prisma.ts
+│   ├── stripe.ts
+│   ├── openai.ts
+│   └── scraper.ts
+│
+├── prisma/
+│   └── schema.prisma              # DB models
+│
+├── public/
+│   └── logo.png
+│
+├── styles/
+│   └── globals.css
+│
+├── .env.local                     # API keys, Stripe secrets
+├── middleware.ts                 # Role-based routing
+├── tailwind.config.ts
+├── postcss.config.js
+├── tsconfig.json
+├── next.config.js
+├── package.json
+└── README.md
+2. Install dependencies
+bash
+Copy
+Edit
+pnpm install
+# or
+npm install
+3. Set up environment variables
+Create a .env.local file and configure:
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
+env
+Copy
+Edit
+DATABASE_URL=postgresql://...
+NEXTAUTH_SECRET=your_secret
+NEXTAUTH_URL=http://localhost:3000
+OPENAI_API_KEY=your_openai_key
+STRIPE_SECRET_KEY=your_stripe_key
+STRIPE_WEBHOOK_SECRET=your_webhook_secret
+UPLOADTHING_SECRET=your_uploadthing_key
+4. Setup Prisma & DB
+bash
+Copy
+Edit
+npx prisma migrate dev --name init
+npx prisma generate
+5. Run locally
+bash
+Copy
+Edit
+pnpm dev
+# or
 npm run dev
-```
+🧪 Testing Stripe Webhooks (optional)
+Use Stripe CLI to test locally:
 
-**Edit a file directly in GitHub**
+bash
+Copy
+Edit
+stripe listen --forward-to localhost:3000/api/webhooks/stripe
+🌐 Live Demo
+Coming soon! Deployed on Vercel
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+🛡 License
+MIT License. Feel free to use and customize for personal/commercial projects.
 
-**Use GitHub Codespaces**
+💡 Future Features
+PDF report generation from results
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+Parts inventory management
 
-## What technologies are used for this project?
+Team/Org accounts
 
-This project is built with:
+AI confidence scoring + explainability
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+Marketplace integration (Amazon/eBay)
 
-## How can I deploy this project?
+🧠 Powered By
+Next.js
 
-Simply open [Lovable](https://lovable.dev/projects/745bf48c-f693-45a3-b1e9-1b8ef9d84e3c) and click on Share -> Publish.
+OpenAI GPT-4o
 
-## Can I connect a custom domain to my Lovable project?
+Stripe
 
-Yes, you can!
+Prisma
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+UploadThing
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
+ScraperAPI
