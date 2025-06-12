@@ -21,15 +21,18 @@ import {
   CheckCircle,
   AlertTriangle,
   XCircle,
-  Upload
+  Upload,
+  Menu
 } from 'lucide-react';
 import DashboardSidebar from '@/components/DashboardSidebar';
+import MobileSidebar from '@/components/MobileSidebar';
 
 const History = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedFilter, setSelectedFilter] = useState('all');
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [activeTab, setActiveTab] = useState('all');
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const tabs = [
     { id: 'all', label: 'All', icon: HistoryIcon, count: 247 },
@@ -157,6 +160,10 @@ const History = () => {
     setIsCollapsed(!isCollapsed);
   };
 
+  const handleToggleMobileMenu = () => {
+    setIsMobileMenuOpen(!isMobileMenuOpen);
+  };
+
   const stats = {
     totalUploads: uploadHistory.length,
     completed: uploadHistory.filter(item => item.status === 'completed').length,
@@ -195,13 +202,31 @@ const History = () => {
       </div>
 
       <DashboardSidebar isCollapsed={isCollapsed} onToggle={handleToggleSidebar} />
+      
+      {/* Mobile Sidebar */}
+      <MobileSidebar isOpen={isMobileMenuOpen} onClose={() => setIsMobileMenuOpen(false)} />
+
+      {/* Mobile Menu Button */}
+      <button 
+        onClick={handleToggleMobileMenu}
+        className="fixed top-4 right-4 z-50 p-2 rounded-lg bg-black/20 backdrop-blur-xl border border-white/10 md:hidden"
+      >
+        <Menu className="w-5 h-5 text-white" />
+      </button>
 
       {/* Main Content */}
       <motion.div
         initial={false}
-        animate={{ marginLeft: isCollapsed ? 80 : 320 }}
+        animate={{ 
+          marginLeft: isCollapsed 
+            ? 'var(--collapsed-sidebar-width, 80px)' 
+            : 'var(--expanded-sidebar-width, 320px)',
+          width: isCollapsed
+            ? 'calc(100% - var(--collapsed-sidebar-width, 80px))'
+            : 'calc(100% - var(--expanded-sidebar-width, 320px))'
+        }}
         transition={{ duration: 0.3, ease: "easeInOut" }}
-        className="flex-1 p-4 lg:p-8 relative z-10"
+        className="flex-1 p-2 sm:p-4 lg:p-8 relative z-10 overflow-x-hidden md:overflow-x-visible"
       >
         <motion.div
           initial={{ opacity: 0, y: 20 }}

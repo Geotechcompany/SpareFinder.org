@@ -24,9 +24,11 @@ import {
   X,
   ImagePlus,
   Loader2,
-  Info
+  Info,
+  Menu
 } from 'lucide-react';
 import DashboardSidebar from '@/components/DashboardSidebar';
+import MobileSidebar from '@/components/MobileSidebar';
 import { useAIAnalysis, type AnalysisProgress, type AnalysisResponse, type PartPrediction } from '@/services/aiService';
 import { toast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
@@ -38,6 +40,7 @@ const Upload = () => {
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [analysisResults, setAnalysisResults] = useState<AnalysisResponse | null>(null);
   const [analysisProgress, setAnalysisProgress] = useState<AnalysisProgress | null>(null);
   const [selectedPrediction, setSelectedPrediction] = useState<PartPrediction | null>(null);
@@ -161,6 +164,10 @@ const Upload = () => {
     setIsCollapsed(!isCollapsed);
   };
 
+  const handleToggleMobileMenu = () => {
+    setIsMobileMenuOpen(!isMobileMenuOpen);
+  };
+
   const getProgressStageColor = (stage: string) => {
     switch (stage) {
       case 'uploading':
@@ -217,19 +224,37 @@ const Upload = () => {
       </div>
 
       <DashboardSidebar isCollapsed={isCollapsed} onToggle={handleToggleSidebar} />
+      
+      {/* Mobile Sidebar */}
+      <MobileSidebar isOpen={isMobileMenuOpen} onClose={() => setIsMobileMenuOpen(false)} />
+
+      {/* Mobile Menu Button */}
+      <button 
+        onClick={handleToggleMobileMenu}
+        className="fixed top-4 right-4 z-50 p-2 rounded-lg bg-black/20 backdrop-blur-xl border border-white/10 md:hidden"
+      >
+        <Menu className="w-5 h-5 text-white" />
+      </button>
 
       {/* Main Content */}
       <motion.div
         initial={false}
-        animate={{ marginLeft: isCollapsed ? 80 : 320 }}
+        animate={{ 
+          marginLeft: isCollapsed 
+            ? 'var(--collapsed-sidebar-width, 80px)' 
+            : 'var(--expanded-sidebar-width, 320px)',
+          width: isCollapsed
+            ? 'calc(100% - var(--collapsed-sidebar-width, 80px))'
+            : 'calc(100% - var(--expanded-sidebar-width, 320px))'
+        }}
         transition={{ duration: 0.3, ease: "easeInOut" }}
-        className="flex-1 p-4 lg:p-8 relative z-10"
+        className="flex-1 p-2 sm:p-4 lg:p-8 relative z-10 overflow-x-hidden md:overflow-x-visible"
       >
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
-          className="space-y-6 lg:space-y-8 max-w-6xl mx-auto"
+          className="space-y-4 sm:space-y-6 lg:space-y-8 max-w-6xl mx-auto"
         >
           {/* Header */}
           <div className="relative">
@@ -272,7 +297,7 @@ const Upload = () => {
           </div>
 
           {/* Main Content Grid */}
-          <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 lg:gap-8">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 lg:gap-8">
             {/* Upload Section */}
             <motion.div
               initial={{ opacity: 0, x: -20 }}

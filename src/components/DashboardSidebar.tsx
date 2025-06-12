@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
@@ -30,7 +30,27 @@ const DashboardSidebar: React.FC<SidebarProps> = ({ isCollapsed = false, onToggl
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const location = useLocation();
 
-  const toggleMobileMenu = () => setIsMobileOpen(!isMobileOpen);
+  // Close mobile menu on route change
+  useEffect(() => {
+    setIsMobileOpen(false);
+  }, [location.pathname]);
+
+  // Close mobile menu on window resize if screen becomes larger
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth >= 768) {
+        setIsMobileOpen(false);
+      }
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  const toggleMobileMenu = () => {
+    setIsMobileOpen(!isMobileOpen);
+    if (onToggle) onToggle();
+  };
 
   const navItems = [
     { href: '/dashboard', icon: Home, label: 'Dashboard', description: 'Overview & analytics' },
@@ -51,25 +71,14 @@ const DashboardSidebar: React.FC<SidebarProps> = ({ isCollapsed = false, onToggl
 
   return (
     <>
-      {/* Mobile Menu Button */}
-      <motion.button
-        onClick={toggleMobileMenu}
-        className="lg:hidden fixed top-4 left-4 z-50 p-3 rounded-xl bg-black/40 backdrop-blur-xl border border-white/10 text-white hover:bg-white/10 transition-colors"
-        whileHover={{ scale: 1.05 }}
-        whileTap={{ scale: 0.95 }}
-        initial={{ opacity: 0, x: -20 }}
-        animate={{ opacity: 1, x: 0 }}
-        transition={{ delay: 0.2 }}
-      >
-        <Menu className="w-6 h-6" />
-      </motion.button>
+      {/* Mobile Menu Button - Removed as it's now handled in Dashboard.tsx */}
 
       {/* Mobile Overlay */}
       <AnimatePresence>
         {isMobileOpen && (
           <motion.div 
             onClick={toggleMobileMenu}
-            className="lg:hidden fixed inset-0 z-40 bg-black/50 backdrop-blur-sm"
+            className="md:hidden fixed inset-0 z-40 bg-black/50 backdrop-blur-sm"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -78,99 +87,95 @@ const DashboardSidebar: React.FC<SidebarProps> = ({ isCollapsed = false, onToggl
       </AnimatePresence>
 
       {/* Mobile Sidebar */}
-      <AnimatePresence>
-        {isMobileOpen && (
-          <motion.div
-            initial={{ x: -320 }}
-            animate={{ x: 0 }}
-            exit={{ x: -320 }}
-            transition={{ type: "spring", damping: 20, stiffness: 100 }}
-            className="fixed lg:hidden z-50 h-full w-80 bg-black/95 backdrop-blur-xl border-r border-white/10"
-          >
-            <div className="flex flex-col h-full">
-              {/* Mobile Header */}
-              <div className="flex items-center justify-between p-6 border-b border-white/10">
-                <div className="flex items-center space-x-3">
-                  <motion.div
-                    animate={{ rotate: [0, 360] }}
-                    transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
-                    className="w-10 h-10 bg-gradient-to-r from-purple-600 to-blue-600 rounded-xl flex items-center justify-center"
-                  >
-                    <Zap className="w-6 h-6 text-white" />
-                  </motion.div>
-                  <div>
-                    <h2 className="text-white font-bold text-lg">PartFinder AI</h2>
-                    <p className="text-gray-400 text-xs">Mobile Dashboard</p>
-                  </div>
-                </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={toggleMobileMenu}
-                  className="text-gray-400 hover:text-white hover:bg-white/10"
-                >
-                  <X className="w-5 h-5" />
-                </Button>
-              </div>
-
-              {/* Mobile Navigation */}
-              <div className="flex-1 p-4 space-y-2">
-                {navItems.map((item, index) => (
-                  <motion.div
-                    key={item.href}
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: index * 0.1 }}
-                  >
-                    <Link
-                      to={item.href}
-                      onClick={toggleMobileMenu}
-                      className={`relative flex items-center space-x-3 p-4 rounded-xl transition-all duration-300 group ${
-                        isActiveRoute(item.href)
-                          ? 'bg-gradient-to-r from-purple-600/20 to-blue-600/20 border border-purple-500/30 text-white'
-                          : 'text-gray-400 hover:text-white hover:bg-white/5'
-                      }`}
-                    >
-                      <item.icon className="w-5 h-5 flex-shrink-0" />
-                      <div className="flex-1">
-                        <div className="font-medium">{item.label}</div>
-                        <div className="text-xs opacity-75">{item.description}</div>
-                      </div>
-                    </Link>
-                  </motion.div>
-                ))}
-              </div>
-
-              {/* Mobile User Section */}
-              <div className="p-4 border-t border-white/10">
-                <div className="flex items-center space-x-3 p-3 rounded-xl bg-white/5 border border-white/10">
-                  <div className="w-10 h-10 bg-gradient-to-r from-green-600 to-emerald-600 rounded-xl flex items-center justify-center">
-                    <UserCircle className="w-6 h-6 text-white" />
-                  </div>
-                  <div className="flex-1">
-                    <p className="text-white font-medium">John Doe</p>
-                    <p className="text-gray-400 text-sm">Pro Plan</p>
-                  </div>
-                </div>
-                <Button 
-                  variant="ghost" 
-                  className="w-full mt-3 text-red-400 hover:text-red-300 hover:bg-red-600/10 justify-start"
-                >
-                  <LogOut className="w-4 h-4 mr-2" />
-                  Sign Out
-                </Button>
-              </div>
+      <motion.div
+        initial={{ x: -320 }}
+        animate={{ x: isMobileOpen ? 0 : -320 }}
+        transition={{ type: "spring", damping: 20, stiffness: 100 }}
+        className="fixed md:hidden z-50 h-full w-[280px] bg-black/95 backdrop-blur-xl border-r border-white/10"
+      >
+        {/* Mobile Header */}
+        <div className="flex items-center justify-between p-4 border-b border-white/10">
+          <div className="flex items-center space-x-3">
+            <motion.div
+              animate={{ rotate: [0, 360] }}
+              transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
+              className="w-8 h-8 bg-gradient-to-r from-purple-600 to-blue-600 rounded-xl flex items-center justify-center"
+            >
+              <Zap className="w-5 h-5 text-white" />
+            </motion.div>
+            <div>
+              <h2 className="text-white font-bold text-base">PartFinder AI</h2>
+              <p className="text-gray-400 text-xs">Mobile Dashboard</p>
             </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={toggleMobileMenu}
+            className="text-gray-400 hover:text-white hover:bg-white/10"
+          >
+            <X className="w-5 h-5" />
+          </Button>
+        </div>
+
+        {/* Mobile Navigation */}
+        <div className="flex-1 p-4 space-y-2">
+          {navItems.map((item, index) => (
+            <motion.div
+              key={item.href}
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: index * 0.1 }}
+            >
+              <Link
+                to={item.href}
+                onClick={toggleMobileMenu}
+                className={`relative flex items-center space-x-3 p-4 rounded-xl transition-all duration-300 group ${
+                  isActiveRoute(item.href)
+                    ? 'bg-gradient-to-r from-purple-600/20 to-blue-600/20 border border-purple-500/30 text-white'
+                    : 'text-gray-400 hover:text-white hover:bg-white/5'
+                }`}
+              >
+                <item.icon className="w-5 h-5 flex-shrink-0" />
+                <div className="flex-1">
+                  <div className="font-medium">{item.label}</div>
+                  <div className="text-xs opacity-75">{item.description}</div>
+                </div>
+              </Link>
+            </motion.div>
+          ))}
+        </div>
+
+        {/* Mobile User Section */}
+        <div className="p-4 border-t border-white/10">
+          <div className="flex items-center space-x-3 p-3 rounded-xl bg-white/5 border border-white/10">
+            <div className="w-10 h-10 bg-gradient-to-r from-green-600 to-emerald-600 rounded-xl flex items-center justify-center">
+              <UserCircle className="w-6 h-6 text-white" />
+            </div>
+            <div className="flex-1">
+              <p className="text-white font-medium">John Doe</p>
+              <p className="text-gray-400 text-sm">Pro Plan</p>
+            </div>
+          </div>
+          <Button 
+            variant="ghost" 
+            className="w-full mt-3 text-red-400 hover:text-red-300 hover:bg-red-600/10 justify-start"
+          >
+            <LogOut className="w-4 h-4 mr-2" />
+            Sign Out
+          </Button>
+        </div>
+      </motion.div>
 
       {/* Desktop Sidebar */}
       <motion.div
         initial={false}
-        animate={{ width: isCollapsed ? 80 : 320 }}
+        animate={{ 
+          width: isCollapsed ? 'var(--collapsed-sidebar-width, 80px)' : 'var(--expanded-sidebar-width, 320px)',
+          x: 0 
+        }}
         transition={{ duration: 0.3, ease: "easeInOut" }}
-        className="hidden lg:flex h-screen bg-black/95 backdrop-blur-xl border-r border-white/10 flex-col fixed left-0 top-0 z-30"
+        className="hidden md:flex h-screen bg-black/95 backdrop-blur-xl border-r border-white/10 flex-col fixed left-0 top-0 z-30"
       >
         {/* Desktop Header */}
         <div className="flex items-center justify-between p-6 border-b border-white/10">

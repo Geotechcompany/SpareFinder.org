@@ -1,0 +1,14 @@
+:root {
+    --collapsed-sidebar-width: 80px;
+    --expanded-sidebar-width: 320px;
+}
+
+
+/* Mobile sidebar adjustments */
+
+@media (max-width: 768px) {
+     :root {
+        --collapsed-sidebar-width: 0px;
+        --expanded-sidebar-width: 0px;
+    }
+}

@@ -22,15 +22,22 @@ import {
   Zap,
   Activity,
   Edit,
-  Camera
+  Camera,
+  Menu
 } from 'lucide-react';
 import DashboardSidebar from '@/components/DashboardSidebar';
+import MobileSidebar from '@/components/MobileSidebar';
 
 const Profile = () => {
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const handleToggleSidebar = () => {
     setIsCollapsed(!isCollapsed);
+  };
+
+  const handleToggleMobileMenu = () => {
+    setIsMobileMenuOpen(!isMobileMenuOpen);
   };
 
   const userStats = {
@@ -91,26 +98,44 @@ const Profile = () => {
       </div>
 
       <DashboardSidebar isCollapsed={isCollapsed} onToggle={handleToggleSidebar} />
+      
+      {/* Mobile Sidebar */}
+      <MobileSidebar isOpen={isMobileMenuOpen} onClose={() => setIsMobileMenuOpen(false)} />
+
+      {/* Mobile Menu Button */}
+      <button 
+        onClick={handleToggleMobileMenu}
+        className="fixed top-4 right-4 z-50 p-2 rounded-lg bg-black/20 backdrop-blur-xl border border-white/10 md:hidden"
+      >
+        <Menu className="w-5 h-5 text-white" />
+      </button>
 
       {/* Main Content */}
       <motion.div
         initial={false}
-        animate={{ marginLeft: isCollapsed ? 80 : 320 }}
+        animate={{ 
+          marginLeft: isCollapsed 
+            ? 'var(--collapsed-sidebar-width, 80px)' 
+            : 'var(--expanded-sidebar-width, 320px)',
+          width: isCollapsed
+            ? 'calc(100% - var(--collapsed-sidebar-width, 80px))'
+            : 'calc(100% - var(--expanded-sidebar-width, 320px))'
+        }}
         transition={{ duration: 0.3, ease: "easeInOut" }}
-        className="flex-1 p-4 lg:p-8 relative z-10"
+        className="flex-1 p-2 sm:p-4 lg:p-8 relative z-10 overflow-x-hidden md:overflow-x-visible"
       >
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
-          className="space-y-6 lg:space-y-8 max-w-6xl mx-auto"
+          className="space-y-4 sm:space-y-6 lg:space-y-8 max-w-6xl mx-auto"
         >
           {/* Header */}
           <div className="relative">
             <div className="absolute inset-0 bg-gradient-to-r from-purple-600/10 to-blue-600/10 rounded-3xl blur-xl opacity-60" />
-            <div className="relative bg-black/20 backdrop-blur-xl rounded-3xl p-6 border border-white/10">
-              <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
-                <div className="flex items-center space-x-6">
+            <div className="relative bg-black/20 backdrop-blur-xl rounded-3xl p-4 sm:p-6 border border-white/10">
+              <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 sm:gap-6">
+                <div className="flex flex-col sm:flex-row sm:items-center space-y-4 sm:space-y-0 sm:space-x-6">
                   <div className="relative">
                     <div className="w-24 h-24 bg-gradient-to-r from-purple-600 to-blue-600 rounded-2xl flex items-center justify-center">
                       <User className="w-12 h-12 text-white" />
@@ -175,7 +200,7 @@ const Profile = () => {
           </div>
 
           {/* Stats Overview */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-6">
             {[
               { 
                 title: 'Total Uploads', 
@@ -237,7 +262,7 @@ const Profile = () => {
             ))}
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 lg:gap-8">
             {/* Achievements */}
             <motion.div
               initial={{ opacity: 0, x: -20 }}
@@ -363,7 +388,7 @@ const Profile = () => {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
                   <div className="space-y-4">
                     <div className="flex items-center space-x-3">
                       <div className="w-10 h-10 bg-gradient-to-r from-blue-600/20 to-cyan-600/20 rounded-xl flex items-center justify-center border border-white/10">

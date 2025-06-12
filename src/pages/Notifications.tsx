@@ -21,17 +21,24 @@ import {
   Zap,
   Upload,
   TrendingUp,
-  Target
+  Target,
+  Menu
 } from 'lucide-react';
 import DashboardSidebar from '@/components/DashboardSidebar';
+import MobileSidebar from '@/components/MobileSidebar';
 
 const Notifications = () => {
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [selectedFilter, setSelectedFilter] = useState('all');
   const [readNotifications, setReadNotifications] = useState<Set<number>>(new Set());
 
   const handleToggleSidebar = () => {
     setIsCollapsed(!isCollapsed);
+  };
+
+  const handleToggleMobileMenu = () => {
+    setIsMobileMenuOpen(!isMobileMenuOpen);
   };
 
   const notifications = [
@@ -207,24 +214,42 @@ const Notifications = () => {
       </div>
 
       <DashboardSidebar isCollapsed={isCollapsed} onToggle={handleToggleSidebar} />
+      
+      {/* Mobile Sidebar */}
+      <MobileSidebar isOpen={isMobileMenuOpen} onClose={() => setIsMobileMenuOpen(false)} />
+
+      {/* Mobile Menu Button */}
+      <button 
+        onClick={handleToggleMobileMenu}
+        className="fixed top-4 right-4 z-50 p-2 rounded-lg bg-black/20 backdrop-blur-xl border border-white/10 md:hidden"
+      >
+        <Menu className="w-5 h-5 text-white" />
+      </button>
 
       {/* Main Content */}
       <motion.div
         initial={false}
-        animate={{ marginLeft: isCollapsed ? 80 : 320 }}
+        animate={{ 
+          marginLeft: isCollapsed 
+            ? 'var(--collapsed-sidebar-width, 80px)' 
+            : 'var(--expanded-sidebar-width, 320px)',
+          width: isCollapsed
+            ? 'calc(100% - var(--collapsed-sidebar-width, 80px))'
+            : 'calc(100% - var(--expanded-sidebar-width, 320px))'
+        }}
         transition={{ duration: 0.3, ease: "easeInOut" }}
-        className="flex-1 p-4 lg:p-8 relative z-10"
+        className="flex-1 p-2 sm:p-4 lg:p-8 relative z-10 overflow-x-hidden md:overflow-x-visible"
       >
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
-          className="space-y-6 lg:space-y-8 max-w-6xl mx-auto"
+          className="space-y-4 sm:space-y-6 lg:space-y-8 max-w-6xl mx-auto"
         >
           {/* Header */}
           <div className="relative">
             <div className="absolute inset-0 bg-gradient-to-r from-purple-600/10 to-blue-600/10 rounded-3xl blur-xl opacity-60" />
-            <div className="relative bg-black/20 backdrop-blur-xl rounded-3xl p-6 border border-white/10">
+            <div className="relative bg-black/20 backdrop-blur-xl rounded-3xl p-4 sm:p-6 border border-white/10">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div>
                   <motion.div
@@ -274,28 +299,30 @@ const Notifications = () => {
                   initial={{ opacity: 0, scale: 0.8 }}
                   animate={{ opacity: 1, scale: 1 }}
                   transition={{ delay: 0.5 }}
-                  className="flex space-x-3"
+                  className="flex flex-col sm:flex-row gap-3"
                 >
                   {unreadCount > 0 && (
                     <motion.div
                       whileHover={{ scale: 1.05 }}
                       whileTap={{ scale: 0.95 }}
+                      className="w-full sm:w-auto"
                     >
-                                             <Button 
-                         onClick={markAllAsRead}
-                         variant="outline" 
-                         className="border-white/10 text-gray-300 hover:bg-white/10 hover:text-white hover:border-white/30 h-12 px-6"
-                       >
-                         <CheckCheck className="w-4 h-4 mr-2" />
-                         Mark All Read
-                       </Button>
+                      <Button 
+                        onClick={markAllAsRead}
+                        variant="outline" 
+                        className="w-full sm:w-auto border-white/10 text-gray-300 hover:bg-white/10 hover:text-white hover:border-white/30 h-12 px-6"
+                      >
+                        <CheckCheck className="w-4 h-4 mr-2" />
+                        Mark All Read
+                      </Button>
                     </motion.div>
                   )}
                   <motion.div
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
+                    className="w-full sm:w-auto"
                   >
-                    <Button className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 shadow-lg shadow-purple-500/25 h-12 px-6">
+                    <Button className="w-full sm:w-auto bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 shadow-lg shadow-purple-500/25 h-12 px-6">
                       <Settings className="w-4 h-4 mr-2" />
                       Settings
                     </Button>
@@ -305,7 +332,7 @@ const Notifications = () => {
             </div>
           </div>
 
-          {/* Filter Tabs */}
+          {/* Filter Tabs - Make scrollable on mobile */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -313,8 +340,8 @@ const Notifications = () => {
             className="relative"
           >
             <div className="absolute inset-0 bg-gradient-to-r from-indigo-600/10 to-purple-600/10 rounded-3xl blur-xl opacity-60" />
-            <div className="relative bg-black/20 backdrop-blur-xl rounded-3xl p-2 border border-white/10">
-              <div className="flex flex-wrap gap-2">
+            <div className="relative bg-black/20 backdrop-blur-xl rounded-3xl p-2 border border-white/10 overflow-x-auto">
+              <div className="flex flex-nowrap gap-2 min-w-max sm:min-w-0 sm:flex-wrap">
                 {[
                   { id: 'all', label: 'All', count: notifications.length },
                   { id: 'unread', label: 'Unread', count: unreadCount },
@@ -356,13 +383,14 @@ const Notifications = () => {
             </div>
           </motion.div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
+          {/* Main Grid - Update for better mobile layout */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 lg:gap-8">
             {/* Notifications List */}
             <motion.div
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: 0.8 }}
-              className="lg:col-span-2 relative"
+              className="lg:col-span-2 relative order-2 lg:order-1"
             >
               <div className="absolute inset-0 bg-gradient-to-r from-purple-600/5 to-blue-600/5 rounded-3xl blur-xl opacity-60" />
               <Card className="relative bg-black/20 backdrop-blur-xl border-white/10">
@@ -463,7 +491,7 @@ const Notifications = () => {
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: 0.8 }}
-              className="relative"
+              className="relative order-1 lg:order-2"
             >
               <div className="absolute inset-0 bg-gradient-to-r from-blue-600/10 to-green-600/10 rounded-3xl blur-xl opacity-60" />
               <Card className="relative bg-black/20 backdrop-blur-xl border-white/10">

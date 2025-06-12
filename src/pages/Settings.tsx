@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -6,6 +6,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
+import { useToast } from '@/components/ui/use-toast';
+import { Loader2 } from 'lucide-react';
+import { createClient } from '@/lib/supabase/client';
 import { 
   Settings as SettingsIcon, 
   Save, 
@@ -23,19 +26,43 @@ import {
   Eye,
   Lock,
   Building2,
-  Briefcase
+  Briefcase,
+  Menu,
+  AlertCircle
 } from 'lucide-react';
 import DashboardSidebar from '@/components/DashboardSidebar';
+import MobileSidebar from '@/components/MobileSidebar';
+
+interface UserProfile {
+  id: string;
+  first_name: string;
+  last_name: string;
+  email: string;
+  phone: string;
+  company: string;
+  position: string;
+  address: string;
+  preferences: {
+    emailNotifications: boolean;
+    smsNotifications: boolean;
+    autoSave: boolean;
+    darkMode: boolean;
+    analytics: boolean;
+    marketing: boolean;
+  };
+}
 
 const Settings = () => {
-  const [formData, setFormData] = useState({
-    firstName: 'John',
-    lastName: 'Doe',
-    email: 'john.doe@example.com',
-    phone: '+1 (555) 123-4567',
-    company: 'Auto Parts Inc.',
-    address: '123 Main St, City, State 12345',
-    position: 'Software Engineer'
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [formData, setFormData] = useState<Partial<UserProfile>>({
+    first_name: '',
+    last_name: '',
+    email: '',
+    phone: '',
+    company: '',
+    position: '',
+    address: ''
   });
 
   const [preferences, setPreferences] = useState({
@@ -48,7 +75,65 @@ const Settings = () => {
   });
 
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('profile');
+  const [isSaving, setIsSaving] = useState(false);
+  
+  const { toast } = useToast();
+  const supabase = createClient();
+
+  useEffect(() => {
+    fetchUserProfile();
+  }, []);
+
+  const fetchUserProfile = async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+
+      // Get the current user's session
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError) throw sessionError;
+      if (!session?.user) throw new Error('No user session found');
+
+      // Fetch user profile from profiles table
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', session.user.id)
+        .single();
+
+      if (profileError) throw profileError;
+
+      if (profile) {
+        setFormData({
+          first_name: profile.first_name || '',
+          last_name: profile.last_name || '',
+          email: profile.email || session.user.email || '',
+          phone: profile.phone || '',
+          company: profile.company || '',
+          position: profile.position || '',
+          address: profile.address || ''
+        });
+
+        // If preferences exist in profile, use them, otherwise use defaults
+        if (profile.preferences) {
+          setPreferences(profile.preferences);
+        }
+      }
+    } catch (err) {
+      console.error('Error fetching user profile:', err);
+      setError(err instanceof Error ? err.message : 'Failed to load user profile');
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to load user profile. Please try again later.",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -58,12 +143,56 @@ const Settings = () => {
     setPreferences(prev => ({ ...prev, [field]: value }));
   };
 
-  const handleSave = () => {
-    console.log('Settings saved:', { formData, preferences });
+  const handleSave = async () => {
+    try {
+      setIsSaving(true);
+      setError(null);
+
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError) throw sessionError;
+      if (!session?.user) throw new Error('No user session found');
+
+      // Update profile in the database
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({
+          first_name: formData.first_name,
+          last_name: formData.last_name,
+          phone: formData.phone,
+          company: formData.company,
+          position: formData.position,
+          address: formData.address,
+          preferences,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', session.user.id);
+
+      if (updateError) throw updateError;
+
+      toast({
+        title: "Success",
+        description: "Your settings have been saved successfully.",
+      });
+    } catch (err) {
+      console.error('Error saving profile:', err);
+      setError(err instanceof Error ? err.message : 'Failed to save changes');
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to save changes. Please try again later.",
+      });
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleToggleSidebar = () => {
     setIsCollapsed(!isCollapsed);
+  };
+
+  const handleToggleMobileMenu = () => {
+    setIsMobileMenuOpen(!isMobileMenuOpen);
   };
 
   const tabs = [
@@ -72,6 +201,33 @@ const Settings = () => {
     { id: 'privacy', label: 'Privacy', icon: Shield },
     { id: 'appearance', label: 'Appearance', icon: Palette }
   ];
+
+  // Show loading state
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-900 via-purple-900/20 to-blue-900/20">
+        <div className="text-center">
+          <Loader2 className="w-10 h-10 animate-spin text-purple-600 mx-auto mb-4" />
+          <p className="text-gray-400">Loading your profile...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show error state
+  if (error) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-900 via-purple-900/20 to-blue-900/20">
+        <div className="text-center">
+          <AlertCircle className="w-10 h-10 text-red-500 mx-auto mb-4" />
+          <p className="text-gray-400 mb-4">{error}</p>
+          <Button onClick={fetchUserProfile} variant="outline">
+            Try Again
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex w-full bg-gradient-to-br from-gray-900 via-purple-900/20 to-blue-900/20 relative overflow-hidden">
@@ -106,30 +262,48 @@ const Settings = () => {
 
       <DashboardSidebar isCollapsed={isCollapsed} onToggle={handleToggleSidebar} />
 
+      {/* Mobile Sidebar */}
+      <MobileSidebar isOpen={isMobileMenuOpen} onClose={() => setIsMobileMenuOpen(false)} />
+
+      {/* Mobile Menu Button */}
+      <button 
+        onClick={handleToggleMobileMenu}
+        className="fixed top-4 right-4 z-50 p-2 rounded-lg bg-black/20 backdrop-blur-xl border border-white/10 md:hidden"
+      >
+        <Menu className="w-5 h-5 text-white" />
+      </button>
+
       {/* Main Content */}
       <motion.div
         initial={false}
-        animate={{ marginLeft: isCollapsed ? 80 : 320 }}
+        animate={{ 
+          marginLeft: isCollapsed 
+            ? 'var(--collapsed-sidebar-width, 80px)' 
+            : 'var(--expanded-sidebar-width, 320px)',
+          width: isCollapsed
+            ? 'calc(100% - var(--collapsed-sidebar-width, 80px))'
+            : 'calc(100% - var(--expanded-sidebar-width, 320px))'
+        }}
         transition={{ duration: 0.3, ease: "easeInOut" }}
-        className="flex-1 p-4 lg:p-8 relative z-10"
+        className="flex-1 p-2 sm:p-4 lg:p-8 relative z-10 overflow-x-hidden md:overflow-x-visible"
       >
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
-          className="space-y-6 lg:space-y-8 max-w-6xl mx-auto"
+          className="space-y-4 sm:space-y-6 lg:space-y-8 max-w-6xl mx-auto"
         >
           {/* Header */}
           <div className="relative">
-            <div className="absolute inset-0 bg-gradient-to-r from-purple-600/10 to-blue-600/10 rounded-3xl blur-xl opacity-60" />
-            <div className="relative bg-black/20 backdrop-blur-xl rounded-3xl p-6 border border-white/10">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div className="absolute inset-0 bg-gradient-to-r from-purple-600/10 to-blue-600/10 rounded-2xl sm:rounded-3xl blur-xl opacity-60" />
+            <div className="relative bg-black/20 backdrop-blur-xl rounded-2xl sm:rounded-3xl p-4 sm:p-6 border border-white/10">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
                 <div>
                   <motion.div
                     initial={{ opacity: 0, scale: 0.8 }}
                     animate={{ opacity: 1, scale: 1 }}
                     transition={{ delay: 0.2 }}
-                    className="inline-flex items-center px-4 py-2 bg-gradient-to-r from-purple-600/20 to-blue-600/20 rounded-full border border-purple-500/30 backdrop-blur-xl mb-4"
+                    className="inline-flex items-center px-3 sm:px-4 py-2 bg-gradient-to-r from-purple-600/20 to-blue-600/20 rounded-full border border-purple-500/30 backdrop-blur-xl mb-3 sm:mb-4"
                   >
                     <motion.div
                       animate={{ rotate: [0, 360] }}
@@ -166,9 +340,22 @@ const Settings = () => {
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
                   >
-                    <Button onClick={handleSave} className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 shadow-lg shadow-purple-500/25 h-12 px-6">
-                      <Save className="w-4 h-4 mr-2" />
-                      Save Changes
+                    <Button 
+                      onClick={handleSave} 
+                      className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 shadow-lg shadow-purple-500/25 h-12 px-6"
+                      disabled={isSaving}
+                    >
+                      {isSaving ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Saving...
+                        </>
+                      ) : (
+                        <>
+                          <Save className="w-4 h-4 mr-2" />
+                          Save Changes
+                        </>
+                      )}
                     </Button>
                   </motion.div>
                 </motion.div>
@@ -183,14 +370,14 @@ const Settings = () => {
             transition={{ delay: 0.6 }}
             className="relative"
           >
-            <div className="absolute inset-0 bg-gradient-to-r from-indigo-600/10 to-purple-600/10 rounded-3xl blur-xl opacity-60" />
-            <div className="relative bg-black/20 backdrop-blur-xl rounded-3xl p-2 border border-white/10">
-              <div className="flex flex-wrap gap-2">
+            <div className="absolute inset-0 bg-gradient-to-r from-indigo-600/10 to-purple-600/10 rounded-2xl sm:rounded-3xl blur-xl opacity-60" />
+            <div className="relative bg-black/20 backdrop-blur-xl rounded-2xl sm:rounded-3xl p-2 border border-white/10 overflow-x-auto">
+              <div className="flex flex-nowrap min-w-max sm:min-w-0 sm:flex-wrap gap-2">
                 {tabs.map((tab, index) => (
                   <motion.button
                     key={tab.id}
                     onClick={() => setActiveTab(tab.id)}
-                    className={`relative flex items-center space-x-2 px-6 py-3 rounded-2xl transition-all duration-300 ${
+                    className={`relative flex items-center space-x-2 px-4 sm:px-6 py-3 rounded-2xl transition-all duration-300 whitespace-nowrap ${
                       activeTab === tab.id
                         ? 'text-white'
                         : 'text-gray-400 hover:text-white hover:bg-white/5'
@@ -234,7 +421,7 @@ const Settings = () => {
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: -20 }}
                   transition={{ duration: 0.3 }}
-                  className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8"
+                  className="grid grid-cols-1 gap-4 sm:gap-6 lg:grid-cols-2 lg:gap-8"
                 >
                   {/* Personal Information */}
                   <div className="relative">
@@ -255,8 +442,8 @@ const Settings = () => {
                             <Label htmlFor="firstName" className="text-gray-200">First Name</Label>
                             <Input
                               id="firstName"
-                              value={formData.firstName}
-                              onChange={(e) => handleInputChange('firstName', e.target.value)}
+                              value={formData.first_name}
+                              onChange={(e) => handleInputChange('first_name', e.target.value)}
                               className="bg-white/5 border-white/10 text-white placeholder:text-gray-400 focus:border-purple-500/50 focus:ring-purple-500/20 h-12"
                             />
                           </div>
@@ -264,8 +451,8 @@ const Settings = () => {
                             <Label htmlFor="lastName" className="text-gray-200">Last Name</Label>
                             <Input
                               id="lastName"
-                              value={formData.lastName}
-                              onChange={(e) => handleInputChange('lastName', e.target.value)}
+                              value={formData.last_name}
+                              onChange={(e) => handleInputChange('last_name', e.target.value)}
                               className="bg-white/5 border-white/10 text-white placeholder:text-gray-400 focus:border-purple-500/50 focus:ring-purple-500/20 h-12"
                             />
                           </div>
@@ -342,7 +529,7 @@ const Settings = () => {
                       </CardHeader>
                       <CardContent className="space-y-6">
                         <div className="space-y-4">
-                          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-4 rounded-xl bg-white/5 border border-white/10">
+                          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 p-4 rounded-xl bg-white/5 border border-white/10">
                             <div>
                               <h4 className="text-white font-medium">Password</h4>
                               <p className="text-gray-400 text-sm">Last changed 3 months ago</p>
@@ -352,7 +539,7 @@ const Settings = () => {
                             </Button>
                           </div>
 
-                          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-4 rounded-xl bg-white/5 border border-white/10">
+                          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 p-4 rounded-xl bg-white/5 border border-white/10">
                             <div>
                               <h4 className="text-white font-medium">Two-Factor Authentication</h4>
                               <p className="text-gray-400 text-sm">Add an extra layer of security</p>
@@ -362,7 +549,7 @@ const Settings = () => {
                             </Button>
                           </div>
 
-                          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-4 rounded-xl bg-white/5 border border-white/10">
+                          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 p-4 rounded-xl bg-white/5 border border-white/10">
                             <div>
                               <h4 className="text-white font-medium">Login Sessions</h4>
                               <p className="text-gray-400 text-sm">Manage your active sessions</p>
@@ -437,7 +624,7 @@ const Settings = () => {
                           }
                         ].map((setting) => (
                           <div key={setting.key} className="p-4 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-colors">
-                            <div className="flex items-center justify-between">
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
                               <div className="flex items-center space-x-4">
                                 <div className={`w-12 h-12 bg-gradient-to-r ${setting.color} rounded-xl flex items-center justify-center`}>
                                   <setting.icon className="w-6 h-6 text-white" />

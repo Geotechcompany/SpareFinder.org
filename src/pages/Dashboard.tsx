@@ -16,12 +16,15 @@ import {
   Search,
   Cpu,
   Database,
-  Activity
+  Activity,
+  Menu
 } from 'lucide-react';
 import DashboardSidebar from '@/components/DashboardSidebar';
+import MobileSidebar from '@/components/MobileSidebar';
 
 const Dashboard = () => {
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   // Mock data - will be replaced with real data from Supabase
   const stats = {
@@ -95,6 +98,10 @@ const Dashboard = () => {
     setIsCollapsed(!isCollapsed);
   };
 
+  const handleToggleMobileMenu = () => {
+    setIsMobileMenuOpen(!isMobileMenuOpen);
+  };
+
   return (
     <div className="min-h-screen flex w-full bg-gradient-to-br from-gray-900 via-purple-900/20 to-blue-900/20 relative overflow-hidden">
       {/* Animated Background Elements */}
@@ -138,29 +145,48 @@ const Dashboard = () => {
         />
       </div>
 
+      {/* Desktop Sidebar */}
       <DashboardSidebar isCollapsed={isCollapsed} onToggle={handleToggleSidebar} />
+
+      {/* Mobile Sidebar */}
+      <MobileSidebar isOpen={isMobileMenuOpen} onClose={() => setIsMobileMenuOpen(false)} />
+
+      {/* Mobile Menu Button */}
+      <button 
+        onClick={handleToggleMobileMenu}
+        className="fixed top-4 right-4 z-50 p-2 rounded-lg bg-black/20 backdrop-blur-xl border border-white/10 md:hidden"
+      >
+        <Menu className="w-5 h-5 text-white" />
+      </button>
 
       {/* Main Content */}
       <motion.div
         initial={false}
-        animate={{ marginLeft: isCollapsed ? 80 : 320 }}
+        animate={{ 
+          marginLeft: isCollapsed 
+            ? 'var(--collapsed-sidebar-width, 80px)' 
+            : 'var(--expanded-sidebar-width, 320px)',
+          width: isCollapsed
+            ? 'calc(100% - var(--collapsed-sidebar-width, 80px))'
+            : 'calc(100% - var(--expanded-sidebar-width, 320px))'
+        }}
         transition={{ duration: 0.3, ease: "easeInOut" }}
-        className="flex-1 p-4 lg:p-8 relative z-10"
+        className="flex-1 p-2 sm:p-4 lg:p-8 relative z-10 overflow-x-hidden md:overflow-x-visible"
       >
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
-          className="space-y-6 lg:space-y-8"
+          className="space-y-4 sm:space-y-6 lg:space-y-8"
         >
           {/* Header */}
           <div className="relative">
-            <div className="absolute inset-0 bg-gradient-to-r from-purple-600/10 to-blue-600/10 rounded-3xl blur-xl opacity-60" />
-            <div className="relative bg-black/20 backdrop-blur-xl rounded-3xl p-6 border border-white/10">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div className="absolute inset-0 bg-gradient-to-r from-purple-600/10 to-blue-600/10 rounded-2xl sm:rounded-3xl blur-xl opacity-60" />
+            <div className="relative bg-black/20 backdrop-blur-xl rounded-2xl sm:rounded-3xl p-4 sm:p-6 border border-white/10">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
                 <div>
                   <motion.h1 
-                    className="text-3xl lg:text-4xl font-bold bg-gradient-to-r from-white via-purple-200 to-blue-200 bg-clip-text text-transparent"
+                    className="text-2xl sm:text-3xl lg:text-4xl font-bold bg-gradient-to-r from-white via-purple-200 to-blue-200 bg-clip-text text-transparent"
                     initial={{ opacity: 0, x: -20 }}
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: 0.2 }}
@@ -168,7 +194,7 @@ const Dashboard = () => {
                     Welcome back, John
                   </motion.h1>
                   <motion.p 
-                    className="text-gray-400 mt-2"
+                    className="text-sm sm:text-base text-gray-400 mt-2"
                     initial={{ opacity: 0, x: -20 }}
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: 0.3 }}
@@ -176,28 +202,29 @@ const Dashboard = () => {
                     Here's what's happening with your part identification today
                   </motion.p>
                 </div>
-                                 <motion.div
-                   className="flex space-x-3"
-                   initial={{ opacity: 0, scale: 0.8 }}
-                   animate={{ opacity: 1, scale: 1 }}
-                   transition={{ delay: 0.4 }}
-                 >
-                   <motion.div
-                     whileHover={{ scale: 1.05, y: -2 }}
-                     whileTap={{ scale: 0.95 }}
-                   >
-                     <Button className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 shadow-lg shadow-purple-500/25">
-                       <Upload className="w-4 h-4 mr-2" />
-                       New Upload
-                     </Button>
-                   </motion.div>
-                 </motion.div>
+                <motion.div
+                  className="flex space-x-3"
+                  initial={{ opacity: 0, scale: 0.8 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ delay: 0.4 }}
+                >
+                  <motion.div
+                    whileHover={{ scale: 1.05, y: -2 }}
+                    whileTap={{ scale: 0.95 }}
+                    className="w-full sm:w-auto"
+                  >
+                    <Button className="w-full sm:w-auto bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 shadow-lg shadow-purple-500/25">
+                      <Upload className="w-4 h-4 mr-2" />
+                      New Upload
+                    </Button>
+                  </motion.div>
+                </motion.div>
               </div>
             </div>
           </div>
 
           {/* Stats Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
+          <div className="grid grid-cols-1 xs:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-6">
             {[
               { 
                 title: 'Total Uploads', 
@@ -240,21 +267,21 @@ const Dashboard = () => {
                 whileHover={{ y: -5, scale: 1.02 }}
                 className="relative group"
               >
-                <div className={`absolute inset-0 bg-gradient-to-r ${stat.bgColor} rounded-2xl blur-xl opacity-60 group-hover:opacity-80 transition-opacity`} />
+                <div className={`absolute inset-0 bg-gradient-to-r ${stat.bgColor} rounded-xl sm:rounded-2xl blur-xl opacity-60 group-hover:opacity-80 transition-opacity`} />
                 <Card className="relative bg-black/40 backdrop-blur-xl border-white/10 hover:border-white/20 transition-all duration-300">
-                  <CardContent className="p-6">
+                  <CardContent className="p-4 sm:p-6">
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="text-gray-400 text-sm font-medium">{stat.title}</p>
-                        <p className="text-2xl font-bold text-white mt-1">{stat.value}</p>
-                        <p className={`text-sm mt-1 ${
+                        <p className="text-gray-400 text-xs sm:text-sm font-medium">{stat.title}</p>
+                        <p className="text-xl sm:text-2xl font-bold text-white mt-1">{stat.value}</p>
+                        <p className={`text-xs sm:text-sm mt-1 ${
                           stat.change.startsWith('+') ? 'text-green-400' : 'text-red-400'
                         }`}>
                           {stat.change} from last month
                         </p>
                       </div>
-                      <div className={`p-3 rounded-xl bg-gradient-to-r ${stat.color} shadow-lg`}>
-                        <stat.icon className="w-6 h-6 text-white" />
+                      <div className={`p-2 sm:p-3 rounded-lg sm:rounded-xl bg-gradient-to-r ${stat.color} shadow-lg`}>
+                        <stat.icon className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
                       </div>
                     </div>
                   </CardContent>
@@ -270,19 +297,19 @@ const Dashboard = () => {
             transition={{ delay: 0.6 }}
             className="relative"
           >
-            <div className="absolute inset-0 bg-gradient-to-r from-indigo-600/10 to-purple-600/10 rounded-3xl blur-xl opacity-60" />
+            <div className="absolute inset-0 bg-gradient-to-r from-indigo-600/10 to-purple-600/10 rounded-2xl sm:rounded-3xl blur-xl opacity-60" />
             <Card className="relative bg-black/20 backdrop-blur-xl border-white/10">
-              <CardHeader>
-                <CardTitle className="text-white flex items-center space-x-2">
+              <CardHeader className="p-4 sm:p-6">
+                <CardTitle className="text-white flex items-center space-x-2 text-lg sm:text-xl">
                   <Zap className="w-5 h-5 text-yellow-400" />
                   <span>Performance Overview</span>
                 </CardTitle>
-                <CardDescription className="text-gray-400">
+                <CardDescription className="text-gray-400 text-sm">
                   AI model insights and system performance metrics
                 </CardDescription>
               </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <CardContent className="p-4 sm:p-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
                   {performanceMetrics.map((metric, index) => (
                     <motion.div
                       key={metric.label}
@@ -314,23 +341,23 @@ const Dashboard = () => {
           </motion.div>
 
           {/* Recent Activity */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 lg:gap-8">
             <motion.div
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: 0.8 }}
             >
               <Card className="bg-black/20 backdrop-blur-xl border-white/10 h-full">
-                <CardHeader>
-                  <CardTitle className="text-white flex items-center space-x-2">
+                <CardHeader className="p-4 sm:p-6">
+                  <CardTitle className="text-white flex items-center space-x-2 text-lg sm:text-xl">
                     <Activity className="w-5 h-5 text-blue-400" />
                     <span>Recent Activity</span>
                   </CardTitle>
-                  <CardDescription className="text-gray-400">
+                  <CardDescription className="text-gray-400 text-sm">
                     Your latest part identification results
                   </CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-4">
+                <CardContent className="space-y-3 sm:space-y-4 p-4 sm:p-6">
                   {recentActivities.map((activity, index) => (
                     <motion.div
                       key={activity.id}
@@ -368,16 +395,16 @@ const Dashboard = () => {
               transition={{ delay: 0.8 }}
             >
               <Card className="bg-black/20 backdrop-blur-xl border-white/10 h-full">
-                <CardHeader>
-                  <CardTitle className="text-white flex items-center space-x-2">
+                <CardHeader className="p-4 sm:p-6">
+                  <CardTitle className="text-white flex items-center space-x-2 text-lg sm:text-xl">
                     <TrendingUp className="w-5 h-5 text-green-400" />
                     <span>Quick Actions</span>
                   </CardTitle>
-                  <CardDescription className="text-gray-400">
+                  <CardDescription className="text-gray-400 text-sm">
                     Frequently used features and tools
                   </CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-3">
+                <CardContent className="space-y-2 sm:space-y-3 p-4 sm:p-6">
                   {[
                     { label: 'Upload New Part', icon: Upload, href: '/dashboard/upload', color: 'from-purple-600 to-blue-600' },
                     { label: 'View History', icon: FileText, href: '/dashboard/history', color: 'from-blue-600 to-cyan-600' },
