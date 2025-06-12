@@ -587,7 +587,7 @@ const Index = () => {
           
           <div className="border-t border-white/10 pt-8 flex flex-col md:flex-row justify-between items-center">
             <div className="text-gray-400 mb-4 md:mb-0">
-              <p>&copy; 2024 PartFinder AI. All rights reserved.</p>
+              <p>&copy; 2025 PartFinder AI. All rights reserved.</p>
             </div>
             <div className="flex space-x-6 text-gray-400">
               <a href="#" className="hover:text-white transition-colors">Privacy</a>
