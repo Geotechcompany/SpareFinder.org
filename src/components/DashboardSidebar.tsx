@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Home, 
@@ -20,6 +20,8 @@ import {
   UserCircle
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { useAuth } from '@/contexts/AuthContext';
+import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 
 interface SidebarProps {
   isCollapsed?: boolean;
@@ -29,6 +31,8 @@ interface SidebarProps {
 const DashboardSidebar: React.FC<SidebarProps> = ({ isCollapsed = false, onToggle }) => {
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const location = useLocation();
+  const navigate = useNavigate();
+  const { user, signOut } = useAuth();
 
   // Close mobile menu on route change
   useEffect(() => {
@@ -52,6 +56,15 @@ const DashboardSidebar: React.FC<SidebarProps> = ({ isCollapsed = false, onToggl
     if (onToggle) onToggle();
   };
 
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+      navigate('/login');
+    } catch (error) {
+      console.error('Error signing out:', error);
+    }
+  };
+
   const navItems = [
     { href: '/dashboard', icon: Home, label: 'Dashboard', description: 'Overview & analytics' },
     { href: '/dashboard/upload', icon: Upload, label: 'Upload', description: 'Identify parts' },
@@ -68,6 +81,47 @@ const DashboardSidebar: React.FC<SidebarProps> = ({ isCollapsed = false, onToggl
     }
     return location.pathname.startsWith(href);
   };
+
+  const getUserInitials = () => {
+    if (!user) return 'U';
+    const nameParts = [user.user_metadata?.full_name, user.email].filter(Boolean)[0]?.split(' ') || [];
+    if (nameParts.length === 0) return 'U';
+    if (nameParts.length === 1) return nameParts[0][0].toUpperCase();
+    return (nameParts[0][0] + nameParts[nameParts.length - 1][0]).toUpperCase();
+  };
+
+  const renderUserSection = (isMobile = false) => (
+    <div className={`p-4 border-t border-white/10 ${isMobile ? '' : ''}`}>
+      <div className="flex items-center space-x-3 p-3 rounded-xl bg-white/5 border border-white/10">
+        <Avatar className="w-10 h-10">
+          <AvatarImage src={user?.user_metadata?.avatar_url} />
+          <AvatarFallback className="bg-gradient-to-r from-green-600 to-emerald-600 text-white">
+            {getUserInitials()}
+          </AvatarFallback>
+        </Avatar>
+        {!isCollapsed && (
+          <div className="flex-1">
+            <p className="text-white font-medium">
+              {user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'User'}
+            </p>
+            <p className="text-gray-400 text-sm">
+              {user?.user_metadata?.subscription_tier || 'Free Plan'}
+            </p>
+          </div>
+        )}
+      </div>
+      {!isCollapsed && (
+        <Button 
+          variant="ghost" 
+          className="w-full mt-3 text-red-400 hover:text-red-300 hover:bg-red-600/10 justify-start"
+          onClick={handleSignOut}
+        >
+          <LogOut className="w-4 h-4 mr-2" />
+          Sign Out
+        </Button>
+      )}
+    </div>
+  );
 
   return (
     <>
@@ -147,24 +201,7 @@ const DashboardSidebar: React.FC<SidebarProps> = ({ isCollapsed = false, onToggl
         </div>
 
         {/* Mobile User Section */}
-        <div className="p-4 border-t border-white/10">
-          <div className="flex items-center space-x-3 p-3 rounded-xl bg-white/5 border border-white/10">
-            <div className="w-10 h-10 bg-gradient-to-r from-green-600 to-emerald-600 rounded-xl flex items-center justify-center">
-              <UserCircle className="w-6 h-6 text-white" />
-            </div>
-            <div className="flex-1">
-              <p className="text-white font-medium">John Doe</p>
-              <p className="text-gray-400 text-sm">Pro Plan</p>
-            </div>
-          </div>
-          <Button 
-            variant="ghost" 
-            className="w-full mt-3 text-red-400 hover:text-red-300 hover:bg-red-600/10 justify-start"
-          >
-            <LogOut className="w-4 h-4 mr-2" />
-            Sign Out
-          </Button>
-        </div>
+        {renderUserSection(true)}
       </motion.div>
 
       {/* Desktop Sidebar */}
@@ -299,56 +336,7 @@ const DashboardSidebar: React.FC<SidebarProps> = ({ isCollapsed = false, onToggl
         </div>
 
         {/* Desktop User Section */}
-        <div className="p-4 border-t border-white/10">
-          <AnimatePresence mode="wait">
-            {!isCollapsed ? (
-              <motion.div
-                key="user-expanded"
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -20 }}
-                transition={{ duration: 0.2 }}
-              >
-                <div className="flex items-center space-x-3 p-3 rounded-xl bg-white/5 border border-white/10 mb-3">
-                  <div className="w-10 h-10 bg-gradient-to-r from-green-600 to-emerald-600 rounded-xl flex items-center justify-center">
-                    <UserCircle className="w-6 h-6 text-white" />
-                  </div>
-                  <div className="flex-1">
-                    <p className="text-white font-medium">John Doe</p>
-                    <p className="text-gray-400 text-sm">Pro Plan</p>
-                  </div>
-                </div>
-                <Button 
-                  variant="ghost" 
-                  className="w-full text-red-400 hover:text-red-300 hover:bg-red-600/10 justify-start"
-                >
-                  <LogOut className="w-4 h-4 mr-2" />
-                  Sign Out
-                </Button>
-              </motion.div>
-            ) : (
-              <motion.div
-                key="user-collapsed"
-                initial={{ opacity: 0, scale: 0.8 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.8 }}
-                transition={{ duration: 0.2 }}
-                className="flex flex-col items-center space-y-3"
-              >
-                <div className="w-10 h-10 bg-gradient-to-r from-green-600 to-emerald-600 rounded-xl flex items-center justify-center">
-                  <UserCircle className="w-6 h-6 text-white" />
-                </div>
-                <Button 
-                  variant="ghost" 
-                  size="sm"
-                  className="w-10 h-10 p-0 text-red-400 hover:text-red-300 hover:bg-red-600/10"
-                >
-                  <LogOut className="w-4 h-4" />
-                </Button>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
+        {renderUserSection()}
       </motion.div>
     </>
   );

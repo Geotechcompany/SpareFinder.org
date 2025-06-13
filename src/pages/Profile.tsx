@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -6,6 +6,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
+import { useToast } from '@/components/ui/use-toast';
+import supabase from '../lib/supabase/client';
+import { Loader2 } from 'lucide-react';
 import { 
   User, 
   Mail, 
@@ -23,14 +26,76 @@ import {
   Activity,
   Edit,
   Camera,
-  Menu
+  Menu,
+  AlertCircle
 } from 'lucide-react';
 import DashboardSidebar from '@/components/DashboardSidebar';
 import MobileSidebar from '@/components/MobileSidebar';
 
+interface UserProfile {
+  id: string;
+  email: string;
+  username: string | null;
+  full_name: string;
+  avatar_url: string | null;
+  created_at?: string;
+}
+
 const Profile = () => {
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [profile, setProfile] = useState<UserProfile | null>(null);
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+  const { toast } = useToast();
+
+  useEffect(() => {
+    fetchUserProfile();
+  }, []);
+
+  const fetchUserProfile = async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+
+      // Get the current user's session
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError) throw sessionError;
+      if (!session?.user) throw new Error('No user session found');
+
+      // Fetch user profile from profiles table
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', session.user.id)
+        .single();
+
+      if (profileError) throw profileError;
+
+      if (profile) {
+        setProfile({
+          id: profile.id,
+          email: profile.email || session.user.email || '',
+          username: profile.username,
+          full_name: profile.full_name || '',
+          avatar_url: profile.avatar_url,
+          created_at: profile.created_at
+        });
+      }
+    } catch (err) {
+      console.error('Error fetching user profile:', err);
+      setError(err instanceof Error ? err.message : 'Failed to load user profile');
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to load user profile. Please try again later.",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleToggleSidebar = () => {
     setIsCollapsed(!isCollapsed);
@@ -40,11 +105,42 @@ const Profile = () => {
     setIsMobileMenuOpen(!isMobileMenuOpen);
   };
 
+  const handleEditProfile = () => {
+    window.location.href = '/settings';
+  };
+
+  // Show loading state
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-900 via-purple-900/20 to-blue-900/20">
+        <div className="text-center">
+          <Loader2 className="w-10 h-10 animate-spin text-purple-600 mx-auto mb-4" />
+          <p className="text-gray-400">Loading your profile...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show error state
+  if (error) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-900 via-purple-900/20 to-blue-900/20">
+        <div className="text-center">
+          <AlertCircle className="w-10 h-10 text-red-500 mx-auto mb-4" />
+          <p className="text-gray-400 mb-4">{error}</p>
+          <Button onClick={fetchUserProfile} variant="outline">
+            Try Again
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   const userStats = {
     totalUploads: 847,
     successRate: 96.8,
     avgConfidence: 94.2,
-    memberSince: 'January 2023',
+    memberSince: profile?.created_at ? new Date(profile.created_at).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) : 'N/A',
     streak: 15,
     totalSaved: '$2,340',
     achievements: 12
@@ -137,13 +233,17 @@ const Profile = () => {
               <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 sm:gap-6">
                 <div className="flex flex-col sm:flex-row sm:items-center space-y-4 sm:space-y-0 sm:space-x-6">
                   <div className="relative">
-                    <div className="w-24 h-24 bg-gradient-to-r from-purple-600 to-blue-600 rounded-2xl flex items-center justify-center">
-                      <User className="w-12 h-12 text-white" />
-                    </div>
+                    <Avatar className="w-24 h-24">
+                      <AvatarImage src={profile?.avatar_url || ''} />
+                      <AvatarFallback className="bg-gradient-to-r from-purple-600 to-blue-600">
+                        <User className="w-12 h-12 text-white" />
+                      </AvatarFallback>
+                    </Avatar>
                     <motion.button
                       whileHover={{ scale: 1.1 }}
                       whileTap={{ scale: 0.9 }}
                       className="absolute -bottom-1 -right-1 w-8 h-8 bg-gradient-to-r from-blue-600 to-purple-600 rounded-full flex items-center justify-center border-2 border-gray-900"
+                      onClick={handleEditProfile}
                     >
                       <Camera className="w-4 h-4 text-white" />
                     </motion.button>
@@ -165,9 +265,9 @@ const Profile = () => {
                       <span className="text-purple-300 text-xs font-semibold">Pro Member</span>
                     </motion.div>
                     <h1 className="text-3xl lg:text-4xl font-bold bg-gradient-to-r from-white via-purple-200 to-blue-200 bg-clip-text text-transparent">
-                      John Doe
+                      {profile?.full_name || 'Anonymous User'}
                     </h1>
-                    <p className="text-gray-400 text-lg mt-1">Senior Parts Analyst at Auto Parts Inc.</p>
+                    <p className="text-gray-400 text-lg mt-1">@{profile?.username || 'username'}</p>
                     <div className="flex items-center space-x-4 mt-3">
                       <div className="flex items-center space-x-1 text-gray-400">
                         <Calendar className="w-4 h-4" />
@@ -189,7 +289,10 @@ const Profile = () => {
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
                   >
-                    <Button className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 shadow-lg shadow-purple-500/25 h-12 px-6">
+                    <Button 
+                      onClick={handleEditProfile}
+                      className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 shadow-lg shadow-purple-500/25 h-12 px-6"
+                    >
                       <Edit className="w-4 h-4 mr-2" />
                       Edit Profile
                     </Button>
@@ -396,16 +499,16 @@ const Profile = () => {
                       </div>
                       <div>
                         <p className="text-gray-400 text-sm">Email</p>
-                        <p className="text-white">john.doe@example.com</p>
+                        <p className="text-white">{profile?.email}</p>
                       </div>
                     </div>
                     <div className="flex items-center space-x-3">
-                      <div className="w-10 h-10 bg-gradient-to-r from-green-600/20 to-emerald-600/20 rounded-xl flex items-center justify-center border border-white/10">
-                        <Phone className="w-5 h-5 text-green-400" />
+                      <div className="w-10 h-10 bg-gradient-to-r from-purple-600/20 to-pink-600/20 rounded-xl flex items-center justify-center border border-white/10">
+                        <User className="w-5 h-5 text-purple-400" />
                       </div>
                       <div>
-                        <p className="text-gray-400 text-sm">Phone</p>
-                        <p className="text-white">+1 (555) 123-4567</p>
+                        <p className="text-gray-400 text-sm">Username</p>
+                        <p className="text-white">@{profile?.username || 'username'}</p>
                       </div>
                     </div>
                   </div>

@@ -58,7 +58,7 @@ import {
   RefreshCw,
 } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
-import { db, supabase } from '@/lib/supabase'
+import supabase, { db } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 import { format } from 'date-fns'
 

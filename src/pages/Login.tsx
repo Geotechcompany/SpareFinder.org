@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -16,12 +16,19 @@ const Login = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
 
-  const { signIn, signInWithOAuth, loading } = useAuth();
+  const { signIn, signInWithOAuth, user, isLoading: authLoading } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
   // Get the redirect path from location state or default to dashboard
   const from = location.state?.from?.pathname || '/dashboard';
+
+  // Redirect if user is already logged in
+  useEffect(() => {
+    if (user && !authLoading) {
+      navigate(from, { replace: true });
+    }
+  }, [user, authLoading, navigate, from]);
 
   const validateForm = () => {
     const newErrors: { [key: string]: string } = {};
@@ -54,8 +61,7 @@ const Login = () => {
     
     try {
       await signIn(email, password);
-      toast.success('Welcome back!');
-      navigate(from, { replace: true });
+      // The useEffect hook will handle redirection once the user state is updated
     } catch (error: any) {
       console.error('Login error:', error);
       toast.error(error.message || 'Failed to sign in');
@@ -69,7 +75,7 @@ const Login = () => {
     try {
       setIsLoading(true);
       await signInWithOAuth('google');
-      toast.success('Signing in with Google...');
+      // OAuth redirection is handled by Supabase
     } catch (error: any) {
       console.error('Google login error:', error);
       toast.error(error.message || 'Failed to sign in with Google');
@@ -82,7 +88,7 @@ const Login = () => {
     try {
       setIsLoading(true);
       await signInWithOAuth('github');
-      toast.success('Signing in with GitHub...');
+      // OAuth redirection is handled by Supabase
     } catch (error: any) {
       console.error('GitHub login error:', error);
       toast.error(error.message || 'Failed to sign in with GitHub');

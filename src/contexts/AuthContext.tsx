@@ -1,12 +1,12 @@
 import React, { createContext, useContext, useEffect, useState } from 'react'
 import { User, Session, AuthError } from '@supabase/supabase-js'
-import { auth, db, Profile, AuthUser } from '@/lib/supabase'
+import { auth, db, Profile, AuthUser } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 
 interface AuthContextType {
   user: AuthUser | null
   session: Session | null
-  loading: boolean
+  isLoading: boolean
   error: AuthError | null
   signUp: (email: string, password: string, metadata?: { [key: string]: any }) => Promise<void>
   signIn: (email: string, password: string) => Promise<void>
@@ -18,70 +18,70 @@ interface AuthContextType {
   refreshProfile: () => Promise<void>
 }
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined)
+// Create and export the context
+export const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
-export const useAuth = () => {
+// Create and export the hook
+export function useAuth() {
   const context = useContext(AuthContext)
-  if (context === undefined) {
+  if (!context) {
     throw new Error('useAuth must be used within an AuthProvider')
   }
   return context
 }
 
-interface AuthProviderProps {
-  children: React.ReactNode
-}
-
-export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
+// Create and export the provider component
+export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null)
   const [session, setSession] = useState<Session | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<AuthError | null>(null)
 
-  // Initialize auth state
   useEffect(() => {
-    const initializeAuth = async () => {
+    // Check active session
+    const checkSession = async () => {
       try {
-        const { session, error: sessionError } = await auth.getSession()
-        
-        if (sessionError) {
-          console.error('Session error:', sessionError)
-          setError(sessionError)
-          setLoading(false)
+        const { session, error } = await auth.getSession()
+        if (error) {
+          console.warn('Session check error:', error)
+          setUser(null)
+          setSession(null)
           return
         }
-
-        if (session?.user) {
+        
+        if (session) {
           await handleUserSession(session)
+        } else {
+          setUser(null)
+          setSession(null)
         }
-      } catch (err) {
-        console.error('Auth initialization error:', err)
-        setError(err as AuthError)
+      } catch (error) {
+        console.error('Error checking session:', error)
+        setUser(null)
+        setSession(null)
       } finally {
-        setLoading(false)
+        setIsLoading(false)
       }
     }
 
-    initializeAuth()
+    checkSession()
 
-    // Listen for auth changes
-    const {
-      data: { subscription },
-    } = auth.onAuthStateChange(async (event, session) => {
-      console.log('Auth state changed:', event, session?.user?.email)
-      
-      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
-        if (session?.user) {
+    // Subscribe to auth changes
+    const { data: { subscription } } = auth.onAuthStateChange(async (event, session) => {
+      setIsLoading(true)
+      try {
+        if (session) {
           await handleUserSession(session)
+        } else {
+          setUser(null)
+          setSession(null)
         }
-      } else if (event === 'SIGNED_OUT') {
+      } catch (error) {
+        console.error('Error handling auth change:', error)
         setUser(null)
         setSession(null)
-        setError(null)
-      }
-      
-      if (event !== 'INITIAL_SESSION') {
-        setLoading(false)
+      } finally {
+        setIsLoading(false)
       }
     })
 
@@ -91,69 +91,77 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   }, [])
 
   const handleUserSession = async (session: Session) => {
-    setSession(session)
-    
     try {
-      // Get or create user profile
-      const { data: profile, error: profileError } = await db.profiles.get(session.user.id)
+      // Always set basic user info first to ensure authentication works
+      const basicUser: AuthUser = {
+        id: session.user.id,
+        email: session.user.email!,
+        role: 'user',
+        user_metadata: session.user.user_metadata,
+      }
       
-      if (profileError && profileError.code !== 'PGSQL_ERROR') {
-        console.error('Profile fetch error:', profileError)
-      }
+      setUser(basicUser)
+      setSession(session)
 
-      // If no profile exists, create one
-      if (!profile) {
-        const newProfile: Omit<Profile, 'created_at' | 'updated_at'> = {
-          id: session.user.id,
-          email: session.user.email || '',
-          full_name: session.user.user_metadata?.full_name || '',
-          username: session.user.user_metadata?.username || '',
-          avatar_url: session.user.user_metadata?.avatar_url || '',
-          role: 'user', // Default role
-        }
-
-        const { data: createdProfile, error: createError } = await db.profiles.create(newProfile)
+      // Try to get/create profile, but don't block authentication if it fails
+      try {
+        const { data: profile, error: profileError } = await db.profiles.get(session.user.id)
         
-        if (createError) {
-          console.error('Profile creation error:', createError)
-          // Continue without profile if creation fails
+        if (profileError && profileError.code !== 'PGRST116') { // PGRST116 is "not found"
+          console.warn('Profile fetch error (non-critical):', profileError)
         }
 
-        const fallbackProfile: Profile = {
-          ...newProfile,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        }
+        // If no profile exists, try to create one
+        if (!profile) {
+          const newProfile: Omit<Profile, 'created_at' | 'updated_at'> = {
+            id: session.user.id,
+            email: session.user.email || '',
+            full_name: session.user.user_metadata?.full_name || session.user.email?.split('@')[0] || '',
+            username: session.user.user_metadata?.username || session.user.email?.split('@')[0] || '',
+            avatar_url: session.user.user_metadata?.avatar_url || '',
+            role: 'user', // Default role
+          }
 
-        setUser({
-          id: session.user.id,
-          email: session.user.email || '',
-          role: 'user',
-          profile: createdProfile || fallbackProfile,
-        })
-      } else {
-        setUser({
-          id: session.user.id,
-          email: session.user.email || '',
-          role: profile.role,
-          profile,
-        })
+          const { data: createdProfile, error: createError } = await db.profiles.create(newProfile)
+          
+          if (createError) {
+            console.warn('Profile creation error (non-critical):', createError)
+          } else if (createdProfile) {
+            setUser(prev => prev ? {
+              ...prev,
+              role: createdProfile.role,
+              profile: createdProfile,
+            } : basicUser)
+          }
+        } else {
+          setUser(prev => prev ? {
+            ...prev,
+            role: profile.role,
+            profile,
+          } : basicUser)
+        }
+      } catch (profileErr) {
+        console.warn('Profile operations failed (non-critical):', profileErr)
+        // Continue with basic user info - authentication still works
       }
+
     } catch (err) {
-      console.error('Profile handling error:', err)
-      // Set basic user info even if profile operations fail
+      console.error('Critical session handling error:', err)
+      // Set basic user info even if everything else fails
       setUser({
         id: session.user.id,
-        email: session.user.email || '',
+        email: session.user.email!,
         role: 'user',
+        user_metadata: session.user.user_metadata,
       })
+      setSession(session)
     }
   }
 
   const signUp = async (email: string, password: string, metadata?: { [key: string]: any }) => {
     try {
       setError(null)
-      setLoading(true)
+      setIsLoading(true)
       
       const { data, error } = await auth.signUp(email, password, metadata)
       
@@ -172,14 +180,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       console.error('Sign up error:', err)
       throw err
     } finally {
-      setLoading(false)
+      setIsLoading(false)
     }
   }
 
   const signIn = async (email: string, password: string) => {
     try {
       setError(null)
-      setLoading(true)
+      setIsLoading(true)
       
       const { data, error } = await auth.signIn(email, password)
       
@@ -189,19 +197,24 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         throw error
       }
 
-      toast.success('Welcome back!')
+      if (data?.session) {
+        await handleUserSession(data.session)
+        toast.success('Welcome back!')
+      } else {
+        throw new Error('No session returned from sign in')
+      }
     } catch (err) {
       console.error('Sign in error:', err)
       throw err
     } finally {
-      setLoading(false)
+      setIsLoading(false)
     }
   }
 
   const signInWithOAuth = async (provider: 'google' | 'github' | 'discord') => {
     try {
       setError(null)
-      setLoading(true)
+      setIsLoading(true)
       
       const { data, error } = await auth.signInWithOAuth(provider)
       
@@ -214,29 +227,19 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       console.error('OAuth sign in error:', err)
       throw err
     } finally {
-      setLoading(false)
+      setIsLoading(false)
     }
   }
 
   const signOut = async () => {
     try {
-      setError(null)
-      setLoading(true)
-      
       const { error } = await auth.signOut()
-      
-      if (error) {
-        setError(error)
-        toast.error(error.message || 'Failed to sign out')
-        throw error
-      }
-
-      toast.success('Signed out successfully')
-    } catch (err) {
-      console.error('Sign out error:', err)
-      throw err
-    } finally {
-      setLoading(false)
+      if (error) throw error
+      setUser(null)
+      setSession(null)
+    } catch (error) {
+      console.error('Error signing out:', error)
+      throw error
     }
   }
 
@@ -333,10 +336,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   }
 
-  const value: AuthContextType = {
+  const value = {
     user,
     session,
-    loading,
+    isLoading,
     error,
     signUp,
     signIn,
@@ -345,7 +348,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     resetPassword,
     updatePassword,
     updateProfile,
-    refreshProfile,
+    refreshProfile
   }
 
   return (
@@ -354,5 +357,3 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     </AuthContext.Provider>
   )
 }
-
-export default AuthProvider 

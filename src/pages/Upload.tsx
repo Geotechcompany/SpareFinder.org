@@ -32,7 +32,7 @@ import MobileSidebar from '@/components/MobileSidebar';
 import { useAIAnalysis, type AnalysisProgress, type AnalysisResponse, type PartPrediction } from '@/services/aiService';
 import { toast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
-import { db } from '@/lib/supabase';
+import { db } from '@/lib/supabase/client';
 
 const Upload = () => {
   const [dragActive, setDragActive] = useState(false);

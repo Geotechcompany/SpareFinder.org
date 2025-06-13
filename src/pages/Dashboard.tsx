@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
 import { 
   Upload, 
   FileText, 
@@ -21,78 +22,196 @@ import {
 } from 'lucide-react';
 import DashboardSidebar from '@/components/DashboardSidebar';
 import MobileSidebar from '@/components/MobileSidebar';
+import { useAuth } from '@/contexts/AuthContext';
+import supabase, { db } from '@/lib/supabase/client';
+import { format, subDays } from 'date-fns';
+import { useNavigate } from 'react-router-dom';
+import { Loader2 } from 'lucide-react';
 
 const Dashboard = () => {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-
-  // Mock data - will be replaced with real data from Supabase
-  const stats = {
-    totalUploads: 24,
-    thisMonth: 8,
-    successRate: 96,
-    avgProcessTime: '2.3s'
-  };
-
-  const recentUploads = [
-    { id: 1, name: 'Brake Pad Model XY-123', date: '2 hours ago', status: 'completed', confidence: 99.2 },
-    { id: 2, name: 'Engine Filter AF-456', date: '1 day ago', status: 'completed', confidence: 97.8 },
-    { id: 3, name: 'Transmission Gear TG-789', date: '2 days ago', status: 'completed', confidence: 98.5 },
-  ];
-
-  const recentActivities = [
-    {
-      id: 1,
-      type: 'upload',
-      title: 'Brake Pad Set Identified',
-      description: 'Successfully identified as Bosch QuietCast Premium',
-      time: '2 minutes ago',
-      confidence: 99.2,
-      status: 'success'
-    },
-    {
-      id: 2,
-      type: 'search',
-      title: 'Air Filter Analysis',
-      description: 'Matched with OEM specification AF-8901-STD',
-      time: '15 minutes ago',
-      confidence: 97.8,
-      status: 'success'
-    },
-    {
-      id: 3,
-      type: 'upload',
-      title: 'Oil Filter Recognition',
-      description: 'Identified as Premium Guard PG-4967',
-      time: '1 hour ago',
-      confidence: 98.5,
-      status: 'success'
-    }
-  ];
-
-  const performanceMetrics = [
+  const { user, isLoading: authLoading } = useAuth();
+  const navigate = useNavigate();
+  const [isDataLoading, setIsDataLoading] = useState(true);
+  
+  // State for dashboard data
+  const [stats, setStats] = useState({
+    totalUploads: 0,
+    successfulUploads: 0,
+    avgConfidence: 0,
+    avgProcessTime: 0
+  });
+  
+  const [recentUploads, setRecentUploads] = useState([]);
+  const [recentActivities, setRecentActivities] = useState([]);
+  const [performanceMetrics, setPerformanceMetrics] = useState([
     {
       label: 'AI Model Accuracy',
-      value: '99.2%',
-      change: '+2.1%',
+      value: '0%',
+      change: '0%',
       icon: Cpu,
       color: 'from-green-600 to-emerald-600'
     },
     {
       label: 'Database Coverage',
-      value: '10.2M',
-      change: '+15K',
+      value: '0',
+      change: '0',
       icon: Database,
       color: 'from-blue-600 to-cyan-600'
     },
     {
       label: 'Response Time',
-      value: '87ms',
-      change: '-12ms',
+      value: '0ms',
+      change: '0ms',
       icon: Activity,
       color: 'from-purple-600 to-violet-600'
     }
-  ];
+  ]);
+
+  useEffect(() => {
+    // Check auth state - redirect to login if no user
+    if (!user) {
+      navigate('/login');
+      return;
+    }
+
+    const fetchDashboardData = async () => {
+      if (!user?.id) {
+        return;
+      }
+
+      try {
+        setIsDataLoading(true);
+        
+        // Fetch total uploads and stats with graceful error handling
+        try {
+          const { data: uploadsData, error: uploadsError } = await supabase
+            .from('part_searches')
+            .select('*')
+            .eq('user_id', user.id);
+
+          if (uploadsError && uploadsError.code !== 'PGRST116') {
+            console.warn('Part searches table not found or error:', uploadsError);
+          } else if (uploadsData) {
+            const successfulUploads = uploadsData.filter(upload => upload.status === 'completed') || [];
+            const totalConfidence = successfulUploads.reduce((sum, upload) => sum + (upload.confidence || 0), 0);
+            const avgConfidence = successfulUploads.length ? (totalConfidence / successfulUploads.length).toFixed(1) : 0;
+            const totalProcessTime = successfulUploads.reduce((sum, upload) => sum + (upload.processing_time || 0), 0);
+            const avgProcessTime = successfulUploads.length ? (totalProcessTime / successfulUploads.length).toFixed(2) : 0;
+
+            setStats({
+              totalUploads: uploadsData.length || 0,
+              successfulUploads: successfulUploads.length,
+              avgConfidence: Number(avgConfidence),
+              avgProcessTime: Number(avgProcessTime)
+            });
+
+            // Fetch recent uploads
+            const { data: recentData, error: recentError } = await supabase
+              .from('part_searches')
+              .select(`
+                id,
+                part_name,
+                created_at,
+                status,
+                confidence
+              `)
+              .eq('user_id', user.id)
+              .order('created_at', { ascending: false })
+              .limit(5);
+
+            if (!recentError && recentData) {
+              setRecentUploads(recentData.map(upload => ({
+                id: upload.id,
+                name: upload.part_name,
+                date: format(new Date(upload.created_at), 'PPp'),
+                status: upload.status,
+                confidence: upload.confidence
+              })));
+            }
+          }
+        } catch (uploadsErr) {
+          console.warn('Error fetching uploads data (non-critical):', uploadsErr);
+        }
+
+        // Fetch recent activities with graceful error handling
+        try {
+          const { data: activitiesData, error: activitiesError } = await supabase
+            .from('user_activities')
+            .select(`
+              id,
+              action,
+              details,
+              created_at,
+              resource_type,
+              resource_id
+            `)
+            .eq('user_id', user.id)
+            .order('created_at', { ascending: false })
+            .limit(5);
+
+          if (!activitiesError && activitiesData) {
+            setRecentActivities(activitiesData.map(activity => ({
+              id: activity.id,
+              type: activity.resource_type,
+              title: activity.action,
+              description: activity.details?.description || '',
+              time: format(new Date(activity.created_at), 'PPp'),
+              confidence: activity.details?.confidence || null,
+              status: activity.details?.status || 'success'
+            })));
+          }
+        } catch (activitiesErr) {
+          console.warn('Error fetching activities data (non-critical):', activitiesErr);
+        }
+
+        // Fetch performance metrics with graceful error handling
+        try {
+          const { data: metricsData, error: metricsError } = await db.analytics.getSystemStats(
+            subDays(new Date(), 30).toISOString(),
+            new Date().toISOString()
+          );
+
+          if (!metricsError && metricsData) {
+            setPerformanceMetrics([
+              {
+                label: 'AI Model Accuracy',
+                value: `${metricsData.model_accuracy.toFixed(1)}%`,
+                change: `${(metricsData.accuracy_change > 0 ? '+' : '')}${metricsData.accuracy_change.toFixed(1)}%`,
+                icon: Cpu,
+                color: 'from-green-600 to-emerald-600'
+              },
+              {
+                label: 'Database Coverage',
+                value: `${(metricsData.database_coverage / 1000000).toFixed(1)}M`,
+                change: `+${(metricsData.coverage_increase / 1000).toFixed(1)}K`,
+                icon: Database,
+                color: 'from-blue-600 to-cyan-600'
+              },
+              {
+                label: 'Response Time',
+                value: `${metricsData.avg_response_time}ms`,
+                change: `${(metricsData.response_time_change < 0 ? '' : '+')}${metricsData.response_time_change}ms`,
+                icon: Activity,
+                color: 'from-purple-600 to-violet-600'
+              }
+            ]);
+          }
+        } catch (metricsErr) {
+          console.warn('Error fetching metrics data (non-critical):', metricsErr);
+        }
+
+      } catch (error) {
+        console.error('Error fetching dashboard data:', error);
+        // Dashboard will still load with default/empty data
+      } finally {
+        setIsDataLoading(false);
+      }
+    };
+
+    fetchDashboardData();
+  }, [user?.id, navigate]);
 
   const handleToggleSidebar = () => {
     setIsCollapsed(!isCollapsed);
@@ -101,6 +220,190 @@ const Dashboard = () => {
   const handleToggleMobileMenu = () => {
     setIsMobileMenuOpen(!isMobileMenuOpen);
   };
+
+  if (isDataLoading) {
+    return (
+      <div className="min-h-screen flex w-full bg-gradient-to-br from-gray-900 via-purple-900/20 to-blue-900/20 relative overflow-hidden">
+        {/* Animated Background Elements */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          <motion.div
+            className="absolute -top-40 -left-40 w-80 h-80 bg-purple-600/30 rounded-full blur-3xl opacity-70"
+            animate={{
+              scale: [1, 1.2, 1],
+              rotate: [0, 180, 360],
+            }}
+            transition={{
+              duration: 20,
+              repeat: Infinity,
+              ease: "linear"
+            }}
+          />
+          <motion.div
+            className="absolute top-1/2 -right-40 w-96 h-96 bg-blue-600/20 rounded-full blur-3xl opacity-60"
+            animate={{
+              scale: [1.2, 1, 1.2],
+              rotate: [360, 180, 0],
+            }}
+            transition={{
+              duration: 25,
+              repeat: Infinity,
+              ease: "linear"
+            }}
+          />
+        </div>
+
+        {/* Desktop Sidebar Skeleton */}
+        <div className="hidden md:flex h-screen bg-black/95 backdrop-blur-xl border-r border-white/10 flex-col fixed left-0 top-0 z-30 w-[320px]">
+          <div className="flex items-center justify-between p-6 border-b border-white/10">
+            <div className="flex items-center space-x-3">
+              <Skeleton className="w-10 h-10 rounded-xl" />
+              <div>
+                <Skeleton className="h-5 w-32 mb-1" />
+                <Skeleton className="h-3 w-24" />
+              </div>
+            </div>
+          </div>
+          <div className="flex-1 p-4 space-y-2">
+            {Array.from({ length: 7 }).map((_, i) => (
+              <div key={i} className="flex items-center space-x-3 p-3 rounded-xl">
+                <Skeleton className="w-5 h-5" />
+                <div className="flex-1">
+                  <Skeleton className="h-4 w-20 mb-1" />
+                  <Skeleton className="h-3 w-16" />
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="p-4 border-t border-white/10">
+            <div className="flex items-center space-x-3 p-3 rounded-xl">
+              <Skeleton className="w-10 h-10 rounded-full" />
+              <div className="flex-1">
+                <Skeleton className="h-4 w-24 mb-1" />
+                <Skeleton className="h-3 w-16" />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Mobile Menu Button */}
+        <div className="fixed top-4 right-4 z-50 md:hidden">
+          <Skeleton className="w-10 h-10 rounded-lg" />
+        </div>
+
+        {/* Main Content */}
+        <div className="flex-1 p-2 sm:p-4 lg:p-8 relative z-10 overflow-x-hidden md:overflow-x-visible md:ml-[320px]">
+          <div className="space-y-4 sm:space-y-6 lg:space-y-8">
+            {/* Header Skeleton */}
+            <div className="relative">
+              <div className="absolute inset-0 bg-gradient-to-r from-purple-600/10 to-blue-600/10 rounded-2xl sm:rounded-3xl blur-xl opacity-60" />
+              <Card className="relative bg-black/20 backdrop-blur-xl border-white/10">
+                <CardContent className="p-4 sm:p-6">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
+                    <div className="flex-1">
+                      <Skeleton className="h-8 sm:h-10 w-64 sm:w-80 mb-3" />
+                      <Skeleton className="h-4 sm:h-5 w-48 sm:w-64" />
+                    </div>
+                    <Skeleton className="h-12 w-full sm:w-32" />
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Stats Grid Skeleton */}
+            <div className="grid grid-cols-1 xs:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-6">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <Card key={i} className="bg-black/40 backdrop-blur-xl border-white/10">
+                  <CardContent className="p-4 sm:p-6">
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1">
+                        <Skeleton className="h-3 sm:h-4 w-20 mb-2" />
+                        <Skeleton className="h-6 sm:h-8 w-16 mb-2" />
+                        <Skeleton className="h-3 w-24" />
+                      </div>
+                      <Skeleton className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg" />
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+
+            {/* Performance Overview Skeleton */}
+            <Card className="bg-black/20 backdrop-blur-xl border-white/10">
+              <CardHeader className="p-4 sm:p-6">
+                <div className="flex items-center space-x-2">
+                  <Skeleton className="w-5 h-5" />
+                  <Skeleton className="h-6 w-48" />
+                </div>
+                <Skeleton className="h-4 w-64 mt-2" />
+              </CardHeader>
+              <CardContent className="p-4 sm:p-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+                  {Array.from({ length: 3 }).map((_, i) => (
+                    <div key={i} className="p-4 rounded-2xl border border-white/10">
+                      <div className="flex items-center justify-between mb-3">
+                        <Skeleton className="w-10 h-10 rounded-xl" />
+                        <Skeleton className="w-12 h-6 rounded-full" />
+                      </div>
+                      <Skeleton className="h-3 w-24 mb-2" />
+                      <Skeleton className="h-8 w-16" />
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Recent Activity Grid Skeleton */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 lg:gap-8">
+              {/* Recent Activity Card */}
+              <Card className="bg-black/20 backdrop-blur-xl border-white/10">
+                <CardHeader className="p-4 sm:p-6">
+                  <div className="flex items-center space-x-2">
+                    <Skeleton className="w-5 h-5" />
+                    <Skeleton className="h-6 w-32" />
+                  </div>
+                  <Skeleton className="h-4 w-48 mt-2" />
+                </CardHeader>
+                <CardContent className="space-y-3 sm:space-y-4 p-4 sm:p-6">
+                  {Array.from({ length: 4 }).map((_, i) => (
+                    <div key={i} className="flex items-start space-x-3 p-3 rounded-xl">
+                      <Skeleton className="w-8 h-8 rounded-lg" />
+                      <div className="flex-1">
+                        <div className="flex items-center justify-between mb-1">
+                          <Skeleton className="h-4 w-32" />
+                          <Skeleton className="w-12 h-5 rounded-full" />
+                        </div>
+                        <Skeleton className="h-3 w-48 mb-1" />
+                        <Skeleton className="h-3 w-20" />
+                      </div>
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+
+              {/* Quick Actions Card */}
+              <Card className="bg-black/20 backdrop-blur-xl border-white/10">
+                <CardHeader className="p-4 sm:p-6">
+                  <div className="flex items-center space-x-2">
+                    <Skeleton className="w-5 h-5" />
+                    <Skeleton className="h-6 w-32" />
+                  </div>
+                  <Skeleton className="h-4 w-48 mt-2" />
+                </CardHeader>
+                <CardContent className="space-y-2 sm:space-y-3 p-4 sm:p-6">
+                  {Array.from({ length: 4 }).map((_, i) => (
+                    <div key={i} className="flex items-center space-x-3 h-12 p-3 rounded-xl">
+                      <Skeleton className="w-8 h-8 rounded-lg" />
+                      <Skeleton className="h-4 w-32" />
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex w-full bg-gradient-to-br from-gray-900 via-purple-900/20 to-blue-900/20 relative overflow-hidden">
@@ -191,7 +494,7 @@ const Dashboard = () => {
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: 0.2 }}
                   >
-                    Welcome back, John
+                    Welcome back, {user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'User'}
                   </motion.h1>
                   <motion.p 
                     className="text-sm sm:text-base text-gray-400 mt-2"
@@ -228,7 +531,7 @@ const Dashboard = () => {
             {[
               { 
                 title: 'Total Uploads', 
-                value: '2,847', 
+                value: stats.totalUploads.toString(), 
                 change: '+12%', 
                 icon: Upload, 
                 color: 'from-purple-600 to-blue-600',
@@ -236,15 +539,15 @@ const Dashboard = () => {
               },
               { 
                 title: 'Successful IDs', 
-                value: '2,731', 
-                change: '+8%', 
+                value: stats.successfulUploads.toString(), 
+                change: `${((stats.successfulUploads / stats.totalUploads) * 100).toFixed(1)}%`, 
                 icon: CheckCircle, 
                 color: 'from-green-600 to-emerald-600',
                 bgColor: 'from-green-600/20 to-emerald-600/20'
               },
               { 
                 title: 'Avg Confidence', 
-                value: '96.8%', 
+                value: `${stats.avgConfidence}%`, 
                 change: '+2.1%', 
                 icon: TrendingUp, 
                 color: 'from-blue-600 to-cyan-600',
@@ -252,7 +555,7 @@ const Dashboard = () => {
               },
               { 
                 title: 'Processing Time', 
-                value: '0.3s', 
+                value: `${stats.avgProcessTime}s`, 
                 change: '-15%', 
                 icon: Clock, 
                 color: 'from-orange-600 to-red-600',

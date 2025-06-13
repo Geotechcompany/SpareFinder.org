@@ -8,7 +8,7 @@ import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/components/ui/use-toast';
 import { Loader2 } from 'lucide-react';
-import { createClient } from '@/lib/supabase/client';
+import supabase from '../lib/supabase/client';
 import { 
   Settings as SettingsIcon, 
   Save, 
@@ -35,14 +35,11 @@ import MobileSidebar from '@/components/MobileSidebar';
 
 interface UserProfile {
   id: string;
-  first_name: string;
-  last_name: string;
   email: string;
-  phone: string;
-  company: string;
-  position: string;
-  address: string;
-  preferences: {
+  username: string | null;
+  full_name: string;
+  avatar_url: string | null;
+  preferences?: {
     emailNotifications: boolean;
     smsNotifications: boolean;
     autoSave: boolean;
@@ -56,13 +53,10 @@ const Settings = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [formData, setFormData] = useState<Partial<UserProfile>>({
-    first_name: '',
-    last_name: '',
     email: '',
-    phone: '',
-    company: '',
-    position: '',
-    address: ''
+    username: '',
+    full_name: '',
+    avatar_url: ''
   });
 
   const [preferences, setPreferences] = useState({
@@ -80,7 +74,6 @@ const Settings = () => {
   const [isSaving, setIsSaving] = useState(false);
   
   const { toast } = useToast();
-  const supabase = createClient();
 
   useEffect(() => {
     fetchUserProfile();
@@ -108,13 +101,10 @@ const Settings = () => {
 
       if (profile) {
         setFormData({
-          first_name: profile.first_name || '',
-          last_name: profile.last_name || '',
           email: profile.email || session.user.email || '',
-          phone: profile.phone || '',
-          company: profile.company || '',
-          position: profile.position || '',
-          address: profile.address || ''
+          username: profile.username || '',
+          full_name: profile.full_name || '',
+          avatar_url: profile.avatar_url || ''
         });
 
         // If preferences exist in profile, use them, otherwise use defaults
@@ -157,12 +147,9 @@ const Settings = () => {
       const { error: updateError } = await supabase
         .from('profiles')
         .update({
-          first_name: formData.first_name,
-          last_name: formData.last_name,
-          phone: formData.phone,
-          company: formData.company,
-          position: formData.position,
-          address: formData.address,
+          username: formData.username,
+          full_name: formData.full_name,
+          avatar_url: formData.avatar_url,
           preferences,
           updated_at: new Date().toISOString()
         })
@@ -439,20 +426,20 @@ const Settings = () => {
                       <CardContent className="space-y-6">
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                           <div className="space-y-2">
-                            <Label htmlFor="firstName" className="text-gray-200">First Name</Label>
+                            <Label htmlFor="username" className="text-gray-200">Username</Label>
                             <Input
-                              id="firstName"
-                              value={formData.first_name}
-                              onChange={(e) => handleInputChange('first_name', e.target.value)}
+                              id="username"
+                              value={formData.username || ''}
+                              onChange={(e) => handleInputChange('username', e.target.value)}
                               className="bg-white/5 border-white/10 text-white placeholder:text-gray-400 focus:border-purple-500/50 focus:ring-purple-500/20 h-12"
                             />
                           </div>
                           <div className="space-y-2">
-                            <Label htmlFor="lastName" className="text-gray-200">Last Name</Label>
+                            <Label htmlFor="fullName" className="text-gray-200">Full Name</Label>
                             <Input
-                              id="lastName"
-                              value={formData.last_name}
-                              onChange={(e) => handleInputChange('last_name', e.target.value)}
+                              id="fullName"
+                              value={formData.full_name || ''}
+                              onChange={(e) => handleInputChange('full_name', e.target.value)}
                               className="bg-white/5 border-white/10 text-white placeholder:text-gray-400 focus:border-purple-500/50 focus:ring-purple-500/20 h-12"
                             />
                           </div>
@@ -467,47 +454,23 @@ const Settings = () => {
                             id="email"
                             type="email"
                             value={formData.email}
-                            onChange={(e) => handleInputChange('email', e.target.value)}
-                            className="bg-white/5 border-white/10 text-white placeholder:text-gray-400 focus:border-purple-500/50 focus:ring-purple-500/20 h-12"
+                            disabled
+                            className="bg-white/5 border-white/10 text-white placeholder:text-gray-400 focus:border-purple-500/50 focus:ring-purple-500/20 h-12 opacity-70"
                           />
+                          <p className="text-sm text-gray-400">Email cannot be changed. Contact support if you need to update it.</p>
                         </div>
 
                         <div className="space-y-2">
-                          <Label htmlFor="phone" className="text-gray-200 flex items-center space-x-2">
-                            <Phone className="w-4 h-4" />
-                            <span>Phone</span>
+                          <Label htmlFor="avatarUrl" className="text-gray-200 flex items-center space-x-2">
+                            <User className="w-4 h-4" />
+                            <span>Avatar URL</span>
                           </Label>
                           <Input
-                            id="phone"
-                            value={formData.phone}
-                            onChange={(e) => handleInputChange('phone', e.target.value)}
+                            id="avatarUrl"
+                            value={formData.avatar_url || ''}
+                            onChange={(e) => handleInputChange('avatar_url', e.target.value)}
                             className="bg-white/5 border-white/10 text-white placeholder:text-gray-400 focus:border-purple-500/50 focus:ring-purple-500/20 h-12"
-                          />
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label htmlFor="company" className="text-gray-200 flex items-center space-x-2">
-                            <Building2 className="w-4 h-4" />
-                            <span>Company</span>
-                          </Label>
-                          <Input
-                            id="company"
-                            value={formData.company}
-                            onChange={(e) => handleInputChange('company', e.target.value)}
-                            className="bg-white/5 border-white/10 text-white placeholder:text-gray-400 focus:border-purple-500/50 focus:ring-purple-500/20 h-12"
-                          />
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label htmlFor="position" className="text-gray-200 flex items-center space-x-2">
-                            <Briefcase className="w-4 h-4" />
-                            <span>Position</span>
-                          </Label>
-                          <Input
-                            id="position"
-                            value={formData.position}
-                            onChange={(e) => handleInputChange('position', e.target.value)}
-                            className="bg-white/5 border-white/10 text-white placeholder:text-gray-400 focus:border-purple-500/50 focus:ring-purple-500/20 h-12"
+                            placeholder="https://example.com/avatar.jpg"
                           />
                         </div>
                       </CardContent>

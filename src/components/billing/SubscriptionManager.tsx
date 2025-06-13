@@ -37,7 +37,7 @@ import {
   Sparkles,
 } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
-import { supabase } from '@/lib/supabase'
+import supabase from '@/lib/supabase/client'
 import { toast } from 'sonner'
 import { format, addDays, addMonths } from 'date-fns'
 
