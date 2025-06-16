@@ -1,10 +1,11 @@
 [build]
-  command = "npm ci && npx vite build"
+  command = "npm ci && npm run build"
   publish = "dist"
   
 [build.environment]
   NODE_VERSION = "18.18.0"
   NPM_VERSION = "9"
+  NPM_CONFIG_PRODUCTION = "false"
 
 [[redirects]]
   from = "/*"
@@ -13,6 +14,7 @@
 
 [context.production.environment]
   NODE_ENV = "production"
+  NPM_CONFIG_PRODUCTION = "false"
 
 [context.deploy-preview.environment]
   NODE_ENV = "development" 
