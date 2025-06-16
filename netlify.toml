@@ -1,9 +1,9 @@
 [build]
-  command = "npm install && npm run build"
+  command = "npm ci && npx vite build"
   publish = "dist"
   
 [build.environment]
-  NODE_VERSION = "18"
+  NODE_VERSION = "18.18.0"
   NPM_VERSION = "9"
 
 [[redirects]]
