@@ -1,25 +1,83 @@
+import React, { useState } from 'react';
 import { motion } from 'framer-motion';
+import { useNavigate, Link } from 'react-router-dom';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
-import { Link } from 'react-router-dom';
-import { Eye, EyeOff, Shield, Lock, Chrome, Sparkles, AlertTriangle, Server } from 'lucide-react';
-import { useState } from 'react';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { useToast } from '@/components/ui/use-toast';
+import { apiClient } from '@/lib/api';
+import { useAuth } from '@/contexts/AuthContext';
+import { 
+  Shield, 
+  Lock, 
+  Mail, 
+  Eye, 
+  EyeOff, 
+  AlertCircle, 
+  ArrowLeft,
+  Server,
+  Crown,
+  Loader2
+} from 'lucide-react';
 
 const AdminLogin = () => {
-  const [showPassword, setShowPassword] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
+  const navigate = useNavigate();
+  const { signIn } = useAuth();
+  const { toast } = useToast();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Admin authentication logic
-    console.log('Admin login attempt:', { email, password });
+    setIsLoading(true);
+    setError('');
+
+    try {
+      const response = await apiClient.adminLogin({ email, password });
+      
+      if (response.success && response.data) {
+        // Set the token and user data manually since we're using admin login
+        apiClient.setToken(response.data.token);
+        
+        // Store admin session info in localStorage for persistence
+        localStorage.setItem('admin_session', JSON.stringify({
+          isAdminLogin: true,
+          user: response.data.user,
+          loginTime: new Date().toISOString()
+        }));
+        
+        toast({
+          title: "Admin Login Successful",
+          description: "Welcome to the admin console.",
+        });
+        
+        // Small delay to ensure token is set before redirect
+        setTimeout(() => {
+          navigate('/admin/dashboard');
+        }, 100);
+      } else {
+        throw new Error(response.error || 'Admin login failed');
+      }
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Admin login failed';
+      setError(errorMessage);
+      toast({
+        variant: "destructive",
+        title: "Admin Login Failed",
+        description: errorMessage,
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-red-900/20 to-gray-900 flex items-center justify-center p-4 relative overflow-hidden">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-900 via-red-900/20 to-orange-900/20 relative overflow-hidden">
       {/* Animated Background Elements */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <motion.div
@@ -35,7 +93,7 @@ const AdminLogin = () => {
           }}
         />
         <motion.div
-          className="absolute -bottom-40 -left-40 w-96 h-96 bg-rose-600/10 rounded-full blur-3xl opacity-40"
+          className="absolute -bottom-40 -left-40 w-96 h-96 bg-orange-600/10 rounded-full blur-3xl opacity-40"
           animate={{
             scale: [1.2, 1, 1.2],
             x: [0, 50, 0],
@@ -47,209 +105,189 @@ const AdminLogin = () => {
             ease: "easeInOut"
           }}
         />
-        <motion.div
-          className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-red-700/5 rounded-full blur-2xl opacity-30"
-          animate={{
-            scale: [0.8, 1.1, 0.8],
-            opacity: [0.3, 0.6, 0.3],
-          }}
-          transition={{
-            duration: 15,
-            repeat: Infinity,
-            ease: "easeInOut"
-          }}
-        />
       </div>
 
-      {/* Grid Pattern Overlay */}
-      <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiM5QzkyQUMiIGZpbGwtb3BhY2l0eT0iMC4wMyI+PGNpcmNsZSBjeD0iMzAiIGN5PSIzMCIgcj0iMSIvPjwvZz48L2c+PC9zdmc+')] opacity-50"></div>
-      
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5 }}
-        className="w-full max-w-md relative z-10"
+      {/* Back to Main Site Link */}
+      <Link 
+        to="/"
+        className="absolute top-6 left-6 flex items-center space-x-2 text-gray-400 hover:text-white transition-colors z-10"
       >
-        {/* Security Warning Banner */}
-        <motion.div
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.2 }}
-          className="mb-6 p-4 bg-red-900/30 backdrop-blur-xl rounded-2xl border border-red-800/50"
-        >
-          <div className="flex items-center space-x-3">
+        <ArrowLeft className="w-4 h-4" />
+        <span>Back to Main Site</span>
+      </Link>
+
+      {/* Main Login Card */}
+      <motion.div
+        initial={{ opacity: 0, y: 20, scale: 0.95 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        transition={{ duration: 0.5 }}
+        className="w-full max-w-md mx-4 relative z-10"
+      >
+        <div className="absolute inset-0 bg-gradient-to-r from-red-600/10 to-orange-600/10 rounded-3xl blur-xl opacity-60" />
+        
+        <Card className="relative bg-black/40 backdrop-blur-xl border-red-500/20 shadow-2xl">
+          <CardHeader className="text-center pb-2">
+            {/* Admin Logo */}
             <motion.div
-              animate={{
-                scale: [1, 1.1, 1],
-                opacity: [0.7, 1, 0.7],
-              }}
-              transition={{
-                duration: 2,
-                repeat: Infinity,
-                ease: "easeInOut"
-              }}
+              initial={{ scale: 0 }}
+              animate={{ scale: 1 }}
+              transition={{ delay: 0.2, type: "spring", stiffness: 200 }}
+              className="mx-auto mb-4 relative"
             >
-              <AlertTriangle className="w-5 h-5 text-red-400" />
-            </motion.div>
-            <div>
-              <p className="text-red-200 font-medium text-sm">Restricted Access Zone</p>
-              <p className="text-red-300/80 text-xs">Administrative privileges required</p>
-            </div>
-          </div>
-        </motion.div>
-
-        <div className="relative">
-          <div className="absolute inset-0 bg-gradient-to-r from-red-600/10 to-rose-600/10 rounded-3xl blur-xl opacity-60" />
-          <Card className="relative backdrop-blur-xl bg-black/20 border-red-800/30 shadow-2xl">
-            <CardHeader className="text-center pb-8">
-              <motion.div
-                initial={{ scale: 0.8, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                transition={{ delay: 0.3, duration: 0.4 }}
-              >
-                <div className="flex justify-center mb-6">
-                  <div className="relative">
-                    <motion.div
-                      animate={{ rotate: [0, 360] }}
-                      transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
-                      className="absolute inset-0 bg-gradient-to-r from-red-600/20 to-rose-600/20 rounded-full blur-xl"
-                    />
-                    <div className="relative w-16 h-16 bg-gradient-to-r from-red-600 to-rose-600 rounded-2xl flex items-center justify-center">
-                      <Shield className="w-8 h-8 text-white" />
-                    </div>
-                  </div>
-                </div>
-                
-                <motion.div
-                  initial={{ opacity: 0, scale: 0.8 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={{ delay: 0.4 }}
-                  className="inline-flex items-center px-4 py-2 bg-gradient-to-r from-red-600/20 to-rose-600/20 rounded-full border border-red-500/30 backdrop-blur-xl mb-4"
-                >
-                  <motion.div
-                    animate={{ rotate: [0, 360] }}
-                    transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
-                    className="mr-2"
-                  >
-                    <Server className="w-4 h-4 text-red-400" />
-                  </motion.div>
-                  <span className="text-red-300 text-sm font-semibold">System Administration</span>
-                </motion.div>
-
-                <CardTitle className="text-3xl font-bold bg-gradient-to-r from-white via-red-100 to-rose-100 bg-clip-text text-transparent mb-3">
-                  Admin Portal
-                </CardTitle>
-                <CardDescription className="text-red-200/80 text-lg">
-                  Secure access to system administration
-                </CardDescription>
-              </motion.div>
-            </CardHeader>
-
-            <CardContent className="px-8 pb-8">
-              <motion.form
-                onSubmit={handleSubmit}
-                className="space-y-6"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 0.5, duration: 0.5 }}
-              >
-                <div className="space-y-2">
-                  <Label htmlFor="email" className="text-gray-200 font-medium">Administrator Email</Label>
-                  <div className="relative">
-                    <Shield className="absolute left-4 top-4 h-5 w-5 text-red-400" />
-                    <Input
-                      id="email"
-                      type="email"
-                      placeholder="admin@geotech.com"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      className="pl-12 h-14 bg-white/5 border-red-800/30 text-white placeholder:text-gray-400 focus:border-red-400 focus:ring-red-400/30 rounded-xl backdrop-blur-sm"
-                      required
-                    />
-                  </div>
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="password" className="text-gray-200 font-medium">Master Password</Label>
-                  <div className="relative">
-                    <Lock className="absolute left-4 top-4 h-5 w-5 text-red-400" />
-                    <Input
-                      id="password"
-                      type={showPassword ? 'text' : 'password'}
-                      placeholder="••••••••••••"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      className="pl-12 pr-12 h-14 bg-white/5 border-red-800/30 text-white placeholder:text-gray-400 focus:border-red-400 focus:ring-red-400/30 rounded-xl backdrop-blur-sm"
-                      required
-                    />
-                    <motion.button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-4 top-4 text-gray-400 hover:text-white transition-colors"
-                      whileHover={{ scale: 1.1 }}
-                      whileTap={{ scale: 0.9 }}
-                    >
-                      {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-                    </motion.button>
-                  </div>
-                </div>
-
-                <motion.div
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                >
-                  <Button
-                    type="submit"
-                    className="w-full h-14 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-700 hover:to-rose-700 text-white font-semibold text-lg shadow-lg shadow-red-500/25 rounded-xl"
-                  >
-                    <Shield className="w-5 h-5 mr-2" />
-                    Authenticate Access
-                  </Button>
-                </motion.div>
-              </motion.form>
-
-              <div className="relative my-8">
-                <div className="absolute inset-0 flex items-center">
-                  <span className="w-full border-t border-red-800/30" />
-                </div>
-                <div className="relative flex justify-center text-xs uppercase">
-                  <span className="bg-transparent px-4 text-red-300/80 font-medium">Enterprise Authentication</span>
-                </div>
+              <div className="absolute inset-0 bg-gradient-to-r from-red-600/20 to-orange-600/20 rounded-full blur-lg" />
+              <div className="relative w-16 h-16 bg-gradient-to-r from-red-600 to-orange-600 rounded-full flex items-center justify-center">
+                <Shield className="w-8 h-8 text-white" />
               </div>
+            </motion.div>
+
+            <CardTitle className="text-2xl font-bold bg-gradient-to-r from-red-200 to-orange-200 bg-clip-text text-transparent">
+              Admin Console
+            </CardTitle>
+            <CardDescription className="text-gray-400">
+              Restricted Access - Administrators Only
+            </CardDescription>
+
+            {/* Security Badge */}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ delay: 0.4 }}
+              className="inline-flex items-center px-3 py-1 bg-gradient-to-r from-red-600/20 to-orange-600/20 rounded-full border border-red-500/30 backdrop-blur-xl mt-2"
+            >
+              <Crown className="w-3 h-3 text-red-400 mr-2" />
+              <span className="text-red-300 text-xs font-semibold">Secure Admin Portal</span>
+            </motion.div>
+          </CardHeader>
+
+          <CardContent className="space-y-6">
+            {error && (
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+              >
+                <Alert variant="destructive" className="bg-red-900/20 border-red-500/30">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>{error}</AlertDescription>
+                </Alert>
+              </motion.div>
+            )}
+
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <motion.div
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.3 }}
+                className="space-y-2"
+              >
+                <Label htmlFor="email" className="text-gray-300 flex items-center space-x-2">
+                  <Mail className="w-4 h-4" />
+                  <span>Admin Email</span>
+                </Label>
+                <Input
+                  id="email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="admin@company.com"
+                  required
+                  className="bg-black/20 border-red-500/30 text-white placeholder-gray-500 focus:border-red-400 focus:ring-red-400/20"
+                />
+              </motion.div>
 
               <motion.div
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.4 }}
+                className="space-y-2"
+              >
+                <Label htmlFor="password" className="text-gray-300 flex items-center space-x-2">
+                  <Lock className="w-4 h-4" />
+                  <span>Admin Password</span>
+                </Label>
+                <div className="relative">
+                  <Input
+                    id="password"
+                    type={showPassword ? 'text' : 'password'}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="Enter your admin password"
+                    required
+                    className="bg-black/20 border-red-500/30 text-white placeholder-gray-500 focus:border-red-400 focus:ring-red-400/20 pr-10"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-white transition-colors"
+                  >
+                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+              </motion.div>
+
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.5 }}
+                className="pt-2"
               >
                 <Button
-                  variant="outline"
-                  className="w-full h-12 bg-white/5 border-red-800/30 text-red-200 hover:bg-red-800/10 hover:border-red-600/50 rounded-xl backdrop-blur-sm"
+                  type="submit"
+                  disabled={isLoading}
+                  className="w-full bg-gradient-to-r from-red-600 to-orange-600 hover:from-red-700 hover:to-orange-700 text-white font-semibold py-3 shadow-lg shadow-red-500/25 transition-all duration-200"
                 >
-                  <Chrome className="mr-3 h-5 w-5" />
-                  Google Workspace SSO
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Authenticating...
+                    </>
+                  ) : (
+                    <>
+                      <Shield className="w-4 h-4 mr-2" />
+                      Access Admin Console
+                    </>
+                  )}
                 </Button>
               </motion.div>
+            </form>
 
-              <div className="mt-8 text-center space-y-3">
-                <p className="text-red-300/70 text-sm">
-                  <Link to="/login" className="hover:text-red-200 underline underline-offset-4 font-medium transition-colors">
-                    ← Back to user login
-                  </Link>
-                </p>
-                <p className="text-red-300/70 text-sm">
-                  <Link to="/admin/forgot-password" className="hover:text-red-200 underline underline-offset-4 font-medium transition-colors">
-                    Forgot master password?
-                  </Link>
-                </p>
-                <div className="pt-4 border-t border-red-900/30">
-                  <p className="text-red-400/60 text-xs">
-                    All admin access attempts are logged and monitored
+            {/* Security Notice */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.6 }}
+              className="pt-4 border-t border-red-500/20"
+            >
+              <div className="flex items-start space-x-3 text-sm text-gray-400">
+                <Server className="w-4 h-4 mt-0.5 text-red-400" />
+                <div>
+                  <p className="font-medium text-red-300">Security Notice</p>
+                  <p className="text-xs">
+                    This is a restricted admin portal. All access attempts are logged and monitored.
+                    Only authorized administrators should access this system.
                   </p>
                 </div>
               </div>
-            </CardContent>
-          </Card>
-        </div>
+            </motion.div>
+          </CardContent>
+        </Card>
+
+        {/* Footer Links */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.7 }}
+          className="text-center mt-6 space-y-2"
+        >
+          <p className="text-gray-500 text-sm">
+            Need regular user access?{' '}
+            <Link to="/login" className="text-red-400 hover:text-red-300 transition-colors">
+              User Login
+            </Link>
+          </p>
+          <p className="text-gray-600 text-xs">
+            © 2024 SpareFinder - Admin Console
+          </p>
+        </motion.div>
       </motion.div>
     </div>
   );

@@ -16,11 +16,11 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   requiredRole,
   redirectTo = '/login',
 }) => {
-  const { user, loading } = useAuth()
+  const { user, isLoading, isAdmin, isSuperAdmin } = useAuth()
   const location = useLocation()
 
   // Show loading spinner while checking authentication
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="flex flex-col items-center space-y-4">
@@ -43,7 +43,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   }
 
   // If specific role is required but user doesn't have it
-  if (requiredRole && (!user || user.role !== requiredRole)) {
+  if (requiredRole && (!user || (requiredRole === 'admin' && !isAdmin))) {
     return (
       <Navigate
         to="/unauthorized"

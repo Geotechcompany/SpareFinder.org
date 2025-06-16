@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import AdminSidebar from '@/components/AdminSidebar';
+import AdminDesktopSidebar from '@/components/AdminDesktopSidebar';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -159,7 +159,7 @@ const AIModelsManagement = () => {
         />
       </div>
 
-      <AdminSidebar isCollapsed={isCollapsed} onToggle={handleToggleSidebar} />
+      <AdminDesktopSidebar isCollapsed={isCollapsed} onToggle={handleToggleSidebar} />
       
       <motion.div
         initial={false}

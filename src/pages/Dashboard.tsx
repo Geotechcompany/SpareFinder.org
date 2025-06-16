@@ -23,10 +23,10 @@ import {
 import DashboardSidebar from '@/components/DashboardSidebar';
 import MobileSidebar from '@/components/MobileSidebar';
 import { useAuth } from '@/contexts/AuthContext';
-import supabase, { db } from '@/lib/supabase/client';
-import { format, subDays } from 'date-fns';
+import { format } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
+import { apiClient } from '@/lib/api';
 
 const Dashboard = () => {
   const [isCollapsed, setIsCollapsed] = useState(false);
@@ -84,122 +84,70 @@ const Dashboard = () => {
       try {
         setIsDataLoading(true);
         
-        // Fetch total uploads and stats with graceful error handling
-        try {
-          const { data: uploadsData, error: uploadsError } = await supabase
-            .from('part_searches')
-            .select('*')
-            .eq('user_id', user.id);
+        // Fetch dashboard stats
+        const statsResponse = await apiClient.getDashboardStats();
+        if (statsResponse.success && statsResponse.data) {
+          setStats({
+            totalUploads: statsResponse.data.totalUploads,
+            successfulUploads: statsResponse.data.successfulUploads,
+            avgConfidence: statsResponse.data.avgConfidence,
+            avgProcessTime: statsResponse.data.avgProcessTime
+          });
+        }
 
-          if (uploadsError && uploadsError.code !== 'PGRST116') {
-            console.warn('Part searches table not found or error:', uploadsError);
-          } else if (uploadsData) {
-            const successfulUploads = uploadsData.filter(upload => upload.status === 'completed') || [];
-            const totalConfidence = successfulUploads.reduce((sum, upload) => sum + (upload.confidence || 0), 0);
-            const avgConfidence = successfulUploads.length ? (totalConfidence / successfulUploads.length).toFixed(1) : 0;
-            const totalProcessTime = successfulUploads.reduce((sum, upload) => sum + (upload.processing_time || 0), 0);
-            const avgProcessTime = successfulUploads.length ? (totalProcessTime / successfulUploads.length).toFixed(2) : 0;
+        // Fetch recent uploads
+        const uploadsResponse = await apiClient.getRecentUploads(5);
+        if (uploadsResponse.success && uploadsResponse.data?.uploads) {
+          setRecentUploads(uploadsResponse.data.uploads.map(upload => ({
+            id: upload.id,
+            name: upload.image_name || 'Unknown',
+            date: format(new Date(upload.created_at), 'PPp'),
+            status: 'completed',
+            confidence: upload.confidence_score ? Math.round(upload.confidence_score * 100) : 0
+          })));
+        }
 
-            setStats({
-              totalUploads: uploadsData.length || 0,
-              successfulUploads: successfulUploads.length,
-              avgConfidence: Number(avgConfidence),
-              avgProcessTime: Number(avgProcessTime)
-            });
+        // Fetch recent activities
+        const activitiesResponse = await apiClient.getRecentActivities(5);
+        if (activitiesResponse.success && activitiesResponse.data?.activities) {
+          setRecentActivities(activitiesResponse.data.activities.map(activity => ({
+            id: activity.id,
+            type: activity.resource_type,
+            title: activity.action,
+            description: activity.details?.description || '',
+            time: format(new Date(activity.created_at), 'PPp'),
+            confidence: activity.details?.confidence || null,
+            status: activity.details?.status || 'success'
+          })));
+        }
 
-            // Fetch recent uploads
-            const { data: recentData, error: recentError } = await supabase
-              .from('part_searches')
-              .select(`
-                id,
-                part_name,
-                created_at,
-                status,
-                confidence
-              `)
-              .eq('user_id', user.id)
-              .order('created_at', { ascending: false })
-              .limit(5);
-
-            if (!recentError && recentData) {
-              setRecentUploads(recentData.map(upload => ({
-                id: upload.id,
-                name: upload.part_name,
-                date: format(new Date(upload.created_at), 'PPp'),
-                status: upload.status,
-                confidence: upload.confidence
-              })));
+        // Fetch performance metrics
+        const metricsResponse = await apiClient.getPerformanceMetrics();
+        if (metricsResponse.success && metricsResponse.data) {
+          const data = metricsResponse.data;
+          setPerformanceMetrics([
+            {
+              label: 'AI Model Accuracy',
+              value: `${data.modelAccuracy.toFixed(1)}%`,
+              change: `${(data.accuracyChange > 0 ? '+' : '')}${data.accuracyChange.toFixed(1)}%`,
+              icon: Cpu,
+              color: 'from-green-600 to-emerald-600'
+            },
+            {
+              label: 'Total Searches',
+              value: `${data.totalSearches}`,
+              change: `${(data.searchesGrowth > 0 ? '+' : '')}${data.searchesGrowth.toFixed(1)}%`,
+              icon: Database,
+              color: 'from-blue-600 to-cyan-600'
+            },
+            {
+              label: 'Response Time',
+              value: `${data.avgResponseTime}ms`,
+              change: `${(data.responseTimeChange < 0 ? '' : '+')}${data.responseTimeChange}ms`,
+              icon: Activity,
+              color: 'from-purple-600 to-violet-600'
             }
-          }
-        } catch (uploadsErr) {
-          console.warn('Error fetching uploads data (non-critical):', uploadsErr);
-        }
-
-        // Fetch recent activities with graceful error handling
-        try {
-          const { data: activitiesData, error: activitiesError } = await supabase
-            .from('user_activities')
-            .select(`
-              id,
-              action,
-              details,
-              created_at,
-              resource_type,
-              resource_id
-            `)
-            .eq('user_id', user.id)
-            .order('created_at', { ascending: false })
-            .limit(5);
-
-          if (!activitiesError && activitiesData) {
-            setRecentActivities(activitiesData.map(activity => ({
-              id: activity.id,
-              type: activity.resource_type,
-              title: activity.action,
-              description: activity.details?.description || '',
-              time: format(new Date(activity.created_at), 'PPp'),
-              confidence: activity.details?.confidence || null,
-              status: activity.details?.status || 'success'
-            })));
-          }
-        } catch (activitiesErr) {
-          console.warn('Error fetching activities data (non-critical):', activitiesErr);
-        }
-
-        // Fetch performance metrics with graceful error handling
-        try {
-          const { data: metricsData, error: metricsError } = await db.analytics.getSystemStats(
-            subDays(new Date(), 30).toISOString(),
-            new Date().toISOString()
-          );
-
-          if (!metricsError && metricsData) {
-            setPerformanceMetrics([
-              {
-                label: 'AI Model Accuracy',
-                value: `${metricsData.model_accuracy.toFixed(1)}%`,
-                change: `${(metricsData.accuracy_change > 0 ? '+' : '')}${metricsData.accuracy_change.toFixed(1)}%`,
-                icon: Cpu,
-                color: 'from-green-600 to-emerald-600'
-              },
-              {
-                label: 'Database Coverage',
-                value: `${(metricsData.database_coverage / 1000000).toFixed(1)}M`,
-                change: `+${(metricsData.coverage_increase / 1000).toFixed(1)}K`,
-                icon: Database,
-                color: 'from-blue-600 to-cyan-600'
-              },
-              {
-                label: 'Response Time',
-                value: `${metricsData.avg_response_time}ms`,
-                change: `${(metricsData.response_time_change < 0 ? '' : '+')}${metricsData.response_time_change}ms`,
-                icon: Activity,
-                color: 'from-purple-600 to-violet-600'
-              }
-            ]);
-          }
-        } catch (metricsErr) {
-          console.warn('Error fetching metrics data (non-critical):', metricsErr);
+          ]);
         }
 
       } catch (error) {

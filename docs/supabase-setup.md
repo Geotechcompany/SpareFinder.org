@@ -1,8 +1,8 @@
-# Supabase Setup Guide for PartFinder AI
+# Supabase Setup Guide for SpareFinder
 
 ## Phase 3: Authentication & Database Setup
 
-This guide covers the complete setup of Supabase authentication and database schema for the GeoTech PartFinder AI application.
+This guide covers the complete setup of Supabase authentication and database schema for the GeoTech SpareFinder application.
 
 ## 1. Supabase Project Configuration
 
@@ -178,7 +178,7 @@ Customize email templates in Authentication > Email Templates:
 
 **Confirm Signup:**
 ```html
-<h2>Welcome to PartFinder AI!</h2>
+<h2>Welcome to SpareFinder!</h2>
 <p>Click the link below to confirm your account:</p>
 <p><a href="{{ .ConfirmationURL }}">Confirm Account</a></p>
 ```

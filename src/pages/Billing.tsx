@@ -1,9 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
+import { useToast } from '@/components/ui/use-toast';
+import { apiClient } from '@/lib/api';
 import { 
   CreditCard, 
   Download, 
@@ -21,15 +23,20 @@ import {
   Building,
   CheckCircle,
   AlertTriangle,
-  Menu
+  Menu,
+  Loader2
 } from 'lucide-react';
 import DashboardSidebar from '@/components/DashboardSidebar';
 import MobileSidebar from '@/components/MobileSidebar';
 
 const Billing = () => {
-  const [currentPlan, setCurrentPlan] = useState('pro');
+  const [currentPlan, setCurrentPlan] = useState('free');
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [billingData, setBillingData] = useState(null);
+  const [invoices, setInvoices] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const { toast } = useToast();
 
   const handleToggleSidebar = () => {
     setIsCollapsed(!isCollapsed);
@@ -39,13 +46,87 @@ const Billing = () => {
     setIsMobileMenuOpen(!isMobileMenuOpen);
   };
 
+  useEffect(() => {
+    fetchBillingData();
+  }, []);
+
+  const fetchBillingData = async () => {
+    try {
+      setIsLoading(true);
+      
+      // Fetch billing info
+      const billingResponse = await apiClient.getBillingInfo();
+      if (billingResponse.success && billingResponse.data) {
+        setBillingData(billingResponse.data);
+        setCurrentPlan(billingResponse.data.subscription?.tier || 'free');
+      }
+
+      // Fetch invoices
+      const invoicesResponse = await apiClient.getInvoices();
+      if (invoicesResponse.success && invoicesResponse.data) {
+        setInvoices(invoicesResponse.data.invoices || []);
+      }
+    } catch (error) {
+      console.error('Error fetching billing data:', error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to load billing information."
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handlePlanChange = async (planId: string) => {
+    try {
+      const response = await apiClient.updateSubscription(planId as 'free' | 'pro' | 'enterprise');
+      if (response.success) {
+        setCurrentPlan(planId);
+        toast({
+          title: "Success",
+          description: "Subscription updated successfully!"
+        });
+        fetchBillingData(); // Refresh data
+      }
+    } catch (error) {
+      console.error('Error updating subscription:', error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to update subscription."
+      });
+    }
+  };
+
+  const handleCancelSubscription = async () => {
+    try {
+      const response = await apiClient.cancelSubscription();
+      if (response.success) {
+        setCurrentPlan('free');
+        toast({
+          title: "Success",
+          description: "Subscription cancelled successfully!"
+        });
+        fetchBillingData(); // Refresh data
+      }
+    } catch (error) {
+      console.error('Error cancelling subscription:', error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to cancel subscription."
+      });
+    }
+  };
+
   const plans = [
     {
       id: 'free',
       name: 'Starter',
       price: 0,
       period: 'month',
-      description: 'Perfect for trying out PartFinder AI',
+      description: 'Perfect for trying out SpareFinder',
       features: [
         '10 uploads per month',
         'Basic AI identification',
@@ -103,54 +184,33 @@ const Billing = () => {
     }
   ];
 
-  const billingHistory = [
-    {
-      id: 1,
-      date: '2024-01-15',
-      description: 'Professional Plan - Monthly',
-      amount: 29.00,
-      status: 'paid',
-      invoice: 'INV-2024-001'
-    },
-    {
-      id: 2,
-      date: '2023-12-15',
-      description: 'Professional Plan - Monthly',
-      amount: 29.00,
-      status: 'paid',
-      invoice: 'INV-2023-012'
-    },
-    {
-      id: 3,
-      date: '2023-11-15',
-      description: 'Professional Plan - Monthly',
-      amount: 29.00,
-      status: 'paid',
-      invoice: 'INV-2023-011'
-    },
-    {
-      id: 4,
-      date: '2023-10-15',
-      description: 'Professional Plan - Monthly',
-      amount: 29.00,
-      status: 'failed',
-      invoice: 'INV-2023-010'
-    }
-  ];
-
-  const currentSubscription = {
-    plan: 'Professional',
+  // Get current subscription data from API response
+  const currentSubscription = billingData?.subscription ? {
+    plan: billingData.subscription.tier === 'free' ? 'Starter' : 
+          billingData.subscription.tier === 'pro' ? 'Professional' : 'Enterprise',
+    status: billingData.subscription.status,
+    nextBilling: billingData.subscription.current_period_end,
+    amount: billingData.subscription.tier === 'free' ? 0 : 
+            billingData.subscription.tier === 'pro' ? 29 : 149,
+    daysLeft: Math.ceil((new Date(billingData.subscription.current_period_end).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))
+  } : {
+    plan: 'Starter',
     status: 'active',
-    nextBilling: '2024-02-15',
-    amount: 29.00,
-    daysLeft: 12
+    nextBilling: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+    amount: 0,
+    daysLeft: 30
   };
 
-  const usageStats = {
-    uploadsThisMonth: 2847,
-    uploadsLimit: 'Unlimited',
-    accuracyRate: 96.8,
-    avgProcessingTime: '0.3s'
+  const usageStats = billingData?.usage ? {
+    uploadsThisMonth: billingData.usage.uploads_count || 0,
+    uploadsLimit: currentPlan === 'free' ? '10/month' : 'Unlimited',
+    accuracyRate: 96.8, // This would come from analytics
+    avgProcessingTime: '0.3s' // This would come from analytics
+  } : {
+    uploadsThisMonth: 0,
+    uploadsLimit: '10/month',
+    accuracyRate: 0,
+    avgProcessingTime: '0s'
   };
 
   const getStatusColor = (status: string) => {
@@ -235,12 +295,20 @@ const Billing = () => {
         transition={{ duration: 0.3, ease: "easeInOut" }}
         className="flex-1 p-2 sm:p-4 lg:p-8 relative z-10 overflow-x-hidden md:overflow-x-visible"
       >
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-          className="space-y-4 sm:space-y-6 lg:space-y-8 max-w-6xl mx-auto"
-        >
+        {isLoading ? (
+          <div className="flex items-center justify-center min-h-[400px]">
+            <div className="text-center">
+              <Loader2 className="w-12 h-12 animate-spin text-purple-400 mx-auto mb-4" />
+              <p className="text-gray-400">Loading billing information...</p>
+            </div>
+          </div>
+        ) : (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+            className="space-y-4 sm:space-y-6 lg:space-y-8 max-w-6xl mx-auto"
+          >
           {/* Header */}
           <div className="relative">
             <div className="absolute inset-0 bg-gradient-to-r from-purple-600/10 to-blue-600/10 rounded-3xl blur-xl opacity-60" />
@@ -344,7 +412,11 @@ const Billing = () => {
                           whileHover={{ scale: 1.05 }}
                           whileTap={{ scale: 0.95 }}
                         >
-                          <Button variant="outline" className="border-red-600/30 text-red-400 hover:bg-red-600/10 hover:border-red-500/50">
+                          <Button 
+                            onClick={handleCancelSubscription}
+                            variant="outline" 
+                            className="border-red-600/30 text-red-400 hover:bg-red-600/10 hover:border-red-500/50"
+                          >
                             Cancel Subscription
                           </Button>
                         </motion.div>
@@ -452,6 +524,7 @@ const Billing = () => {
                             whileTap={{ scale: 0.95 }}
                           >
                             <Button
+                              onClick={() => currentPlan !== plan.id && handlePlanChange(plan.id)}
                               className={`w-full h-12 ${
                                 currentPlan === plan.id
                                   ? 'bg-gray-600/50 text-gray-400 cursor-not-allowed'
@@ -492,7 +565,7 @@ const Billing = () => {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-3">
-                    {billingHistory.map((item, index) => (
+                    {invoices.length > 0 ? invoices.map((item, index) => (
                       <motion.div
                         key={item.id}
                         initial={{ opacity: 0, y: 20 }}
@@ -517,7 +590,13 @@ const Billing = () => {
                            </div>
                         </div>
                       </motion.div>
-                    ))}
+                    )) : (
+                      <div className="text-center py-8">
+                        <Receipt className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+                        <p className="text-gray-400">No invoices yet</p>
+                        <p className="text-gray-500 text-sm">Your billing history will appear here</p>
+                      </div>
+                    )}
                   </div>
                   
                   <motion.div
@@ -535,6 +614,7 @@ const Billing = () => {
             </motion.div>
           </div>
         </motion.div>
+        )}
       </motion.div>
     </div>
   );

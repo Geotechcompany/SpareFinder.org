@@ -1,4 +1,4 @@
--- GeoTech PartFinder AI - Complete Supabase Database Setup
+-- GeoTech SpareFinder - Complete Supabase Database Setup
 -- Execute this in your Supabase SQL Editor
 
 -- Create custom types

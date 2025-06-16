@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# GeoTech PartFinder AI - API Keys Setup Script
-echo "🔑 GeoTech PartFinder AI - API Keys Setup"
+# GeoTech SpareFinder - API Keys Setup Script
+echo "🔑 GeoTech SpareFinder - API Keys Setup"
 echo "=========================================="
 
 # Get API keys from user

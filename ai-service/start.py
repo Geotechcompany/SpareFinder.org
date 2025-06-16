@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-GeoTech PartFinder AI Service Startup Script
+GeoTech SpareFinder Service Startup Script
 Starts the FastAPI server with simplified configuration
 (TensorFlow AI + Google Search only)
 """
@@ -58,7 +58,7 @@ def setup_environment():
 def main():
     """Main startup function."""
     
-    print("🚀 Starting GeoTech PartFinder AI Service (Simplified)...")
+    print("🚀 Starting GeoTech SpareFinder Service (Simplified)...")
     print("🤖 Features: TensorFlow AI + Google Search")
     
     # Setup environment

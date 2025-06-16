@@ -1,6 +1,6 @@
 import { motion, AnimatePresence, useScroll, useTransform } from 'framer-motion';
 import { Button } from '@/components/ui/button';
-import { Rocket, ShieldCheck, BarChart, Globe, Zap, Cloud, Factory, Cpu, Database, Server, TestTube2, Upload, Check, X, Target, Shield, Sparkles, Clock, Award, Users, Scale, Lock } from 'lucide-react';
+import { Rocket, ShieldCheck, BarChart, Globe, Zap, Cloud, Factory, Cpu, Database, Server, TestTube2, Upload, Check, X, Target, Shield, Sparkles, Clock, Award, Users, Scale, Lock, Menu } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useState, useEffect, useRef } from 'react';
 import { useInView } from 'framer-motion';
@@ -58,6 +58,7 @@ const loadImage = (url: string) => {
 const Landing = () => {
   const [loadedImages, setLoadedImages] = useState<Set<string>>(new Set());
   const [isAnnual, setIsAnnual] = useState(true);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const { scrollY, scrollYProgress } = useScroll();
   const y1 = useTransform(scrollY, [0, 300], [0, 50]);
   const y2 = useTransform(scrollY, [0, 300], [0, -50]);
@@ -191,7 +192,7 @@ const Landing = () => {
     },
     {
       name: "Pro",
-      price: { monthly: "99", annual: "79" },
+      price: { monthly: "82", annual: "66" },
       features: ["Unlimited scans", "Advanced analytics", "Priority support", "Bulk processing"],
       cta: "Go Professional",
       featured: true,
@@ -350,11 +351,11 @@ const Landing = () => {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.8, delay: 0.2 }}
             >
-              <h1 className="text-6xl md:text-8xl lg:text-9xl font-black mb-8 leading-[0.9]">
-                <span className="block bg-gradient-to-r from-white via-gray-200 to-white bg-clip-text text-transparent">
+              <h1 className="text-6xl md:text-8xl lg:text-9xl font-black mb-8 leading-[0.9] relative z-20">
+                <span className="block bg-gradient-to-r from-white via-gray-100 to-white bg-clip-text text-transparent">
                   Industrial AI
                 </span>
-                <span className="block bg-gradient-to-r from-purple-400 via-blue-400 via-purple-400 to-blue-400 bg-clip-text text-transparent bg-[length:300%_auto] animate-gradient">
+                <span className="block bg-gradient-to-r from-purple-200 via-blue-200 via-purple-200 to-blue-200 bg-clip-text text-transparent bg-[length:300%_auto] animate-gradient z-index-10 pb-6">
                   Part Recognition
                 </span>
               </h1>
@@ -363,10 +364,10 @@ const Landing = () => {
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ delay: 0.5, duration: 0.8 }}
-                className="text-2xl text-gray-300 mb-12 max-w-4xl mx-auto leading-relaxed font-light"
+                className="text-2xl text-gray-200 mb-12 max-w-4xl mx-auto leading-relaxed font-light"
               >
                 Revolutionary computer vision technology that identifies industrial parts with 
-                <span className="text-purple-400 font-semibold"> 99.9% accuracy</span> in milliseconds
+                <span className="text-purple-300 font-semibold"> 99.9% accuracy</span> in milliseconds
               </motion.p>
             </motion.div>
 
@@ -962,7 +963,7 @@ const Landing = () => {
                   <div className="mb-6">
                     <div className="flex items-center justify-center">
                       <span className="text-5xl font-bold bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent">
-                        ${isAnnual ? plan.price.annual : plan.price.monthly}
+                        £{isAnnual ? plan.price.annual : plan.price.monthly}
                       </span>
                       {plan.price.monthly !== "Custom" && (
                         <span className="text-gray-400 ml-2">/mo</span>

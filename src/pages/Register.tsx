@@ -115,7 +115,7 @@ const Register = () => {
             </div>
           </motion.div>
           <span className="text-xl font-bold bg-gradient-to-r from-white via-purple-200 to-blue-200 bg-clip-text text-transparent">
-            PartFinder AI
+            SpareFinder
           </span>
         </div>
       </div>
@@ -147,7 +147,7 @@ const Register = () => {
                   >
                     <Sparkles className="w-4 h-4 text-purple-400" />
                   </motion.div>
-                  <span className="text-purple-300 text-sm font-semibold">Join PartFinder AI</span>
+                  <span className="text-purple-300 text-sm font-semibold">Join SpareFinder</span>
                 </div>
               </motion.div>
 

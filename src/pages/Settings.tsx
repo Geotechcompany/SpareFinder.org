@@ -8,7 +8,7 @@ import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/components/ui/use-toast';
 import { Loader2 } from 'lucide-react';
-import supabase from '../lib/supabase/client';
+import { apiClient } from '@/lib/api';
 import { 
   Settings as SettingsIcon, 
   Save, 
@@ -84,33 +84,37 @@ const Settings = () => {
       setIsLoading(true);
       setError(null);
 
-      // Get the current user's session
-      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      // Fetch profile data
+      const profileResponse = await apiClient.getProfile();
       
-      if (sessionError) throw sessionError;
-      if (!session?.user) throw new Error('No user session found');
-
-      // Fetch user profile from profiles table
-      const { data: profile, error: profileError } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', session.user.id)
-        .single();
-
-      if (profileError) throw profileError;
-
-      if (profile) {
+      if (profileResponse.success && profileResponse.data?.profile) {
+        const profile = profileResponse.data.profile;
         setFormData({
-          email: profile.email || session.user.email || '',
-          username: profile.username || '',
+          email: profile.email,
+          username: '', // Username not available in profile API
           full_name: profile.full_name || '',
           avatar_url: profile.avatar_url || ''
         });
+      }
 
-        // If preferences exist in profile, use them, otherwise use defaults
-        if (profile.preferences) {
-          setPreferences(profile.preferences);
+      // Fetch settings
+      try {
+        const settingsResponse = await apiClient.getSettings();
+        
+        if (settingsResponse.success && settingsResponse.data?.settings) {
+          const settings = settingsResponse.data.settings;
+          setPreferences({
+            emailNotifications: settings.notifications?.email ?? true,
+            smsNotifications: settings.notifications?.push ?? false,
+            autoSave: true, // Default value since not in API
+            darkMode: settings.preferences?.theme === 'dark',
+            analytics: settings.privacy?.dataSharing ?? true,
+            marketing: settings.notifications?.marketing ?? false
+          });
         }
+      } catch (settingsError) {
+        // Settings might not exist yet, use defaults
+        console.log('Settings not found, using defaults');
       }
     } catch (err) {
       console.error('Error fetching user profile:', err);
@@ -138,29 +142,40 @@ const Settings = () => {
       setIsSaving(true);
       setError(null);
 
-      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-      
-      if (sessionError) throw sessionError;
-      if (!session?.user) throw new Error('No user session found');
-
-      // Update profile in the database
-      const { error: updateError } = await supabase
-        .from('profiles')
-        .update({
-          username: formData.username,
-          full_name: formData.full_name,
-          avatar_url: formData.avatar_url,
-          preferences,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', session.user.id);
-
-      if (updateError) throw updateError;
-
-      toast({
-        title: "Success",
-        description: "Your settings have been saved successfully.",
+      // Update profile data
+      const profileResponse = await apiClient.updateProfileData({
+        full_name: formData.full_name,
+        // Note: username and avatar_url updates would need additional API endpoints
       });
+
+      // Update settings
+      const settingsData = {
+        notifications: {
+          email: preferences.emailNotifications,
+          push: preferences.smsNotifications,
+          marketing: preferences.marketing
+        },
+        privacy: {
+          dataSharing: preferences.analytics,
+          profileVisibility: 'private' as const
+        },
+        preferences: {
+          theme: preferences.darkMode ? 'dark' as const : 'light' as const,
+          language: 'en',
+          timezone: 'UTC'
+        }
+      };
+
+      const settingsResponse = await apiClient.updateSettings(settingsData);
+
+      if (profileResponse.success && settingsResponse.success) {
+        toast({
+          title: "Success",
+          description: "Your settings have been saved successfully.",
+        });
+      } else {
+        throw new Error('Failed to save some settings');
+      }
     } catch (err) {
       console.error('Error saving profile:', err);
       setError(err instanceof Error ? err.message : 'Failed to save changes');

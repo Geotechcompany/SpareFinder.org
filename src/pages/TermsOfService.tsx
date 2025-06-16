@@ -11,7 +11,7 @@ const TermsOfService = () => {
       title: "Service Description",
       icon: FileText,
       content: [
-        "PartFinder AI provides AI-powered industrial part identification services",
+        "SpareFinder provides AI-powered industrial part identification services",
         "Access to our comprehensive database of 10+ million verified parts",
         "Real-time part specifications and supplier information",
         "API access for enterprise integration and automation",
@@ -55,7 +55,7 @@ const TermsOfService = () => {
       title: "Intellectual Property",
       icon: Shield,
       content: [
-        "PartFinder AI retains all rights to our AI models and algorithms",
+        "SpareFinder retains all rights to our AI models and algorithms",
         "Part data remains property of respective manufacturers",
         "Users retain rights to their uploaded images and data",
         "Limited license granted to use our service as intended",
@@ -118,7 +118,7 @@ const TermsOfService = () => {
               </span>
             </h1>
             <p className="text-xl text-gray-300 mb-8 leading-relaxed">
-              Clear, fair terms that protect both you and PartFinder AI. 
+              Clear, fair terms that protect both you and SpareFinder. 
               We believe in transparency and building trust through our service agreements.
             </p>
             <div className="inline-flex items-center px-6 py-3 bg-gradient-to-r from-blue-500/20 to-purple-500/20 rounded-full border border-blue-500/30">
@@ -201,7 +201,7 @@ const TermsOfService = () => {
                 <h3 className="text-2xl font-bold text-white mb-4">Important Notice</h3>
                 <p className="text-gray-300 leading-relaxed mb-4">
                   While our AI achieves 99.9% accuracy, always verify part compatibility and safety requirements 
-                  for your specific application. PartFinder AI is a tool to assist in part identification, 
+                  for your specific application. SpareFinder is a tool to assist in part identification, 
                   not a substitute for professional engineering judgment.
                 </p>
                 <p className="text-gray-400 text-sm">

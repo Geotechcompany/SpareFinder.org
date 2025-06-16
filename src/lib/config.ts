@@ -41,7 +41,7 @@ const defaultConfig: AppConfig = {
     enableMock: true,
   },
   app: {
-    name: 'PartFinder AI',
+    name: 'SpareFinder',
     version: '1.0.0',
     environment: 'development',
   },

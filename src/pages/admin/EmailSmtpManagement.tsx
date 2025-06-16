@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import AdminSidebar from '@/components/AdminSidebar';
+import AdminDesktopSidebar from '@/components/AdminDesktopSidebar';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -39,12 +39,12 @@ const EmailSmtpManagement = () => {
     username: 'noreply@geotech.com',
     password: '',
     encryption: 'TLS',
-    fromName: 'PartFinder AI',
+    fromName: 'SpareFinder',
     fromEmail: 'noreply@geotech.com'
   });
 
   const [emailTemplates, setEmailTemplates] = useState([
-    { id: 1, name: 'Welcome Email', subject: 'Welcome to PartFinder AI', status: 'active' },
+    { id: 1, name: 'Welcome Email', subject: 'Welcome to SpareFinder', status: 'active' },
     { id: 2, name: 'Password Reset', subject: 'Reset Your Password', status: 'active' },
     { id: 3, name: 'Upgrade Notification', subject: 'Subscription Updated', status: 'active' },
     { id: 4, name: 'Weekly Report', subject: 'Your Weekly Analytics', status: 'inactive' }
@@ -74,11 +74,11 @@ const EmailSmtpManagement = () => {
   };
 
   return (
-    <div className="min-h-screen flex w-full bg-gradient-to-br from-gray-900 via-red-900/20 to-gray-900 relative overflow-hidden">
+    <div className="min-h-screen flex w-full bg-gradient-to-br from-gray-900 via-blue-900/20 to-gray-900 relative overflow-hidden">
       {/* Animated Background Elements */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <motion.div
-          className="absolute top-1/4 -right-40 w-80 h-80 bg-red-600/15 rounded-full blur-3xl opacity-60"
+          className="absolute top-1/4 -right-40 w-80 h-80 bg-blue-600/15 rounded-full blur-3xl opacity-60"
           animate={{
             scale: [1, 1.3, 1],
             rotate: [0, 180, 360],
@@ -90,7 +90,7 @@ const EmailSmtpManagement = () => {
           }}
         />
         <motion.div
-          className="absolute -bottom-40 -left-40 w-96 h-96 bg-rose-600/10 rounded-full blur-3xl opacity-40"
+          className="absolute -bottom-40 -left-40 w-96 h-96 bg-purple-600/10 rounded-full blur-3xl opacity-40"
           animate={{
             scale: [1.2, 1, 1.2],
             x: [0, 50, 0],
@@ -104,7 +104,7 @@ const EmailSmtpManagement = () => {
         />
       </div>
 
-      <AdminSidebar isCollapsed={isCollapsed} onToggle={handleToggleSidebar} />
+      <AdminDesktopSidebar isCollapsed={isCollapsed} onToggle={handleToggleSidebar} />
       
       <motion.div
         initial={false}
@@ -120,7 +120,7 @@ const EmailSmtpManagement = () => {
         >
           {/* Header */}
           <div className="relative">
-            <div className="absolute inset-0 bg-gradient-to-r from-red-600/10 to-rose-600/10 rounded-3xl blur-xl opacity-60" />
+            <div className="absolute inset-0 bg-gradient-to-r from-blue-600/10 to-purple-600/10 rounded-3xl blur-xl opacity-60" />
             <div className="relative bg-black/20 backdrop-blur-xl rounded-3xl p-6 border border-white/10">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div>
@@ -128,19 +128,19 @@ const EmailSmtpManagement = () => {
                     initial={{ opacity: 0, scale: 0.8 }}
                     animate={{ opacity: 1, scale: 1 }}
                     transition={{ delay: 0.2 }}
-                    className="inline-flex items-center px-4 py-2 bg-gradient-to-r from-red-600/20 to-rose-600/20 rounded-full border border-red-500/30 backdrop-blur-xl mb-4"
+                    className="inline-flex items-center px-4 py-2 bg-gradient-to-r from-blue-600/20 to-purple-600/20 rounded-full border border-blue-500/30 backdrop-blur-xl mb-4"
                   >
                     <motion.div
                       animate={{ rotate: [0, 360] }}
                       transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
                       className="mr-2"
                     >
-                      <Mail className="w-4 h-4 text-red-400" />
+                      <Mail className="w-4 h-4 text-blue-400" />
                     </motion.div>
-                    <span className="text-red-300 text-sm font-semibold">Email Configuration</span>
+                    <span className="text-blue-300 text-sm font-semibold">Email Configuration</span>
                   </motion.div>
                   <motion.h1 
-                    className="text-3xl lg:text-4xl font-bold bg-gradient-to-r from-white via-red-100 to-rose-100 bg-clip-text text-transparent mb-3"
+                    className="text-3xl lg:text-4xl font-bold bg-gradient-to-r from-white via-blue-100 to-purple-100 bg-clip-text text-transparent mb-3"
                     initial={{ opacity: 0, x: -20 }}
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: 0.3 }}
@@ -181,11 +181,11 @@ const EmailSmtpManagement = () => {
             >
               {/* Quick Setup */}
               <div className="relative">
-                <div className="absolute inset-0 bg-gradient-to-r from-blue-600/5 to-purple-600/5 rounded-3xl blur-xl opacity-60" />
+                <div className="absolute inset-0 bg-gradient-to-r from-purple-600/5 to-pink-600/5 rounded-3xl blur-xl opacity-60" />
                 <Card className="relative bg-black/20 backdrop-blur-xl border-white/10">
                   <CardHeader>
                     <CardTitle className="text-white flex items-center space-x-2">
-                      <Zap className="w-5 h-5 text-blue-400" />
+                      <Zap className="w-5 h-5 text-purple-400" />
                       <span>Quick Setup</span>
                     </CardTitle>
                     <CardDescription className="text-gray-400">
@@ -221,11 +221,11 @@ const EmailSmtpManagement = () => {
 
               {/* SMTP Server Settings */}
               <div className="relative">
-                <div className="absolute inset-0 bg-gradient-to-r from-red-600/5 to-rose-600/5 rounded-3xl blur-xl opacity-60" />
+                <div className="absolute inset-0 bg-gradient-to-r from-blue-600/5 to-purple-600/5 rounded-3xl blur-xl opacity-60" />
                 <Card className="relative bg-black/20 backdrop-blur-xl border-white/10">
                   <CardHeader>
                     <CardTitle className="text-white flex items-center space-x-2">
-                      <Server className="w-5 h-5 text-red-400" />
+                      <Server className="w-5 h-5 text-blue-400" />
                       <span>SMTP Server Configuration</span>
                     </CardTitle>
                     <CardDescription className="text-gray-400">
@@ -240,7 +240,7 @@ const EmailSmtpManagement = () => {
                           id="host"
                           value={smtpConfig.host}
                           onChange={(e) => setSmtpConfig(prev => ({ ...prev, host: e.target.value }))}
-                          className="h-12 bg-white/5 border-white/10 text-white placeholder:text-gray-400 focus:border-red-400/50 rounded-xl"
+                          className="h-12 bg-white/5 border-white/10 text-white placeholder:text-gray-400 focus:border-blue-400/50 rounded-xl"
                           placeholder="smtp.example.com"
                         />
                       </div>
@@ -251,7 +251,7 @@ const EmailSmtpManagement = () => {
                           type="number"
                           value={smtpConfig.port}
                           onChange={(e) => setSmtpConfig(prev => ({ ...prev, port: parseInt(e.target.value) }))}
-                          className="h-12 bg-white/5 border-white/10 text-white placeholder:text-gray-400 focus:border-red-400/50 rounded-xl"
+                          className="h-12 bg-white/5 border-white/10 text-white placeholder:text-gray-400 focus:border-blue-400/50 rounded-xl"
                         />
                       </div>
                       <div className="space-y-2">
@@ -260,7 +260,7 @@ const EmailSmtpManagement = () => {
                           id="username"
                           value={smtpConfig.username}
                           onChange={(e) => setSmtpConfig(prev => ({ ...prev, username: e.target.value }))}
-                          className="h-12 bg-white/5 border-white/10 text-white placeholder:text-gray-400 focus:border-red-400/50 rounded-xl"
+                          className="h-12 bg-white/5 border-white/10 text-white placeholder:text-gray-400 focus:border-blue-400/50 rounded-xl"
                           placeholder="your-email@example.com"
                         />
                       </div>
@@ -272,7 +272,7 @@ const EmailSmtpManagement = () => {
                             type={showPassword ? 'text' : 'password'}
                             value={smtpConfig.password}
                             onChange={(e) => setSmtpConfig(prev => ({ ...prev, password: e.target.value }))}
-                            className="h-12 pr-12 bg-white/5 border-white/10 text-white placeholder:text-gray-400 focus:border-red-400/50 rounded-xl"
+                            className="h-12 pr-12 bg-white/5 border-white/10 text-white placeholder:text-gray-400 focus:border-blue-400/50 rounded-xl"
                             placeholder="Your password or app key"
                           />
                           <button
@@ -303,7 +303,7 @@ const EmailSmtpManagement = () => {
                           id="fromName"
                           value={smtpConfig.fromName}
                           onChange={(e) => setSmtpConfig(prev => ({ ...prev, fromName: e.target.value }))}
-                          className="h-12 bg-white/5 border-white/10 text-white placeholder:text-gray-400 focus:border-red-400/50 rounded-xl"
+                          className="h-12 bg-white/5 border-white/10 text-white placeholder:text-gray-400 focus:border-blue-400/50 rounded-xl"
                           placeholder="Your Company Name"
                         />
                       </div>
@@ -323,7 +323,7 @@ const EmailSmtpManagement = () => {
                           <Button
                             onClick={handleTestConnection}
                             disabled={testResult === 'testing'}
-                            className="bg-blue-600 hover:bg-blue-700 rounded-xl"
+                            className="bg-purple-600 hover:bg-purple-700 rounded-xl"
                           >
                             {testResult === 'testing' ? (
                               <>
@@ -349,7 +349,7 @@ const EmailSmtpManagement = () => {
                               ? 'bg-green-600/20 border border-green-500/30' 
                               : testResult === 'error'
                               ? 'bg-red-600/20 border border-red-500/30'
-                              : 'bg-blue-600/20 border border-blue-500/30'
+                              : 'bg-purple-600/20 border border-purple-500/30'
                           }`}
                         >
                           <div className="flex items-center space-x-2">
@@ -358,11 +358,11 @@ const EmailSmtpManagement = () => {
                             ) : testResult === 'error' ? (
                               <AlertTriangle className="w-4 h-4 text-red-400" />
                             ) : (
-                              <Clock className="w-4 h-4 text-blue-400 animate-spin" />
+                              <Clock className="w-4 h-4 text-purple-400 animate-spin" />
                             )}
                             <span className={`text-sm ${
                               testResult === 'success' ? 'text-green-300' :
-                              testResult === 'error' ? 'text-red-300' : 'text-blue-300'
+                              testResult === 'error' ? 'text-red-300' : 'text-purple-300'
                             }`}>
                               {testResult === 'success' && 'Test email sent successfully!'}
                               {testResult === 'error' && 'Failed to send test email. Check your settings.'}
@@ -387,7 +387,7 @@ const EmailSmtpManagement = () => {
                         whileHover={{ scale: 1.05 }}
                         whileTap={{ scale: 0.95 }}
                       >
-                        <Button className="bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-700 hover:to-rose-700 shadow-lg shadow-red-500/25 rounded-xl">
+                        <Button className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 shadow-lg shadow-blue-500/25 rounded-xl">
                           <Shield className="w-4 h-4 mr-2" />
                           Save Configuration
                         </Button>

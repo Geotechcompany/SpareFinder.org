@@ -1,8 +1,8 @@
-# 🚀 GeoTech PartFinder AI - Complete Supabase Setup Guide
+# 🚀 GeoTech SpareFinder - Complete Supabase Setup Guide
 
 ## Overview
 
-This guide will help you set up a complete Supabase backend for the GeoTech PartFinder AI application, including authentication, database, storage, and all necessary configurations.
+This guide will help you set up a complete Supabase backend for the GeoTech SpareFinder application, including authentication, database, storage, and all necessary configurations.
 
 ## Prerequisites
 
@@ -19,7 +19,7 @@ This guide will help you set up a complete Supabase backend for the GeoTech Part
    - Click "New Project"
    - Choose your organization
    - Enter project details:
-     - **Name**: `geotech-partfinder-ai`
+     - **Name**: `geotech-SparePart Finder-ai`
      - **Database Password**: Generate a strong password (save this!)
      - **Region**: Choose closest to your users
      - **Pricing Plan**: Start with Free tier
@@ -278,4 +278,4 @@ If you encounter issues:
 
 ---
 
-**🎉 Congratulations!** Your Supabase backend is now ready for the GeoTech PartFinder AI application. 
+**🎉 Congratulations!** Your Supabase backend is now ready for the GeoTech SpareFinder application. 

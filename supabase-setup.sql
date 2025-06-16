@@ -1,4 +1,4 @@
--- GeoTech PartFinder AI - Complete Supabase Database Setup
+-- GeoTech SpareFinder - Complete Supabase Database Setup
 -- Execute this in your Supabase SQL Editor
 
 -- Enable RLS (Row Level Security)
@@ -394,10 +394,161 @@ INSERT INTO system_metrics (metric_name, metric_value, tags) VALUES
 ('avg_processing_time', 0, '{"type": "gauge", "unit": "ms"}'),
 ('system_uptime', 99.9, '{"type": "gauge", "unit": "percent"}');
 
+-- =============================================
+-- STATS ENHANCEMENTS FOR DASHBOARD PAGES
+-- =============================================
+
+-- Add missing columns to existing tables
+ALTER TABLE part_searches 
+ADD COLUMN IF NOT EXISTS image_name TEXT,
+ADD COLUMN IF NOT EXISTS ai_model_version TEXT;
+
+-- Add streak tracking to profiles
+ALTER TABLE profiles 
+ADD COLUMN IF NOT EXISTS current_streak INTEGER DEFAULT 0,
+ADD COLUMN IF NOT EXISTS longest_streak INTEGER DEFAULT 0,
+ADD COLUMN IF NOT EXISTS last_activity_date DATE;
+
+-- User achievements table
+CREATE TABLE IF NOT EXISTS user_achievements (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    user_id UUID REFERENCES profiles(id) ON DELETE CASCADE NOT NULL,
+    achievement_id TEXT NOT NULL,
+    achievement_name TEXT NOT NULL,
+    achievement_description TEXT,
+    earned_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    metadata JSONB DEFAULT '{}',
+    UNIQUE(user_id, achievement_id)
+);
+
+-- Billing analytics table
+CREATE TABLE IF NOT EXISTS billing_analytics (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    user_id UUID REFERENCES profiles(id) ON DELETE CASCADE NOT NULL,
+    month INTEGER NOT NULL,
+    year INTEGER NOT NULL,
+    total_spent DECIMAL(10,2) DEFAULT 0,
+    total_saved DECIMAL(10,2) DEFAULT 0,
+    plan_changes INTEGER DEFAULT 0,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE(user_id, month, year)
+);
+
+-- Performance metrics table
+CREATE TABLE IF NOT EXISTS performance_metrics (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    user_id UUID REFERENCES profiles(id) ON DELETE CASCADE,
+    date DATE NOT NULL,
+    accuracy_rate DECIMAL(5,2),
+    avg_response_time INTEGER,
+    total_searches INTEGER DEFAULT 0,
+    successful_searches INTEGER DEFAULT 0,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE(user_id, date)
+);
+
+-- Function to update user streak
+CREATE OR REPLACE FUNCTION update_user_streak(p_user_id UUID)
+RETURNS VOID AS $$
+DECLARE
+    last_activity DATE;
+    current_date DATE := CURRENT_DATE;
+    current_streak INTEGER;
+BEGIN
+    SELECT last_activity_date INTO last_activity FROM profiles WHERE id = p_user_id;
+    SELECT current_streak INTO current_streak FROM profiles WHERE id = p_user_id;
+    
+    IF last_activity IS NULL OR last_activity < current_date - INTERVAL '1 day' THEN
+        IF last_activity = current_date - INTERVAL '1 day' THEN
+            current_streak := COALESCE(current_streak, 0) + 1;
+        ELSE
+            current_streak := 1;
+        END IF;
+    ELSIF last_activity = current_date THEN
+        RETURN;
+    END IF;
+    
+    UPDATE profiles 
+    SET 
+        current_streak = current_streak,
+        longest_streak = GREATEST(COALESCE(longest_streak, 0), current_streak),
+        last_activity_date = current_date
+    WHERE id = p_user_id;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Function to calculate total savings
+CREATE OR REPLACE FUNCTION calculate_user_savings(p_user_id UUID)
+RETURNS DECIMAL AS $$
+DECLARE
+    total_searches INTEGER;
+    estimated_savings DECIMAL;
+BEGIN
+    SELECT COUNT(*) INTO total_searches 
+    FROM part_searches 
+    WHERE user_id = p_user_id AND status = 'completed' AND confidence_score > 0.7;
+    
+    estimated_savings := total_searches * 2.50;
+    RETURN estimated_savings;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Trigger to update streak when user performs an action
+CREATE OR REPLACE FUNCTION trigger_update_streak()
+RETURNS TRIGGER AS $$
+BEGIN
+    PERFORM update_user_streak(NEW.user_id);
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS update_streak_on_search ON part_searches;
+CREATE TRIGGER update_streak_on_search
+    AFTER INSERT ON part_searches
+    FOR EACH ROW EXECUTE FUNCTION trigger_update_streak();
+
+-- Enable RLS on new tables
+ALTER TABLE user_achievements ENABLE ROW LEVEL SECURITY;
+ALTER TABLE billing_analytics ENABLE ROW LEVEL SECURITY;
+ALTER TABLE performance_metrics ENABLE ROW LEVEL SECURITY;
+
+-- RLS policies for new tables
+CREATE POLICY "Users can view own achievements" ON user_achievements FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "System can insert achievements" ON user_achievements FOR INSERT WITH CHECK (true);
+CREATE POLICY "Users can view own billing analytics" ON billing_analytics FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "System can manage billing analytics" ON billing_analytics FOR ALL WITH CHECK (true);
+CREATE POLICY "Users can view own performance metrics" ON performance_metrics FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "System can manage performance metrics" ON performance_metrics FOR ALL WITH CHECK (true);
+
+-- Indexes for new tables
+CREATE INDEX IF NOT EXISTS user_achievements_user_id_idx ON user_achievements(user_id);
+CREATE INDEX IF NOT EXISTS user_achievements_earned_at_idx ON user_achievements(earned_at);
+CREATE INDEX IF NOT EXISTS billing_analytics_user_id_idx ON billing_analytics(user_id);
+CREATE INDEX IF NOT EXISTS billing_analytics_date_idx ON billing_analytics(year, month);
+CREATE INDEX IF NOT EXISTS performance_metrics_user_id_idx ON performance_metrics(user_id);
+CREATE INDEX IF NOT EXISTS performance_metrics_date_idx ON performance_metrics(date);
+
+-- Initialize billing analytics for existing users
+INSERT INTO billing_analytics (user_id, month, year, total_spent, total_saved)
+SELECT 
+    p.id,
+    EXTRACT(MONTH FROM NOW()),
+    EXTRACT(YEAR FROM NOW()),
+    CASE 
+        WHEN s.tier = 'pro' THEN 29.00
+        WHEN s.tier = 'enterprise' THEN 149.00
+        ELSE 0
+    END,
+    calculate_user_savings(p.id)
+FROM profiles p
+LEFT JOIN subscriptions s ON p.id = s.user_id
+ON CONFLICT (user_id, month, year) DO NOTHING;
+
 -- Success message
 DO $$
 BEGIN
-    RAISE NOTICE 'PartFinder AI database setup completed successfully!';
+    RAISE NOTICE 'SpareFinder database setup completed successfully!';
+    RAISE NOTICE 'Stats enhancements added for dashboard pages!';
     RAISE NOTICE 'Next steps:';
     RAISE NOTICE '1. Update your environment variables';
     RAISE NOTICE '2. Enable authentication providers in Supabase dashboard';

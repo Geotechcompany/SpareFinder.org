@@ -19,9 +19,11 @@ import {
   Globe,
   Award,
   Users,
-  TrendingUp
+  TrendingUp,
+  Menu,
+  X
 } from "lucide-react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { Link } from "react-router-dom";
 import ThemeToggle from "@/components/ThemeToggle";
 import { Calendar } from "@/components/ui/calendar";
@@ -30,6 +32,7 @@ const Index = () => {
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
   const [hoveredPlan, setHoveredPlan] = useState<string | null>(null);
   const [activeTestimonial, setActiveTestimonial] = useState(0);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const features = [
     {
@@ -62,7 +65,7 @@ const Index = () => {
     {
       name: "Michael Rodriguez",
       role: "Senior Mechanic at AutoTech Solutions",
-      content: "PartFinder AI has revolutionized our workflow. What used to take hours now takes seconds. The accuracy is phenomenal.",
+      content: "SpareFinder has revolutionized our workflow. What used to take hours now takes seconds. The accuracy is phenomenal.",
       avatar: "MR",
       rating: 5
     },
@@ -93,7 +96,7 @@ const Index = () => {
     {
       id: "starter",
       name: "Starter",
-      price: "$29",
+      price: "£24",
       period: "/month",
       description: "Perfect for small workshops and hobbyists",
       features: [
@@ -109,7 +112,7 @@ const Index = () => {
     {
       id: "professional",
       name: "Professional",
-      price: "$89",
+      price: "£74",
       period: "/month",
       description: "Ideal for growing businesses and service centers",
       features: [
@@ -127,7 +130,7 @@ const Index = () => {
     {
       id: "enterprise",
       name: "Enterprise",
-      price: "$299",
+      price: "£249",
       period: "/month",
       description: "For large organizations and dealerships",
       features: [
@@ -154,9 +157,94 @@ const Index = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 dark:from-slate-900 dark:via-purple-900 dark:to-slate-900 light:from-slate-50 light:via-purple-50 light:to-slate-50">
+      {/* Mobile Sidebar */}
+      <AnimatePresence>
+        {isMobileMenuOpen && (
+          <>
+            {/* Backdrop */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40 md:hidden"
+              onClick={() => setIsMobileMenuOpen(false)}
+            />
+            
+            {/* Mobile Menu */}
+            <motion.div
+              initial={{ x: "100%" }}
+              animate={{ x: 0 }}
+              exit={{ x: "100%" }}
+              transition={{ type: "spring", damping: 25, stiffness: 200 }}
+              className="fixed top-0 right-0 h-full w-80 bg-black/95 backdrop-blur-xl border-l border-white/20 z-50 md:hidden"
+            >
+              <div className="p-6">
+                {/* Close Button */}
+                <div className="flex justify-end mb-8">
+                  <button
+                    onClick={() => setIsMobileMenuOpen(false)}
+                    className="p-2 rounded-xl bg-white/10 hover:bg-white/20 transition-colors"
+                  >
+                    <X className="w-6 h-6 text-white" />
+                  </button>
+                </div>
+
+                {/* Logo */}
+                <div className="flex items-center space-x-3 mb-8">
+                  <div className="w-10 h-10 bg-gradient-to-r from-purple-500 to-blue-500 rounded-xl flex items-center justify-center shadow-lg shadow-purple-500/25">
+                    <Zap className="w-6 h-6 text-white" />
+                  </div>
+                  <span className="text-xl font-bold text-white">SpareFinder</span>
+                </div>
+
+                {/* Navigation Links */}
+                <nav className="space-y-4 mb-8">
+                  {[
+                    { name: "Features", href: "#features" },
+                    { name: "Pricing", href: "#pricing" },
+                    { name: "Reviews", href: "#testimonials" },
+                  ].map((item) => (
+                    <a
+                      key={item.name}
+                      href={item.href}
+                      className="block py-3 px-4 text-gray-300 hover:text-white hover:bg-white/10 rounded-xl transition-all duration-200"
+                      onClick={() => setIsMobileMenuOpen(false)}
+                    >
+                      {item.name}
+                    </a>
+                  ))}
+                </nav>
+
+                {/* Action Buttons */}
+                <div className="space-y-4">
+                  <Link to="/login" className="block">
+                    <Button 
+                      variant="ghost" 
+                      className="w-full text-white hover:bg-white/10 rounded-xl justify-start"
+                      onClick={() => setIsMobileMenuOpen(false)}
+                    >
+                      Sign In
+                    </Button>
+                  </Link>
+                  <Link to="/register" className="block">
+                    <Button 
+                      className="w-full bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 text-white shadow-lg shadow-purple-500/25 rounded-xl"
+                      onClick={() => setIsMobileMenuOpen(false)}
+                    >
+                      Get Started
+                      <ArrowRight className="ml-2 w-4 h-4" />
+                    </Button>
+                  </Link>
+                </div>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
       {/* Enhanced Navigation */}
-      <nav className="fixed top-0 w-full z-50 border-b border-white/10 backdrop-blur-xl bg-black/20">
-        <div className="container mx-auto px-6 py-4">
+      <nav className="fixed top-4 left-4 right-4 z-50 backdrop-blur-xl bg-black/30 border border-white/20 rounded-2xl shadow-2xl shadow-black/20">
+        <div className="px-6 py-4">
           <div className="flex items-center justify-between">
             <motion.div 
               className="flex items-center space-x-3"
@@ -174,7 +262,7 @@ const Index = () => {
               </div>
               <div>
                 <span className="text-xl font-bold bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent">
-                  PartFinder AI
+                  SpareFinder
                 </span>
                 <div className="flex items-center space-x-1">
                   <Badge variant="secondary" className="text-xs bg-purple-500/20 text-purple-300 border-purple-500/30">
@@ -204,17 +292,29 @@ const Index = () => {
 
             <div className="flex items-center space-x-4">
               <ThemeToggle />
-              <Link to="/login">
-                <Button variant="ghost" className="text-white hover:text-purple-300 hover:bg-white/10">
-                  Sign In
-                </Button>
-              </Link>
-              <Link to="/register">
-                <Button className="bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 text-white px-6 shadow-lg shadow-purple-500/25">
-                  Get Started
-                  <ArrowRight className="ml-2 w-4 h-4" />
-                </Button>
-              </Link>
+              
+              {/* Desktop Buttons */}
+              <div className="hidden md:flex items-center space-x-4">
+                <Link to="/login">
+                  <Button variant="ghost" className="text-white hover:text-purple-300 hover:bg-white/10 rounded-xl">
+                    Sign In
+                  </Button>
+                </Link>
+                <Link to="/register">
+                  <Button className="bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 text-white px-6 shadow-lg shadow-purple-500/25 rounded-xl">
+                    Get Started
+                    <ArrowRight className="ml-2 w-4 h-4" />
+                  </Button>
+                </Link>
+              </div>
+
+              {/* Mobile Menu Button */}
+              <button
+                onClick={() => setIsMobileMenuOpen(true)}
+                className="md:hidden p-2 rounded-xl bg-white/10 hover:bg-white/20 transition-colors"
+              >
+                <Menu className="w-6 h-6 text-white" />
+              </button>
             </div>
           </div>
         </div>
@@ -241,23 +341,20 @@ const Index = () => {
               Revolutionary AI Technology
             </Badge>
             
-            <h1 className="text-5xl md:text-7xl lg:text-8xl font-bold mb-8 leading-tight">
-              <span className="bg-gradient-to-r from-white via-purple-200 to-blue-200 bg-clip-text text-transparent">
-                Identify Any{" "}
+            <h1 className="text-5xl md:text-7xl lg:text-8xl font-bold mb-8 leading-tight relative z-20">
+              <span className="bg-gradient-to-r from-white via-gray-100 to-white bg-clip-text text-transparent">
+                Industrial AI{" "}
               </span>
               <br />
-              <span className="bg-gradient-to-r from-purple-400 via-pink-400 to-blue-400 bg-clip-text text-transparent">
-                Spare Part
-              </span>
-              <br />
-              <span className="bg-gradient-to-r from-white via-purple-200 to-blue-200 bg-clip-text text-transparent">
-                Instantly
+              <span className="bg-gradient-to-r from-purple-200 via-pink-200 to-blue-200 bg-clip-text text-transparent z-30">
+                Part Recognition
               </span>
             </h1>
 
-            <p className="text-xl md:text-2xl text-gray-300 mb-12 max-w-4xl mx-auto leading-relaxed">
-              Harness the power of advanced AI vision technology to identify automotive parts, 
-              find specifications, and locate the best prices across 50+ global marketplaces in seconds.
+            <p className="text-xl md:text-2xl text-gray-200 mb-12 max-w-4xl mx-auto leading-relaxed relative z-20 ">
+              Revolutionary computer vision technology that identifies industrial parts with{" "}
+              <span className="text-purple-300 font-semibold">99.9% accuracy</span>{" "}
+              in milliseconds
             </p>
 
             <div className="flex flex-col sm:flex-row gap-6 justify-center items-center mb-16">
@@ -415,8 +512,8 @@ const Index = () => {
             className="text-center mb-20"
           >
             <Badge className="mb-4 bg-gradient-to-r from-purple-500/20 to-pink-500/20 text-purple-300 border-purple-500/30">
-              <DollarSign className="w-4 h-4 mr-2" />
-              Transparent Pricing
+              <span className="text-lg">£</span>
+              <span className="ml-1">Transparent Pricing</span>
             </Badge>
             <h2 className="text-4xl md:text-6xl font-bold text-white mb-6">
               Choose Your
@@ -515,7 +612,7 @@ const Index = () => {
             </h2>
             
             <p className="text-xl text-gray-300 mb-10 max-w-3xl mx-auto">
-              Join over 50,000 mechanics, engineers, and hobbyists who trust PartFinder AI 
+              Join over 50,000 mechanics, engineers, and hobbyists who trust SpareFinder 
               for accurate, instant spare part identification. Start your free trial today.
             </p>
             
@@ -551,7 +648,7 @@ const Index = () => {
                 <div className="w-10 h-10 bg-gradient-to-r from-purple-500 to-blue-500 rounded-xl flex items-center justify-center">
                   <Zap className="w-6 h-6 text-white" />
                 </div>
-                <span className="text-xl font-bold text-white">PartFinder AI</span>
+                <span className="text-xl font-bold text-white">SpareFinder</span>
               </div>
               <p className="text-gray-400 mb-6 max-w-md">
                 Revolutionizing automotive part identification with cutting-edge AI technology. 
@@ -587,7 +684,7 @@ const Index = () => {
           
           <div className="border-t border-white/10 pt-8 flex flex-col md:flex-row justify-between items-center">
             <div className="text-gray-400 mb-4 md:mb-0">
-              <p>&copy; 2025 PartFinder AI. All rights reserved.</p>
+              <p>&copy; 2025 SpareFinder. All rights reserved.</p>
             </div>
             <div className="flex space-x-6 text-gray-400">
               <a href="#" className="hover:text-white transition-colors">Privacy</a>

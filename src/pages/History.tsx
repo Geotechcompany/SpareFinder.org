@@ -1,9 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { useToast } from '@/components/ui/use-toast';
+import { apiClient } from '@/lib/api';
 import { 
   History as HistoryIcon, 
   Search, 
@@ -22,7 +24,9 @@ import {
   AlertTriangle,
   XCircle,
   Upload,
-  Menu
+  Menu,
+  Loader2,
+  Trash2
 } from 'lucide-react';
 import DashboardSidebar from '@/components/DashboardSidebar';
 import MobileSidebar from '@/components/MobileSidebar';
@@ -33,94 +37,109 @@ const History = () => {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [activeTab, setActiveTab] = useState('all');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [uploadHistory, setUploadHistory] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [pagination, setPagination] = useState({
+    page: 1,
+    limit: 20,
+    total: 0,
+    totalPages: 0
+  });
+  const { toast } = useToast();
 
   const tabs = [
-    { id: 'all', label: 'All', icon: HistoryIcon, count: 247 },
-    { id: 'completed', label: 'Completed', icon: CheckCircle, count: 239 },
-    { id: 'processing', label: 'Processing', icon: Clock, count: 3 },
-    { id: 'failed', label: 'Failed', icon: XCircle, count: 5 }
+    { id: 'all', label: 'All', icon: HistoryIcon, count: pagination.total },
+    { id: 'completed', label: 'Completed', icon: CheckCircle, count: uploadHistory.filter(item => item.status === 'completed').length },
+    { id: 'processing', label: 'Processing', icon: Clock, count: uploadHistory.filter(item => item.status === 'processing').length },
+    { id: 'failed', label: 'Failed', icon: XCircle, count: uploadHistory.filter(item => item.status === 'failed').length }
   ];
 
-  const uploadHistory = [
-    {
-      id: 1,
-      partName: 'Brake Pad Set - Front',
-      partNumber: 'BP-2134-F',
-      uploadDate: '2024-01-15',
-      date: '2024-01-15',
-      status: 'completed',
-      confidence: 96.5,
-      category: 'Braking System',
-      manufacturer: 'Bosch',
-      processingTime: '0.2s',
-      image: '/placeholder.svg'
-    },
-    {
-      id: 2,
-      partName: 'Air Filter Element',
-      partNumber: 'AF-8901-STD',
-      uploadDate: '2024-01-14',
-      date: '2024-01-14',
-      status: 'completed',
-      confidence: 94.2,
-      category: 'Engine',
-      manufacturer: 'OEM',
-      processingTime: '0.3s',
-      image: '/placeholder.svg'
-    },
-    {
-      id: 3,
-      partName: 'Spark Plug Set',
-      partNumber: 'SP-4567-V6',
-      uploadDate: '2024-01-13',
-      date: '2024-01-13',
-      status: 'processing',
-      confidence: 85.0,
-      category: 'Ignition',
-      manufacturer: 'NGK',
-      processingTime: '--',
-      image: '/placeholder.svg'
-    },
-    {
-      id: 4,
-      partName: 'Oil Filter',
-      partNumber: 'OF-3456-HD',
-      uploadDate: '2024-01-12',
-      date: '2024-01-12',
-      status: 'completed',
-      confidence: 98.1,
-      category: 'Engine',
-      manufacturer: 'Fram',
-      processingTime: '0.1s',
-      image: '/placeholder.svg'
-    },
-    {
-      id: 5,
-      partName: 'Transmission Filter',
-      partNumber: 'TF-7890-AT',
-      uploadDate: '2024-01-11',
-      date: '2024-01-11',
-      status: 'failed',
-      confidence: 45.0,
-      category: 'Transmission',
-      manufacturer: 'Unknown',
-      processingTime: '0.5s',
-      image: '/placeholder.svg'
-    },
-    {
-      id: 6,
-      partName: 'Fuel Pump Assembly',
-      partNumber: 'FP-9876-EFI',
-      uploadDate: '2024-01-10',
-      date: '2024-01-10',
-      status: 'completed',
-      confidence: 95.7,
-      category: 'Fuel System',
-      manufacturer: 'Delphi',
-      processingTime: '0.4s',
-      image: '/placeholder.svg'
+  useEffect(() => {
+    fetchUploadHistory();
+  }, [pagination.page, activeTab, searchTerm]);
+
+  const fetchUploadHistory = async () => {
+    try {
+      setIsLoading(true);
+      const filters = {
+        search: searchTerm || undefined,
+        status: activeTab !== 'all' ? activeTab : undefined
+      };
+
+      const response = await apiClient.getUploadHistory(pagination.page, pagination.limit, filters);
+      
+      if (response.success && response.data) {
+        const mappedHistory = response.data.uploads.map(upload => ({
+          id: upload.id,
+          partName: upload.image_name || 'Unknown Part',
+          partNumber: `PN-${upload.id.slice(-8)}`,
+          uploadDate: upload.created_at,
+          date: upload.created_at,
+          status: upload.confidence_score > 0.5 ? 'completed' : 'failed',
+          confidence: upload.confidence_score ? Math.round(upload.confidence_score * 100) : 0,
+          category: upload.predictions?.[0]?.category || 'Unknown',
+          manufacturer: upload.predictions?.[0]?.manufacturer || 'Unknown',
+          processingTime: upload.processing_time ? `${upload.processing_time}s` : '--',
+          image: upload.image_url || '/placeholder.svg'
+        }));
+        
+        setUploadHistory(mappedHistory);
+        setPagination(prev => ({
+          ...prev,
+          total: response.data.pagination.total,
+          totalPages: response.data.pagination.totalPages
+        }));
+      }
+    } catch (error) {
+      console.error('Error fetching upload history:', error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to load upload history. Please try again."
+      });
+    } finally {
+      setIsLoading(false);
     }
-  ];
+  };
+
+  const handleExportHistory = async () => {
+    try {
+      const response = await apiClient.exportHistory('csv');
+      if (response.success) {
+        toast({
+          title: "Success",
+          description: "History exported successfully!"
+        });
+      }
+    } catch (error) {
+      console.error('Error exporting history:', error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to export history. Please try again."
+      });
+    }
+  };
+
+  const handleDeleteUpload = async (uploadId: string) => {
+    try {
+      const response = await apiClient.deleteUpload(uploadId);
+      if (response.success) {
+        toast({
+          title: "Success",
+          description: "Upload deleted successfully!"
+        });
+        fetchUploadHistory(); // Refresh the list
+      }
+    } catch (error) {
+      console.error('Error deleting upload:', error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to delete upload. Please try again."
+      });
+    }
+  };
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -164,11 +183,32 @@ const History = () => {
     setIsMobileMenuOpen(!isMobileMenuOpen);
   };
 
-  const stats = {
-    totalUploads: uploadHistory.length,
-    completed: uploadHistory.filter(item => item.status === 'completed').length,
-    avgConfidence: (uploadHistory.filter(item => item.confidence).reduce((sum, item) => sum + (item.confidence || 0), 0) / uploadHistory.filter(item => item.confidence).length).toFixed(1),
-    avgProcessingTime: '0.3s'
+  const [stats, setStats] = useState({
+    totalUploads: 0,
+    completed: 0,
+    avgConfidence: '0.0',
+    avgProcessingTime: '0.0s'
+  });
+
+  useEffect(() => {
+    fetchDashboardStats();
+  }, []);
+
+  const fetchDashboardStats = async () => {
+    try {
+      const response = await apiClient.getDashboardStats();
+      if (response.success && response.data) {
+        const data = response.data;
+        setStats({
+          totalUploads: data.totalUploads || 0,
+          completed: data.successfulUploads || 0,
+          avgConfidence: (data.avgConfidence || 0).toFixed(1),
+          avgProcessingTime: `${data.avgProcessTime || 0}s`
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching dashboard stats:', error);
+    }
   };
 
   return (
@@ -281,7 +321,10 @@ const History = () => {
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
                   >
-                    <Button className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 shadow-lg shadow-purple-500/25 h-12 px-6">
+                    <Button 
+                      onClick={handleExportHistory}
+                      className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 shadow-lg shadow-purple-500/25 h-12 px-6"
+                    >
                       <Download className="w-4 h-4 mr-2" />
                       Export History
                     </Button>
@@ -299,10 +342,10 @@ const History = () => {
             className="grid grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6"
           >
             {[
-              { label: 'Total Uploads', value: '247', icon: Database, color: 'from-blue-600 to-cyan-600' },
-              { label: 'Completed', value: '239', icon: HistoryIcon, color: 'from-green-600 to-emerald-600' },
-              { label: 'Avg Confidence', value: '94.8%', icon: TrendingUp, color: 'from-purple-600 to-violet-600' },
-              { label: 'Avg Time', value: '2.3s', icon: Clock, color: 'from-orange-600 to-red-600' }
+              { label: 'Total Uploads', value: stats.totalUploads.toString(), icon: Database, color: 'from-blue-600 to-cyan-600' },
+              { label: 'Completed', value: stats.completed.toString(), icon: HistoryIcon, color: 'from-green-600 to-emerald-600' },
+              { label: 'Avg Confidence', value: `${stats.avgConfidence}%`, icon: TrendingUp, color: 'from-purple-600 to-violet-600' },
+              { label: 'Avg Time', value: stats.avgProcessingTime, icon: Clock, color: 'from-orange-600 to-red-600' }
             ].map((stat, index) => (
               <motion.div
                 key={stat.label}
@@ -416,7 +459,12 @@ const History = () => {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                {filteredHistory.length > 0 ? (
+                {isLoading ? (
+                  <div className="text-center py-12">
+                    <Loader2 className="w-16 h-16 text-purple-400 mx-auto mb-4 animate-spin" />
+                    <p className="text-gray-400 text-lg">Loading upload history...</p>
+                  </div>
+                ) : filteredHistory.length > 0 ? (
                   <div className="space-y-4">
                     {filteredHistory.map((item, index) => (
                       <motion.div
@@ -476,6 +524,7 @@ const History = () => {
                                 whileHover={{ scale: 1.1 }}
                                 whileTap={{ scale: 0.9 }}
                                 className="p-2 lg:p-3 hover:bg-white/10 rounded-lg transition-colors"
+                                title="View Details"
                               >
                                 <Eye className="w-4 h-4 text-blue-400" />
                               </motion.button>
@@ -483,8 +532,18 @@ const History = () => {
                                 whileHover={{ scale: 1.1 }}
                                 whileTap={{ scale: 0.9 }}
                                 className="p-2 lg:p-3 hover:bg-white/10 rounded-lg transition-colors"
+                                title="Download"
                               >
                                 <Download className="w-4 h-4 text-green-400" />
+                              </motion.button>
+                              <motion.button
+                                whileHover={{ scale: 1.1 }}
+                                whileTap={{ scale: 0.9 }}
+                                onClick={() => handleDeleteUpload(item.id)}
+                                className="p-2 lg:p-3 hover:bg-red-500/10 rounded-lg transition-colors"
+                                title="Delete"
+                              >
+                                <Trash2 className="w-4 h-4 text-red-400" />
                               </motion.button>
                             </div>
                           </div>

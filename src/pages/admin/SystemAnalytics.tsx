@@ -1,8 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import AdminSidebar from '@/components/AdminSidebar';
+import AdminDesktopSidebar from '@/components/AdminDesktopSidebar';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useToast } from '@/components/ui/use-toast';
+import { apiClient } from '@/lib/api';
 import { 
   BarChart3, 
   Activity, 
@@ -22,15 +26,129 @@ import {
   Shield,
   AlertTriangle,
   CheckCircle,
-  MemoryStick
+  MemoryStick,
+  RefreshCw,
+  Calendar,
+  Target,
+  Loader2
 } from 'lucide-react';
+
+interface SystemMetrics {
+  cpu_usage: number;
+  memory_usage: number;
+  disk_usage: number;
+  avg_response_time: number;
+  total_users: number;
+  active_users: number;
+  total_searches: number;
+  success_rate: number;
+  searches_today: number;
+  new_users_today: number;
+  searches_this_week: number;
+  system_health: 'healthy' | 'warning' | 'critical';
+}
+
+interface AnalyticsData {
+  searches_by_day: Record<string, number>;
+  registrations_by_day: Record<string, number>;
+  time_range: string;
+}
 
 const SystemAnalytics = () => {
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [timeRange, setTimeRange] = useState('30d');
+  const [metrics, setMetrics] = useState<SystemMetrics | null>(null);
+  const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
+  
+  const { toast } = useToast();
 
   const handleToggleSidebar = () => {
     setIsCollapsed(!isCollapsed);
   };
+
+  useEffect(() => {
+    fetchSystemData();
+  }, [timeRange]);
+
+  const fetchSystemData = async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+
+      // Fetch system metrics and analytics in parallel
+      const [metricsResponse, analyticsResponse] = await Promise.all([
+        apiClient.getAdminStats(),
+        apiClient.getAdminAnalytics(timeRange)
+      ]);
+
+      if (metricsResponse.success && metricsResponse.data?.statistics) {
+        const stats = metricsResponse.data.statistics;
+        setMetrics({
+          ...stats,
+          system_health: (stats.system_health as 'healthy' | 'warning' | 'critical') || 'healthy'
+        });
+      }
+
+      if (analyticsResponse.success && analyticsResponse.data?.analytics) {
+        setAnalytics(analyticsResponse.data.analytics);
+      }
+
+      setLastUpdated(new Date());
+    } catch (err) {
+      console.error('Error fetching system data:', err);
+      setError(err instanceof Error ? err.message : 'Failed to fetch system data');
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to load system analytics. Please try again.",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const getHealthColor = (health: string) => {
+    switch (health) {
+      case 'healthy': return 'text-green-400';
+      case 'warning': return 'text-yellow-400';
+      case 'critical': return 'text-red-400';
+      default: return 'text-gray-400';
+    }
+  };
+
+  const getHealthIcon = (health: string) => {
+    switch (health) {
+      case 'healthy': return CheckCircle;
+      case 'warning': return AlertTriangle;
+      case 'critical': return AlertTriangle;
+      default: return Clock;
+    }
+  };
+
+  const getUsageColor = (usage: number) => {
+    if (usage >= 90) return 'from-red-600 to-rose-600';
+    if (usage >= 70) return 'from-yellow-600 to-orange-600';
+    return 'from-green-600 to-emerald-600';
+  };
+
+  const formatLastUpdated = () => {
+    return lastUpdated.toLocaleTimeString();
+  };
+
+  const calculateGrowth = (current: number, previous: number) => {
+    if (previous === 0) return current > 0 ? 100 : 0;
+    return ((current - previous) / previous) * 100;
+  };
+
+  // Calculate chart data from analytics
+  const chartData = analytics ? Object.entries(analytics.searches_by_day).map(([date, searches]) => ({
+    date,
+    searches,
+    registrations: analytics.registrations_by_day[date] || 0
+  })).slice(-30) : [];
 
   const systemMetrics = {
     uptime: '47d 12h 34m',
@@ -92,11 +210,11 @@ const SystemAnalytics = () => {
   };
 
   return (
-    <div className="min-h-screen flex w-full bg-gradient-to-br from-gray-900 via-red-900/20 to-gray-900 relative overflow-hidden">
+    <div className="min-h-screen flex w-full bg-gradient-to-br from-gray-900 via-blue-900/20 to-gray-900 relative overflow-hidden">
       {/* Animated Background Elements */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <motion.div
-          className="absolute top-1/4 -right-40 w-80 h-80 bg-red-600/15 rounded-full blur-3xl opacity-60"
+          className="absolute top-1/4 -right-40 w-80 h-80 bg-blue-600/15 rounded-full blur-3xl opacity-60"
           animate={{
             scale: [1, 1.3, 1],
             rotate: [0, 180, 360],
@@ -108,7 +226,7 @@ const SystemAnalytics = () => {
           }}
         />
         <motion.div
-          className="absolute -bottom-40 -left-40 w-96 h-96 bg-rose-600/10 rounded-full blur-3xl opacity-40"
+          className="absolute -bottom-40 -left-40 w-96 h-96 bg-purple-600/10 rounded-full blur-3xl opacity-40"
           animate={{
             scale: [1.2, 1, 1.2],
             x: [0, 50, 0],
@@ -122,7 +240,7 @@ const SystemAnalytics = () => {
         />
       </div>
 
-      <AdminSidebar isCollapsed={isCollapsed} onToggle={handleToggleSidebar} />
+      <AdminDesktopSidebar isCollapsed={isCollapsed} onToggle={handleToggleSidebar} />
       
       <motion.div
         initial={false}
@@ -138,7 +256,7 @@ const SystemAnalytics = () => {
         >
           {/* Header */}
           <div className="relative">
-            <div className="absolute inset-0 bg-gradient-to-r from-red-600/10 to-rose-600/10 rounded-3xl blur-xl opacity-60" />
+            <div className="absolute inset-0 bg-gradient-to-r from-blue-600/10 to-purple-600/10 rounded-3xl blur-xl opacity-60" />
             <div className="relative bg-black/20 backdrop-blur-xl rounded-3xl p-6 border border-white/10">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div>
@@ -146,19 +264,19 @@ const SystemAnalytics = () => {
                     initial={{ opacity: 0, scale: 0.8 }}
                     animate={{ opacity: 1, scale: 1 }}
                     transition={{ delay: 0.2 }}
-                    className="inline-flex items-center px-4 py-2 bg-gradient-to-r from-red-600/20 to-rose-600/20 rounded-full border border-red-500/30 backdrop-blur-xl mb-4"
+                    className="inline-flex items-center px-4 py-2 bg-gradient-to-r from-blue-600/20 to-purple-600/20 rounded-full border border-blue-500/30 backdrop-blur-xl mb-4"
                   >
                     <motion.div
                       animate={{ rotate: [0, 360] }}
                       transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
                       className="mr-2"
                     >
-                      <BarChart3 className="w-4 h-4 text-red-400" />
+                      <BarChart3 className="w-4 h-4 text-blue-400" />
                     </motion.div>
-                    <span className="text-red-300 text-sm font-semibold">System Analytics</span>
+                    <span className="text-blue-300 text-sm font-semibold">System Analytics</span>
                   </motion.div>
                   <motion.h1 
-                    className="text-3xl lg:text-4xl font-bold bg-gradient-to-r from-white via-red-100 to-rose-100 bg-clip-text text-transparent mb-3"
+                    className="text-3xl lg:text-4xl font-bold bg-gradient-to-r from-white via-blue-100 to-purple-100 bg-clip-text text-transparent mb-3"
                     initial={{ opacity: 0, x: -20 }}
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: 0.3 }}
@@ -242,11 +360,11 @@ const SystemAnalytics = () => {
             >
               {/* System Performance */}
               <div className="relative">
-                <div className="absolute inset-0 bg-gradient-to-r from-red-600/5 to-rose-600/5 rounded-3xl blur-xl opacity-60" />
+                <div className="absolute inset-0 bg-gradient-to-r from-blue-600/5 to-purple-600/5 rounded-3xl blur-xl opacity-60" />
                 <Card className="relative bg-black/20 backdrop-blur-xl border-white/10">
                   <CardHeader>
                     <CardTitle className="text-white flex items-center space-x-2">
-                      <Server className="w-5 h-5 text-red-400" />
+                      <Server className="w-5 h-5 text-blue-400" />
                       <span>System Performance</span>
                     </CardTitle>
                     <CardDescription className="text-gray-400">

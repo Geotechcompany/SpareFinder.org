@@ -29,10 +29,52 @@ import {
 } from 'lucide-react';
 import DashboardSidebar from '@/components/DashboardSidebar';
 import MobileSidebar from '@/components/MobileSidebar';
-import { useAIAnalysis, type AnalysisProgress, type AnalysisResponse, type PartPrediction } from '@/services/aiService';
+import { apiClient } from '@/lib/api';
 import { toast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
-import { db } from '@/lib/supabase/client';
+
+// Types for analysis functionality
+interface AnalysisProgress {
+  stage: 'uploading' | 'processing' | 'analyzing' | 'enriching' | 'complete' | 'error';
+  progress: number;
+  message: string;
+  details?: string;
+}
+
+interface PartPrediction {
+  id: string;
+  partName: string;
+  partNumber: string;
+  category: string;
+  manufacturer: string;
+  confidence: number;
+  description?: string;
+  specifications?: Record<string, any>;
+  estimatedPrice?: {
+    min: number;
+    max: number;
+    currency: string;
+  };
+  compatibility?: any[];
+  suppliers?: any[];
+  images?: string[];
+  tags?: string[];
+  lastUpdated?: string;
+}
+
+interface AnalysisResponse {
+  success: boolean;
+  analysisId: string;
+  predictions: PartPrediction[];
+  processingTime: number;
+  metadata: {
+    imageSize: number;
+    imageFormat: string;
+    modelVersion: string;
+    confidence: number;
+  };
+  error?: string;
+}
 
 const Upload = () => {
   const [dragActive, setDragActive] = useState(false);
@@ -46,7 +88,73 @@ const Upload = () => {
   const [selectedPrediction, setSelectedPrediction] = useState<PartPrediction | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const { analyzeImage, validateFile } = useAIAnalysis();
+  // File validation function
+  const validateFile = (file: File): { valid: boolean; error?: string } => {
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+    const maxSize = 10 * 1024 * 1024; // 10MB
+
+    if (!allowedTypes.includes(file.type)) {
+      return { valid: false, error: 'Please upload a valid image file (JPEG, PNG, WebP)' };
+    }
+
+    if (file.size > maxSize) {
+      return { valid: false, error: 'File size must be less than 10MB' };
+    }
+
+    return { valid: true };
+  };
+
+  // Analysis function using backend API
+  const analyzeImage = async (
+    file: File,
+    options: any = {},
+    onProgress?: (progress: AnalysisProgress) => void
+  ): Promise<AnalysisResponse | null> => {
+    try {
+      // Update progress
+      onProgress?.({
+        stage: 'uploading',
+        progress: 0,
+        message: 'Uploading image...'
+      });
+
+      const response = await apiClient.uploadImage(file, options);
+
+      if (response.success && response.data) {
+        onProgress?.({
+          stage: 'complete',
+          progress: 100,
+          message: 'Analysis complete!'
+        });
+
+        // Transform backend response to match expected format
+        return {
+          success: true,
+          analysisId: response.data.id || 'temp-id',
+          predictions: response.data.predictions || [],
+          processingTime: response.data.processingTime || 0,
+          metadata: {
+            imageSize: file.size,
+            imageFormat: file.type,
+            modelVersion: response.data.modelVersion || 'v1.0',
+            confidence: response.data.confidence || 0.85
+          }
+        };
+      } else {
+        throw new Error(response.error || 'Analysis failed');
+      }
+    } catch (error) {
+      onProgress?.({
+        stage: 'error',
+        progress: 0,
+        message: 'Analysis failed',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      });
+      
+      console.error('Image analysis error:', error);
+      return null;
+    }
+  };
 
   const handleDrag = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -187,7 +295,10 @@ const Upload = () => {
     }
   };
 
-  const formatPrice = (price: { min: number; max: number; currency: string }) => {
+  const formatPrice = (price?: { min: number; max: number; currency: string } | null) => {
+    if (!price || typeof price.min === 'undefined' || typeof price.max === 'undefined') {
+      return 'Price not available';
+    }
     const symbol = price.currency === 'GBP' ? '£' : '$';
     return `${symbol}${price.min} - ${symbol}${price.max}`;
   };
@@ -592,7 +703,7 @@ const Upload = () => {
                       )}
 
                       {/* Compatibility */}
-                      {selectedPrediction.compatibility.length > 0 && (
+                      {selectedPrediction.compatibility && selectedPrediction.compatibility.length > 0 && (
                         <div className="p-4 rounded-xl bg-white/5 border border-white/10">
                           <div className="text-gray-400 text-sm mb-3">Compatible Vehicles</div>
                           <div className="space-y-2">
@@ -614,7 +725,7 @@ const Upload = () => {
                       )}
 
                       {/* Suppliers */}
-                      {selectedPrediction.suppliers.length > 0 && (
+                      {selectedPrediction.suppliers && selectedPrediction.suppliers.length > 0 && (
                         <div className="p-4 rounded-xl bg-white/5 border border-white/10">
                           <div className="text-gray-400 text-sm mb-3">Available Suppliers</div>
                           <div className="space-y-3">
@@ -673,7 +784,7 @@ const Upload = () => {
                       </div>
 
                       {/* Multiple Predictions */}
-                      {analysisResults && analysisResults.predictions.length > 1 && (
+                      {analysisResults && analysisResults.predictions && analysisResults.predictions.length > 1 && (
                         <div className="border-t border-white/10 pt-4">
                           <div className="text-gray-400 text-sm mb-3">Other Possible Matches</div>
                           <div className="space-y-2">

@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/components/ui/use-toast';
-import supabase from '../lib/supabase/client';
+import { apiClient } from '@/lib/api';
 import { Loader2 } from 'lucide-react';
 import { 
   User, 
@@ -47,6 +47,15 @@ const Profile = () => {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [userStats, setUserStats] = useState({
+    totalUploads: 0,
+    successRate: 0,
+    avgConfidence: 0,
+    memberSince: 'N/A',
+    streak: 0,
+    totalSaved: '$0',
+    achievements: 0
+  });
 
   const { toast } = useToast();
 
@@ -54,35 +63,31 @@ const Profile = () => {
     fetchUserProfile();
   }, []);
 
+  useEffect(() => {
+    if (profile) {
+      fetchUserStats();
+    }
+  }, [profile]);
+
   const fetchUserProfile = async () => {
     try {
       setIsLoading(true);
       setError(null);
 
-      // Get the current user's session
-      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      const response = await apiClient.getProfile();
       
-      if (sessionError) throw sessionError;
-      if (!session?.user) throw new Error('No user session found');
-
-      // Fetch user profile from profiles table
-      const { data: profile, error: profileError } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', session.user.id)
-        .single();
-
-      if (profileError) throw profileError;
-
-      if (profile) {
+      if (response.success && response.data?.profile) {
+        const profileData = response.data.profile;
         setProfile({
-          id: profile.id,
-          email: profile.email || session.user.email || '',
-          username: profile.username,
-          full_name: profile.full_name || '',
-          avatar_url: profile.avatar_url,
-          created_at: profile.created_at
+          id: profileData.id,
+          email: profileData.email,
+          username: null, // Username not available in current API
+          full_name: profileData.full_name || '',
+          avatar_url: profileData.avatar_url,
+          created_at: profileData.created_at
         });
+      } else {
+        throw new Error('Failed to fetch profile data');
       }
     } catch (err) {
       console.error('Error fetching user profile:', err);
@@ -94,6 +99,33 @@ const Profile = () => {
       });
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const fetchUserStats = async () => {
+    try {
+      // Fetch dashboard stats which includes comprehensive user data
+      const response = await apiClient.getDashboardStats();
+      
+      if (response.success && response.data) {
+        const stats = response.data;
+        setUserStats({
+          totalUploads: stats.totalUploads || 0,
+          successRate: stats.successfulUploads && stats.totalUploads 
+            ? Math.round((stats.successfulUploads / stats.totalUploads) * 100 * 100) / 100 
+            : 0,
+          avgConfidence: stats.avgConfidence || 0,
+          memberSince: profile?.created_at 
+            ? new Date(profile.created_at).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) 
+            : 'N/A',
+          streak: stats.currentStreak || 0,
+          totalSaved: `$${stats.totalSaved || 0}`,
+          achievements: stats.totalAchievements || 0
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching user stats:', error);
+      // Keep default values on error
     }
   };
 
@@ -135,16 +167,6 @@ const Profile = () => {
       </div>
     );
   }
-
-  const userStats = {
-    totalUploads: 847,
-    successRate: 96.8,
-    avgConfidence: 94.2,
-    memberSince: profile?.created_at ? new Date(profile.created_at).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) : 'N/A',
-    streak: 15,
-    totalSaved: '$2,340',
-    achievements: 12
-  };
 
   const achievements = [
     { id: 1, title: 'First Upload', description: 'Uploaded your first part', icon: Trophy, color: 'from-yellow-600 to-orange-600', earned: true },

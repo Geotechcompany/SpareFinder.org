@@ -39,7 +39,7 @@ const Footer = () => {
               </motion.div>
               <div>
                 <h3 className="text-4xl font-bold bg-gradient-to-r from-white via-purple-200 to-blue-200 bg-clip-text text-transparent">
-                  PartFinder AI
+                  SpareFinder
                 </h3>
                 <p className="text-gray-400 text-sm">Industrial AI Excellence</p>
               </div>
@@ -205,7 +205,7 @@ const Footer = () => {
             transition={{ delay: 0.5, duration: 0.8 }}
             className="flex flex-col sm:flex-row items-center space-y-4 sm:space-y-0 sm:space-x-8 text-center sm:text-left"
           >
-            <span className="text-gray-400 font-medium">© 2025 PartFinder AI. All rights reserved.</span>
+            <span className="text-gray-400 font-medium">© 2025 SpareFinder. All rights reserved.</span>
             <div className="flex space-x-6">
               <Link to="/privacy-policy" className="text-gray-500 hover:text-purple-400 text-sm font-medium transition-colors duration-300">Privacy Policy</Link>
               <Link to="/terms-of-service" className="text-gray-500 hover:text-purple-400 text-sm font-medium transition-colors duration-300">Terms of Service</Link>
