@@ -25,7 +25,7 @@ const upload = multer({
 });
 
 // Multer error handler
-const handleMulterError = (err: any, req: any, res: Response, next: any) => {
+const handleMulterError = (err: any, _req: any, res: Response, next: any) => {
   if (err instanceof multer.MulterError) {
     if (err.code === 'LIMIT_FILE_SIZE') {
       return res.status(400).json({
@@ -46,7 +46,7 @@ const handleMulterError = (err: any, req: any, res: Response, next: any) => {
     });
   }
   
-  next();
+  return next();
 };
 
 // File upload status endpoint

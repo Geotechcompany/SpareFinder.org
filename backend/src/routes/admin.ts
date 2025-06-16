@@ -126,7 +126,7 @@ router.delete('/users/:userId', [authenticateToken, requireAdmin], async (req: A
 });
 
 // Get system statistics (admin only)
-router.get('/stats', [authenticateToken, requireAdmin], async (req: AuthRequest, res: Response) => {
+router.get('/stats', [authenticateToken, requireAdmin], async (_req: AuthRequest, res: Response) => {
   try {
     // Get comprehensive statistics
     const [

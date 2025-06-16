@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: sparefinder-ai-service
+    env: docker
+    plan: starter
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /health
+    envVars:
+      - key: PORT
+        value: 8000
+      - key: PYTHONUNBUFFERED
+        value: 1 

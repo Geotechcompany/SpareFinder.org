@@ -1,9 +1,8 @@
 import { Router, Response } from 'express';
 import multer from 'multer';
-import axios from 'axios';
-import { supabase } from '../server';
 import { authenticateToken } from '../middleware/auth';
 import { AuthRequest } from '../types/auth';
+import { supabase } from '../server';
 
 const router = Router();
 
@@ -13,230 +12,169 @@ const upload = multer({
   limits: {
     fileSize: 10 * 1024 * 1024, // 10MB
   },
-  fileFilter: (req, file, cb) => {
-    if (file.mimetype.startsWith('image/')) {
+  fileFilter: (_req, file, cb) => {
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+    if (allowedTypes.includes(file.mimetype)) {
       cb(null, true);
     } else {
-      cb(new Error('Only image files are allowed'));
+      cb(new Error('Invalid file type. Only JPEG, PNG, and WebP are allowed.'));
     }
-  }
+  },
 });
 
-// AI Part prediction endpoint
+// Image prediction endpoint
 router.post('/predict', [authenticateToken, upload.single('image')], async (req: AuthRequest, res: Response) => {
   try {
     if (!req.file) {
       return res.status(400).json({
-        error: 'No image provided',
-        message: 'Please upload an image file'
+        error: 'No image file provided'
       });
     }
 
-    const confidence_threshold = parseFloat(req.body.confidence_threshold) || 0.5;
-    const max_predictions = parseInt(req.body.max_predictions) || 5;
-    const include_external_search = req.body.include_external_search === 'true';
-
-    // Create FormData for AI service
-    const formData = new FormData();
-    const imageBlob = new Blob([req.file.buffer], { type: req.file.mimetype });
-    formData.append('file', imageBlob, req.file.originalname);
-
-    // Call AI service
-    const aiResponse = await axios.post(
-      `${process.env.AI_SERVICE_URL}/predict/image`,
-      formData,
-      {
-        headers: {
-          'Authorization': `Bearer ${process.env.AI_SERVICE_API_KEY}`,
-          'Content-Type': 'multipart/form-data'
-        },
-        params: {
-          confidence_threshold,
-          include_external_search
-        },
-        timeout: 30000 // 30 seconds
-      }
-    );
-
-    const predictions = aiResponse.data;
-
-    // Store search in database
-    const { data: searchRecord, error: searchError } = await supabase
-      .from('part_searches')
-      .insert([
+    // For now, return a mock response
+    // This would integrate with the AI service in production
+    return res.json({
+      success: true,
+      predictions: [
         {
-          user_id: req.user!.userId,
-          image_name: req.file.originalname,
-          image_size: req.file.size,
-          predictions: predictions.predictions || [],
-          confidence_score: predictions.max_confidence || 0,
-          processing_time: predictions.processing_time || 0,
-          ai_model_version: predictions.model_version || 'unknown',
-          metadata: {
-            confidence_threshold,
-            max_predictions,
-            include_external_search,
-            image_dimensions: predictions.image_info?.dimensions,
-            file_type: req.file.mimetype
-          }
+          part_name: 'Brake Pad Set',
+          confidence: 0.95,
+          category: 'Braking System',
+          part_number: 'BP-001-2024'
         }
-      ])
-      .select()
-      .single();
-
-    if (searchError) {
-      console.error('Search record creation error:', searchError);
-      // Don't fail the request, just log the error
-    }
-
-    res.json({
-      ...predictions,
-      search_id: searchRecord?.id,
-      message: 'Image analyzed successfully'
+      ],
+      processing_time: 1200
     });
 
   } catch (error) {
     console.error('Prediction error:', error);
-    
-    if (axios.isAxiosError(error)) {
-      const status = error.response?.status || 500;
-      const message = error.response?.data?.message || 'AI service error';
-      
-      return res.status(status).json({
-        error: 'AI prediction failed',
-        message,
-        details: error.response?.data
-      });
-    }
-
-    res.status(500).json({
-      error: 'Internal server error',
-      message: 'An unexpected error occurred during prediction'
+    return res.status(500).json({
+      error: 'Prediction failed',
+      message: 'An error occurred during image analysis'
     });
   }
 });
 
-// Search parts by number
+// Get part by part number
 router.get('/parts/:partNumber', authenticateToken, async (req: AuthRequest, res: Response) => {
   try {
     const { partNumber } = req.params;
 
-    // Call AI service for part search
-    const aiResponse = await axios.get(
-      `${process.env.AI_SERVICE_URL}/parts/search/number/${partNumber}`,
-      {
-        headers: {
-          'Authorization': `Bearer ${process.env.AI_SERVICE_API_KEY}`
-        },
-        timeout: 10000
+    // Mock part data - would come from external APIs in production
+    const mockPart = {
+      part_number: partNumber,
+      name: 'Sample Part',
+      description: 'This is a sample part description',
+      category: 'Engine',
+      manufacturer: 'Sample Manufacturer',
+      price: 29.99,
+      availability: 'In Stock',
+      specifications: {
+        weight: '2.5 lbs',
+        dimensions: '10x5x3 inches',
+        material: 'Steel'
       }
-    );
+    };
 
-    res.json(aiResponse.data);
+    return res.json({
+      success: true,
+      part: mockPart
+    });
+
+  } catch (error) {
+    console.error('Part fetch error:', error);
+    return res.status(500).json({
+      error: 'Part fetch failed',
+      message: 'An error occurred while fetching part details'
+    });
+  }
+});
+
+// Search parts
+router.get('/parts/search', authenticateToken, async (req: AuthRequest, res: Response) => {
+  try {
+    const { q: query, category, manufacturer } = req.query;
+
+    // Mock search results - would come from external APIs in production
+    const mockResults = [
+      {
+        part_number: 'BP-001-2024',
+        name: 'Brake Pad Set',
+        category: 'Braking System',
+        manufacturer: 'AutoParts Inc',
+        price: 45.99,
+        availability: 'In Stock'
+      },
+      {
+        part_number: 'AF-002-2024',
+        name: 'Air Filter',
+        category: 'Engine',
+        manufacturer: 'FilterTech',
+        price: 19.99,
+        availability: 'Limited Stock'
+      }
+    ];
+
+    return res.json({
+      success: true,
+      results: mockResults,
+      total: mockResults.length,
+      query: {
+        search: query,
+        category,
+        manufacturer
+      }
+    });
 
   } catch (error) {
     console.error('Part search error:', error);
-    
-    if (axios.isAxiosError(error)) {
-      const status = error.response?.status || 500;
-      const message = error.response?.data?.message || 'Part search failed';
-      
-      return res.status(status).json({
-        error: 'Part search failed',
-        message,
-        details: error.response?.data
-      });
-    }
-
-    res.status(500).json({
-      error: 'Internal server error',
-      message: 'An unexpected error occurred during part search'
+    return res.status(500).json({
+      error: 'Search failed',
+      message: 'An error occurred while searching for parts'
     });
   }
 });
 
-// Search parts by description
-router.get('/parts/search', authenticateToken, async (req: AuthRequest, res: Response) => {
-  try {
-    const { description } = req.query;
-
-    if (!description || typeof description !== 'string') {
-      return res.status(400).json({
-        error: 'Missing description',
-        message: 'Please provide a search description'
-      });
-    }
-
-    // Call AI service for part search
-    const aiResponse = await axios.get(
-      `${process.env.AI_SERVICE_URL}/parts/search/description`,
-      {
-        headers: {
-          'Authorization': `Bearer ${process.env.AI_SERVICE_API_KEY}`
-        },
-        params: { description },
-        timeout: 10000
-      }
-    );
-
-    res.json(aiResponse.data);
-
-  } catch (error) {
-    console.error('Part description search error:', error);
-    
-    if (axios.isAxiosError(error)) {
-      const status = error.response?.status || 500;
-      const message = error.response?.data?.message || 'Part search failed';
-      
-      return res.status(status).json({
-        error: 'Part search failed',
-        message,
-        details: error.response?.data
-      });
-    }
-
-    res.status(500).json({
-      error: 'Internal server error',
-      message: 'An unexpected error occurred during part search'
-    });
-  }
-});
-
-// Get part details
+// Get part details with pricing
 router.get('/parts/:partNumber/details', authenticateToken, async (req: AuthRequest, res: Response) => {
   try {
     const { partNumber } = req.params;
 
-    // Call AI service for part details
-    const aiResponse = await axios.get(
-      `${process.env.AI_SERVICE_URL}/parts/details/${partNumber}`,
-      {
-        headers: {
-          'Authorization': `Bearer ${process.env.AI_SERVICE_API_KEY}`
-        },
-        timeout: 10000
-      }
-    );
+    // Mock detailed part data
+    const mockDetails = {
+      part_number: partNumber,
+      name: 'Detailed Part Information',
+      description: 'Comprehensive part details with specifications',
+      category: 'Engine',
+      manufacturer: 'Premium Parts Co',
+      pricing: [
+        { supplier: 'Supplier A', price: 29.99, availability: 'In Stock', shipping: 'Free' },
+        { supplier: 'Supplier B', price: 32.50, availability: 'Limited', shipping: '$5.99' },
+        { supplier: 'Supplier C', price: 27.99, availability: 'In Stock', shipping: 'Free' }
+      ],
+      specifications: {
+        weight: '2.5 lbs',
+        dimensions: '10x5x3 inches',
+        material: 'Steel',
+        warranty: '2 years'
+      },
+      compatibility: [
+        'Vehicle Model A (2020-2024)',
+        'Vehicle Model B (2019-2023)',
+        'Vehicle Model C (2021-2024)'
+      ]
+    };
 
-    res.json(aiResponse.data);
+    return res.json({
+      success: true,
+      details: mockDetails
+    });
 
   } catch (error) {
     console.error('Part details error:', error);
-    
-    if (axios.isAxiosError(error)) {
-      const status = error.response?.status || 500;
-      const message = error.response?.data?.message || 'Part details fetch failed';
-      
-      return res.status(status).json({
-        error: 'Part details fetch failed',
-        message,
-        details: error.response?.data
-      });
-    }
-
-    res.status(500).json({
-      error: 'Internal server error',
-      message: 'An unexpected error occurred while fetching part details'
+    return res.status(500).json({
+      error: 'Details fetch failed',
+      message: 'An error occurred while fetching part details'
     });
   }
 });
@@ -245,36 +183,33 @@ router.get('/parts/:partNumber/details', authenticateToken, async (req: AuthRequ
 router.get('/:searchId', authenticateToken, async (req: AuthRequest, res: Response) => {
   try {
     const { searchId } = req.params;
+    const userId = req.user!.userId;
 
     const { data: search, error } = await supabase
       .from('part_searches')
       .select('*')
       .eq('id', searchId)
-      .eq('user_id', req.user!.userId)
+      .eq('user_id', userId)
       .single();
 
     if (error) {
-      if (error.code === 'PGRST116') {
-        return res.status(404).json({
-          error: 'Search not found',
-          message: 'No search found with the provided ID'
-        });
-      }
-
       console.error('Search fetch error:', error);
-      return res.status(500).json({
-        error: 'Search fetch failed',
-        message: 'Failed to retrieve search data'
+      return res.status(404).json({
+        error: 'Search not found',
+        message: 'The requested search could not be found'
       });
     }
 
-    res.json({ search });
+    return res.json({
+      success: true,
+      search
+    });
 
   } catch (error) {
-    console.error('Get search error:', error);
-    res.status(500).json({
-      error: 'Internal server error',
-      message: 'An unexpected error occurred while fetching search data'
+    console.error('Search fetch error:', error);
+    return res.status(500).json({
+      error: 'Search fetch failed',
+      message: 'An error occurred while fetching search details'
     });
   }
 });

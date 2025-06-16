@@ -28,8 +28,8 @@ COPY . .
 # Create directories for models and logs
 RUN mkdir -p /app/models /app/logs
 
-# Expose port
-EXPOSE 8000
+# Expose port (Render will set PORT env var)
+EXPOSE $PORT
 
 # Run the application
 CMD ["python", "start.py"] 

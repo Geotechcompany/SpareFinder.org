@@ -23,7 +23,7 @@ router.get('/profile', authenticateToken, async (req: AuthRequest, res: Response
       });
     }
 
-    res.json({
+    return res.json({
       profile: {
         id: profile.id,
         email: profile.email,
@@ -43,7 +43,7 @@ router.get('/profile', authenticateToken, async (req: AuthRequest, res: Response
 
   } catch (error) {
     console.error('Get profile error:', error);
-    res.status(500).json({
+    return res.status(500).json({
       error: 'Internal server error',
       message: 'An unexpected error occurred while fetching profile'
     });
@@ -112,7 +112,7 @@ router.put('/profile', [
       });
     }
 
-    res.json({
+    return res.json({
       message: 'Profile updated successfully',
       profile: {
         id: updatedProfile.id,
@@ -132,7 +132,7 @@ router.put('/profile', [
 
   } catch (error) {
     console.error('Update profile error:', error);
-    res.status(500).json({
+    return res.status(500).json({
       error: 'Internal server error',
       message: 'An unexpected error occurred while updating profile'
     });
@@ -161,7 +161,7 @@ router.get('/searches', authenticateToken, async (req: AuthRequest, res: Respons
       });
     }
 
-    res.json({
+    return res.json({
       searches,
       pagination: {
         page,
@@ -173,7 +173,7 @@ router.get('/searches', authenticateToken, async (req: AuthRequest, res: Respons
 
   } catch (error) {
     console.error('Get searches error:', error);
-    res.status(500).json({
+    return res.status(500).json({
       error: 'Internal server error',
       message: 'An unexpected error occurred while fetching searches'
     });
@@ -194,13 +194,13 @@ router.delete('/account', authenticateToken, async (req: AuthRequest, res: Respo
       });
     }
 
-    res.json({
+    return res.json({
       message: 'Account deleted successfully'
     });
 
   } catch (error) {
     console.error('Delete account error:', error);
-    res.status(500).json({
+    return res.status(500).json({
       error: 'Internal server error',
       message: 'An unexpected error occurred while deleting account'
     });
