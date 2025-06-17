@@ -2,6 +2,8 @@ import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { useAuth } from '@/contexts/AuthContext';
 import { 
   Home, 
   Upload, 
@@ -22,6 +24,7 @@ interface MobileSidebarProps {
 
 const MobileSidebar: React.FC<MobileSidebarProps> = ({ isOpen, onClose }) => {
   const location = useLocation();
+  const { user, signOut } = useAuth();
 
   const navItems = [
     { href: '/dashboard', icon: Home, label: 'Dashboard', description: 'Overview & analytics' },
@@ -39,6 +42,26 @@ const MobileSidebar: React.FC<MobileSidebarProps> = ({ isOpen, onClose }) => {
     }
     return location.pathname.startsWith(href);
   };
+
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+      onClose();
+    } catch (error) {
+      console.error('Sign out failed:', error);
+    }
+  };
+
+  // Get user display info
+  const displayName = user?.full_name || user?.email?.split('@')[0] || 'User';
+  const userInitials = user?.full_name
+    ? user.full_name.split(' ').map(n => n[0]).join('').toUpperCase()
+    : user?.email?.charAt(0).toUpperCase() || 'U';
+  
+  // Get subscription tier display
+  const subscriptionTier = user?.user_metadata?.subscription_tier || 'free';
+  const tierDisplay = subscriptionTier === 'pro' ? 'Pro Member' : 
+                     subscriptionTier === 'enterprise' ? 'Enterprise' : 'Free Plan';
 
   return (
     <AnimatePresence>
@@ -64,12 +87,15 @@ const MobileSidebar: React.FC<MobileSidebarProps> = ({ isOpen, onClose }) => {
             {/* Header */}
             <div className="flex items-center justify-between p-4 border-b border-white/10">
               <div className="flex items-center gap-3">
-                <div className="w-8 h-8 bg-gradient-to-r from-purple-600 to-blue-600 rounded-xl flex items-center justify-center">
-                  <UserCircle className="w-5 h-5 text-white" />
-                </div>
+                <Avatar className="w-8 h-8">
+                  <AvatarImage src={user?.avatar_url} alt={displayName} />
+                  <AvatarFallback className="bg-gradient-to-r from-purple-600 to-blue-600 text-white text-sm">
+                    {userInitials}
+                  </AvatarFallback>
+                </Avatar>
                 <div>
-                  <h3 className="text-white font-semibold">John Doe</h3>
-                  <p className="text-xs text-gray-400">Pro Member</p>
+                  <h3 className="text-white font-semibold text-sm">{displayName}</h3>
+                  <p className="text-xs text-gray-400">{tierDisplay}</p>
                 </div>
               </div>
               <Button
@@ -109,10 +135,7 @@ const MobileSidebar: React.FC<MobileSidebarProps> = ({ isOpen, onClose }) => {
               <Button
                 variant="ghost"
                 className="w-full justify-start text-red-400 hover:text-red-300 hover:bg-red-500/10"
-                onClick={() => {
-                  // Handle logout
-                  onClose();
-                }}
+                onClick={handleSignOut}
               >
                 <LogOut className="w-4 h-4 mr-2" />
                 Sign Out

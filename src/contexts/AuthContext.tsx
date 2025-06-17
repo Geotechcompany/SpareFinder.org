@@ -90,8 +90,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const { session } = await auth.getSession()
         
         if (session?.user) {
+          console.log('Found existing Supabase session, processing...')
           // Handle OAuth session - create/sync user with backend
           await handleOAuthSession(session)
+        } else {
+          console.log('No existing session found')
         }
       } catch (error) {
         console.error('Session check failed:', error)
@@ -142,7 +145,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const supabaseUser = supabaseSession.user
       
-      // Create or sync user with your backend
+      console.log('Processing OAuth session for user:', supabaseUser.email)
+      
+      // Create or sync user with your backend using direct user data
       const userData = {
         id: supabaseUser.id,
         email: supabaseUser.email,
@@ -151,61 +156,49 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         provider: supabaseUser.app_metadata?.provider || 'google'
       }
 
-             // Try to sync with backend using proper Google tokens
-       try {
-         // Get the provider token from Supabase session
-         const providerToken = supabaseSession.provider_token
-         const providerRefreshToken = supabaseSession.provider_refresh_token
-         
-         if (providerToken) {
-           // Use the actual Google ID token from the provider
-           const response = await apiClient.googleAuth({ 
-             access_token: providerToken,
-             id_token: providerToken 
-           })
-           
-           if (response.success && response.data) {
-             handleAuthSuccess(response.data)
-             toast.success('Successfully signed in with Google!')
-             return
-           } else {
-             console.error('Backend Google auth failed:', response.error)
-           }
-         }
-         
-         // If no provider token or backend sync fails, fall back to Supabase-only auth
-         throw new Error('No provider token available or backend sync failed')
-         
-       } catch (backendError) {
-         console.warn('Backend sync failed, using Supabase-only session:', backendError)
-         
-         // Fallback: create auth user from Supabase data without backend sync
-         const authUser: AuthUser = {
-           id: supabaseUser.id,
-           email: supabaseUser.email || '',
-           role: 'user',
-           full_name: userData.full_name,
-           avatar_url: userData.avatar_url,
-           created_at: new Date().toISOString(),
-           user_metadata: {
-             full_name: userData.full_name,
-             avatar_url: userData.avatar_url,
-             subscription_tier: 'free'
-           }
-         }
-         
-         setUser(authUser)
-         setSession({
-           access_token: supabaseSession.access_token,
-           user: authUser
-         })
-         
-         // Set the Supabase access token for API calls (fallback mode)
-         localStorage.setItem('auth_token', supabaseSession.access_token)
-         apiClient.setToken(supabaseSession.access_token)
-         
-         toast.success('Successfully signed in with Google!')
-       }
+      // Instead of trying to authenticate with the backend using tokens,
+      // create a direct user session using Supabase user data
+      try {
+        // Create auth user from Supabase data
+        const authUser: AuthUser = {
+          id: supabaseUser.id,
+          email: supabaseUser.email || '',
+          role: 'user', // Default role - will be updated from backend if profile exists
+          full_name: userData.full_name,
+          avatar_url: userData.avatar_url,
+          created_at: supabaseUser.created_at || new Date().toISOString(),
+          user_metadata: {
+            full_name: userData.full_name,
+            avatar_url: userData.avatar_url,
+            subscription_tier: 'free'
+          }
+        }
+        
+        setUser(authUser)
+        setSession({
+          access_token: supabaseSession.access_token,
+          user: authUser
+        })
+        
+        // Set the Supabase access token for API calls
+        localStorage.setItem('auth_token', supabaseSession.access_token)
+        apiClient.setToken(supabaseSession.access_token)
+        
+        console.log('OAuth session completed - token set:', supabaseSession.access_token.substring(0, 20) + '...')
+        
+        // Try to refresh profile data from backend to get correct role and info
+        setTimeout(() => {
+          refreshProfile().catch(error => {
+            console.log('Profile refresh failed after OAuth, continuing with basic profile:', error)
+          })
+        }, 1000)
+        
+        toast.success('Successfully signed in with Google!')
+        
+      } catch (fallbackError) {
+        console.error('OAuth session setup failed:', fallbackError)
+        toast.error('OAuth sign-in setup failed')
+      }
     } catch (error) {
       console.error('OAuth session handling failed:', error)
       toast.error('OAuth sign-in failed')
@@ -326,8 +319,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       setIsLoading(true)
       
+      // Clear backend session if exists
       await apiClient.logout()
       
+      // Clear Supabase session if exists  
+      try {
+        const { auth } = await import('../lib/supabase/client')
+        await auth.signOut()
+      } catch (supabaseError) {
+        console.log('Supabase signout not needed or failed:', supabaseError)
+      }
+      
+      // Clear local state
       setUser(null)
       setSession(null)
       setError(null)
@@ -432,6 +435,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             user: refreshedUser
           })
         }
+        console.log('Profile refreshed with backend data:', refreshedUser.email, 'role:', refreshedUser.role)
       }
     } catch (error) {
       console.error('Profile refresh failed:', error)

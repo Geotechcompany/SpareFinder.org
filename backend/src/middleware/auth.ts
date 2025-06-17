@@ -59,12 +59,47 @@ export const authenticateToken = async (req: AuthRequest, res: Response, next: N
           });
         }
 
-        // Get user profile from database
-        const { data: profile } = await supabase
+        // Get user profile from database, create if doesn't exist
+        let { data: profile, error: profileError } = await supabase
           .from('profiles')
           .select('*')
           .eq('id', user.id)
           .single();
+
+        // If profile doesn't exist, create it (common for OAuth users)
+        if (profileError && profileError.code === 'PGRST116') {
+          console.log('Creating profile for OAuth user:', user.email);
+          
+          const { data: newProfile, error: createError } = await supabase
+            .from('profiles')
+            .insert([
+              {
+                id: user.id,
+                email: user.email!,
+                full_name: user.user_metadata?.full_name || user.user_metadata?.name || '',
+                avatar_url: user.user_metadata?.avatar_url || user.user_metadata?.picture || null,
+                role: 'user'
+              }
+            ])
+            .select()
+            .single();
+
+          if (createError) {
+            console.error('Profile creation error:', createError);
+            return res.status(500).json({
+              error: 'Profile creation failed',
+              message: 'Failed to create user profile'
+            });
+          }
+
+          profile = newProfile;
+        } else if (profileError) {
+          console.error('Profile fetch error:', profileError);
+          return res.status(500).json({
+            error: 'Profile fetch failed',
+            message: 'Failed to retrieve user profile'
+          });
+        }
 
         req.user = {
           userId: user.id,
