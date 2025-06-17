@@ -46,7 +46,10 @@ class ApiClient {
     endpoint: string,
     options: RequestInit = {}
   ): Promise<ApiResponse<T>> {
-    const url = `${this.baseUrl}${endpoint}`;
+    // Ensure proper URL formatting - remove double slashes
+    const cleanBaseUrl = this.baseUrl.replace(/\/+$/, ''); // Remove trailing slashes
+    const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+    const url = `${cleanBaseUrl}${cleanEndpoint}`;
     
     const headers: Record<string, string> = {
       ...(options.headers as Record<string, string>),
