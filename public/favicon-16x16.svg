@@ -1,0 +1,11 @@
+<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Simplified gear for small size -->
+  <path d="M8 1L9 3L12 2.5L11.5 5.5L14 7L11.5 9.5L12 13L9 12.5L8 15L7 12.5L4 13L4.5 9.5L2 7L4.5 5.5L4 2.5L7 3L8 1Z" fill="#3B82F6"/>
+  
+  <!-- Inner circle -->
+  <circle cx="8" cy="8" r="3" fill="#FFFFFF"/>
+  
+  <!-- Small search indicator -->
+  <circle cx="10" cy="6" r="1.5" fill="none" stroke="#F59E0B" stroke-width="1"/>
+  <path d="M11 7L12.5 8.5" stroke="#F59E0B" stroke-width="1"/>
+</svg> 
