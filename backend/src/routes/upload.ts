@@ -144,17 +144,61 @@ router.post('/image', authenticateToken, upload.single('image'), handleMulterErr
     }
 
     console.log('Sending request to AI service...');
-    const aiResponse = await axios.post(
-      `${process.env.AI_SERVICE_URL}/predict/image`,
-      formData,
-      {
-        headers: {
-          ...formData.getHeaders(),
-          'Authorization': `Bearer ${process.env.AI_SERVICE_API_KEY}`
-        },
-        timeout: 30000 // 30 second timeout
+    
+    let aiResponse;
+    try {
+      aiResponse = await axios.post(
+        `${process.env.AI_SERVICE_URL}/predict/image`,
+        formData,
+        {
+          headers: {
+            ...formData.getHeaders(),
+            'Authorization': `Bearer ${process.env.AI_SERVICE_API_KEY}`
+          },
+          timeout: 30000 // 30 second timeout
+        }
+      );
+    } catch (aiError) {
+      console.error('AI service error:', aiError);
+      
+      // If AI service is down, save the upload with a placeholder response
+      const fallbackResult = {
+        id: `upload_${Date.now()}`,
+        user_id: userId,
+        image_url: urlData.publicUrl,
+        image_name: originalname,
+        predictions: [],
+        confidence_score: 0,
+        processing_time: 0,
+        ai_model_version: 'offline',
+        status: 'failed' as const,
+        error_message: 'AI service unavailable',
+        metadata: {
+          file_size: size,
+          file_type: mimetype,
+          ai_service_error: axios.isAxiosError(aiError) ? aiError.response?.status : 'unknown'
+        }
+      };
+
+      // Save the failed attempt to database
+      const { error: dbError } = await supabase
+        .from('part_searches')
+        .insert(fallbackResult);
+
+      if (dbError) {
+        console.error('Database insert error for failed upload:', dbError);
       }
-    );
+
+      // Return a fallback response
+      return res.status(503).json({
+        success: false,
+        error: 'AI service temporarily unavailable',
+        message: 'Your image was uploaded successfully, but our AI analysis service is currently down. Please try again later.',
+        id: fallbackResult.id,
+        image_url: urlData.publicUrl,
+        retry_suggested: true
+      });
+    }
 
     console.log('AI service response received:', {
       status: aiResponse.status,
