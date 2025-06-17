@@ -347,16 +347,26 @@ router.post('/google', async (req: Request, res: Response) => {
       });
     }
 
-    // Sign in with Google
+    // Use ID token first, then fall back to access token
+    const googleToken = id_token || access_token;
+    
+    // Sign in with Google using the token
     const { data: authData, error: authError } = await supabase.auth.signInWithIdToken({
       provider: 'google',
-      token: id_token || access_token
+      token: googleToken
     });
 
     if (authError) {
       return res.status(401).json({
-        error: 'Google authentication failed',
-        message: authError.message
+        error: 'Bad ID token',
+        message: `Google authentication failed: ${authError.message}`
+      });
+    }
+
+    if (!authData?.user) {
+      return res.status(401).json({
+        error: 'Invalid token',
+        message: 'No user data received from Google'
       });
     }
 

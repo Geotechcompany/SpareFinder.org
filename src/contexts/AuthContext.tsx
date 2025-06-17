@@ -168,6 +168,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
              handleAuthSuccess(response.data)
              toast.success('Successfully signed in with Google!')
              return
+           } else {
+             console.error('Backend Google auth failed:', response.error)
            }
          }
          
@@ -224,6 +226,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       user: authUser
     })
     setError(null)
+    
+    // Ensure the API client has the token
+    apiClient.setToken(authResponse.token)
   }
 
   const signUp = async (email: string, password: string, metadata?: { [key: string]: any }) => {
