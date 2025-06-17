@@ -61,28 +61,37 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const isAdmin = user?.role === 'admin' || user?.role === 'super_admin'
   const isSuperAdmin = user?.role === 'super_admin'
 
-  // Check for existing session on mount
+  // Check for existing session on mount and listen for auth state changes
   useEffect(() => {
     const checkSession = async () => {
       try {
+        // First check for regular API token
         const token = localStorage.getItem('auth_token')
-        if (!token) {
-          setIsLoading(false)
-          return
+        if (token) {
+          const response = await apiClient.getCurrentUser()
+          if (response.success && response.data?.user) {
+            const authUser = mapApiUserToAuthUser(response.data.user)
+            setUser(authUser)
+            setSession({
+              access_token: token,
+              user: authUser
+            })
+            setIsLoading(false)
+            return
+          } else {
+            // Invalid token, clear it
+            localStorage.removeItem('auth_token')
+            apiClient.setToken(null)
+          }
         }
 
-        const response = await apiClient.getCurrentUser()
-        if (response.success && response.data?.user) {
-          const authUser = mapApiUserToAuthUser(response.data.user)
-          setUser(authUser)
-          setSession({
-            access_token: token,
-            user: authUser
-          })
-        } else {
-          // Invalid token, clear it
-          localStorage.removeItem('auth_token')
-          apiClient.setToken(null)
+        // Check for Supabase OAuth session
+        const { auth } = await import('../lib/supabase/client')
+        const { session } = await auth.getSession()
+        
+        if (session?.user) {
+          // Handle OAuth session - create/sync user with backend
+          await handleOAuthSession(session)
         }
       } catch (error) {
         console.error('Session check failed:', error)
@@ -93,8 +102,95 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     }
 
+    // Set up Supabase auth state listener for OAuth
+    const setupAuthListener = async () => {
+      const { auth } = await import('../lib/supabase/client')
+      const { data: { subscription } } = auth.onAuthStateChange(async (event, session) => {
+        console.log('Auth state changed:', event, session)
+        
+        if (event === 'SIGNED_IN' && session?.user) {
+          await handleOAuthSession(session)
+        } else if (event === 'SIGNED_OUT') {
+          setUser(null)
+          setSession(null)
+          setError(null)
+          localStorage.removeItem('auth_token')
+          apiClient.setToken(null)
+        }
+      })
+      
+      return subscription
+    }
+
     checkSession()
+    let authSubscription: any = null
+    
+    setupAuthListener().then(subscription => {
+      authSubscription = subscription
+    })
+
+    // Cleanup
+    return () => {
+      if (authSubscription) {
+        authSubscription.unsubscribe()
+      }
+    }
   }, [])
+
+  // Handle OAuth session from Supabase
+  const handleOAuthSession = async (supabaseSession: any) => {
+    try {
+      const supabaseUser = supabaseSession.user
+      
+      // Create or sync user with your backend
+      const userData = {
+        id: supabaseUser.id,
+        email: supabaseUser.email,
+        full_name: supabaseUser.user_metadata?.full_name || supabaseUser.user_metadata?.name || '',
+        avatar_url: supabaseUser.user_metadata?.avatar_url || supabaseUser.user_metadata?.picture || '',
+        provider: supabaseUser.app_metadata?.provider || 'google'
+      }
+
+             // Sync with your backend using Google OAuth endpoint
+       try {
+         const response = await apiClient.googleAuth({ 
+           access_token: supabaseSession.access_token,
+           id_token: supabaseSession.access_token 
+         })
+         if (response.success && response.data) {
+           handleAuthSuccess(response.data)
+           toast.success('Successfully signed in with Google!')
+         }
+       } catch (backendError) {
+         console.warn('Backend sync failed, using Supabase session:', backendError)
+         
+         // Fallback: create auth user from Supabase data
+         const authUser: AuthUser = {
+           id: supabaseUser.id,
+           email: supabaseUser.email || '',
+           role: 'user',
+           full_name: userData.full_name,
+           avatar_url: userData.avatar_url,
+           created_at: new Date().toISOString(),
+           user_metadata: {
+             full_name: userData.full_name,
+             avatar_url: userData.avatar_url,
+             subscription_tier: 'free'
+           }
+         }
+         
+         setUser(authUser)
+         setSession({
+           access_token: supabaseSession.access_token,
+           user: authUser
+         })
+         toast.success('Successfully signed in with Google!')
+       }
+    } catch (error) {
+      console.error('OAuth session handling failed:', error)
+      toast.error('OAuth sign-in failed')
+    }
+  }
 
   const mapApiUserToAuthUser = (apiUser: ApiUser): AuthUser => {
     return {
@@ -177,14 +273,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setIsLoading(true)
       setError(null)
 
-      if (provider === 'google') {
-        // For Google OAuth, we'll need to implement the OAuth flow
-        // This is a placeholder - you'll need to integrate with Google OAuth
-        toast.info('Google OAuth integration coming soon')
-        throw new Error('Google OAuth not yet implemented')
-      } else {
-        throw new Error(`${provider} OAuth not supported`)
+      // Import the auth helper from Supabase client
+      const { auth } = await import('../lib/supabase/client')
+      
+      const { data, error } = await auth.signInWithOAuth(provider)
+
+      if (error) {
+        throw new Error(error.message || `${provider} OAuth failed`)
       }
+
+      // The OAuth flow will redirect to the provider's login page
+      // After successful authentication, the user will be redirected back
+      // and the session will be handled by Supabase's auth state change
+      toast.success(`Redirecting to ${provider} login...`)
+      
     } catch (error) {
       const authError = {
         message: error instanceof Error ? error.message : `${provider} OAuth failed`
