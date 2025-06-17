@@ -1,14 +1,5 @@
--- COMPREHENSIVE DATABASE AND STORAGE FIX
--- Execute this in your Supabase SQL Editor
-
--- =============================================
--- DROP EXISTING POLICIES (CLEAN SLATE)
--- =============================================
-DROP POLICY IF EXISTS "Users can view own profile" ON profiles;
-DROP POLICY IF EXISTS "Users can update own profile" ON profiles;
-DROP POLICY IF EXISTS "Admins can manage all profiles" ON profiles;
-DROP POLICY IF EXISTS "Profiles are viewable by everyone" ON profiles;
-DROP POLICY IF EXISTS "Users can insert own profile" ON profiles;
+-- COMPREHENSIVE DATABASE AND STORAGE FIX FOR SPAREFINDER
+-- Execute this in your Supabase SQL Editor to fix all database issues
 
 -- =============================================
 -- CREATE MISSING TABLES
@@ -53,14 +44,12 @@ CREATE TABLE IF NOT EXISTS performance_metrics (
 );
 
 -- Add missing columns to existing tables
-ALTER TABLE part_searches 
-ADD COLUMN IF NOT EXISTS image_name TEXT,
-ADD COLUMN IF NOT EXISTS ai_model_version TEXT;
+ALTER TABLE part_searches ADD COLUMN IF NOT EXISTS image_name TEXT;
+ALTER TABLE part_searches ADD COLUMN IF NOT EXISTS ai_model_version TEXT;
 
-ALTER TABLE profiles 
-ADD COLUMN IF NOT EXISTS current_streak INTEGER DEFAULT 0,
-ADD COLUMN IF NOT EXISTS longest_streak INTEGER DEFAULT 0,
-ADD COLUMN IF NOT EXISTS last_activity_date DATE;
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS current_streak INTEGER DEFAULT 0;
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS longest_streak INTEGER DEFAULT 0;
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS last_activity_date DATE;
 
 -- =============================================
 -- CREATE HELPER FUNCTIONS
@@ -94,36 +83,6 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- Function to update user streak
-CREATE OR REPLACE FUNCTION update_user_streak(p_user_id UUID)
-RETURNS VOID AS $$
-DECLARE
-    last_activity DATE;
-    current_date DATE := CURRENT_DATE;
-    current_streak INTEGER;
-BEGIN
-    SELECT last_activity_date INTO last_activity FROM profiles WHERE id = p_user_id;
-    SELECT current_streak INTO current_streak FROM profiles WHERE id = p_user_id;
-    
-    IF last_activity IS NULL OR last_activity < current_date - INTERVAL '1 day' THEN
-        IF last_activity = current_date - INTERVAL '1 day' THEN
-            current_streak := COALESCE(current_streak, 0) + 1;
-        ELSE
-            current_streak := 1;
-        END IF;
-    ELSIF last_activity = current_date THEN
-        RETURN;
-    END IF;
-    
-    UPDATE profiles 
-    SET 
-        current_streak = current_streak,
-        longest_streak = GREATEST(COALESCE(longest_streak, 0), current_streak),
-        last_activity_date = current_date
-    WHERE id = p_user_id;
-END;
-$$ LANGUAGE plpgsql;
-
 -- =============================================
 -- ENABLE RLS ON ALL TABLES
 -- =============================================
@@ -135,7 +94,22 @@ ALTER TABLE billing_analytics ENABLE ROW LEVEL SECURITY;
 ALTER TABLE performance_metrics ENABLE ROW LEVEL SECURITY;
 
 -- =============================================
--- DATABASE TABLE RLS POLICIES
+-- DROP EXISTING CONFLICTING POLICIES
+-- =============================================
+
+-- Drop existing policies to avoid conflicts
+DROP POLICY IF EXISTS "Users can view own profile" ON profiles;
+DROP POLICY IF EXISTS "Users can update own profile" ON profiles;
+DROP POLICY IF EXISTS "Users can insert own profile" ON profiles;
+DROP POLICY IF EXISTS "Admins can manage all profiles" ON profiles;
+
+DROP POLICY IF EXISTS "Users can view own searches" ON part_searches;
+DROP POLICY IF EXISTS "Users can insert own searches" ON part_searches;
+DROP POLICY IF EXISTS "Users can update own searches" ON part_searches;
+DROP POLICY IF EXISTS "Admins can manage all searches" ON part_searches;
+
+-- =============================================
+-- CREATE RLS POLICIES FOR DATABASE TABLES
 -- =============================================
 
 -- PROFILES TABLE POLICIES
@@ -174,9 +148,6 @@ FOR INSERT WITH CHECK (true);
 CREATE POLICY "Users can update own achievements" ON user_achievements 
 FOR UPDATE USING (auth.uid() = user_id);
 
-CREATE POLICY "Admins can manage all achievements" ON user_achievements 
-FOR ALL USING (is_admin());
-
 -- BILLING_ANALYTICS TABLE POLICIES
 CREATE POLICY "Users can view own billing analytics" ON billing_analytics 
 FOR SELECT USING (auth.uid() = user_id);
@@ -200,8 +171,8 @@ INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_typ
 VALUES (
   'parts',
   'parts',
-  true, -- Make bucket public for easy access to uploaded images
-  52428800, -- 50MB file size limit
+  true,
+  52428800,
   ARRAY['image/jpeg', 'image/png', 'image/webp', 'image/gif']::text[]
 )
 ON CONFLICT (id) DO UPDATE SET
@@ -213,13 +184,15 @@ ON CONFLICT (id) DO UPDATE SET
 -- STORAGE RLS POLICIES
 -- =============================================
 
--- DROP ANY EXISTING STORAGE POLICIES
+-- Drop existing storage policies
 DROP POLICY IF EXISTS "Allow authenticated users to upload parts" ON storage.objects;
 DROP POLICY IF EXISTS "Allow users to view parts" ON storage.objects;
 DROP POLICY IF EXISTS "Allow users to delete own parts" ON storage.objects;
 DROP POLICY IF EXISTS "Allow users to update own parts" ON storage.objects;
+DROP POLICY IF EXISTS "Allow authenticated uploads to parts bucket" ON storage.objects;
+DROP POLICY IF EXISTS "Allow public access to parts bucket" ON storage.objects;
 
--- STORAGE BUCKET POLICIES FOR 'parts' BUCKET
+-- Create new storage policies
 CREATE POLICY "Allow authenticated uploads to parts bucket" ON storage.objects
 FOR INSERT WITH CHECK (
   bucket_id = 'parts' 
@@ -231,12 +204,6 @@ FOR SELECT USING (bucket_id = 'parts');
 
 CREATE POLICY "Allow users to delete own parts" ON storage.objects
 FOR DELETE USING (
-  bucket_id = 'parts' 
-  AND auth.uid()::text = (storage.foldername(name))[1]
-);
-
-CREATE POLICY "Allow users to update own parts" ON storage.objects
-FOR UPDATE USING (
   bucket_id = 'parts' 
   AND auth.uid()::text = (storage.foldername(name))[1]
 );
@@ -253,25 +220,7 @@ CREATE INDEX IF NOT EXISTS performance_metrics_user_id_idx ON performance_metric
 CREATE INDEX IF NOT EXISTS performance_metrics_date_idx ON performance_metrics(date);
 
 -- =============================================
--- CREATE TRIGGERS
--- =============================================
-
--- Trigger to update streak when user performs an action
-CREATE OR REPLACE FUNCTION trigger_update_streak()
-RETURNS TRIGGER AS $$
-BEGIN
-    PERFORM update_user_streak(NEW.user_id);
-    RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
-DROP TRIGGER IF EXISTS update_streak_on_search ON part_searches;
-CREATE TRIGGER update_streak_on_search
-    AFTER INSERT ON part_searches
-    FOR EACH ROW EXECUTE FUNCTION trigger_update_streak();
-
--- =============================================
--- INSERT SAMPLE ACHIEVEMENTS FOR EXISTING USERS
+-- INSERT SAMPLE DATA FOR EXISTING USERS
 -- =============================================
 
 -- Insert first upload achievement for users who already have uploads
@@ -293,50 +242,31 @@ SELECT
     p.id,
     EXTRACT(MONTH FROM NOW())::INTEGER,
     EXTRACT(YEAR FROM NOW())::INTEGER,
-    CASE 
-        WHEN s.tier = 'pro' THEN 29.00
-        WHEN s.tier = 'enterprise' THEN 149.00
-        ELSE 0
-    END,
+    0.00,
     calculate_user_savings(p.id)
 FROM profiles p
-LEFT JOIN subscriptions s ON p.id = s.user_id
-ON CONFLICT (user_id, month, year) DO NOTHING;
-
--- =============================================
--- VERIFY SETUP
--- =============================================
-
--- Display table counts to verify everything is working
-DO $$
-DECLARE
-    profiles_count INTEGER;
-    searches_count INTEGER;
-    achievements_count INTEGER;
-    bucket_count INTEGER;
-BEGIN
-    SELECT COUNT(*) INTO profiles_count FROM profiles;
-    SELECT COUNT(*) INTO searches_count FROM part_searches;
-    SELECT COUNT(*) INTO achievements_count FROM user_achievements;
-    SELECT COUNT(*) INTO bucket_count FROM storage.buckets WHERE id = 'parts';
-    
-    RAISE NOTICE 'Setup Complete!';
-    RAISE NOTICE 'Profiles: %', profiles_count;
-    RAISE NOTICE 'Searches: %', searches_count;
-    RAISE NOTICE 'Achievements: %', achievements_count;
-    RAISE NOTICE 'Parts bucket exists: %', CASE WHEN bucket_count > 0 THEN 'YES' ELSE 'NO' END;
-END $$;
+WHERE NOT EXISTS (
+    SELECT 1 FROM billing_analytics ba 
+    WHERE ba.user_id = p.id 
+    AND ba.month = EXTRACT(MONTH FROM NOW()) 
+    AND ba.year = EXTRACT(YEAR FROM NOW())
+);
 
 -- =============================================
 -- GRANT NECESSARY PERMISSIONS
 -- =============================================
 
--- Grant usage on sequences
 GRANT USAGE ON ALL SEQUENCES IN SCHEMA public TO authenticated;
-
--- Grant access to tables
 GRANT ALL ON ALL TABLES IN SCHEMA public TO authenticated;
 
--- Grant access to storage
-GRANT ALL ON storage.objects TO authenticated;
-GRANT ALL ON storage.buckets TO authenticated; 
+-- =============================================
+-- VERIFICATION
+-- =============================================
+
+-- Test query to ensure everything works
+SELECT 
+    'Database setup completed successfully!' as status,
+    (SELECT COUNT(*) FROM profiles) as profiles_count,
+    (SELECT COUNT(*) FROM part_searches) as searches_count,
+    (SELECT COUNT(*) FROM user_achievements) as achievements_count,
+    (SELECT COUNT(*) FROM storage.buckets WHERE id = 'parts') as parts_bucket_exists; 

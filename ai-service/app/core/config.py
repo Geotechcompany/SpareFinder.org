@@ -18,11 +18,11 @@ class Settings(BaseSettings):
     # Security
     API_KEY: str = Field(description="API key for authentication")
     ALLOWED_ORIGINS: List[str] = Field(
-        default=["http://localhost:3000", "http://localhost:5173"],
+        default=["*"],
         description="Allowed CORS origins"
     )
     ALLOWED_HOSTS: List[str] = Field(
-        default=["localhost", "127.0.0.1"],
+        default=["*"],
         description="Allowed host headers"
     )
     

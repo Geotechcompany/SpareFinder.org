@@ -79,7 +79,8 @@ def main():
         
         print(f"\n🔐 Security:")
         print(f"   API Key: {'✅ Configured' if settings.API_KEY else '❌ Missing'}")
-        print(f"   CORS Origins: {', '.join(settings.ALLOWED_ORIGINS)}")
+        cors_status = "All Origins (*)" if "*" in settings.ALLOWED_ORIGINS else ', '.join(settings.ALLOWED_ORIGINS)
+        print(f"   CORS Origins: {cors_status}")
         
         print(f"\n🧠 TensorFlow AI Model:")
         print(f"   Type: {settings.MODEL_TYPE}")
