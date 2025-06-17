@@ -18,46 +18,71 @@ export const authenticateToken = async (req: AuthRequest, res: Response, next: N
       });
     }
 
-    // Verify JWT token
-    const decoded = jwt.verify(token, process.env.JWT_SECRET!) as JWTPayload;
-    
-    // Optional: Verify user still exists and is active
-    const { data: profile, error } = await supabase
-      .from('profiles')
-      .select('id, email, role')
-      .eq('id', decoded.userId)
-      .single();
+    // First try to verify as our custom JWT
+    try {
+      const decoded = jwt.verify(token, process.env.JWT_SECRET!) as JWTPayload;
+      
+      // Verify user still exists and is active
+      const { data: profile, error } = await supabase
+        .from('profiles')
+        .select('id, email, role')
+        .eq('id', decoded.userId)
+        .single();
 
-    if (error || !profile) {
-      return res.status(401).json({
-        error: 'Invalid token',
-        message: 'User not found or inactive'
-      });
+      if (error || !profile) {
+        return res.status(401).json({
+          error: 'Invalid token',
+          message: 'User not found or inactive'
+        });
+      }
+
+      // Add user info to request
+      req.user = {
+        userId: decoded.userId,
+        email: decoded.email,
+        role: decoded.role
+      };
+
+      return next();
+    } catch (jwtError) {
+      console.log('JWT verification failed, trying Supabase token...');
+      
+      // If JWT fails, try to verify as Supabase token
+      try {
+        const { data: { user }, error } = await supabase.auth.getUser(token);
+        
+        if (error || !user) {
+          console.log('Supabase token verification failed:', error?.message);
+          return res.status(403).json({ 
+            error: 'Invalid token', 
+            message: 'Token is not valid' 
+          });
+        }
+
+        // Get user profile from database
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', user.id)
+          .single();
+
+        req.user = {
+          userId: user.id,
+          email: user.email || '',
+          role: profile?.role || 'user'
+        };
+        
+        console.log('Supabase token verified for user:', user.email);
+        return next();
+      } catch (supabaseError) {
+        console.log('Supabase token verification error:', supabaseError);
+        return res.status(403).json({ 
+          error: 'Invalid token', 
+          message: 'Token is not valid' 
+        });
+      }
     }
-
-    // Add user info to request
-    req.user = {
-      userId: decoded.userId,
-      email: decoded.email,
-      role: decoded.role
-    };
-
-    return next();
   } catch (error) {
-    if (error instanceof jwt.TokenExpiredError) {
-      return res.status(401).json({
-        error: 'Token expired',
-        message: 'Please log in again'
-      });
-    }
-
-    if (error instanceof jwt.JsonWebTokenError) {
-      return res.status(401).json({
-        error: 'Invalid token',
-        message: 'Token is malformed'
-      });
-    }
-
     console.error('Authentication error:', error);
     return res.status(500).json({
       error: 'Authentication failed',

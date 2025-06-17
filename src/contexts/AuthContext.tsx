@@ -199,6 +199,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
            access_token: supabaseSession.access_token,
            user: authUser
          })
+         
+         // Set the Supabase access token for API calls (fallback mode)
+         localStorage.setItem('auth_token', supabaseSession.access_token)
+         apiClient.setToken(supabaseSession.access_token)
+         
          toast.success('Successfully signed in with Google!')
        }
     } catch (error) {

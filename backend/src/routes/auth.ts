@@ -357,6 +357,7 @@ router.post('/google', async (req: Request, res: Response) => {
     });
 
     if (authError) {
+      console.error('Supabase Google auth error:', authError);
       return res.status(401).json({
         error: 'Bad ID token',
         message: `Google authentication failed: ${authError.message}`
@@ -364,6 +365,7 @@ router.post('/google', async (req: Request, res: Response) => {
     }
 
     if (!authData?.user) {
+      console.error('No user data from Supabase Google auth');
       return res.status(401).json({
         error: 'Invalid token',
         message: 'No user data received from Google'
