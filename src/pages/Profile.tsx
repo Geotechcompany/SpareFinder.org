@@ -6,9 +6,11 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/use-toast';
 import { apiClient } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
+import { useProfileData } from '@/hooks/useProfileData';
 import { Loader2 } from 'lucide-react';
 import { 
   User, 
@@ -60,6 +62,7 @@ const Profile = () => {
 
   const { toast } = useToast();
   const { user } = useAuth(); // Get Google profile data from auth context
+  const { achievements, activities, totalEarned, totalAvailable, loading: profileDataLoading, error: profileDataError } = useProfileData();
 
   useEffect(() => {
     fetchUserProfile();
@@ -185,21 +188,18 @@ const Profile = () => {
     );
   }
 
-  const achievements = [
-    { id: 1, title: 'First Upload', description: 'Uploaded your first part', icon: Trophy, color: 'from-yellow-600 to-orange-600', earned: true },
-    { id: 2, title: 'Speed Demon', description: 'Identified 100 parts in a day', icon: Zap, color: 'from-blue-600 to-cyan-600', earned: true },
-    { id: 3, title: 'Accuracy Expert', description: 'Achieved 95% accuracy rate', icon: Target, color: 'from-green-600 to-emerald-600', earned: true },
-    { id: 4, title: 'Part Master', description: 'Identified 1000+ parts', icon: Award, color: 'from-purple-600 to-pink-600', earned: false },
-    { id: 5, title: 'Streak Master', description: '30-day identification streak', icon: Activity, color: 'from-red-600 to-orange-600', earned: false },
-    { id: 6, title: 'Explorer', description: 'Used all part categories', icon: TrendingUp, color: 'from-indigo-600 to-purple-600', earned: true }
-  ];
-
-  const recentActivity = [
-    { id: 1, action: 'Identified Brake Pad Set', confidence: 98.2, time: '2 hours ago', category: 'Braking System' },
-    { id: 2, action: 'Uploaded Air Filter', confidence: 94.5, time: '1 day ago', category: 'Engine' },
-    { id: 3, action: 'Found Spark Plug Match', confidence: 96.8, time: '2 days ago', category: 'Ignition' },
-    { id: 4, action: 'Analyzed Oil Filter', confidence: 92.1, time: '3 days ago', category: 'Engine' }
-  ];
+  // Icon mapping for achievements
+  const getAchievementIcon = (iconName: string) => {
+    const iconMap: { [key: string]: any } = {
+      Trophy,
+      Zap,
+      Target,
+      Award,
+      Activity,
+      TrendingUp
+    };
+    return iconMap[iconName] || Trophy;
+  };
 
   return (
     <div className="min-h-screen flex w-full bg-gradient-to-br from-gray-900 via-purple-900/20 to-blue-900/20 relative overflow-hidden">
@@ -432,7 +432,7 @@ const Profile = () => {
                     <Award className="w-5 h-5 text-yellow-400" />
                     <span>Achievements</span>
                     <Badge variant="secondary" className="bg-yellow-600/20 text-yellow-400 border-yellow-500/30">
-                      {achievements.filter(a => a.earned).length}/{achievements.length}
+                      {profileDataLoading ? '...' : `${totalEarned}/${totalAvailable}`}
                     </Badge>
                   </CardTitle>
                   <CardDescription className="text-gray-400">
@@ -441,38 +441,66 @@ const Profile = () => {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
-                    {achievements.map((achievement, index) => (
-                      <motion.div
-                        key={achievement.id}
-                        initial={{ opacity: 0, x: -20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: 0.7 + index * 0.1 }}
-                        className={`p-4 rounded-xl border transition-all duration-300 ${
-                          achievement.earned 
-                            ? 'bg-white/5 border-white/10 hover:bg-white/10' 
-                            : 'bg-gray-500/5 border-gray-500/10 opacity-50'
-                        }`}
-                      >
-                        <div className="flex items-center space-x-4">
-                          <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
-                            achievement.earned 
-                              ? `bg-gradient-to-r ${achievement.color}` 
-                              : 'bg-gray-600/30'
-                          }`}>
-                            <achievement.icon className="w-6 h-6 text-white" />
-                          </div>
-                          <div className="flex-1">
-                            <h4 className="text-white font-medium">{achievement.title}</h4>
-                            <p className="text-gray-400 text-sm">{achievement.description}</p>
-                          </div>
-                          {achievement.earned && (
-                            <div className="w-6 h-6 bg-green-600 rounded-full flex items-center justify-center">
-                              <span className="text-white text-xs">✓</span>
+                    {profileDataLoading ? (
+                      // Loading skeletons
+                      Array.from({ length: 4 }).map((_, index) => (
+                        <div key={index} className="p-4 rounded-xl bg-gray-500/5 border border-gray-500/10">
+                          <div className="flex items-center space-x-4">
+                            <Skeleton className="w-12 h-12 rounded-xl bg-gray-600/30" />
+                            <div className="flex-1 space-y-2">
+                              <Skeleton className="h-4 w-32 bg-gray-600/30" />
+                              <Skeleton className="h-3 w-48 bg-gray-600/30" />
                             </div>
-                          )}
+                          </div>
                         </div>
-                      </motion.div>
-                    ))}
+                      ))
+                    ) : profileDataError ? (
+                      <div className="text-center py-8">
+                        <AlertCircle className="w-8 h-8 text-red-400 mx-auto mb-2" />
+                        <p className="text-gray-400">Failed to load achievements</p>
+                      </div>
+                    ) : achievements.length > 0 ? (
+                      achievements.map((achievement, index) => {
+                        const IconComponent = getAchievementIcon(achievement.icon);
+                        return (
+                          <motion.div
+                            key={achievement.id}
+                            initial={{ opacity: 0, x: -20 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            transition={{ delay: 0.7 + index * 0.1 }}
+                            className={`p-4 rounded-xl border transition-all duration-300 ${
+                              achievement.earned 
+                                ? 'bg-white/5 border-white/10 hover:bg-white/10' 
+                                : 'bg-gray-500/5 border-gray-500/10 opacity-50'
+                            }`}
+                          >
+                            <div className="flex items-center space-x-4">
+                              <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
+                                achievement.earned 
+                                  ? `bg-gradient-to-r ${achievement.color}` 
+                                  : 'bg-gray-600/30'
+                              }`}>
+                                <IconComponent className="w-6 h-6 text-white" />
+                              </div>
+                              <div className="flex-1">
+                                <h4 className="text-white font-medium">{achievement.title}</h4>
+                                <p className="text-gray-400 text-sm">{achievement.description}</p>
+                              </div>
+                              {achievement.earned && (
+                                <div className="w-6 h-6 bg-green-600 rounded-full flex items-center justify-center">
+                                  <span className="text-white text-xs">✓</span>
+                                </div>
+                              )}
+                            </div>
+                          </motion.div>
+                        );
+                      })
+                    ) : (
+                      <div className="text-center py-8">
+                        <Award className="w-8 h-8 text-gray-400 mx-auto mb-2" />
+                        <p className="text-gray-400">No achievements yet</p>
+                      </div>
+                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -498,26 +526,56 @@ const Profile = () => {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
-                    {recentActivity.map((activity, index) => (
-                      <motion.div
-                        key={activity.id}
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: 0.8 + index * 0.1 }}
-                        className="p-4 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-all duration-300"
-                      >
-                        <div className="flex items-center justify-between mb-2">
-                          <h4 className="text-white font-medium">{activity.action}</h4>
-                          <Badge variant="secondary" className="bg-green-600/20 text-green-400 border-green-500/30 text-xs">
-                            {activity.confidence}%
-                          </Badge>
+                    {profileDataLoading ? (
+                      // Loading skeletons
+                      Array.from({ length: 4 }).map((_, index) => (
+                        <div key={index} className="p-4 rounded-xl bg-gray-500/5 border border-gray-500/10">
+                          <div className="flex items-center justify-between mb-2">
+                            <Skeleton className="h-4 w-40 bg-gray-600/30" />
+                            <Skeleton className="h-5 w-12 rounded-full bg-gray-600/30" />
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <Skeleton className="h-3 w-24 bg-gray-600/30" />
+                            <Skeleton className="h-3 w-16 bg-gray-600/30" />
+                          </div>
                         </div>
-                        <div className="flex items-center justify-between text-sm">
-                          <span className="text-gray-400">{activity.category}</span>
-                          <span className="text-gray-500">{activity.time}</span>
-                        </div>
-                      </motion.div>
-                    ))}
+                      ))
+                    ) : profileDataError ? (
+                      <div className="text-center py-8">
+                        <Activity className="w-8 h-8 text-red-400 mx-auto mb-2" />
+                        <p className="text-gray-400">Failed to load recent activity</p>
+                      </div>
+                    ) : activities.length > 0 ? (
+                      activities.map((activity, index) => (
+                        <motion.div
+                          key={activity.id}
+                          initial={{ opacity: 0, y: 20 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ delay: 0.8 + index * 0.1 }}
+                          className="p-4 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-all duration-300"
+                        >
+                          <div className="flex items-center justify-between mb-2">
+                            <h4 className="text-white font-medium">{activity.action}</h4>
+                            {activity.details.confidence && (
+                              <Badge variant="secondary" className="bg-green-600/20 text-green-400 border-green-500/30 text-xs">
+                                {Math.round(activity.details.confidence)}%
+                              </Badge>
+                            )}
+                          </div>
+                          <div className="flex items-center justify-between text-sm">
+                            <span className="text-gray-400">{activity.details.description}</span>
+                            <span className="text-gray-500">
+                              {new Date(activity.created_at).toLocaleDateString()}
+                            </span>
+                          </div>
+                        </motion.div>
+                      ))
+                    ) : (
+                      <div className="text-center py-8">
+                        <Activity className="w-8 h-8 text-gray-400 mx-auto mb-2" />
+                        <p className="text-gray-400">No recent activity</p>
+                      </div>
+                    )}
                   </div>
                 </CardContent>
               </Card>

@@ -485,6 +485,22 @@ class ApiClient {
     return this.request(`/api/dashboard/recent-activities?limit=${limit}`);
   }
 
+  async getAchievements(): Promise<ApiResponse<{
+    achievements: Array<{
+      id: string;
+      title: string;
+      description: string;
+      icon: string;
+      color: string;
+      earned: boolean;
+      earnedAt?: string;
+    }>;
+    totalEarned: number;
+    totalAvailable: number;
+  }>> {
+    return this.request('/api/dashboard/achievements');
+  }
+
   async getPerformanceMetrics(): Promise<ApiResponse<{
     modelAccuracy: number;
     accuracyChange: number;

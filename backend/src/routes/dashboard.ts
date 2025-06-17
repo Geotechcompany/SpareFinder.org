@@ -386,4 +386,164 @@ router.get('/usage-stats', authenticateToken, async (req: AuthRequest, res: Resp
   }
 });
 
+// Get user achievements
+router.get('/achievements', authenticateToken, async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user!.userId;
+
+    // Define all possible achievements
+    const allAchievements = [
+      {
+        id: 'first_upload',
+        title: 'First Upload',
+        description: 'Uploaded your first part',
+        icon: 'Trophy',
+        color: 'from-yellow-600 to-orange-600',
+        requirement: { type: 'uploads', count: 1 }
+      },
+      {
+        id: 'speed_demon',
+        title: 'Speed Demon',
+        description: 'Identified 100 parts in a day',
+        icon: 'Zap',
+        color: 'from-blue-600 to-cyan-600',
+        requirement: { type: 'daily_uploads', count: 100 }
+      },
+      {
+        id: 'accuracy_expert',
+        title: 'Accuracy Expert',
+        description: 'Achieved 95% accuracy rate',
+        icon: 'Target',
+        color: 'from-green-600 to-emerald-600',
+        requirement: { type: 'accuracy', threshold: 0.95 }
+      },
+      {
+        id: 'part_master',
+        title: 'Part Master',
+        description: 'Identified 1000+ parts',
+        icon: 'Award',
+        color: 'from-purple-600 to-pink-600',
+        requirement: { type: 'uploads', count: 1000 }
+      },
+      {
+        id: 'streak_master',
+        title: 'Streak Master',
+        description: '30-day identification streak',
+        icon: 'Activity',
+        color: 'from-red-600 to-orange-600',
+        requirement: { type: 'streak', count: 30 }
+      },
+      {
+        id: 'explorer',
+        title: 'Explorer',
+        description: 'Used all part categories',
+        icon: 'TrendingUp',
+        color: 'from-indigo-600 to-purple-600',
+        requirement: { type: 'categories', count: 5 }
+      }
+    ];
+
+    // Get user's earned achievements from database
+    const { data: earnedAchievements, error: achievementError } = await supabase
+      .from('user_achievements')
+      .select('achievement_id, earned_at')
+      .eq('user_id', userId);
+
+    if (achievementError && achievementError.code !== 'PGRST116') {
+      console.error('Error fetching achievements:', achievementError);
+    }
+
+    // Get user stats to determine which achievements should be earned
+    const { data: userSearches, error: searchError } = await supabase
+      .from('part_searches')
+      .select('id, confidence_score, created_at, predictions')
+      .eq('user_id', userId);
+
+    if (searchError) {
+      console.error('Error fetching user searches:', searchError);
+      return res.status(500).json({
+        error: 'Failed to fetch user data for achievements'
+      });
+    }
+
+    const searches = userSearches || [];
+    const totalUploads = searches.length;
+    
+    // Calculate accuracy
+    const highConfidenceSearches = searches.filter(s => s.confidence_score && s.confidence_score > 0.95);
+    const accuracyRate = totalUploads > 0 ? highConfidenceSearches.length / totalUploads : 0;
+
+    // Get user streak
+    const { data: userProfile } = await supabase
+      .from('profiles')
+      .select('current_streak')
+      .eq('id', userId)
+      .single();
+
+    const currentStreak = userProfile?.current_streak || 0;
+
+    // Calculate daily uploads for speed demon
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    
+    const todayUploads = searches.filter(s => {
+      const searchDate = new Date(s.created_at);
+      return searchDate >= today && searchDate < tomorrow;
+    }).length;
+
+    // Estimate categories used (simplified)
+    const categoriesUsed = Math.min(5, Math.floor(totalUploads / 10)); // Rough estimate
+
+    // Determine which achievements are earned
+    const earnedIds = new Set((earnedAchievements || []).map(a => a.achievement_id));
+    
+    const achievementsWithStatus = allAchievements.map(achievement => {
+      let earned = earnedIds.has(achievement.id);
+      
+      // Auto-check achievements based on current stats if not already in DB
+      if (!earned) {
+        switch (achievement.requirement.type) {
+          case 'uploads':
+            earned = totalUploads >= (achievement.requirement.count || 0);
+            break;
+          case 'accuracy':
+            earned = accuracyRate >= (achievement.requirement.threshold || 0);
+            break;
+          case 'streak':
+            earned = currentStreak >= (achievement.requirement.count || 0);
+            break;
+          case 'daily_uploads':
+            earned = todayUploads >= (achievement.requirement.count || 0);
+            break;
+          case 'categories':
+            earned = categoriesUsed >= (achievement.requirement.count || 0);
+            break;
+        }
+      }
+
+      return {
+        ...achievement,
+        earned,
+        earnedAt: earnedIds.has(achievement.id) 
+          ? earnedAchievements?.find(a => a.achievement_id === achievement.id)?.earned_at 
+          : null
+      };
+    });
+
+    return res.json({
+      achievements: achievementsWithStatus,
+      totalEarned: achievementsWithStatus.filter(a => a.earned).length,
+      totalAvailable: allAchievements.length
+    });
+
+  } catch (error) {
+    console.error('Achievements error:', error);
+    return res.status(500).json({
+      error: 'Failed to fetch achievements'
+    });
+  }
+});
+
 export default router; 
