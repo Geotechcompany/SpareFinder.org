@@ -151,20 +151,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         provider: supabaseUser.app_metadata?.provider || 'google'
       }
 
-             // Sync with your backend using Google OAuth endpoint
+             // Try to sync with backend using proper Google tokens
        try {
-         const response = await apiClient.googleAuth({ 
-           access_token: supabaseSession.access_token,
-           id_token: supabaseSession.access_token 
-         })
-         if (response.success && response.data) {
-           handleAuthSuccess(response.data)
-           toast.success('Successfully signed in with Google!')
-         }
-       } catch (backendError) {
-         console.warn('Backend sync failed, using Supabase session:', backendError)
+         // Get the provider token from Supabase session
+         const providerToken = supabaseSession.provider_token
+         const providerRefreshToken = supabaseSession.provider_refresh_token
          
-         // Fallback: create auth user from Supabase data
+         if (providerToken) {
+           // Use the actual Google ID token from the provider
+           const response = await apiClient.googleAuth({ 
+             access_token: providerToken,
+             id_token: providerToken 
+           })
+           
+           if (response.success && response.data) {
+             handleAuthSuccess(response.data)
+             toast.success('Successfully signed in with Google!')
+             return
+           }
+         }
+         
+         // If no provider token or backend sync fails, fall back to Supabase-only auth
+         throw new Error('No provider token available or backend sync failed')
+         
+       } catch (backendError) {
+         console.warn('Backend sync failed, using Supabase-only session:', backendError)
+         
+         // Fallback: create auth user from Supabase data without backend sync
          const authUser: AuthUser = {
            id: supabaseUser.id,
            email: supabaseUser.email || '',

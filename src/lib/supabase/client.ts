@@ -127,6 +127,11 @@ export const auth = {
       provider,
       options: {
         redirectTo: `${window.location.origin}/dashboard`,
+        queryParams: {
+          access_type: 'offline',
+          prompt: 'consent',
+        },
+        scopes: 'openid email profile'
       },
     })
     return { data, error }
