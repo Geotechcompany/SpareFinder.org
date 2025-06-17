@@ -156,21 +156,63 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         provider: supabaseUser.app_metadata?.provider || 'google'
       }
 
-      // Instead of trying to authenticate with the backend using tokens,
-      // create a direct user session using Supabase user data
       try {
-        // Create auth user from Supabase data
+        // First check if profile exists in profiles table
+        const { createClient } = await import('../lib/supabase/client')
+        const supabase = createClient()
+        let existingProfile = null
+        
+        const { data: profileData, error: profileError } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', userData.id)
+          .single()
+
+        if (profileError && profileError.code !== 'PGRST116') { // PGRST116 = not found
+          console.error('Error checking profile:', profileError)
+          throw new Error('Failed to check user profile')
+        }
+
+        existingProfile = profileData
+
+        // If profile doesn't exist, create it
+        if (!existingProfile) {
+          console.log('Creating new profile for OAuth user:', userData.email)
+          const { data: newProfile, error: insertError } = await supabase
+            .from('profiles')
+            .insert([
+              {
+                id: userData.id,
+                email: userData.email,
+                full_name: userData.full_name,
+                avatar_url: userData.avatar_url,
+                role: 'user',
+                provider: userData.provider
+              }
+            ])
+            .select()
+            .single()
+
+          if (insertError) {
+            console.error('Error creating profile:', insertError)
+            throw new Error('Failed to create user profile')
+          }
+
+          existingProfile = newProfile
+        }
+
+        // Create auth user from profile data
         const authUser: AuthUser = {
-          id: supabaseUser.id,
-          email: supabaseUser.email || '',
-          role: 'user', // Default role - will be updated from backend if profile exists
-          full_name: userData.full_name,
-          avatar_url: userData.avatar_url,
-          created_at: supabaseUser.created_at || new Date().toISOString(),
+          id: existingProfile.id,
+          email: existingProfile.email,
+          role: existingProfile.role,
+          full_name: existingProfile.full_name,
+          avatar_url: existingProfile.avatar_url,
+          created_at: existingProfile.created_at || supabaseUser.created_at,
           user_metadata: {
-            full_name: userData.full_name,
-            avatar_url: userData.avatar_url,
-            subscription_tier: 'free'
+            full_name: existingProfile.full_name,
+            avatar_url: existingProfile.avatar_url,
+            subscription_tier: existingProfile.subscription_tier || 'free'
           }
         }
         
@@ -186,22 +228,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         
         console.log('OAuth session completed - token set:', supabaseSession.access_token.substring(0, 20) + '...')
         
-        // Try to refresh profile data from backend to get correct role and info
-        setTimeout(() => {
-          refreshProfile().catch(error => {
-            console.log('Profile refresh failed after OAuth, continuing with basic profile:', error)
-          })
-        }, 1000)
+        // Update profile with latest OAuth data if needed
+        if (
+          existingProfile.avatar_url !== userData.avatar_url ||
+          existingProfile.full_name !== userData.full_name
+        ) {
+          const { error: updateError } = await supabase
+            .from('profiles')
+            .update({
+              avatar_url: userData.avatar_url,
+              full_name: userData.full_name,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', userData.id)
+
+          if (updateError) {
+            console.error('Error updating profile:', updateError)
+          }
+        }
         
         toast.success('Successfully signed in with Google!')
         
-      } catch (fallbackError) {
-        console.error('OAuth session setup failed:', fallbackError)
-        toast.error('OAuth sign-in setup failed')
+      } catch (error) {
+        console.error('OAuth profile setup failed:', error)
+        toast.error('Failed to setup user profile')
+        throw error
       }
     } catch (error) {
       console.error('OAuth session handling failed:', error)
       toast.error('OAuth sign-in failed')
+      throw error
     }
   }
 
