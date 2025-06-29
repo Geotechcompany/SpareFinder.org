@@ -5,6 +5,7 @@ import FormData from 'form-data';
 import { authenticateToken } from '../middleware/auth';
 import { AuthRequest } from '../types/auth';
 import { supabase } from '../server';
+import { DatabaseLogger, PartSearchData, SearchHistoryData } from '../services/database-logger';
 
 const router = Router();
 
@@ -162,7 +163,7 @@ router.post('/image', authenticateToken, upload.single('image'), handleMulterErr
       console.error('AI service error:', aiError);
       
       // If AI service is down, save the upload with a placeholder response
-      const fallbackResult = {
+      const fallbackData: PartSearchData = {
         id: `upload_${Date.now()}`,
         user_id: userId,
         image_url: urlData.publicUrl,
@@ -171,30 +172,44 @@ router.post('/image', authenticateToken, upload.single('image'), handleMulterErr
         confidence_score: 0,
         processing_time: 0,
         ai_model_version: 'offline',
-        status: 'failed' as const,
+        analysis_status: 'failed',
         error_message: 'AI service unavailable',
+        image_size_bytes: size,
+        image_format: mimetype,
+        upload_source: 'web',
+        web_scraping_used: false,
+        sites_searched: 0,
+        parts_found: 0,
         metadata: {
-          file_size: size,
-          file_type: mimetype,
           ai_service_error: axios.isAxiosError(aiError) ? aiError.response?.status : 'unknown'
         }
       };
 
-      // Save the failed attempt to database
-      const { error: dbError } = await supabase
-        .from('part_searches')
-        .insert(fallbackResult);
-
-      if (dbError) {
-        console.error('Database insert error for failed upload:', dbError);
+      // Save the failed attempt to database using enhanced logger
+      const logResult = await DatabaseLogger.logPartSearch(fallbackData);
+      if (!logResult.success) {
+        console.error('Database logging error for failed upload:', logResult.error);
       }
+
+      // Also log search history
+      const searchHistoryData: SearchHistoryData = {
+        user_id: userId,
+        part_search_id: fallbackData.id,
+        search_type: 'image_upload',
+        search_query: originalname,
+        results_count: 0,
+        session_id: req.headers['x-session-id'] as string,
+        ip_address: req.ip,
+        user_agent: req.headers['user-agent']
+      };
+      await DatabaseLogger.logSearchHistory(searchHistoryData);
 
       // Return a fallback response
       return res.status(503).json({
         success: false,
         error: 'AI service temporarily unavailable',
         message: 'Your image was uploaded successfully, but our AI analysis service is currently down. Please try again later.',
-        id: fallbackResult.id,
+        id: fallbackData.id,
         image_url: urlData.publicUrl,
         retry_suggested: true
       });
@@ -207,8 +222,8 @@ router.post('/image', authenticateToken, upload.single('image'), handleMulterErr
       predictionsCount: aiResponse.data?.predictions?.length || 0
     });
 
-    // Step 3: Save analysis result to database
-    const analysisResult = {
+    // Step 3: Save analysis result to database using enhanced logger
+    const analysisData: PartSearchData = {
       id: aiResponse.data.request_id,
       user_id: userId,
       image_url: urlData.publicUrl,
@@ -216,23 +231,40 @@ router.post('/image', authenticateToken, upload.single('image'), handleMulterErr
       predictions: aiResponse.data.predictions || [],
       confidence_score: aiResponse.data.predictions?.[0]?.confidence || 0,
       processing_time: aiResponse.data.processing_time || 0,
-      ai_model_version: aiResponse.data.model_version,
-      status: 'completed' as const,
+      ai_model_version: aiResponse.data.model_version || 'Google Vision API v1',
+      analysis_status: 'completed',
+      image_size_bytes: size,
+      image_format: mimetype,
+      upload_source: 'web',
+      web_scraping_used: !!(aiResponse.data.similar_images && aiResponse.data.similar_images.length > 0),
+      sites_searched: aiResponse.data.image_metadata?.web_scraping_used ? 1 : 0,
+      parts_found: aiResponse.data.similar_images?.length || 0,
+      similar_images: aiResponse.data.similar_images || [],
+      search_query: aiResponse.data.predictions?.[0]?.class_name,
       metadata: {
-        file_size: size,
-        file_type: mimetype,
+        ...aiResponse.data.image_metadata,
         ...req.body.metadata && JSON.parse(req.body.metadata)
       }
     };
 
-    const { error: dbError } = await supabase
-      .from('part_searches')
-      .insert(analysisResult);
-
-    if (dbError) {
-      console.error('Database insert error:', dbError);
+    const logResult = await DatabaseLogger.logPartSearch(analysisData);
+    if (!logResult.success) {
+      console.error('Database logging error:', logResult.error);
       // Continue anyway - the AI analysis was successful
     }
+
+    // Also log search history for successful uploads
+    const searchHistoryData: SearchHistoryData = {
+      user_id: userId,
+      part_search_id: analysisData.id,
+      search_type: 'image_upload',
+      search_query: originalname,
+      results_count: (aiResponse.data.predictions?.length || 0) + (aiResponse.data.similar_images?.length || 0),
+      session_id: req.headers['x-session-id'] as string,
+      ip_address: req.ip,
+      user_agent: req.headers['user-agent']
+    };
+    await DatabaseLogger.logSearchHistory(searchHistoryData);
 
     // Step 4: Return results to frontend
     return res.json({
@@ -291,33 +323,64 @@ router.get('/history', authenticateToken, async (req: AuthRequest, res: Response
   try {
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 20;
-    const offset = (page - 1) * limit;
+    
+    // Extract filters from query parameters
+    const filters = {
+      analysis_status: req.query.status as string,
+      web_scraping_used: req.query.web_scraping === 'true' ? true : req.query.web_scraping === 'false' ? false : undefined,
+      date_from: req.query.date_from as string,
+      date_to: req.query.date_to as string
+    };
 
-    const { data: searches, error } = await supabase
-      .from('part_searches')
-      .select('*')
-      .eq('user_id', req.user!.userId)
-      .order('created_at', { ascending: false })
-      .range(offset, offset + limit - 1);
+    // Remove undefined filters
+    Object.keys(filters).forEach(key => {
+      if (filters[key as keyof typeof filters] === undefined) {
+        delete filters[key as keyof typeof filters];
+      }
+    });
 
-    if (error) {
-      console.error('History fetch error:', error);
-      return res.status(500).json({
-        error: 'Failed to fetch upload history'
-      });
-    }
+    const historyResult = await DatabaseLogger.getUserHistory(req.user!.userId, page, limit, filters);
 
     return res.json({
-      searches: searches || [],
-      page,
-      limit,
-      total: searches?.length || 0
+      success: true,
+      searches: historyResult.data,
+      page: historyResult.page,
+      limit: historyResult.limit,
+      total: historyResult.total,
+      filters: filters
     });
 
   } catch (error) {
     console.error('Upload history error:', error);
     return res.status(500).json({
       error: 'Failed to fetch upload history'
+    });
+  }
+});
+
+// Get user statistics
+router.get('/statistics', authenticateToken, async (req: AuthRequest, res: Response) => {
+  try {
+    const statistics = await DatabaseLogger.getUserStatistics(req.user!.userId);
+    
+    return res.json({
+      success: true,
+      statistics: statistics || {
+        total_uploads: 0,
+        total_successful_identifications: 0,
+        total_failed_identifications: 0,
+        total_web_scraping_searches: 0,
+        total_similar_parts_found: 0,
+        average_confidence_score: 0,
+        average_processing_time: 0,
+        last_upload_at: null
+      }
+    });
+
+  } catch (error) {
+    console.error('User statistics error:', error);
+    return res.status(500).json({
+      error: 'Failed to fetch user statistics'
     });
   }
 });

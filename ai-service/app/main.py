@@ -21,6 +21,7 @@ from app.services.ai_service import AIService
 from app.services.image_processor import ImageProcessor
 from app.services.google_search import google_search_service
 from app.services.web_scraper import automotive_scraper
+from app.services.database_service import database_service, log_ai_prediction
 from app.models.prediction import PredictionRequest, PredictionResponse
 from app.utils.exceptions import AIServiceException
 from app.services.external_part_api import external_part_api, PartResult
@@ -286,6 +287,25 @@ async def predict_part(
             response.processing_time,
             include_web_scraping and settings.is_web_scraping_enabled
         )
+        
+        # Log to database in background (if user_id is available from headers)
+        user_id = None  # TODO: Extract from JWT token or request headers if available
+        if database_service.is_enabled():
+            background_tasks.add_task(
+                log_ai_prediction,
+                request_id=request_id,
+                predictions=[pred.dict() for pred in predictions],
+                processing_time=response.processing_time,
+                model_version=ai_service.get_model_version(),
+                similar_images=[img for img in (similar_images or [])],
+                web_scraping_used=include_web_scraping and settings.is_web_scraping_enabled,
+                user_id=user_id,
+                image_metadata={
+                    "filename": file.filename,
+                    "content_type": file.content_type,
+                    "size_bytes": len(image_data)
+                }
+            )
         
         logger.info(
             "Google Vision prediction completed",
