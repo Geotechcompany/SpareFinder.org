@@ -2,6 +2,7 @@ import { useState, useCallback, useRef } from 'react';
 import { toast } from '@/hooks/use-toast';
 import { validateImageFile, type ProcessedImage, type ImageProcessingOptions } from '@/lib/imageService';
 import { config } from '@/lib/config';
+import { apiClient } from '@/lib/api';
 
 export interface UploadedFile {
   id: string;
@@ -22,6 +23,30 @@ export interface UseFileUploadOptions {
   onFileRemoved?: (fileId: string) => void;
   autoProcess?: boolean;
   processingOptions?: ImageProcessingOptions;
+}
+
+interface UploadResponse {
+  success: boolean;
+  part_info?: {
+    name: string;
+    part_number?: string;
+    category: string;
+    manufacturer: string;
+    price_range: string;
+    confidence_score: number;
+    description?: string;
+    specifications?: Record<string, any>;
+    compatibility?: string[];
+    similar_images?: Array<{
+      url: string;
+      metadata: Record<string, any>;
+      similarity_score: number;
+      source: string;
+      title: string;
+      price: string;
+    }>;
+  };
+  error?: string;
 }
 
 export interface UseFileUploadReturn {
@@ -47,6 +72,9 @@ export interface UseFileUploadReturn {
   };
   inputRef: React.RefObject<HTMLInputElement>;
   openFileDialog: () => void;
+  uploadFile: (file: File) => Promise<UploadResponse>;
+  isUploading: boolean;
+  error: string | null;
 }
 
 export const useFileUpload = (options: UseFileUploadOptions = {}): UseFileUploadReturn => {
@@ -66,6 +94,8 @@ export const useFileUpload = (options: UseFileUploadOptions = {}): UseFileUpload
   const [isProcessing, setIsProcessing] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const dragCounter = useRef(0);
+  const [isUploading, setIsUploading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   // Generate unique ID for files
   const generateFileId = () => Math.random().toString(36).substr(2, 9);
@@ -325,6 +355,33 @@ export const useFileUpload = (options: UseFileUploadOptions = {}): UseFileUpload
     ref: inputRef,
   }), [accept, maxFiles, handleInputChange]);
 
+  const uploadFile = async (file: File): Promise<UploadResponse> => {
+    setIsUploading(true);
+    setError(null);
+
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const response = await apiClient.post('/api/upload', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+
+      return response.data;
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to upload file';
+      setError(errorMessage);
+      return {
+        success: false,
+        error: errorMessage,
+      };
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
   return {
     files,
     isDragActive,
@@ -338,5 +395,8 @@ export const useFileUpload = (options: UseFileUploadOptions = {}): UseFileUpload
     getInputProps,
     inputRef,
     openFileDialog,
+    uploadFile,
+    isUploading,
+    error,
   };
 }; 

@@ -85,6 +85,12 @@ class PredictionResponse(BaseModel):
         description="Original image metadata (size, format, etc.)"
     )
     
+    # Similar images from web scraping
+    similar_images: Optional[List[Dict[str, Any]]] = Field(
+        default=None,
+        description="Similar part images found through web scraping"
+    )
+    
     class Config:
         json_encoders = {
             datetime: lambda v: v.isoformat()

@@ -6,6 +6,7 @@ import compression from 'compression';
 import rateLimit from 'express-rate-limit';
 import dotenv from 'dotenv';
 import { createClient } from '@supabase/supabase-js';
+import { apiLimiter } from './middleware/rate-limit';
 
 // Load environment variables
 dotenv.config();
@@ -80,6 +81,9 @@ app.get('/health', (_req, res) => {
     environment: process.env.NODE_ENV || 'development'
   });
 });
+
+// Apply global rate limiter to all routes
+app.use(apiLimiter);
 
 // API routes
 app.use('/api/auth', authRoutes);

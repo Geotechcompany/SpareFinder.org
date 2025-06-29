@@ -2,7 +2,7 @@ import os
 from functools import lru_cache
 from typing import List, Optional
 
-from pydantic import Field, validator
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings
 
 
@@ -17,28 +17,17 @@ class Settings(BaseSettings):
     
     # Security
     API_KEY: str = Field(description="API key for authentication")
-    ALLOWED_ORIGINS: List[str] = Field(
-        default=["*"],
-        description="Allowed CORS origins"
+    ALLOWED_ORIGINS: str = Field(
+        default="*",
+        description="Allowed CORS origins (comma-separated)"
     )
-    ALLOWED_HOSTS: List[str] = Field(
-        default=["*"],
-        description="Allowed host headers"
+    ALLOWED_HOSTS: str = Field(
+        default="*",
+        description="Allowed host headers (comma-separated)"
     )
     
-    # AI Model Configuration (TensorFlow only)
-    MODEL_PATH: str = Field(
-        default="/app/models/mobilenet_v2",
-        description="Path to TensorFlow model files"
-    )
-    MODEL_TYPE: str = Field(
-        default="mobilenet_v2",
-        description="Type of TensorFlow model (mobilenet_v2, efficientnet, custom)"
-    )
-    MODEL_CACHE_SIZE: int = Field(
-        default=1,
-        description="Number of models to keep in memory"
-    )
+    # AI API Configuration - Google Vision only
+    # No additional AI API keys needed - using Google Vision API
     
     # Processing Configuration
     MAX_FILE_SIZE_MB: int = Field(default=10, description="Maximum file size in MB")
@@ -49,8 +38,8 @@ class Settings(BaseSettings):
     )
     
     # Database Configuration (Supabase)
-    SUPABASE_URL: str = Field(description="Supabase project URL")
-    SUPABASE_KEY: str = Field(description="Supabase anon/service key")
+    SUPABASE_URL: Optional[str] = Field(default=None, description="Supabase project URL")
+    SUPABASE_KEY: Optional[str] = Field(default=None, description="Supabase anon/service key")
     SUPABASE_SERVICE_KEY: Optional[str] = Field(
         default=None,
         description="Supabase service role key for admin operations"
@@ -62,7 +51,7 @@ class Settings(BaseSettings):
         description="Supabase storage bucket name"
     )
     
-    # Google Search API
+    # Google APIs Configuration
     GOOGLE_API_KEY: Optional[str] = Field(
         default=None,
         description="Google API key for custom search"
@@ -70,6 +59,24 @@ class Settings(BaseSettings):
     GOOGLE_SEARCH_ENGINE_ID: Optional[str] = Field(
         default=None,
         description="Google Custom Search Engine ID"
+    )
+    GOOGLE_VISION_API_KEY: Optional[str] = Field(
+        default=None,
+        description="Google Vision API key for image analysis"
+    )
+    
+    # Web Scraping Configuration
+    WEB_SCRAPING_ENABLED: bool = Field(
+        default=True,
+        description="Enable web scraping for part information"
+    )
+    MAX_SCRAPING_SITES: int = Field(
+        default=5,
+        description="Maximum number of sites to scrape per search"
+    )
+    SCRAPING_DELAY: float = Field(
+        default=2.0,
+        description="Delay between scraping requests (seconds)"
     )
     
     # External Part Database APIs (Simplified)
@@ -106,29 +113,10 @@ class Settings(BaseSettings):
     )
     REQUEST_TIMEOUT: int = Field(default=30, description="Request timeout in seconds")
     
-    @validator("ALLOWED_ORIGINS", pre=True)
-    def parse_cors_origins(cls, v):
-        """Parse CORS origins from string or list."""
-        if isinstance(v, str):
-            return [origin.strip() for origin in v.split(",")]
-        return v
+    # Model type validation removed - using Google Vision API only
     
-    @validator("ALLOWED_HOSTS", pre=True)
-    def parse_allowed_hosts(cls, v):
-        """Parse allowed hosts from string or list."""
-        if isinstance(v, str):
-            return [host.strip() for host in v.split(",")]
-        return v
-    
-    @validator("MODEL_TYPE")
-    def validate_model_type(cls, v):
-        """Validate model type (TensorFlow only)."""
-        allowed_types = ["mobilenet_v2", "efficientnet", "custom"]
-        if v not in allowed_types:
-            raise ValueError(f"MODEL_TYPE must be one of: {allowed_types}")
-        return v
-    
-    @validator("ENVIRONMENT")
+    @field_validator("ENVIRONMENT")
+    @classmethod
     def validate_environment(cls, v):
         """Validate environment."""
         allowed_envs = ["development", "staging", "production"]
@@ -136,12 +124,25 @@ class Settings(BaseSettings):
             raise ValueError(f"ENVIRONMENT must be one of: {allowed_envs}")
         return v
     
-    @validator("DEFAULT_CONFIDENCE_THRESHOLD")
+    @field_validator("DEFAULT_CONFIDENCE_THRESHOLD")
+    @classmethod
     def validate_confidence_threshold(cls, v):
         """Validate confidence threshold range."""
         if not 0.0 <= v <= 1.0:
             raise ValueError("DEFAULT_CONFIDENCE_THRESHOLD must be between 0.0 and 1.0")
         return v
+    
+    # GPT-4 API key validation removed - using Google Vision API only
+    
+    @property
+    def allowed_origins_list(self) -> List[str]:
+        """Get ALLOWED_ORIGINS as a list."""
+        return [origin.strip() for origin in self.ALLOWED_ORIGINS.split(",")]
+    
+    @property
+    def allowed_hosts_list(self) -> List[str]:
+        """Get ALLOWED_HOSTS as a list."""
+        return [host.strip() for host in self.ALLOWED_HOSTS.split(",")]
     
     @property
     def is_production(self) -> bool:
@@ -151,12 +152,18 @@ class Settings(BaseSettings):
     @property
     def database_url(self) -> str:
         """Get database URL for async connections."""
-        return f"{self.SUPABASE_URL}/rest/v1/"
+        return f"{self.SUPABASE_URL}/rest/v1/" if self.SUPABASE_URL else ""
     
-    class Config:
-        env_file = ".env"
-        env_file_encoding = "utf-8"
-        case_sensitive = True
+    @property
+    def is_web_scraping_enabled(self) -> bool:
+        """Check if web scraping is enabled."""
+        return self.WEB_SCRAPING_ENABLED
+    
+    model_config = {
+        "env_file": ".env",
+        "env_file_encoding": "utf-8",
+        "case_sensitive": True
+    }
 
 
 @lru_cache()

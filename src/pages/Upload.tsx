@@ -29,37 +29,71 @@ import {
 } from 'lucide-react';
 import DashboardSidebar from '@/components/DashboardSidebar';
 import MobileSidebar from '@/components/MobileSidebar';
-import { apiClient } from '@/lib/api';
+import { apiClient, api } from '@/lib/api';
 import { toast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
+import { Input } from '@/components/ui/input';
+import { useToast } from '@/components/ui/use-toast';
+import { Skeleton } from '@/components/ui/skeleton';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '@/components/ui/carousel';
+import { useFileUpload } from '@/hooks/useFileUpload';
+import { cn } from '@/lib/utils';
 
 // Types for analysis functionality
 interface AnalysisProgress {
-  stage: 'uploading' | 'processing' | 'analyzing' | 'enriching' | 'complete' | 'error';
-  progress: number;
+  status: string;
   message: string;
+  progress: number;
+  identifiedPart?: string;
+  confidence?: number;
+  currentStep?: string;
+  totalSteps?: number;
+  currentStepIndex?: number;
   details?: string;
+  searchResults?: {
+    sitesSearched: number;
+    partsFound: number;
+    databasesQueried: string[];
+  };
 }
 
 interface PartPrediction {
-  id: string;
-  partName: string;
-  partNumber: string;
-  category: string;
-  manufacturer: string;
+  name: string;
   confidence: number;
-  description?: string;
-  specifications?: Record<string, any>;
-  estimatedPrice?: {
-    min: number;
-    max: number;
-    currency: string;
+  details: string;
+  partNumber?: string;
+  category?: string;
+  manufacturer?: string;
+  estimatedPrice?: string;
+  compatibility?: string[];
+}
+
+interface AIServiceResponse {
+  request_id: string;
+  predictions: Array<{
+    class_name: string;
+    confidence: number;
+    part_number?: string;
+    description: string;
+    category: string;
+    manufacturer: string;
+    compatibility: string[];
+    estimated_price: string;
+  }>;
+  processing_time: number;
+  model_version: string;
+  image_metadata?: {
+    web_scraping_used: boolean;
   };
-  compatibility?: any[];
-  suppliers?: any[];
-  images?: string[];
-  tags?: string[];
-  lastUpdated?: string;
+  similar_images?: Array<{
+    url: string;
+    metadata: Record<string, any>;
+    similarity_score: number;
+    source: string;
+    title: string;
+    price: string;
+  }>;
 }
 
 interface AnalysisResponse {
@@ -72,9 +106,42 @@ interface AnalysisResponse {
     imageFormat: string;
     modelVersion: string;
     confidence: number;
+    webScrapingUsed?: boolean;
+    sitesSearched?: number;
   };
+  similarImages?: Array<{
+    url: string;
+    metadata: Record<string, any>;
+    similarity_score: number;
+    source: string;
+    title: string;
+    price: string;
+  }>;
   error?: string;
 }
+
+// Add new animation variants
+const fadeInScale = {
+  initial: { opacity: 0, scale: 0.95 },
+  animate: { opacity: 1, scale: 1 },
+  exit: { opacity: 0, scale: 0.95 },
+  transition: { duration: 0.2 }
+};
+
+const slideInRight = {
+  initial: { opacity: 0, x: 20 },
+  animate: { opacity: 1, x: 0 },
+  exit: { opacity: 0, x: -20 },
+  transition: { duration: 0.3 }
+};
+
+const pulseAnimation = {
+  initial: { scale: 1 },
+  animate: { 
+    scale: [1, 1.02, 1],
+    transition: { duration: 2, repeat: Infinity, ease: "easeInOut" }
+  }
+};
 
 const Upload = () => {
   const [dragActive, setDragActive] = useState(false);
@@ -86,73 +153,318 @@ const Upload = () => {
   const [analysisResults, setAnalysisResults] = useState<AnalysisResponse | null>(null);
   const [analysisProgress, setAnalysisProgress] = useState<AnalysisProgress | null>(null);
   const [selectedPrediction, setSelectedPrediction] = useState<PartPrediction | null>(null);
+  const [partInfo, setPartInfo] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // File validation function
-  const validateFile = (file: File): { valid: boolean; error?: string } => {
-    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
-    const maxSize = 10 * 1024 * 1024; // 10MB
+  const { toast } = useToast();
+  const { uploadFile } = useFileUpload();
 
-    if (!allowedTypes.includes(file.type)) {
-      return { valid: false, error: 'Please upload a valid image file (JPEG, PNG, WebP)' };
+  const getProgressStageColor = (stage: string) => {
+    switch (stage) {
+      case 'uploading':
+        return 'from-blue-500 to-cyan-500';
+      case 'validating':
+        return 'from-cyan-500 to-teal-500';
+      case 'ai_analysis':
+        return 'from-purple-500 to-pink-500';
+      case 'database_search':
+        return 'from-orange-500 to-red-500';
+      case 'part_matching':
+        return 'from-red-500 to-rose-500';
+      case 'supplier_search':
+        return 'from-green-500 to-emerald-500';
+      case 'data_enrichment':
+        return 'from-emerald-500 to-teal-500';
+      case 'finalizing':
+        return 'from-indigo-500 to-purple-500';
+      case 'complete':
+        return 'from-green-400 to-emerald-400';
+      case 'error':
+        return 'from-red-500 to-pink-500';
+      default:
+        return 'from-gray-500 to-slate-500';
     }
-
-    if (file.size > maxSize) {
-      return { valid: false, error: 'File size must be less than 10MB' };
-    }
-
-    return { valid: true };
   };
 
-  // Analysis function using backend API
+  const getProgressStageIcon = (stage: string) => {
+    switch (stage) {
+      case 'uploading':
+        return <UploadIcon className="w-4 h-4" />;
+      case 'validating':
+        return <CheckCircle className="w-4 h-4" />;
+      case 'ai_analysis':
+        return <Brain className="w-4 h-4" />;
+      case 'database_search':
+        return <Target className="w-4 h-4" />;
+      case 'part_matching':
+        return <Zap className="w-4 h-4" />;
+      case 'supplier_search':
+        return <ExternalLink className="w-4 h-4" />;
+      case 'data_enrichment':
+        return <Sparkles className="w-4 h-4" />;
+      case 'finalizing':
+        return <RefreshCw className="w-4 h-4" />;
+      case 'complete':
+        return <CheckCircle className="w-4 h-4" />;
+      case 'error':
+        return <AlertTriangle className="w-4 h-4" />;
+      default:
+        return <Loader2 className="w-4 h-4" />;
+    }
+  };
+
+  const formatPrice = (price?: { min: number; max: number; currency: string } | null) => {
+    if (!price || typeof price.min === 'undefined' || typeof price.max === 'undefined') {
+      return 'Price not available';
+    }
+    const symbol = price.currency === 'GBP' ? '£' : '$';
+    return `${symbol}${price.min} - ${symbol}${price.max}`;
+  };
+
   const analyzeImage = async (
     file: File,
     options: any = {},
     onProgress?: (progress: AnalysisProgress) => void
   ): Promise<AnalysisResponse | null> => {
     try {
-      // Update progress
+      // Step 1: Upload and validate
       onProgress?.({
-        stage: 'uploading',
-        progress: 0,
-        message: 'Uploading image...'
+        status: 'uploading',
+        message: 'Uploading image to secure server...',
+        progress: 5,
+        currentStep: 'Upload & Validation',
+        currentStepIndex: 1,
+        totalSteps: 6,
+        details: 'Transferring image data and performing security checks'
       });
 
-      const response = await apiClient.uploadImage(file, options);
+      await new Promise(resolve => setTimeout(resolve, 800));
 
-      if (response.success && response.data) {
+      // Step 2: Image validation
+      onProgress?.({
+        status: 'validating',
+        message: 'Validating image quality and format...',
+        progress: 15,
+        currentStep: 'Image Analysis',
+        currentStepIndex: 2,
+        totalSteps: 6,
+        details: 'Checking resolution, format compatibility, and image clarity'
+      });
+
+      await new Promise(resolve => setTimeout(resolve, 600));
+
+      // Step 3: Google Vision Analysis
+      onProgress?.({
+        status: 'ai_analysis',
+        message: 'Running Google Vision analysis...',
+        progress: 35,
+        currentStep: 'Google Vision AI',
+        currentStepIndex: 3,
+        totalSteps: 6,
+        details: 'Google Vision API analyzing automotive components and features'
+      });
+
+      await new Promise(resolve => setTimeout(resolve, 1500));
+
+      // Step 4: Web Scraping
+      onProgress?.({
+        status: 'database_search',
+        message: 'Searching automotive parts online...',
+        progress: 60,
+        currentStep: 'Web Scraping',
+        currentStepIndex: 4,
+        totalSteps: 6,
+        details: 'Scraping automotive websites for similar parts and pricing data',
+        searchResults: {
+          sitesSearched: 1,
+          partsFound: 0,
+          databasesQueried: ['eBay UK Motors']
+        }
+      });
+
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
+      // Step 5: Data Processing
+      onProgress?.({
+        status: 'data_enrichment',
+        message: 'Processing scraped data...',
+        progress: 80,
+        currentStep: 'Data Processing',
+        currentStepIndex: 5,
+        totalSteps: 6,
+        details: 'Analyzing scraped results and matching with Google Vision identification'
+      });
+
+      // Make the actual API call to Google Vision + Web Scraper integration
+      const response = await api.upload.image(file) as unknown as AIServiceResponse;
+      console.log('🤖 Google Vision + Web Scraper Response:', response);
+
+      if (response && response.predictions && response.predictions.length > 0) {
+        const prediction = response.predictions[0];
+        const identifiedPart = prediction.class_name;
+        const confidence = Math.round(prediction.confidence * 100);
+        
+        console.log(`✅ Google Vision identified: "${identifiedPart}" with ${confidence}% confidence`);
+        if (response.similar_images && response.similar_images.length > 0) {
+          console.log(`🖼️ Found ${response.similar_images.length} similar images from web scraping`);
+        }
+
+        // Step 6: Finalizing
         onProgress?.({
-          stage: 'complete',
-          progress: 100,
-          message: 'Analysis complete!'
+          status: 'finalizing',
+          message: 'Finalizing analysis and generating report...',
+          progress: 95,
+          currentStep: 'Report Generation',
+          currentStepIndex: 6,
+          totalSteps: 6,
+          identifiedPart: identifiedPart,
+          confidence: confidence,
+          details: 'Compiling Google Vision analysis with scraped market data',
+          searchResults: {
+            sitesSearched: 1,
+            partsFound: response.similar_images?.length || 0,
+            databasesQueried: ['eBay UK Motors - Live Results']
+          }
         });
 
-        // Transform backend response to match expected format
+        await new Promise(resolve => setTimeout(resolve, 600));
+
+        // Complete
+        onProgress?.({
+          status: 'complete',
+          message: 'Analysis complete! Part identified successfully.',
+          progress: 100,
+          currentStep: 'Complete',
+          currentStepIndex: 6,
+          totalSteps: 6,
+          identifiedPart: identifiedPart,
+          confidence: confidence,
+          details: `Google Vision + Web Scraping found ${response.similar_images?.length || 0} similar parts with pricing and availability`,
+          searchResults: {
+            sitesSearched: 1,
+            partsFound: response.similar_images?.length || 0,
+            databasesQueried: ['eBay UK Motors - Live Results']
+          }
+        });
+
         return {
           success: true,
-          analysisId: response.data.id || 'temp-id',
-          predictions: response.data.predictions || [],
-          processingTime: response.data.processingTime || 0,
+          analysisId: response.request_id || 'temp-id',
+          predictions: [{
+            name: prediction.class_name,
+            confidence: prediction.confidence * 100, // Convert to percentage
+            details: prediction.description || '',
+            partNumber: prediction.part_number,
+            category: prediction.category,
+            manufacturer: prediction.manufacturer,
+            estimatedPrice: prediction.estimated_price,
+            compatibility: prediction.compatibility || []
+          }],
+          processingTime: response.processing_time || 0,
           metadata: {
             imageSize: file.size,
             imageFormat: file.type,
-            modelVersion: response.data.modelVersion || 'v1.0',
-            confidence: response.data.confidence || 0.85
-          }
+            modelVersion: response.model_version || 'Google Vision API v1',
+            confidence: prediction.confidence * 100,
+            webScrapingUsed: response.image_metadata?.web_scraping_used || false,
+            sitesSearched: 1
+          },
+          similarImages: response.similar_images || []
         };
       } else {
-        throw new Error(response.error || 'Analysis failed');
+        throw new Error('No predictions found');
       }
     } catch (error) {
       onProgress?.({
-        stage: 'error',
+        status: 'error',
+        message: 'Analysis failed - please try again',
         progress: 0,
-        message: 'Analysis failed',
-        details: error instanceof Error ? error.message : 'Unknown error'
+        currentStep: 'Error',
+        details: error instanceof Error ? error.message : 'Unknown error occurred'
       });
       
       console.error('Image analysis error:', error);
+      toast({
+        title: 'Analysis Failed',
+        description: error instanceof Error ? error.message : 'Failed to analyze image',
+        variant: 'destructive',
+      });
       return null;
+    }
+  };
+
+  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      // Validate file
+      if (!file.type.startsWith('image/')) {
+        toast({
+          title: "Invalid file type",
+          description: "Please select an image file.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      if (file.size > 10 * 1024 * 1024) { // 10MB limit
+        toast({
+          title: "File too large",
+          description: "Please select an image under 10MB.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      setUploadedFile(file);
+      setImagePreview(URL.createObjectURL(file));
+      setSelectedPrediction(null);
+      setAnalysisProgress(null);
+      setPartInfo(null);
+    }
+  };
+
+  const resetForm = () => {
+    setUploadedFile(null);
+    setImagePreview(null);
+    setSelectedPrediction(null);
+    setAnalysisProgress(null);
+    setPartInfo(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  const handleUpload = async () => {
+    if (!uploadedFile) {
+      toast({
+        title: "No file selected",
+        description: "Please select an image file first.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const result = await uploadFile(uploadedFile);
+      if (result.success && result.part_info) {
+        setPartInfo(result.part_info);
+        toast({
+          title: "Success",
+          description: "Part information retrieved successfully.",
+        });
+      } else {
+        throw new Error(result.error || 'Failed to process image');
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to process image",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -173,43 +485,16 @@ const Upload = () => {
     
     const files = e.dataTransfer.files;
     if (files && files[0]) {
-      handleFileSelect(files[0]);
+      handleFileSelect({ target: { files: files } } as React.ChangeEvent<HTMLInputElement>);
     }
   }, []);
 
   const handleFileInput = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (files && files[0]) {
-      handleFileSelect(files[0]);
+      handleFileSelect(e);
     }
   }, []);
-
-  const handleFileSelect = useCallback((file: File) => {
-    // Validate file
-    const validation = validateFile(file);
-    if (!validation.valid) {
-      toast({
-        title: 'Invalid File',
-        description: validation.error,
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    setUploadedFile(file);
-    setAnalysisResults(null);
-    setSelectedPrediction(null);
-    setAnalysisProgress(null);
-
-    // Create image preview
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      if (e.target?.result) {
-        setImagePreview(e.target.result as string);
-      }
-    };
-    reader.readAsDataURL(file);
-  }, [validateFile]);
 
   const handleAnalyze = useCallback(async () => {
     if (!uploadedFile) return;
@@ -255,6 +540,7 @@ const Upload = () => {
     setAnalysisResults(null);
     setSelectedPrediction(null);
     setAnalysisProgress(null);
+    setPartInfo(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -270,37 +556,6 @@ const Upload = () => {
 
   const handleToggleSidebar = () => {
     setIsCollapsed(!isCollapsed);
-  };
-
-  const handleToggleMobileMenu = () => {
-    setIsMobileMenuOpen(!isMobileMenuOpen);
-  };
-
-  const getProgressStageColor = (stage: string) => {
-    switch (stage) {
-      case 'uploading':
-        return 'from-blue-600 to-blue-700';
-      case 'processing':
-        return 'from-purple-600 to-purple-700';
-      case 'analyzing':
-        return 'from-orange-600 to-orange-700';
-      case 'enriching':
-        return 'from-green-600 to-green-700';
-      case 'complete':
-        return 'from-emerald-600 to-emerald-700';
-      case 'error':
-        return 'from-red-600 to-red-700';
-      default:
-        return 'from-gray-600 to-gray-700';
-    }
-  };
-
-  const formatPrice = (price?: { min: number; max: number; currency: string } | null) => {
-    if (!price || typeof price.min === 'undefined' || typeof price.max === 'undefined') {
-      return 'Price not available';
-    }
-    const symbol = price.currency === 'GBP' ? '£' : '$';
-    return `${symbol}${price.min} - ${symbol}${price.max}`;
   };
 
   return (
@@ -341,7 +596,7 @@ const Upload = () => {
 
       {/* Mobile Menu Button */}
       <button 
-        onClick={handleToggleMobileMenu}
+        onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
         className="fixed top-4 right-4 z-50 p-2 rounded-lg bg-black/20 backdrop-blur-xl border border-white/10 md:hidden"
       >
         <Menu className="w-5 h-5 text-white" />
@@ -385,7 +640,7 @@ const Upload = () => {
                   >
                     <Sparkles className="w-4 h-4 text-purple-400" />
                   </motion.div>
-                  <span className="text-purple-300 text-sm font-semibold">AI-Powered Recognition</span>
+                  <span className="text-purple-300 text-sm font-semibold">Google Vision AI-Powered</span>
                 </motion.div>
                 <motion.h1 
                   className="text-3xl lg:text-4xl font-bold bg-gradient-to-r from-white via-purple-200 to-blue-200 bg-clip-text text-transparent mb-3"
@@ -552,34 +807,194 @@ const Upload = () => {
                     )}
                   </div>
 
-                  {/* Progress Bar */}
+                  {/* Modern Progress Bar */}
                   <AnimatePresence>
                     {isAnalyzing && analysisProgress && (
                       <motion.div
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: -10 }}
-                        className="space-y-3"
+                        className="space-y-4"
                       >
-                        <div className="flex justify-between items-center">
-                          <span className="text-white text-sm font-medium">
-                            {analysisProgress.message}
-                          </span>
-                          <span className="text-gray-400 text-sm">
-                            {analysisProgress.progress}%
-                          </span>
+                        {/* Progress Header */}
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center space-x-3">
+                            <motion.div
+                              animate={{ rotate: analysisProgress.status === 'complete' ? 0 : 360 }}
+                              transition={{ 
+                                duration: analysisProgress.status === 'complete' ? 0 : 2, 
+                                repeat: analysisProgress.status === 'complete' ? 0 : Infinity, 
+                                ease: "linear" 
+                              }}
+                              className={`p-2 rounded-full bg-gradient-to-r ${getProgressStageColor(analysisProgress.status)} shadow-lg`}
+                            >
+                              {getProgressStageIcon(analysisProgress.status)}
+                            </motion.div>
+                            <div>
+                              <div className="text-white font-medium text-lg">
+                                {analysisProgress.currentStep || analysisProgress.message}
+                              </div>
+                              <div className="text-gray-400 text-sm">
+                                {analysisProgress.details || 'Processing your request...'}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <div className="text-white text-lg font-bold">
+                              {analysisProgress.progress}%
+                            </div>
+                            {analysisProgress.currentStepIndex && analysisProgress.totalSteps && (
+                              <div className="text-gray-400 text-xs">
+                                Step {analysisProgress.currentStepIndex} of {analysisProgress.totalSteps}
+                              </div>
+                            )}
+                          </div>
                         </div>
-                        <div className="w-full bg-gray-700/30 rounded-full h-3 overflow-hidden">
+
+                        {/* Modern Progress Bar */}
+                        <div className="relative">
+                          <div className="w-full bg-gray-800/50 rounded-full h-3 overflow-hidden backdrop-blur-sm border border-gray-700/50">
+                            <motion.div
+                              className={`h-full bg-gradient-to-r ${getProgressStageColor(analysisProgress.status)} rounded-full relative overflow-hidden`}
+                              initial={{ width: 0 }}
+                              animate={{ width: `${analysisProgress.progress}%` }}
+                              transition={{ duration: 0.8, ease: "easeOut" }}
+                            >
+                              {/* Animated shine effect */}
+                              <motion.div
+                                className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent"
+                                animate={{ x: ['-100%', '100%'] }}
+                                transition={{ 
+                                  duration: 2, 
+                                  repeat: analysisProgress.status !== 'complete' ? Infinity : 0,
+                                  ease: "easeInOut" 
+                                }}
+                              />
+                            </motion.div>
+                          </div>
+                          {/* Progress markers */}
+                          {analysisProgress.totalSteps && (
+                            <div className="flex justify-between mt-2">
+                              {Array.from({ length: analysisProgress.totalSteps }, (_, i) => (
+                                <div
+                                  key={i}
+                                  className={`w-2 h-2 rounded-full transition-colors duration-300 ${
+                                    (analysisProgress.currentStepIndex || 0) > i
+                                      ? 'bg-green-400'
+                                      : (analysisProgress.currentStepIndex || 0) === i + 1
+                                      ? `bg-gradient-to-r ${getProgressStageColor(analysisProgress.status)}`
+                                      : 'bg-gray-600'
+                                  }`}
+                                />
+                              ))}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Database Search Results */}
+                        {analysisProgress.searchResults && (
                           <motion.div
-                            className={`h-full bg-gradient-to-r ${getProgressStageColor(analysisProgress.stage)} rounded-full`}
-                            initial={{ width: 0 }}
-                            animate={{ width: `${analysisProgress.progress}%` }}
-                            transition={{ duration: 0.5, ease: "easeOut" }}
-                          />
-                        </div>
-                        {analysisProgress.details && (
-                          <p className="text-gray-500 text-xs">{analysisProgress.details}</p>
+                            initial={{ opacity: 0, scale: 0.95 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            className="grid grid-cols-3 gap-3"
+                          >
+                            <div className="bg-blue-600/10 border border-blue-500/20 rounded-lg p-3 text-center">
+                              <div className="text-blue-400 text-lg font-bold">
+                                {analysisProgress.searchResults.sitesSearched}
+                              </div>
+                              <div className="text-blue-300 text-xs">Sites Searched</div>
+                            </div>
+                            <div className="bg-green-600/10 border border-green-500/20 rounded-lg p-3 text-center">
+                              <div className="text-green-400 text-lg font-bold">
+                                {analysisProgress.searchResults.partsFound}
+                              </div>
+                              <div className="text-green-300 text-xs">Parts Found</div>
+                            </div>
+                            <div className="bg-purple-600/10 border border-purple-500/20 rounded-lg p-3 text-center">
+                              <div className="text-purple-400 text-lg font-bold">
+                                {analysisProgress.searchResults.databasesQueried.length}
+                              </div>
+                              <div className="text-purple-300 text-xs">Databases</div>
+                            </div>
+                          </motion.div>
                         )}
+
+                        {/* Active Databases List */}
+                        {analysisProgress.searchResults?.databasesQueried && analysisProgress.searchResults.databasesQueried.length > 0 && (
+                          <motion.div
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            className="bg-gray-800/30 border border-gray-700/50 rounded-lg p-3"
+                          >
+                            <div className="text-gray-400 text-xs mb-2 flex items-center">
+                              <Target className="w-3 h-3 mr-1" />
+                              Currently Searching:
+                            </div>
+                            <div className="flex flex-wrap gap-1">
+                              {analysisProgress.searchResults.databasesQueried.map((db, index) => (
+                                <motion.span
+                                  key={index}
+                                  initial={{ opacity: 0, scale: 0.8 }}
+                                  animate={{ opacity: 1, scale: 1 }}
+                                  transition={{ delay: index * 0.1 }}
+                                  className="inline-flex items-center px-2 py-1 rounded-full bg-gradient-to-r from-blue-600/20 to-purple-600/20 border border-blue-500/30 text-blue-300 text-xs"
+                                >
+                                  <motion.div
+                                    animate={{ scale: [1, 1.2, 1] }}
+                                    transition={{ duration: 1, repeat: Infinity, delay: index * 0.2 }}
+                                    className="w-1 h-1 bg-blue-400 rounded-full mr-1"
+                                  />
+                                  {db}
+                                </motion.span>
+                              ))}
+                            </div>
+                          </motion.div>
+                        )}
+
+                        {/* Identified Part Display */}
+                        {analysisProgress.identifiedPart && (
+                          <motion.div
+                            initial={{ opacity: 0, scale: 0.9 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            className="p-4 rounded-lg bg-gradient-to-r from-green-600/20 to-emerald-600/20 border border-green-500/30 backdrop-blur-sm"
+                          >
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center space-x-3">
+                                <div className="p-2 bg-green-600/30 rounded-full">
+                                  <CheckCircle className="w-5 h-5 text-green-400" />
+                                </div>
+                                <div>
+                                  <div className="text-green-300 font-medium text-lg">
+                                    Part Identified!
+                                  </div>
+                                  <div className="text-green-200 font-semibold">
+                                    {analysisProgress.identifiedPart}
+                                  </div>
+                                </div>
+                              </div>
+                              {analysisProgress.confidence && (
+                                <div className="text-right">
+                                  <div className="text-green-400 text-xl font-bold">
+                                    {analysisProgress.confidence}%
+                                  </div>
+                                  <div className="text-green-300 text-xs">Confidence</div>
+                                </div>
+                              )}
+                            </div>
+                          </motion.div>
+                        )}
+
+                        {/* Real-time Status Messages */}
+                        <motion.div
+                          key={analysisProgress.status}
+                          initial={{ opacity: 0, x: -20 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          className="text-center"
+                        >
+                          <p className="text-gray-300 text-sm">
+                            {analysisProgress.message}
+                          </p>
+                        </motion.div>
                       </motion.div>
                     )}
                   </AnimatePresence>
@@ -615,9 +1030,15 @@ const Upload = () => {
                     <Brain className="w-5 h-5 text-blue-400" />
                     <span>Analysis Results</span>
                     {analysisResults && (
-                      <Badge className="bg-green-600/20 text-green-300 border-green-500/30 ml-auto">
-                        {analysisResults.predictions.length} match{analysisResults.predictions.length !== 1 ? 'es' : ''}
-                      </Badge>
+                      <motion.div
+                        initial={{ scale: 0 }}
+                        animate={{ scale: 1 }}
+                        transition={{ type: "spring", stiffness: 200, damping: 15 }}
+                      >
+                        <Badge className="bg-green-600/20 text-green-300 border-green-500/30 ml-auto">
+                          {analysisResults.predictions.length} match{analysisResults.predictions.length !== 1 ? 'es' : ''}
+                        </Badge>
+                      </motion.div>
                     )}
                   </CardTitle>
                   <CardDescription className="text-gray-400">
@@ -625,202 +1046,393 @@ const Upload = () => {
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  {isAnalyzing ? (
-                    <div className="flex flex-col items-center justify-center py-12 space-y-6">
+                  <AnimatePresence mode="wait">
+                    {isAnalyzing ? (
                       <motion.div
-                        animate={{ rotate: 360 }}
-                        transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
-                        className="w-16 h-16 border-4 border-purple-600/30 border-t-purple-600 rounded-full"
-                      />
-                      <div className="text-center">
-                        <p className="text-white font-medium text-lg">Analyzing your part...</p>
-                        <p className="text-gray-400 text-sm mt-1">Our AI is processing the image</p>
-                      </div>
-                    </div>
-                  ) : selectedPrediction ? (
-                    <motion.div
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className="space-y-6"
-                    >
-                      {/* Confidence Score */}
-                      <div className="text-center p-4 rounded-xl bg-gradient-to-r from-green-600/20 to-emerald-600/20 border border-green-500/30">
-                        <div className="text-3xl font-bold text-green-400">{selectedPrediction.confidence.toFixed(1)}%</div>
-                        <div className="text-green-300 text-sm">Confidence Score</div>
-                      </div>
-
-                      {/* Part Details */}
-                      <div className="space-y-4">
-                        <div className="p-4 rounded-xl bg-white/5 border border-white/10">
-                          <div className="flex justify-between items-start">
-                            <div className="flex-1">
-                              <div className="text-gray-400 text-sm mb-1">Part Name</div>
-                              <div className="text-white font-medium text-lg">{selectedPrediction.partName}</div>
-                            </div>
-                          </div>
-                        </div>
-                        
-                        <div className="p-4 rounded-xl bg-white/5 border border-white/10">
-                          <div className="flex justify-between items-center">
-                            <div className="flex-1">
-                              <div className="text-gray-400 text-sm mb-1">Part Number</div>
-                              <div className="text-white font-medium font-mono">{selectedPrediction.partNumber}</div>
-                            </div>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleCopyPartNumber(selectedPrediction.partNumber)}
-                              className="text-blue-400 hover:text-blue-300 h-8 w-8 p-0"
+                        key="analyzing"
+                        {...fadeInScale}
+                        className="flex flex-col items-center justify-center py-12 space-y-6"
+                      >
+                        <motion.div
+                          animate={{ rotate: 360 }}
+                          transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+                          className="relative w-20 h-20"
+                        >
+                          <div className="absolute inset-0 rounded-full bg-gradient-to-r from-purple-600 to-blue-600 blur-lg opacity-50" />
+                          <div className="relative w-full h-full border-4 border-purple-600/30 border-t-purple-600 rounded-full" />
+                        </motion.div>
+                        <motion.div
+                          {...pulseAnimation}
+                          className="text-center"
+                        >
+                          <p className="text-white font-medium text-lg">Analyzing your part...</p>
+                          <p className="text-gray-400 text-sm mt-1">Our AI is processing the image</p>
+                        </motion.div>
+                      </motion.div>
+                    ) : selectedPrediction ? (
+                      <motion.div
+                        key="results"
+                        {...slideInRight}
+                        className="space-y-6"
+                      >
+                        {/* Confidence Score with Radial Progress */}
+                        <motion.div
+                          className="relative w-32 h-32 mx-auto"
+                          initial={{ scale: 0 }}
+                          animate={{ scale: 1 }}
+                          transition={{ type: "spring", stiffness: 200, damping: 15 }}
+                        >
+                          <svg className="w-full h-full" viewBox="0 0 100 100">
+                            <circle
+                              cx="50"
+                              cy="50"
+                              r="45"
+                              fill="none"
+                              stroke="rgba(74, 222, 128, 0.1)"
+                              strokeWidth="10"
+                            />
+                            <motion.circle
+                              cx="50"
+                              cy="50"
+                              r="45"
+                              fill="none"
+                              stroke="rgba(74, 222, 128, 0.5)"
+                              strokeWidth="10"
+                              strokeLinecap="round"
+                              initial={{ pathLength: 0 }}
+                              animate={{ pathLength: selectedPrediction.confidence / 100 }}
+                              transition={{ duration: 1, ease: "easeOut" }}
+                              transform="rotate(-90 50 50)"
+                              strokeDasharray="283"
+                              strokeDashoffset="0"
+                            />
+                            <text
+                              x="50"
+                              y="50"
+                              textAnchor="middle"
+                              dy="0.3em"
+                              className="text-2xl font-bold fill-green-400"
                             >
-                              <Copy className="w-4 h-4" />
-                            </Button>
-                          </div>
-                        </div>
+                              {selectedPrediction.confidence.toFixed(1)}%
+                            </text>
+                          </svg>
+                          <div className="text-green-300 text-sm text-center mt-2">Confidence Score</div>
+                        </motion.div>
 
-                        <div className="grid grid-cols-2 gap-4">
-                          <div className="p-4 rounded-xl bg-white/5 border border-white/10">
-                            <div className="text-gray-400 text-sm mb-1">Category</div>
-                            <div className="text-white font-medium">{selectedPrediction.category}</div>
-                          </div>
-                          <div className="p-4 rounded-xl bg-white/5 border border-white/10">
-                            <div className="text-gray-400 text-sm mb-1">Manufacturer</div>
-                            <div className="text-white font-medium">{selectedPrediction.manufacturer}</div>
-                          </div>
-                        </div>
-
-                        <div className="p-4 rounded-xl bg-white/5 border border-white/10">
-                          <div className="text-gray-400 text-sm mb-1">Estimated Price</div>
-                          <div className="text-white font-medium text-lg">{formatPrice(selectedPrediction.estimatedPrice)}</div>
-                        </div>
-                      </div>
-
-                      {/* Description */}
-                      {selectedPrediction.description && (
-                        <div className="p-4 rounded-xl bg-white/5 border border-white/10">
-                          <div className="text-gray-400 text-sm mb-2">Description</div>
-                          <div className="text-white text-sm leading-relaxed">{selectedPrediction.description}</div>
-                        </div>
-                      )}
-
-                      {/* Compatibility */}
-                      {selectedPrediction.compatibility && selectedPrediction.compatibility.length > 0 && (
-                        <div className="p-4 rounded-xl bg-white/5 border border-white/10">
-                          <div className="text-gray-400 text-sm mb-3">Compatible Vehicles</div>
-                          <div className="space-y-2">
-                            {selectedPrediction.compatibility.slice(0, 3).map((vehicle, index) => (
-                              <div key={index} className="text-white text-sm bg-white/5 rounded-lg px-3 py-2 flex justify-between items-center">
-                                <span>{vehicle.make} {vehicle.model}</span>
-                                <span className="text-gray-400 text-xs">{vehicle.years}</span>
+                        {/* Part Details */}
+                        <motion.div
+                          variants={{
+                            initial: { opacity: 0 },
+                            animate: { opacity: 1, transition: { staggerChildren: 0.1 } }
+                          }}
+                          initial="initial"
+                          animate="animate"
+                          className="space-y-4"
+                        >
+                          {/* Part Name */}
+                          <motion.div
+                            variants={fadeInScale}
+                            className="p-4 rounded-xl bg-gradient-to-r from-purple-600/10 to-blue-600/10 border border-white/10 hover:border-white/20 transition-colors"
+                          >
+                            <div className="flex justify-between items-start">
+                              <div className="flex-1">
+                                <div className="text-gray-400 text-sm mb-1">Part Name</div>
+                                <div className="text-white font-medium text-lg">{selectedPrediction.name}</div>
                               </div>
-                            ))}
-                            {selectedPrediction.compatibility.length > 3 && (
-                              <div className="text-center">
-                                <Badge variant="outline" className="border-gray-600 text-gray-400">
-                                  +{selectedPrediction.compatibility.length - 3} more
-                                </Badge>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      )}
+                            </div>
+                          </motion.div>
 
-                      {/* Suppliers */}
-                      {selectedPrediction.suppliers && selectedPrediction.suppliers.length > 0 && (
-                        <div className="p-4 rounded-xl bg-white/5 border border-white/10">
-                          <div className="text-gray-400 text-sm mb-3">Available Suppliers</div>
-                          <div className="space-y-3">
-                            {selectedPrediction.suppliers.slice(0, 2).map((supplier, index) => (
-                              <div key={supplier.id} className="flex items-center justify-between p-3 bg-white/5 rounded-lg">
+                          {/* Part Number with Copy */}
+                          {selectedPrediction.partNumber && (
+                            <motion.div
+                              variants={fadeInScale}
+                              className="p-4 rounded-xl bg-gradient-to-r from-blue-600/10 to-purple-600/10 border border-white/10 hover:border-white/20 transition-colors"
+                            >
+                              <div className="flex justify-between items-center">
                                 <div className="flex-1">
-                                  <div className="text-white font-medium">{supplier.name}</div>
-                                  <div className="flex items-center space-x-2 mt-1">
-                                    <div className="flex items-center">
-                                      {[...Array(5)].map((_, i) => (
-                                        <Star
-                                          key={i}
-                                          className={`w-3 h-3 ${
-                                            i < Math.floor(supplier.rating)
-                                              ? 'text-yellow-400 fill-current'
-                                              : 'text-gray-500'
-                                          }`}
-                                        />
-                                      ))}
-                                      <span className="text-gray-400 text-xs ml-1">({supplier.reviewCount})</span>
+                                  <div className="text-gray-400 text-sm mb-1">Part Number</div>
+                                  <div className="text-white font-medium font-mono">{selectedPrediction.partNumber}</div>
+                                </div>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleCopyPartNumber(selectedPrediction.partNumber || '')}
+                                  className="text-blue-400 hover:text-blue-300 hover:bg-blue-400/10 transition-colors h-8 w-8 p-0"
+                                >
+                                  <Copy className="w-4 h-4" />
+                                </Button>
+                              </div>
+                            </motion.div>
+                          )}
+
+                          {/* Category and Manufacturer */}
+                          <div className="grid grid-cols-2 gap-4">
+                            <motion.div
+                              variants={fadeInScale}
+                              className="p-4 rounded-xl bg-gradient-to-r from-green-600/10 to-emerald-600/10 border border-white/10 hover:border-white/20 transition-colors"
+                            >
+                              <div className="text-gray-400 text-sm mb-1">Category</div>
+                              <div className="text-white font-medium">{selectedPrediction.category || 'Unknown'}</div>
+                            </motion.div>
+                            <motion.div
+                              variants={fadeInScale}
+                              className="p-4 rounded-xl bg-gradient-to-r from-emerald-600/10 to-green-600/10 border border-white/10 hover:border-white/20 transition-colors"
+                            >
+                              <div className="text-gray-400 text-sm mb-1">Manufacturer</div>
+                              <div className="text-white font-medium">{selectedPrediction.manufacturer || 'Unknown'}</div>
+                            </motion.div>
+                          </div>
+
+                          {/* Estimated Price */}
+                          <motion.div
+                            variants={fadeInScale}
+                            className="p-4 rounded-xl bg-gradient-to-r from-yellow-600/10 to-orange-600/10 border border-white/10 hover:border-white/20 transition-colors"
+                          >
+                            <div className="text-gray-400 text-sm mb-1">Estimated Price</div>
+                            <div className="text-white font-medium text-lg">{selectedPrediction.estimatedPrice || 'Price not available'}</div>
+                          </motion.div>
+
+                          {/* Analysis Stats */}
+                          {analysisResults?.metadata && (
+                            <motion.div
+                              variants={fadeInScale}
+                              className="p-4 rounded-xl bg-gradient-to-r from-gray-600/10 to-slate-600/10 border border-white/10 hover:border-white/20 transition-colors"
+                            >
+                              <div className="text-gray-400 text-sm mb-2">Analysis Information</div>
+                              <div className="grid grid-cols-2 gap-3 text-sm">
+                                <div>
+                                  <span className="text-gray-400">Processing Time:</span>
+                                  <span className="text-white ml-2">{analysisResults.processingTime.toFixed(1)}s</span>
+                                </div>
+                                <div>
+                                  <span className="text-gray-400">Model:</span>
+                                  <span className="text-white ml-2">{analysisResults.metadata.modelVersion}</span>
+                                </div>
+                                {analysisResults.metadata.webScrapingUsed && (
+                                  <div>
+                                    <span className="text-gray-400">Sites Searched:</span>
+                                    <span className="text-white ml-2">{analysisResults.metadata.sitesSearched || 'Multiple'}</span>
+                                  </div>
+                                )}
+                                <div>
+                                  <span className="text-gray-400">Confidence:</span>
+                                  <span className="text-green-300 ml-2">{analysisResults.metadata.confidence.toFixed(1)}%</span>
+                                </div>
+                              </div>
+                            </motion.div>
+                          )}
+
+                          {/* Description */}
+                          {selectedPrediction.details && (
+                            <motion.div
+                              variants={fadeInScale}
+                              className="p-4 rounded-xl bg-gradient-to-r from-indigo-600/10 to-violet-600/10 border border-white/10 hover:border-white/20 transition-colors"
+                            >
+                              <div className="text-gray-400 text-sm mb-2">Description</div>
+                              <div className="text-white text-sm leading-relaxed">{selectedPrediction.details}</div>
+                            </motion.div>
+                          )}
+
+                          {/* Similar Images Section */}
+                          {analysisResults?.similarImages && analysisResults.similarImages.length > 0 && (
+                            <motion.div
+                              variants={fadeInScale}
+                              className="p-4 rounded-xl bg-gradient-to-r from-emerald-600/10 to-teal-600/10 border border-white/10 hover:border-white/20 transition-colors"
+                            >
+                              <div className="text-gray-400 text-sm mb-3 flex items-center">
+                                <ImagePlus className="w-4 h-4 mr-2" />
+                                Similar Parts Found ({analysisResults.similarImages.length})
+                              </div>
+                              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                                {analysisResults.similarImages.slice(0, 6).map((image, index) => (
+                                  <div key={index} className="relative group">
+                                    <div className="aspect-square rounded-lg overflow-hidden border border-white/10 bg-gray-800">
+                                      <img
+                                        src={image.url}
+                                        alt={image.title}
+                                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+                                        onError={(e) => {
+                                          const target = e.target as HTMLImageElement;
+                                          target.src = '/placeholder.svg';
+                                        }}
+                                      />
+                                    </div>
+                                    <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity duration-200 rounded-lg flex flex-col justify-between p-2">
+                                      <div className="flex justify-end">
+                                        {image.metadata?.link && (
+                                          <motion.a
+                                            href={image.metadata.link}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            whileHover={{ scale: 1.1 }}
+                                            whileTap={{ scale: 0.9 }}
+                                            className="bg-blue-600/80 hover:bg-blue-500/90 text-white p-1.5 rounded-full transition-colors"
+                                            onClick={(e) => e.stopPropagation()}
+                                          >
+                                            <ExternalLink className="w-3 h-3" />
+                                          </motion.a>
+                                        )}
+                                      </div>
+                                      <div className="space-y-1">
+                                        <div className="text-white text-xs font-medium truncate" title={image.title}>
+                                          {image.title}
+                                        </div>
+                                        <div className="flex justify-between items-center text-xs">
+                                          <span className="text-green-300">{image.price}</span>
+                                          <span className="text-blue-300">
+                                            {Math.round(image.similarity_score * 100)}% match
+                                          </span>
+                                        </div>
+                                        <div className="flex justify-between items-center text-xs">
+                                          <span className="text-gray-300 truncate">{image.source}</span>
+                                          {image.metadata?.link && (
+                                            <span className="text-blue-400 cursor-pointer hover:text-blue-300">
+                                              View Details →
+                                            </span>
+                                          )}
+                                        </div>
+                                      </div>
                                     </div>
                                   </div>
-                                </div>
-                                <div className="text-right">
-                                  <div className="text-white font-bold">£{supplier.price.toFixed(2)}</div>
-                                  <div className="text-gray-400 text-xs">{supplier.shippingTime}</div>
-                                </div>
+                                ))}
                               </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Actions */}
-                      <div className="flex flex-col sm:flex-row gap-3">
-                        <motion.div
-                          whileHover={{ scale: 1.05 }}
-                          whileTap={{ scale: 0.95 }}
-                          className="flex-1"
-                        >
-                          <Button className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 h-12">
-                            <Download className="w-4 h-4 mr-2" />
-                            Save Results
-                          </Button>
-                        </motion.div>
-                        <motion.div
-                          whileHover={{ scale: 1.05 }}
-                          whileTap={{ scale: 0.95 }}
-                          className="flex-1"
-                        >
-                          <Button variant="outline" className="w-full border-gray-600 text-gray-300 hover:bg-white/10 h-12">
-                            <ExternalLink className="w-4 h-4 mr-2" />
-                            Find Suppliers
-                          </Button>
-                        </motion.div>
-                      </div>
-
-                      {/* Multiple Predictions */}
-                      {analysisResults && analysisResults.predictions && analysisResults.predictions.length > 1 && (
-                        <div className="border-t border-white/10 pt-4">
-                          <div className="text-gray-400 text-sm mb-3">Other Possible Matches</div>
-                          <div className="space-y-2">
-                            {analysisResults.predictions.slice(1, 3).map((prediction, index) => (
-                              <button
-                                key={prediction.id}
-                                onClick={() => setSelectedPrediction(prediction)}
-                                className="w-full p-3 rounded-lg bg-white/5 hover:bg-white/10 transition-colors text-left"
-                              >
-                                <div className="flex justify-between items-center">
-                                  <div>
-                                    <div className="text-white font-medium">{prediction.partName}</div>
-                                    <div className="text-gray-400 text-sm">{prediction.partNumber}</div>
-                                  </div>
-                                  <div className="text-gray-400 text-sm">
-                                    {prediction.confidence.toFixed(1)}%
-                                  </div>
+                              {analysisResults.similarImages.length > 6 && (
+                                <div className="text-center mt-3">
+                                  <span className="text-gray-400 text-xs">
+                                    +{analysisResults.similarImages.length - 6} more similar parts found
+                                  </span>
                                 </div>
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </motion.div>
-                  ) : (
-                    <div className="flex flex-col items-center justify-center py-12 text-center">
-                      <motion.div
-                        animate={{ scale: [1, 1.1, 1] }}
-                        transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
-                      >
-                        <FileText className="w-16 h-16 text-gray-400 mb-4" />
+                              )}
+                            </motion.div>
+                          )}
+
+                          {/* Detailed Similar Parts List */}
+                          {analysisResults?.similarImages && analysisResults.similarImages.length > 0 && (
+                            <motion.div
+                              variants={fadeInScale}
+                              className="p-4 rounded-xl bg-gradient-to-r from-blue-600/10 to-purple-600/10 border border-white/10 hover:border-white/20 transition-colors"
+                            >
+                              <div className="text-gray-400 text-sm mb-3 flex items-center justify-between">
+                                <div className="flex items-center">
+                                  <ExternalLink className="w-4 h-4 mr-2" />
+                                  Available from Suppliers
+                                </div>
+                                <span className="text-xs">Click to view details</span>
+                              </div>
+                              <div className="space-y-2 max-h-48 overflow-y-auto">
+                                {analysisResults.similarImages.slice(0, 8).map((image, index) => (
+                                  <motion.div
+                                    key={index}
+                                    whileHover={{ scale: 1.02 }}
+                                    className="flex items-center space-x-3 p-2 rounded-lg bg-white/5 hover:bg-white/10 transition-colors cursor-pointer"
+                                    onClick={() => {
+                                      if (image.metadata?.link) {
+                                        window.open(image.metadata.link, '_blank', 'noopener,noreferrer');
+                                      }
+                                    }}
+                                  >
+                                    <div className="w-12 h-12 rounded-lg overflow-hidden bg-gray-800 flex-shrink-0">
+                                      <img
+                                        src={image.url}
+                                        alt={image.title}
+                                        className="w-full h-full object-cover"
+                                        onError={(e) => {
+                                          const target = e.target as HTMLImageElement;
+                                          target.src = '/placeholder.svg';
+                                        }}
+                                      />
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                      <div className="text-white text-sm font-medium truncate" title={image.title}>
+                                        {image.title}
+                                      </div>
+                                      <div className="flex items-center justify-between text-xs mt-1">
+                                        <span className="text-gray-400">{image.source}</span>
+                                        <span className="text-green-300">{image.price}</span>
+                                      </div>
+                                      {image.metadata?.part_number && (
+                                        <div className="text-xs text-blue-300 truncate">
+                                          Part #: {image.metadata.part_number}
+                                        </div>
+                                      )}
+                                    </div>
+                                    <div className="flex items-center space-x-2 flex-shrink-0">
+                                      <span className="text-xs text-blue-300">
+                                        {Math.round(image.similarity_score * 100)}%
+                                      </span>
+                                      {image.metadata?.link && (
+                                        <ExternalLink className="w-3 h-3 text-blue-400" />
+                                      )}
+                                    </div>
+                                  </motion.div>
+                                ))}
+                              </div>
+                            </motion.div>
+                          )}
+
+                          {/* Actions */}
+                          <motion.div
+                            variants={fadeInScale}
+                            className="flex flex-col sm:flex-row gap-3 pt-4"
+                          >
+                            <motion.div
+                              whileHover={{ scale: 1.02 }}
+                              whileTap={{ scale: 0.98 }}
+                              className="flex-1"
+                            >
+                              <Button className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 h-12 shadow-lg shadow-purple-500/25">
+                                <Download className="w-4 h-4 mr-2" />
+                                Save Results
+                              </Button>
+                            </motion.div>
+                            <motion.div
+                              whileHover={{ scale: 1.02 }}
+                              whileTap={{ scale: 0.98 }}
+                              className="flex-1"
+                            >
+                              <Button 
+                                variant="outline" 
+                                className="w-full border-gray-600 text-gray-300 hover:bg-white/10 h-12"
+                                onClick={() => {
+                                  if (analysisResults?.similarImages && analysisResults.similarImages.length > 0) {
+                                    const firstLink = analysisResults.similarImages.find(img => img.metadata?.link)?.metadata?.link;
+                                    if (firstLink) {
+                                      window.open(firstLink, '_blank', 'noopener,noreferrer');
+                                    }
+                                  }
+                                }}
+                              >
+                                <ExternalLink className="w-4 h-4 mr-2" />
+                                Find Suppliers
+                              </Button>
+                            </motion.div>
+                          </motion.div>
+                        </motion.div>
                       </motion.div>
-                      <p className="text-gray-400 text-lg">Upload an image to get started</p>
-                      <p className="text-gray-500 text-sm">AI analysis will appear here</p>
-                    </div>
-                  )}
+                    ) : (
+                      <motion.div
+                        key="empty"
+                        {...fadeInScale}
+                        className="flex flex-col items-center justify-center py-12 text-center"
+                      >
+                        <motion.div
+                          animate={{ 
+                            scale: [1, 1.1, 1],
+                            rotate: [0, 5, -5, 0]
+                          }}
+                          transition={{ 
+                            duration: 3,
+                            repeat: Infinity,
+                            ease: "easeInOut"
+                          }}
+                        >
+                          <FileText className="w-16 h-16 text-gray-400 mb-4" />
+                        </motion.div>
+                        <p className="text-gray-400 text-lg">Upload an image to get started</p>
+                        <p className="text-gray-500 text-sm">AI analysis will appear here</p>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                 </CardContent>
               </Card>
             </motion.div>

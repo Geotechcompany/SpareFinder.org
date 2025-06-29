@@ -20,7 +20,11 @@ class GoogleSearchService:
     
     def is_configured(self) -> bool:
         """Check if Google Search is properly configured."""
-        return bool(self.api_key and self.search_engine_id)
+        is_configured = bool(self.api_key and self.search_engine_id and 
+                           self.api_key.strip() and self.search_engine_id.strip())
+        if not is_configured:
+            logger.info(f"Google Search not configured - API Key: {'✓' if self.api_key else '✗'}, Engine ID: {'✓' if self.search_engine_id else '✗'}")
+        return is_configured
     
     async def search_automotive_part(
         self, 
@@ -40,7 +44,7 @@ class GoogleSearchService:
             Dict containing enhanced part information
         """
         if not self.is_configured():
-            logger.warning("Google Search API not configured")
+            logger.info("Google Search API not configured - skipping Google search enhancement")
             return {}
         
         try:

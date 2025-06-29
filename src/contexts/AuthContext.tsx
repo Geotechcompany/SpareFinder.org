@@ -1,9 +1,16 @@
 import React, { createContext, useContext, useEffect, useState } from 'react'
-import { apiClient, type User as ApiUser, type AuthResponse } from '@/lib/api'
+import { apiClient, api } from '@/lib/api'
 import { toast } from 'sonner'
 
 // Types for compatibility with existing code
-interface AuthUser extends ApiUser {
+interface AuthUser {
+  id: string
+  email: string
+  full_name: string
+  company?: string
+  role: string
+  avatar_url?: string
+  created_at: string
   user_metadata?: {
     full_name?: string
     avatar_url?: string
@@ -12,7 +19,7 @@ interface AuthUser extends ApiUser {
   }
 }
 
-interface Session {
+interface AuthSession {
   access_token: string
   user: AuthUser
 }
@@ -22,11 +29,11 @@ interface AuthError {
   status?: number
 }
 
-interface Profile extends ApiUser {}
+interface Profile extends AuthUser {}
 
 interface AuthContextType {
   user: AuthUser | null
-  session: Session | null
+  session: AuthSession | null
   isLoading: boolean
   error: AuthError | null
   isAdmin: boolean
@@ -41,11 +48,11 @@ interface AuthContextType {
   refreshProfile: () => Promise<void>
 }
 
-const AuthContext = createContext<AuthContextType | null>(null)
+const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
 export function useAuth() {
   const context = useContext(AuthContext)
-  if (!context) {
+  if (context === undefined) {
     throw new Error('useAuth must be used within an AuthProvider')
   }
   return context
@@ -53,236 +60,146 @@ export function useAuth() {
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null)
-  const [session, setSession] = useState<Session | null>(null)
+  const [authSession, setAuthSession] = useState<AuthSession | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<AuthError | null>(null)
 
-  // Computed admin role checks
-  const isAdmin = user?.role === 'admin' || user?.role === 'super_admin'
+  const isAdmin = user?.role === 'admin'
   const isSuperAdmin = user?.role === 'super_admin'
 
-  // Check for existing session on mount and listen for auth state changes
   useEffect(() => {
     const checkSession = async () => {
       try {
-        // First check for regular API token
+        // Check for existing token
         const token = localStorage.getItem('auth_token')
         if (token) {
-          const response = await apiClient.getCurrentUser()
-          if (response.success && response.data?.user) {
-            const authUser = mapApiUserToAuthUser(response.data.user)
-            setUser(authUser)
-            setSession({
-              access_token: token,
-              user: authUser
-            })
-            setIsLoading(false)
-            return
-          } else {
-            // Invalid token, clear it
-            localStorage.removeItem('auth_token')
-            apiClient.setToken(null)
+          // Try to get current user from backend
+          try {
+            const response = await api.user.getProfile()
+            if (response.success && response.data?.profile) {
+              const authUser = mapApiUserToAuthUser(response.data.profile)
+              setUser(authUser)
+              setAuthSession({
+                access_token: token,
+                user: authUser
+              })
+              console.log('Session restored from backend:', authUser.email, 'role:', authUser.role)
+            }
+          } catch (backendError) {
+            console.log('Backend session check failed, trying Supabase:', backendError)
           }
         }
 
-        // Check for Supabase OAuth session
-        const { auth } = await import('../lib/supabase/client')
-        const { session } = await auth.getSession()
-        
-        if (session?.user) {
-          console.log('Found existing Supabase session, processing...')
-          // Handle OAuth session - create/sync user with backend
-          await handleOAuthSession(session)
-        } else {
-          console.log('No existing session found')
+        // Check Supabase session
+        try {
+          const { auth } = await import('../lib/supabase/client')
+          const { session, error } = await auth.getSession()
+          
+          if (session?.user) {
+            await handleOAuthSession(session)
+          }
+        } catch (supabaseError) {
+          console.log('Supabase session check failed:', supabaseError)
         }
       } catch (error) {
         console.error('Session check failed:', error)
-        localStorage.removeItem('auth_token')
-        apiClient.setToken(null)
       } finally {
         setIsLoading(false)
       }
     }
 
-    // Set up Supabase auth state listener for OAuth
     const setupAuthListener = async () => {
-      const { auth } = await import('../lib/supabase/client')
-      const { data: { subscription } } = auth.onAuthStateChange(async (event, session) => {
-        console.log('Auth state changed:', event, session)
+      try {
+        const { auth } = await import('../lib/supabase/client')
         
-        if (event === 'SIGNED_IN' && session?.user) {
-          await handleOAuthSession(session)
-        } else if (event === 'SIGNED_OUT') {
-          setUser(null)
-          setSession(null)
-          setError(null)
-          localStorage.removeItem('auth_token')
-          apiClient.setToken(null)
-        }
-      })
-      
-      return subscription
+        auth.onAuthStateChange(async (event, supabaseSession) => {
+          console.log('Supabase auth state change:', event, supabaseSession?.user?.email)
+          
+          if (event === 'SIGNED_IN' && supabaseSession) {
+            await handleOAuthSession(supabaseSession)
+          } else if (event === 'SIGNED_OUT') {
+            setUser(null)
+            setAuthSession(null)
+            setError(null)
+          }
+        })
+      } catch (error) {
+        console.error('Failed to setup auth listener:', error)
+      }
     }
 
     checkSession()
-    let authSubscription: any = null
-    
-    setupAuthListener().then(subscription => {
-      authSubscription = subscription
-    })
-
-    // Cleanup
-    return () => {
-      if (authSubscription) {
-        authSubscription.unsubscribe()
-      }
-    }
+    setupAuthListener()
   }, [])
 
-  // Handle OAuth session from Supabase
   const handleOAuthSession = async (supabaseSession: any) => {
     try {
       const supabaseUser = supabaseSession.user
       
-      console.log('Processing OAuth session for user:', supabaseUser.email)
-      
-      // Create or sync user with your backend using direct user data
-      const userData = {
+      // Map Supabase user to our AuthUser format
+      const authUser: AuthUser = {
         id: supabaseUser.id,
         email: supabaseUser.email,
-        full_name: supabaseUser.user_metadata?.full_name || supabaseUser.user_metadata?.name || '',
-        avatar_url: supabaseUser.user_metadata?.avatar_url || supabaseUser.user_metadata?.picture || '',
-        provider: supabaseUser.app_metadata?.provider || 'google'
+        full_name: supabaseUser.user_metadata?.full_name || supabaseUser.email?.split('@')[0] || 'User',
+        company: supabaseUser.user_metadata?.company,
+        role: supabaseUser.user_metadata?.role || 'user',
+        avatar_url: supabaseUser.user_metadata?.avatar_url,
+        created_at: supabaseUser.created_at,
+        user_metadata: supabaseUser.user_metadata
       }
 
-      try {
-        // First check if profile exists in profiles table
-        const { createClient } = await import('../lib/supabase/client')
-        const supabase = createClient()
-        let existingProfile = null
-        
-        const { data: profileData, error: profileError } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', userData.id)
-          .single()
+      setUser(authUser)
+      setAuthSession({
+        access_token: supabaseSession.access_token,
+        user: authUser
+      })
 
-        if (profileError && profileError.code !== 'PGRST116') { // PGRST116 = not found
-          console.error('Error checking profile:', profileError)
-          throw new Error('Failed to check user profile')
+      // Try to sync with backend if we have a backend token
+      const backendToken = localStorage.getItem('auth_token')
+      if (backendToken) {
+        try {
+          await api.user.updateProfile({
+            full_name: authUser.full_name,
+            company: authUser.company
+          })
+        } catch (backendError) {
+          console.log('Backend profile sync failed:', backendError)
         }
-
-        existingProfile = profileData
-
-        // If profile doesn't exist, create it
-        if (!existingProfile) {
-          console.log('Creating new profile for OAuth user:', userData.email)
-          const { data: newProfile, error: insertError } = await supabase
-            .from('profiles')
-            .insert([
-              {
-                id: userData.id,
-                email: userData.email,
-                full_name: userData.full_name,
-                avatar_url: userData.avatar_url,
-                role: 'user',
-                provider: userData.provider
-              }
-            ])
-            .select()
-            .single()
-
-          if (insertError) {
-            console.error('Error creating profile:', insertError)
-            throw new Error('Failed to create user profile')
-          }
-
-          existingProfile = newProfile
-        }
-
-        // Create auth user from profile data
-        const authUser: AuthUser = {
-          id: existingProfile.id,
-          email: existingProfile.email,
-          role: existingProfile.role,
-          full_name: existingProfile.full_name,
-          avatar_url: existingProfile.avatar_url,
-          created_at: existingProfile.created_at || supabaseUser.created_at,
-          user_metadata: {
-            full_name: existingProfile.full_name,
-            avatar_url: existingProfile.avatar_url,
-            subscription_tier: existingProfile.subscription_tier || 'free'
-          }
-        }
-        
-        setUser(authUser)
-        setSession({
-          access_token: supabaseSession.access_token,
-          user: authUser
-        })
-        
-        // Set the Supabase access token for API calls
-        localStorage.setItem('auth_token', supabaseSession.access_token)
-        apiClient.setToken(supabaseSession.access_token)
-        
-        console.log('OAuth session completed - token set:', supabaseSession.access_token.substring(0, 20) + '...')
-        
-        // Update profile with latest OAuth data if needed
-        if (
-          existingProfile.avatar_url !== userData.avatar_url ||
-          existingProfile.full_name !== userData.full_name
-        ) {
-          const { error: updateError } = await supabase
-            .from('profiles')
-            .update({
-              avatar_url: userData.avatar_url,
-              full_name: userData.full_name,
-              updated_at: new Date().toISOString()
-            })
-            .eq('id', userData.id)
-
-          if (updateError) {
-            console.error('Error updating profile:', updateError)
-          }
-        }
-        
-        toast.success('Successfully signed in with Google!')
-        
-      } catch (error) {
-        console.error('OAuth profile setup failed:', error)
-        toast.error('Failed to setup user profile')
-        throw error
       }
+
+      console.log('OAuth session established:', authUser.email, 'role:', authUser.role)
     } catch (error) {
-      console.error('OAuth session handling failed:', error)
-      toast.error('OAuth sign-in failed')
-      throw error
+      console.error('Failed to handle OAuth session:', error)
+      setError({
+        message: 'Failed to process OAuth session'
+      })
     }
   }
 
-  const mapApiUserToAuthUser = (apiUser: ApiUser): AuthUser => {
+  const mapApiUserToAuthUser = (apiUser: any): AuthUser => {
     return {
-      ...apiUser,
-      user_metadata: {
-        full_name: apiUser.full_name,
-        avatar_url: apiUser.avatar_url,
-        subscription_tier: 'free', // Default value, can be enhanced later
-      }
+      id: apiUser.id,
+      email: apiUser.email,
+      full_name: apiUser.full_name,
+      company: apiUser.company,
+      role: apiUser.role,
+      avatar_url: apiUser.avatar_url,
+      created_at: apiUser.created_at,
+      user_metadata: apiUser.user_metadata
     }
   }
 
-  const handleAuthSuccess = (authResponse: AuthResponse) => {
+  const handleAuthSuccess = (authResponse: any) => {
     const authUser = mapApiUserToAuthUser(authResponse.user)
     setUser(authUser)
-    setSession({
+    setAuthSession({
       access_token: authResponse.token,
       user: authUser
     })
-    setError(null)
     
-    // Ensure the API client has the token
-    apiClient.setToken(authResponse.token)
+    // Ensure token is saved to localStorage for API client
+    localStorage.setItem('auth_token', authResponse.token)
+    setError(null)
   }
 
   const signUp = async (email: string, password: string, metadata?: { [key: string]: any }) => {
@@ -290,12 +207,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setIsLoading(true)
       setError(null)
 
-      const response = await apiClient.register({
-        email,
-        password,
-        full_name: metadata?.full_name || '',
-        company: metadata?.company
-      })
+      const response = await api.auth.register({ email, password, name: metadata?.full_name || email })
 
       if (response.success && response.data) {
         handleAuthSuccess(response.data)
@@ -320,7 +232,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setIsLoading(true)
       setError(null)
 
-      const response = await apiClient.login({ email, password })
+      const response = await api.auth.login(email, password)
 
       if (response.success && response.data) {
         handleAuthSuccess(response.data)
@@ -376,7 +288,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setIsLoading(true)
       
       // Clear backend session if exists
-      await apiClient.logout()
+      await api.auth.logout()
       
       // Clear Supabase session if exists  
       try {
@@ -388,7 +300,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       
       // Clear local state
       setUser(null)
-      setSession(null)
+      setAuthSession(null)
       setError(null)
       
       toast.success('Signed out successfully')
@@ -396,8 +308,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.error('Logout error:', error)
       // Even if logout fails on backend, clear local state
       setUser(null)
-      setSession(null)
-      apiClient.setToken(null)
+      setAuthSession(null)
+      localStorage.removeItem('auth_token')
     } finally {
       setIsLoading(false)
     }
@@ -408,13 +320,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setIsLoading(true)
       setError(null)
 
-      const response = await apiClient.resetPassword(email)
-
-      if (response.success) {
-        toast.success('Password reset email sent!')
-      } else {
-        throw new Error(response.error || 'Password reset failed')
-      }
+      // This would need to be implemented in your backend
+      toast.info('Password reset feature coming soon')
+      throw new Error('Password reset not yet implemented')
     } catch (error) {
       const authError = {
         message: error instanceof Error ? error.message : 'Password reset failed'
@@ -452,14 +360,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setIsLoading(true)
       setError(null)
 
-      const response = await apiClient.updateProfile(updates)
+      const response = await api.user.updateProfile(updates)
 
-      if (response.success && response.data?.user) {
-        const updatedUser = mapApiUserToAuthUser(response.data.user)
+      if (response.success && response.data?.profile) {
+        const updatedUser = mapApiUserToAuthUser(response.data.profile)
         setUser(updatedUser)
-        if (session) {
-          setSession({
-            ...session,
+        if (authSession) {
+          setAuthSession({
+            ...authSession,
             user: updatedUser
           })
         }
@@ -481,13 +389,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const refreshProfile = async () => {
     try {
-      const response = await apiClient.getCurrentUser()
-      if (response.success && response.data?.user) {
-        const refreshedUser = mapApiUserToAuthUser(response.data.user)
+      const response = await api.user.getProfile()
+      if (response.success && response.data?.profile) {
+        const refreshedUser = mapApiUserToAuthUser(response.data.profile)
         setUser(refreshedUser)
-        if (session) {
-          setSession({
-            ...session,
+        if (authSession) {
+          setAuthSession({
+            ...authSession,
             user: refreshedUser
           })
         }
@@ -500,7 +408,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const value: AuthContextType = {
     user,
-    session,
+    session: authSession,
     isLoading,
     error,
     isAdmin,

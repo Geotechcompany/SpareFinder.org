@@ -1,23 +1,41 @@
-interface ApiResponse<T = any> {
-  success?: boolean;
+import axios, { AxiosInstance } from 'axios';
+
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+const AI_SERVICE_URL = import.meta.env.VITE_AI_SERVICE_URL || 'http://localhost:8000';
+
+// Type definitions
+export interface ApiResponse<T = any> {
+  success: boolean;
   data?: T;
   error?: string;
   message?: string;
 }
 
-interface LoginRequest {
-  email: string;
-  password: string;
+export interface UploadResponse {
+  success: boolean;
+  part_info?: {
+    name: string;
+    part_number?: string;
+    category: string;
+    manufacturer: string;
+    price_range: string;
+    confidence_score: number;
+    description?: string;
+    specifications?: Record<string, any>;
+    compatibility?: string[];
+    similar_images?: Array<{
+      url: string;
+      metadata: Record<string, any>;
+      similarity_score: number;
+      source: string;
+      title: string;
+      price: string;
+    }>;
+  };
+  error?: string;
 }
 
-interface RegisterRequest {
-  email: string;
-  password: string;
-  full_name: string;
-  company?: string;
-}
-
-interface User {
+export interface User {
   id: string;
   email: string;
   full_name: string;
@@ -27,47 +45,73 @@ interface User {
   created_at: string;
 }
 
-interface AuthResponse {
+export interface AuthResponse {
   token: string;
   user: User;
   message: string;
 }
 
+export interface LoginRequest {
+  email: string;
+  password: string;
+}
+
+export interface RegisterRequest {
+  email: string;
+  password: string;
+  full_name: string;
+  company?: string;
+}
+
+// Class-based API client for backward compatibility
 class ApiClient {
   private baseUrl: string;
+  private aiServiceUrl: string;
   private token: string | null = null;
 
   constructor() {
-    this.baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:4000';
+    this.baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+    this.aiServiceUrl = import.meta.env.VITE_AI_SERVICE_URL || 'http://localhost:8000';
     this.token = localStorage.getItem('auth_token');
   }
 
   private async request<T>(
     endpoint: string,
-    options: RequestInit = {}
+    options: RequestInit = {},
+    useAiService = false,
+    queryParams?: string
   ): Promise<ApiResponse<T>> {
-    // Ensure proper URL formatting - remove double slashes
-    const cleanBaseUrl = this.baseUrl.replace(/\/+$/, ''); // Remove trailing slashes
+    const baseUrlToUse = useAiService ? this.aiServiceUrl : this.baseUrl;
+    const cleanBaseUrl = baseUrlToUse.replace(/\/+$/, '');
     const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
-    const url = `${cleanBaseUrl}${cleanEndpoint}`;
+    const url = `${cleanBaseUrl}${cleanEndpoint}${queryParams ? `?${queryParams}` : ''}`;
     
     const headers: Record<string, string> = {
       ...(options.headers as Record<string, string>),
     };
 
-    // Only set Content-Type if not already specified and body is not FormData
     if (!headers['Content-Type'] && !(options.body instanceof FormData)) {
       headers['Content-Type'] = 'application/json';
     }
 
-    if (this.token) {
-      headers.Authorization = `Bearer ${this.token}`;
+    if (useAiService) {
+      const apiKey = 'geotech-dev-key-2024';
+      headers['Authorization'] = `Bearer ${apiKey}`;
+    } else {
+      // Always check for the latest token from localStorage
+      const currentToken = localStorage.getItem('auth_token');
+      if (currentToken) {
+        this.token = currentToken;
+        headers.Authorization = `Bearer ${currentToken}`;
+      }
     }
 
     try {
       const response = await fetch(url, {
         ...options,
         headers,
+        mode: 'cors',
+        credentials: 'omit'
       });
 
       if (!response.ok) {
@@ -78,7 +122,6 @@ class ApiClient {
           if (contentType && contentType.includes('application/json')) {
             errorData = await response.json();
           } else {
-            // Handle non-JSON error responses (HTML, text, etc.)
             const errorText = await response.text();
             errorData = { message: errorText || response.statusText };
           }
@@ -89,14 +132,12 @@ class ApiClient {
         throw new Error(errorData.message || `HTTP ${response.status}: ${response.statusText}`);
       }
 
-      // Handle successful responses
       const contentType = response.headers.get('content-type');
       let data: any;
       
       if (contentType && contentType.includes('application/json')) {
         data = await response.json();
       } else {
-        // Handle non-JSON success responses
         data = await response.text();
       }
       
@@ -117,6 +158,10 @@ class ApiClient {
     } else {
       localStorage.removeItem('auth_token');
     }
+  }
+
+  refreshToken() {
+    this.token = localStorage.getItem('auth_token');
   }
 
   // Auth endpoints
@@ -166,34 +211,6 @@ class ApiClient {
     });
   }
 
-  async refreshToken(refreshToken: string): Promise<ApiResponse<AuthResponse>> {
-    const response = await this.request<AuthResponse>('/api/auth/refresh', {
-      method: 'POST',
-      body: JSON.stringify({ refresh_token: refreshToken }),
-    });
-
-    if (response.success && response.data?.token) {
-      this.setToken(response.data.token);
-    }
-
-    return response;
-  }
-
-  // Google OAuth
-  async googleAuth(tokenData: { access_token?: string; id_token?: string }): Promise<ApiResponse<AuthResponse>> {
-    const response = await this.request<AuthResponse>('/api/auth/google', {
-      method: 'POST',
-      body: JSON.stringify(tokenData),
-    });
-
-    if (response.success && response.data?.token) {
-      this.setToken(response.data.token);
-    }
-
-    return response;
-  }
-
-  // Admin Auth endpoints
   async adminLogin(credentials: LoginRequest): Promise<ApiResponse<AuthResponse>> {
     const response = await this.request<AuthResponse>('/api/auth/admin/login', {
       method: 'POST',
@@ -216,338 +233,51 @@ class ApiClient {
     return response;
   }
 
-  // User endpoints
-  async updateProfile(updates: Partial<User>): Promise<ApiResponse<{ user: User }>> {
-    return this.request<{ user: User }>('/api/user/profile', {
-      method: 'PATCH',
-      body: JSON.stringify(updates),
-    });
-  }
-
-  async uploadAvatar(file: File): Promise<ApiResponse<{ avatar_url: string }>> {
-    const formData = new FormData();
-    formData.append('avatar', file);
-
-    return this.request<{ avatar_url: string }>('/api/user/avatar', {
-      method: 'POST',
-      body: formData,
-      headers: {}, // Let browser set Content-Type for FormData
-    });
-  }
-
-  // Upload endpoints
   async uploadImage(file: File, metadata?: any): Promise<ApiResponse<any>> {
     const formData = new FormData();
-    formData.append('image', file);
-    if (metadata) {
-      formData.append('metadata', JSON.stringify(metadata));
-    }
+    formData.append('file', file);
+    
+    const confidence_threshold = 0.5;
+    const max_predictions = 5;
+    const include_web_scraping = true;
 
-    return this.request('/api/upload/image', {
+    const queryParams = new URLSearchParams({
+      confidence_threshold: confidence_threshold.toString(),
+      max_predictions: max_predictions.toString(),
+      include_web_scraping: include_web_scraping.toString()
+    }).toString();
+
+    const apiKey = 'geotech-dev-key-2024';
+
+    return this.request('/predict', {
       method: 'POST',
       body: formData,
-      headers: {}, // Let browser set Content-Type for FormData
-    });
-  }
-
-  // Search endpoints
-  async searchParts(query: string, filters?: any): Promise<ApiResponse<any>> {
-    const params = new URLSearchParams({ q: query });
-    if (filters) {
-      Object.entries(filters).forEach(([key, value]) => {
-        if (value) params.append(key, String(value));
-      });
-    }
-
-    return this.request(`/api/search/parts?${params}`);
-  }
-
-  async getSearchHistory(page = 1, limit = 20): Promise<ApiResponse<any>> {
-    return this.request(`/api/search/history?page=${page}&limit=${limit}`);
-  }
-
-  // Admin endpoints
-  async getUsers(page = 1, limit = 20): Promise<ApiResponse<any>> {
-    return this.request(`/api/admin/users?page=${page}&limit=${limit}`);
-  }
-
-  async updateUser(userId: string, updates: any): Promise<ApiResponse<any>> {
-    return this.request(`/api/admin/users/${userId}`, {
-      method: 'PATCH',
-      body: JSON.stringify(updates),
-    });
-  }
-
-  async deleteUser(userId: string): Promise<ApiResponse<any>> {
-    return this.request(`/api/admin/users/${userId}`, {
-      method: 'DELETE',
-    });
-  }
-
-  async getSystemAnalytics(timeRange?: string): Promise<ApiResponse<any>> {
-    const params = timeRange ? `?timeRange=${timeRange}` : '';
-    return this.request(`/api/admin/analytics${params}`);
-  }
-
-  // Enhanced Admin endpoints
-  async getAdminStats(): Promise<ApiResponse<{
-    statistics: {
-      total_users: number;
-      total_searches: number;
-      active_users: number;
-      success_rate: number;
-      recent_searches: any[];
-      top_users: any[];
-      system_metrics: any[];
-      searches_today: number;
-      new_users_today: number;
-      searches_this_week: number;
-      system_health: string;
-      pending_tasks: number;
-      recent_alerts: number;
-      avg_response_time: number;
-      cpu_usage: number;
-      memory_usage: number;
-      disk_usage: number;
-    };
-  }>> {
-    return this.request<{
-      statistics: {
-        total_users: number;
-        total_searches: number;
-        active_users: number;
-        success_rate: number;
-        recent_searches: any[];
-        top_users: any[];
-        system_metrics: any[];
-        searches_today: number;
-        new_users_today: number;
-        searches_this_week: number;
-        system_health: string;
-        pending_tasks: number;
-        recent_alerts: number;
-        avg_response_time: number;
-        cpu_usage: number;
-        memory_usage: number;
-        disk_usage: number;
-      };
-    }>('/api/admin/stats');
-  }
-
-  async getAdminAnalytics(timeRange = '30d'): Promise<ApiResponse<{
-    analytics: {
-      searches_by_day: Record<string, number>;
-      registrations_by_day: Record<string, number>;
-      time_range: string;
-    };
-  }>> {
-    return this.request(`/api/admin/analytics?range=${timeRange}`);
-  }
-
-  async getAdminSearches(page = 1, limit = 50, filters?: { status?: string; userId?: string }): Promise<ApiResponse<{
-    searches: any[];
-    pagination: {
-      page: number;
-      limit: number;
-      total: number;
-      pages: number;
-    };
-  }>> {
-    const params = new URLSearchParams({
-      page: page.toString(),
-      limit: limit.toString()
-    });
-    
-    if (filters?.status) params.append('status', filters.status);
-    if (filters?.userId) params.append('userId', filters.userId);
-
-    return this.request(`/api/admin/searches?${params}`);
-  }
-
-  async deleteAdminUser(userId: string): Promise<ApiResponse> {
-    return this.request(`/api/admin/users/${userId}`, {
-      method: 'DELETE'
-    });
-  }
-
-  async updateUserRole(userId: string, role: 'user' | 'admin' | 'super_admin'): Promise<ApiResponse<{ user: any }>> {
-    return this.request(`/api/admin/users/${userId}/role`, {
-      method: 'PATCH',
-      body: JSON.stringify({ role })
-    });
-  }
-
-  async updateSystemSettings(settings: any): Promise<ApiResponse<{ settings: any }>> {
-    return this.request('/api/admin/settings', {
-      method: 'PATCH',
-      body: JSON.stringify({ settings })
-    });
-  }
-
-  async getSystemLogs(page = 1, limit = 100, level?: string): Promise<ApiResponse<{
-    logs: any[];
-    pagination: {
-      page: number;
-      limit: number;
-      total: number;
-      pages: number;
-    };
-  }>> {
-    const params = new URLSearchParams({
-      page: page.toString(),
-      limit: limit.toString()
-    });
-    
-    if (level) params.append('level', level);
-
-    return this.request(`/api/admin/logs?${params}`);
-  }
-
-  async getAdminLogs(options: {
-    page?: number;
-    limit?: number;
-    level?: string;
-    userId?: string;
-    action?: string;
-  } = {}): Promise<ApiResponse<{
-    logs: Array<{
-      id: string;
-      user_id: string;
-      action: string;
-      resource_type: string;
-      details: any;
-      created_at: string;
-      profiles?: {
-        full_name: string;
-        email: string;
-      };
-    }>;
-    pagination: {
-      page: number;
-      limit: number;
-      total: number;
-      pages: number;
-    };
-  }>> {
-    const params = new URLSearchParams({
-      page: (options.page || 1).toString(),
-      limit: (options.limit || 50).toString(),
-    });
-
-    if (options.level) {
-      params.append('level', options.level);
-    }
-    if (options.userId) {
-      params.append('userId', options.userId);
-    }
-    if (options.action) {
-      params.append('action', options.action);
-    }
-
-    return this.request(`/api/admin/logs?${params}`);
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Accept': 'application/json'
+      }
+    }, true, queryParams);
   }
 
   // Dashboard endpoints
-  async getDashboardStats(): Promise<ApiResponse<{
-    totalUploads: number;
-    successfulUploads: number;
-    avgConfidence: number;
-    avgProcessTime: number;
-    monthlyGrowth: number;
-    currentStreak: number;
-    longestStreak: number;
-    totalAchievements: number;
-    totalSaved: number;
-    subscriptionTier: string;
-    uploadsThisMonth: number;
-  }>> {
+  async getDashboardStats(): Promise<ApiResponse<any>> {
     return this.request('/api/dashboard/stats');
   }
 
-  async getRecentUploads(limit = 5): Promise<ApiResponse<{
-    uploads: Array<{
-      id: string;
-      image_name: string;
-      created_at: string;
-      confidence_score: number;
-      predictions: any[];
-    }>;
-  }>> {
+  async getRecentUploads(limit = 5): Promise<ApiResponse<any>> {
     return this.request(`/api/dashboard/recent-uploads?limit=${limit}`);
   }
 
-  async getRecentActivities(limit = 5): Promise<ApiResponse<{
-    activities: Array<{
-      id: string;
-      action: string;
-      resource_type: string;
-      details: any;
-      created_at: string;
-    }>;
-  }>> {
+  async getRecentActivities(limit = 5): Promise<ApiResponse<any>> {
     return this.request(`/api/dashboard/recent-activities?limit=${limit}`);
   }
 
-  async getAchievements(): Promise<ApiResponse<{
-    achievements: Array<{
-      id: string;
-      title: string;
-      description: string;
-      icon: string;
-      color: string;
-      earned: boolean;
-      earnedAt?: string;
-    }>;
-    totalEarned: number;
-    totalAvailable: number;
-  }>> {
-    return this.request('/api/dashboard/achievements');
-  }
-
-  async getPerformanceMetrics(): Promise<ApiResponse<{
-    modelAccuracy: number;
-    accuracyChange: number;
-    avgResponseTime: number;
-    responseTimeChange: number;
-    totalSearches: number;
-    searchesGrowth: number;
-  }>> {
+  async getPerformanceMetrics(): Promise<ApiResponse<any>> {
     return this.request('/api/dashboard/performance-metrics');
   }
 
-  async getUserUsageStats(): Promise<ApiResponse<{
-    currentMonth: {
-      searches: number;
-      apiCalls: number;
-      storageUsed: number;
-    };
-    previousMonth: {
-      searches: number;
-      apiCalls: number;
-      storageUsed: number;
-    };
-  }>> {
-    return this.request('/api/dashboard/usage-stats');
-  }
-
   // History endpoints
-  async getUploadHistory(page = 1, limit = 20, filters?: any): Promise<ApiResponse<{
-    uploads: Array<{
-      id: string;
-      image_name: string;
-      image_url: string;
-      created_at: string;
-      confidence_score: number;
-      predictions: any[];
-      processing_time: number;
-    }>;
-    pagination: {
-      page: number;
-      limit: number;
-      total: number;
-      totalPages: number;
-    };
-  }>> {
+  async getUploadHistory(page = 1, limit = 20, filters?: any): Promise<ApiResponse<any>> {
     const params = new URLSearchParams({
       page: page.toString(),
       limit: limit.toString()
@@ -573,74 +303,19 @@ class ApiClient {
   }
 
   // Profile endpoints
-  async getProfile(): Promise<ApiResponse<{
-    profile: {
-      id: string;
-      email: string;
-      full_name: string;
-      company?: string;
-      phone?: string;
-      bio?: string;
-      location?: string;
-      website?: string;
-      avatar_url?: string;
-      role: string;
-      created_at: string;
-      updated_at: string;
-    };
-  }>> {
+  async getProfile(): Promise<ApiResponse<any>> {
     return this.request('/api/profile');
   }
 
-  async updateProfileData(updates: {
-    full_name?: string;
-    company?: string;
-    phone?: string;
-    bio?: string;
-    location?: string;
-    website?: string;
-  }): Promise<ApiResponse<{ profile: any }>> {
+  async updateProfileData(updates: any): Promise<ApiResponse<{ profile: any }>> {
     return this.request('/api/profile', {
       method: 'PATCH',
       body: JSON.stringify(updates)
     });
   }
 
-  async changePassword(data: {
-    currentPassword: string;
-    newPassword: string;
-  }): Promise<ApiResponse> {
-    return this.request('/api/profile/change-password', {
-      method: 'POST',
-      body: JSON.stringify(data)
-    });
-  }
-
-  async deleteAccount(): Promise<ApiResponse> {
-    return this.request('/api/profile/delete-account', {
-      method: 'DELETE'
-    });
-  }
-
   // Settings endpoints
-  async getSettings(): Promise<ApiResponse<{
-    settings: {
-      notifications: {
-        email: boolean;
-        push: boolean;
-        marketing: boolean;
-      };
-      privacy: {
-        profileVisibility: 'public' | 'private';
-        dataSharing: boolean;
-      };
-      preferences: {
-        theme: 'light' | 'dark' | 'system';
-        language: string;
-        timezone: string;
-      };
-    };
-  }>> {
+  async getSettings(): Promise<ApiResponse<any>> {
     return this.request('/api/settings');
   }
 
@@ -651,76 +326,8 @@ class ApiClient {
     });
   }
 
-  // Notifications endpoints
-  async getNotifications(page = 1, limit = 20): Promise<ApiResponse<{
-    notifications: Array<{
-      id: string;
-      title: string;
-      message: string;
-      type: 'info' | 'success' | 'warning' | 'error';
-      read: boolean;
-      created_at: string;
-      action_url?: string;
-    }>;
-    pagination: {
-      page: number;
-      limit: number;
-      total: number;
-      unreadCount: number;
-    };
-  }>> {
-    return this.request(`/api/notifications?page=${page}&limit=${limit}`);
-  }
-
-  async markNotificationAsRead(notificationId: string): Promise<ApiResponse> {
-    return this.request(`/api/notifications/${notificationId}/read`, {
-      method: 'PATCH'
-    });
-  }
-
-  async markAllNotificationsAsRead(): Promise<ApiResponse> {
-    return this.request('/api/notifications/mark-all-read', {
-      method: 'PATCH'
-    });
-  }
-
-  async deleteNotification(notificationId: string): Promise<ApiResponse> {
-    return this.request(`/api/notifications/${notificationId}`, {
-      method: 'DELETE'
-    });
-  }
-
   // Billing endpoints
-  async getBillingInfo(): Promise<ApiResponse<{
-    subscription: {
-      id: string;
-      tier: 'free' | 'pro' | 'enterprise';
-      status: 'active' | 'canceled' | 'past_due' | 'unpaid' | 'trialing';
-      current_period_start: string;
-      current_period_end: string;
-      cancel_at_period_end: boolean;
-    };
-    usage: {
-      current_period: {
-        searches: number;
-        api_calls: number;
-        storage_used: number;
-      };
-      limits: {
-        searches: number;
-        api_calls: number;
-        storage: number;
-      };
-    };
-    invoices: Array<{
-      id: string;
-      amount: number;
-      currency: string;
-      status: string;
-      created_at: string;
-      invoice_url?: string;
-    }>;
-  }>> {
+  async getBillingInfo(): Promise<ApiResponse<any>> {
     return this.request('/api/billing');
   }
 
@@ -737,39 +344,198 @@ class ApiClient {
     });
   }
 
-  async getInvoices(page = 1, limit = 10): Promise<ApiResponse<{
-    invoices: Array<{
-      id: string;
-      amount: number;
-      currency: string;
-      status: string;
-      created_at: string;
-      invoice_url?: string;
-    }>;
-    pagination: {
-      page: number;
-      limit: number;
-      total: number;
-    };
-  }>> {
+  async getInvoices(page = 1, limit = 10): Promise<ApiResponse<any>> {
     return this.request(`/api/billing/invoices?page=${page}&limit=${limit}`);
   }
 
-  // Health check endpoint
-  async healthCheck(): Promise<ApiResponse<{ status: string; timestamp: string }>> {
-    return this.request('/api/health');
+  // Admin endpoints
+  async getUsers(page = 1, limit = 20): Promise<ApiResponse<any>> {
+    return this.request(`/api/admin/users?page=${page}&limit=${limit}`);
+  }
+
+  async updateUserRole(userId: string, role: 'user' | 'admin' | 'super_admin'): Promise<ApiResponse<{ user: any }>> {
+    return this.request(`/api/admin/users/${userId}/role`, {
+      method: 'PATCH',
+      body: JSON.stringify({ role })
+    });
+  }
+
+  async deleteAdminUser(userId: string): Promise<ApiResponse> {
+    return this.request(`/api/admin/users/${userId}`, {
+      method: 'DELETE'
+    });
+  }
+
+  async getAdminStats(): Promise<ApiResponse<any>> {
+    return this.request('/api/admin/stats');
+  }
+
+  async getAdminAnalytics(timeRange = '30d'): Promise<ApiResponse<any>> {
+    return this.request(`/api/admin/analytics?range=${timeRange}`);
+  }
+
+  async getSystemLogs(page = 1, limit = 100, level?: string): Promise<ApiResponse<any>> {
+    const params = new URLSearchParams({
+      page: page.toString(),
+      limit: limit.toString()
+    });
+    
+    if (level) params.append('level', level);
+
+    return this.request(`/api/admin/logs?${params}`);
   }
 }
 
-// Create singleton instance
+// Create singleton instance of the class-based client
 export const apiClient = new ApiClient();
-export default apiClient;
 
-// Export types for use in components
-export type { 
-  ApiResponse, 
-  LoginRequest, 
-  RegisterRequest, 
-  User, 
-  AuthResponse 
-}; 
+// API endpoints for the new approach
+export const endpoints = {
+  auth: {
+    login: '/api/auth/login',
+    register: '/api/auth/register',
+    logout: '/api/auth/logout',
+    refresh: '/api/auth/refresh',
+  },
+  upload: {
+    image: '/api/upload',
+    analyze: '/api/analyze',
+  },
+  user: {
+    profile: '/api/user/profile',
+    settings: '/api/user/settings',
+  },
+  parts: {
+    search: '/api/parts/search',
+    details: (id: string) => `/api/parts/${id}`,
+  },
+} as const;
+
+// Create axios instance for new approach
+const client: AxiosInstance = axios.create({
+  baseURL: API_BASE_URL,
+  timeout: 30000,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+});
+
+client.interceptors.request.use((config) => {
+  const token = localStorage.getItem('auth_token');
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
+
+client.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    if (error.response?.status === 401) {
+      localStorage.removeItem('auth_token');
+      window.location.href = '/login';
+    }
+    return Promise.reject(error);
+  }
+);
+
+// AI Service client for image uploads
+const aiClient: AxiosInstance = axios.create({
+  baseURL: AI_SERVICE_URL,
+  timeout: 120000, // Increased to 2 minutes for AI processing
+  headers: {
+    'Content-Type': 'application/json',
+  },
+});
+
+aiClient.interceptors.request.use((config) => {
+  // Use the AI service API key
+  const apiKey = 'geotech-dev-key-2024';
+  config.headers.Authorization = `Bearer ${apiKey}`;
+  return config;
+});
+
+// API functions for the new approach
+export const api = {
+  auth: {
+    login: async (email: string, password: string) => {
+      const response = await client.post<any>(endpoints.auth.login, { email, password });
+      console.log('API Login Response:', response.data);
+      
+      // Backend returns { token, user, message } directly
+      if (response.data && response.data.token) {
+        // Save token to localStorage for the class-based client
+        localStorage.setItem('auth_token', response.data.token);
+        
+        return {
+          success: true,
+          data: response.data
+        };
+      }
+      
+      return {
+        success: false,
+        error: 'Invalid login response'
+      };
+    },
+    register: async (userData: { email: string; password: string; name: string }) => {
+      const response = await client.post<ApiResponse>(endpoints.auth.register, userData);
+      return response.data;
+    },
+    logout: async () => {
+      const response = await client.post<ApiResponse>(endpoints.auth.logout);
+      return response.data;
+    },
+  },
+  upload: {
+    image: async (file: File): Promise<UploadResponse> => {
+      try {
+        const formData = new FormData();
+        formData.append('file', file);
+        
+        // Add query parameters for AI service
+        const params = new URLSearchParams({
+          confidence_threshold: '0.5',
+          max_predictions: '5',
+          include_web_scraping: 'true'
+        });
+        
+        console.log('Uploading to AI service:', `${AI_SERVICE_URL}/predict?${params}`);
+        
+        const response = await aiClient.post<UploadResponse>(`/predict?${params}`, formData, {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
+          timeout: 120000, // 2 minutes timeout for this specific request
+        });
+        
+        console.log('AI service response:', response.data);
+        return response.data;
+      } catch (error) {
+        console.error('AI service error:', error);
+        
+        if (error.code === 'ECONNABORTED') {
+          throw new Error('AI analysis is taking longer than expected. Please try with a smaller image or try again later.');
+        } else if (error.response?.status === 500) {
+          throw new Error('AI service is currently unavailable. Please try again later.');
+        } else if (error.code === 'ECONNREFUSED') {
+          throw new Error('Cannot connect to AI service. Please make sure the AI service is running.');
+        }
+        
+        throw error;
+      }
+    },
+  },
+  user: {
+    getProfile: async () => {
+      const response = await client.get<ApiResponse>(endpoints.user.profile);
+      return response.data;
+    },
+    updateProfile: async (profileData: any) => {
+      const response = await client.put<ApiResponse>(endpoints.user.profile, profileData);
+      return response.data;
+    },
+  },
+};
+
+export default apiClient; 
