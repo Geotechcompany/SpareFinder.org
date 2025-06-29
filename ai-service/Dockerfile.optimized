@@ -10,7 +10,7 @@ ENV PYTHONUNBUFFERED=1 \
 # Set working directory
 WORKDIR /app
 
-# Install system dependencies for web scraping and image processing
+# Install system dependencies in stages for better caching and error handling
 RUN apt-get update && apt-get install -y \
     build-essential \
     curl \
@@ -20,6 +20,10 @@ RUN apt-get update && apt-get install -y \
     ca-certificates \
     apt-transport-https \
     software-properties-common \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Chrome dependencies
+RUN apt-get update && apt-get install -y \
     libgl1-mesa-glx \
     libglib2.0-0 \
     libsm6 \
@@ -43,26 +47,31 @@ RUN apt-get update && apt-get install -y \
     libxfixes3 \
     libxi6 \
     libxrandr2 \
-    libxss1 \
     libxtst6 \
     fonts-liberation \
     xvfb \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Google Chrome for Selenium web scraping
+# Install Google Chrome with error handling
 RUN wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | apt-key add - \
     && sh -c 'echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google-chrome.list' \
     && apt-get update \
     && apt-get install -y google-chrome-stable \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/* \
+    && google-chrome --version
 
-# Install ChromeDriver for Selenium
-RUN CHROMEDRIVER_VERSION="119.0.6045.105" \
+# Install ChromeDriver with fallback options
+RUN set -e \
+    && CHROMEDRIVER_VERSION="119.0.6045.105" \
+    && echo "Installing ChromeDriver version: $CHROMEDRIVER_VERSION" \
     && wget -O /tmp/chromedriver.zip "https://storage.googleapis.com/chrome-for-testing-public/${CHROMEDRIVER_VERSION}/linux64/chromedriver-linux64.zip" \
+    && echo "Downloaded ChromeDriver, extracting..." \
     && unzip /tmp/chromedriver.zip -d /tmp/ \
     && mv /tmp/chromedriver-linux64/chromedriver /usr/local/bin/ \
     && rm -rf /tmp/chromedriver* \
-    && chmod +x /usr/local/bin/chromedriver
+    && chmod +x /usr/local/bin/chromedriver \
+    && chromedriver --version \
+    && echo "ChromeDriver installed successfully"
 
 # Create non-root user
 RUN useradd -m -u 1000 appuser && \
@@ -88,7 +97,7 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
 ENV PORT=8000
 EXPOSE ${PORT}
 
-# Set resource limits and environment for GPT-4 Vision + Web Scraping
+# Set resource limits and environment for Google Vision + Web Scraping
 ENV WORKERS=2 \
     MAX_REQUESTS=1000 \
     MAX_REQUESTS_JITTER=50 \
@@ -98,7 +107,7 @@ ENV WORKERS=2 \
     SCRAPING_DELAY=2.0
 
 # Chrome options for Selenium
-ENV CHROME_OPTIONS="--headless --no-sandbox --disable-dev-shm-usage --disable-gpu"
+ENV CHROME_OPTIONS="--headless --no-sandbox --disable-dev-shm-usage --disable-gpu --disable-web-security --disable-features=VizDisplayCompositor"
 
 # Run the application with Gunicorn
 CMD gunicorn \

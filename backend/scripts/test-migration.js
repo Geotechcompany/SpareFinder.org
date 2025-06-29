@@ -23,62 +23,62 @@ async function testMigration() {
     console.log('=' * 40);
 
     const tests = [{
-        name: 'Migration Record',
-        test: async () => {
-            const { data, error } = await supabase
-                .from('_migrations')
-                .select('*')
-                .eq('name', '003_enhanced_user_tracking');
+            name: 'Migration Record',
+            test: async() => {
+                const { data, error } = await supabase
+                    .from('_migrations')
+                    .select('*')
+                    .eq('name', '003_enhanced_user_tracking');
 
-            if (error) throw error;
-            return data && data.length > 0;
-        }
-    },
-    {
-        name: 'User Statistics Table',
-        test: async () => {
-            const { data, error } = await supabase
-                .from('user_statistics')
-                .select('*')
-                .limit(1);
+                if (error) throw error;
+                return data && data.length > 0;
+            }
+        },
+        {
+            name: 'User Statistics Table',
+            test: async() => {
+                const { data, error } = await supabase
+                    .from('user_statistics')
+                    .select('*')
+                    .limit(1);
 
-            // Table exists if no error or just no data
-            return !error || error.code === 'PGRST116';
-        }
-    },
-    {
-        name: 'User Search History Table',
-        test: async () => {
-            const { data, error } = await supabase
-                .from('user_search_history')
-                .select('*')
-                .limit(1);
+                // Table exists if no error or just no data
+                return !error || error.code === 'PGRST116';
+            }
+        },
+        {
+            name: 'User Search History Table',
+            test: async() => {
+                const { data, error } = await supabase
+                    .from('user_search_history')
+                    .select('*')
+                    .limit(1);
 
-            return !error || error.code === 'PGRST116';
-        }
-    },
-    {
-        name: 'Daily Usage Stats Table',
-        test: async () => {
-            const { data, error } = await supabase
-                .from('daily_usage_stats')
-                .select('*')
-                .limit(1);
+                return !error || error.code === 'PGRST116';
+            }
+        },
+        {
+            name: 'Daily Usage Stats Table',
+            test: async() => {
+                const { data, error } = await supabase
+                    .from('daily_usage_stats')
+                    .select('*')
+                    .limit(1);
 
-            return !error || error.code === 'PGRST116';
-        }
-    },
-    {
-        name: 'Part Searches New Columns',
-        test: async () => {
-            const { data, error } = await supabase
-                .from('part_searches')
-                .select('similar_images, web_scraping_used, analysis_status')
-                .limit(1);
+                return !error || error.code === 'PGRST116';
+            }
+        },
+        {
+            name: 'Part Searches New Columns',
+            test: async() => {
+                const { data, error } = await supabase
+                    .from('part_searches')
+                    .select('similar_images, web_scraping_used, analysis_status')
+                    .limit(1);
 
-            return !error || error.code === 'PGRST116';
+                return !error || error.code === 'PGRST116';
+            }
         }
-    }
     ];
 
     let passed = 0;
