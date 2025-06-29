@@ -8,7 +8,10 @@
         "dev": "tsx watch src/server.ts",
         "build": "tsc",
         "lint": "eslint src/**/*.ts",
-        "test": "jest"
+        "test": "jest",
+        "migrate": "node scripts/migrate-to-supabase.js",
+        "migrate:manual": "node scripts/migrate-to-supabase.js --manual",
+        "test:migration": "node scripts/test-migration.js"
     },
     "dependencies": {
         "@supabase/supabase-js": "^2.38.5",
