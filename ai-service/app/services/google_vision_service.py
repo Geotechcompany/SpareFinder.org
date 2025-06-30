@@ -235,13 +235,28 @@ class GoogleVisionService:
         # First, try to extract part name from detected text
         text_part_name = self._extract_part_name_from_text(description)
         
-        # If we found a good part name from text, use it
+        # Initialize base confidence
+        base_confidence = 0.0
+        
+        # If we found a good part name from text
         if text_part_name and len(text_part_name) > 3:
             part_name = text_part_name
-            confidence = 75.0  # Higher confidence for text-based identification
+            # Calculate confidence based on text quality
+            base_confidence = 65.0  # Start with base confidence
+            
+            # Boost confidence based on text characteristics
+            if any(char.isdigit() for char in text_part_name):  # Contains numbers (likely a part)
+                base_confidence += 10.0
+            if len(text_part_name) > 5:  # Longer text usually more specific
+                base_confidence += 5.0
+            if any(label.get('description', '').lower() in text_part_name.lower() for label in labels):
+                base_confidence += 10.0  # Text matches vision labels
+            
+            confidence = min(base_confidence, 95.0)  # Cap at 95%
         else:
             # Fall back to labels, but skip generic ones
             part_name = self._get_meaningful_label(labels)
+            # Use vision API's confidence score
             confidence = labels[0].get('score', 0) * 100 + 10
         
         # Determine category and price range
@@ -253,7 +268,7 @@ class GoogleVisionService:
             'part_name': part_name,
             'category': category.title(),
             'price_range': price_range,
-            'confidence': min(confidence, 95)
+            'confidence': min(confidence, 95)  # Ensure we never exceed 95%
         }
         
         # Add description

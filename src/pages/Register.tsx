@@ -28,15 +28,8 @@ const Register = () => {
     
     // Debug logging
     console.log('🔍 Form data before submission:', formData);
-    console.log('🔍 Data being sent to signUp:', {
-      email: formData.email,
-      password: formData.password,
-      metadata: {
-        full_name: formData.name,
-        company: formData.company,
-      }
-    });
     
+    // Form validation
     if (formData.password !== formData.confirmPassword) {
       toast.error('Passwords do not match');
       return;
@@ -56,16 +49,44 @@ const Register = () => {
     setIsLoading(true);
     
     try {
-      await signUp(formData.email, formData.password, {
+      const result = await signUp(formData.email, formData.password, {
         full_name: formData.name.trim(),
         company: formData.company.trim(),
       });
       
-      toast.success('Registration successful! Please check your email for verification.');
-      navigate('/login');
+      console.log('✅ Registration successful:', result);
+      
+      // Clear form data
+      setFormData({
+        name: '',
+        email: '',
+        company: '',
+        password: '',
+        confirmPassword: ''
+      });
+      
+      // Show success message and redirect
+      toast.success('Registration successful! Redirecting to login...');
+      
+      // Small delay before redirect to ensure toast is visible
+      setTimeout(() => {
+        navigate('/login');
+      }, 1500);
+      
     } catch (error: any) {
-      console.error('Registration error:', error);
-      toast.error(error?.message || 'Registration failed. Please try again.');
+      console.error('❌ Registration error:', error);
+      
+      // Extract error message
+      const errorMessage = error?.message || 'Registration failed. Please try again.';
+      
+      // Show error toast with specific message
+      toast.error(errorMessage);
+      
+      // If it's a network error, show a more specific message
+      if (error.name === 'TypeError' && error.message.includes('Failed to fetch')) {
+        toast.error('Unable to connect to the server. Please check your internet connection.');
+      }
+      
     } finally {
       setIsLoading(false);
     }

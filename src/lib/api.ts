@@ -479,24 +479,34 @@ export const api = {
       };
     },
     register: async (userData: { email: string; password: string; full_name: string; company?: string }) => {
-      const response = await client.post<any>(endpoints.auth.register, userData);
-      console.log('API Register Response:', response.data);
-      
-      // Backend returns { token, user, message } directly
-      if (response.data && response.data.token) {
-        // Save token to localStorage for the class-based client
-        localStorage.setItem('auth_token', response.data.token);
+      try {
+        const response = await client.post<any>(endpoints.auth.register, userData);
+        console.log('API Register Response:', response.data);
         
+        if (!response.data) {
+          throw new Error('Invalid registration response');
+        }
+        
+        // Backend returns { token, user, message } directly
+        if (response.data.token) {
+          // Save token to localStorage for the class-based client
+          localStorage.setItem('auth_token', response.data.token);
+          
+          return {
+            success: true,
+            data: response.data
+          };
+        }
+        
+        // If we get here, something went wrong
+        throw new Error(response.data.error || response.data.message || 'Registration failed');
+      } catch (error: any) {
+        console.error('Registration error:', error);
         return {
-          success: true,
-          data: response.data
+          success: false,
+          error: error.response?.data?.message || error.message || 'Registration failed'
         };
       }
-      
-      return {
-        success: false,
-        error: 'Invalid registration response'
-      };
     },
     logout: async () => {
       const response = await client.post<ApiResponse>(endpoints.auth.logout);

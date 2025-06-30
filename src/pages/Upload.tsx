@@ -330,7 +330,7 @@ const Upload = () => {
         currentStep: 'Web Scraping',
         currentStepIndex: 4,
         totalSteps: 6,
-        details: 'Scraping automotive websites for similar parts and pricing data',
+        details: 'Searching  automotive websites for similar parts and pricing data',
         searchResults: {
           sitesSearched: 1,
           partsFound: 0,
@@ -348,7 +348,7 @@ const Upload = () => {
         currentStep: 'Data Processing',
         currentStepIndex: 5,
         totalSteps: 6,
-        details: 'Analyzing scraped results and matching with SpareFinder AI identification'
+        details: 'Analyzing results and matching with SpareFinder AI identification'
       });
 
       // Make the actual API call to SpareFinder AI + Web Scraper integration
@@ -358,11 +358,29 @@ const Upload = () => {
       if (response && response.predictions && response.predictions.length > 0) {
         const prediction = response.predictions[0];
         const identifiedPart = prediction.class_name;
-        const confidence = Math.round(prediction.confidence * 100);
+        
+        // Fix confidence score calculation - ensure it's properly converted to percentage
+        let confidence = prediction.confidence;
+        if (confidence <= 1.0) {
+          confidence = Math.round(confidence * 100); // Convert decimal to percentage
+        } else {
+          confidence = Math.round(confidence); // Already in percentage
+        }
         
         console.log(`✅ SpareFinder AI identified: "${identifiedPart}" with ${confidence}% confidence`);
+        
+        // Enhanced similar images logging
         if (response.similar_images && response.similar_images.length > 0) {
           console.log(`🖼️ Found ${response.similar_images.length} similar images from web scraping`);
+          console.log('Similar images sources:', response.similar_images.map(img => img.source));
+          
+          // Log eBay specific results
+          const ebayImages = response.similar_images.filter(img => 
+            img.source && img.source.toLowerCase().includes('ebay')
+          );
+          if (ebayImages.length > 0) {
+            console.log(`🛒 Found ${ebayImages.length} eBay listings with prices`);
+          }
         }
 
         // Step 6: Finalizing
@@ -375,11 +393,11 @@ const Upload = () => {
           totalSteps: 6,
           identifiedPart: identifiedPart,
           confidence: confidence,
-          details: 'Compiling SpareFinder AI analysis with scraped market data',
+          details: 'Compiling SpareFinder AI analysis with eBay and market data',
           searchResults: {
             sitesSearched: 1,
             partsFound: response.similar_images?.length || 0,
-            databasesQueried: ['Automotive Parts Database - Live Results']
+            databasesQueried: ['eBay UK - Live Results', 'Automotive Parts Database']
           }
         });
 
@@ -399,21 +417,46 @@ const Upload = () => {
           searchResults: {
             sitesSearched: 1,
             partsFound: response.similar_images?.length || 0,
-            databasesQueried: ['Automotive Parts Database - Live Results']
+            databasesQueried: ['eBay UK - Live Results', 'Automotive Parts Database']
           }
         });
+
+        // Enhanced price formatting
+        const formatEstimatedPrice = (priceStr?: string) => {
+          if (!priceStr) return 'Price not available';
+          
+          // Handle various price formats from AI service
+          if (priceStr.includes('£') || priceStr.includes('$')) {
+            return priceStr; // Already formatted
+          }
+          
+          // Try to extract price range or single price
+          const priceMatch = priceStr.match(/(\d+(?:\.\d+)?)\s*-?\s*(\d+(?:\.\d+)?)?/);
+          if (priceMatch) {
+            const minPrice = parseFloat(priceMatch[1]);
+            const maxPrice = priceMatch[2] ? parseFloat(priceMatch[2]) : null;
+            
+            if (maxPrice && maxPrice > minPrice) {
+              return `£${minPrice.toFixed(2)} - £${maxPrice.toFixed(2)}`;
+            } else {
+              return `£${minPrice.toFixed(2)}`;
+            }
+          }
+          
+          return priceStr; // Return as-is if can't parse
+        };
 
         return {
           success: true,
           analysisId: response.request_id || 'temp-id',
           predictions: [{
             name: prediction.class_name,
-            confidence: prediction.confidence * 100, // Convert to percentage
+            confidence: confidence, // Use the corrected confidence value
             details: prediction.description || '',
             partNumber: prediction.part_number,
             category: prediction.category,
             manufacturer: prediction.manufacturer,
-            estimatedPrice: prediction.estimated_price,
+            estimatedPrice: formatEstimatedPrice(prediction.estimated_price),
             compatibility: prediction.compatibility || []
           }],
           processingTime: response.processing_time || 0,
@@ -421,11 +464,28 @@ const Upload = () => {
             imageSize: file.size,
             imageFormat: file.type,
             modelVersion: 'SpareFinder AI v1',
-            confidence: prediction.confidence * 100,
+            confidence: confidence, // Use the corrected confidence value
             webScrapingUsed: response.image_metadata?.web_scraping_used || false,
             sitesSearched: 1
           },
-          similarImages: response.similar_images || []
+          // Enhanced similar images with better validation
+          similarImages: response.similar_images?.map(img => ({
+            ...img,
+            // Ensure image URL is valid and accessible
+            url: img.url || '',
+            // Enhanced price formatting for similar images
+            price: img.price || 'Price not available',
+            // Ensure source is properly formatted
+            source: img.source || 'Unknown source',
+            // Add eBay-specific enhancements
+            isEbay: img.source && img.source.toLowerCase().includes('ebay'),
+            // Extract part number from metadata if available
+            partNumber: img.metadata?.part_number || img.metadata?.partNumber || null,
+            // Extract condition from metadata
+            condition: img.metadata?.condition || null,
+            // Extract shipping info
+            shipping: img.metadata?.shipping || null
+          })) || []
         };
       } else {
         throw new Error('No predictions found');
@@ -1301,27 +1361,48 @@ const Upload = () => {
                             </motion.div>
                           )}
 
-                          {/* Similar Images Section */}
+                          {/* Enhanced Similar Images Section with eBay Focus */}
                           {analysisResults?.similarImages && analysisResults.similarImages.length > 0 && (
                             <motion.div
                               variants={fadeInScale}
                               className="p-4 rounded-xl bg-gradient-to-r from-emerald-600/10 to-teal-600/10 border border-white/10 hover:border-white/20 transition-colors"
                             >
-                              <div className="text-gray-400 text-sm mb-3 flex items-center">
-                                <ImagePlus className="w-4 h-4 mr-2" />
-                                Similar Parts Found ({analysisResults.similarImages.length})
+                              <div className="text-gray-400 text-sm mb-3 flex items-center justify-between">
+                                <div className="flex items-center">
+                                  <ImagePlus className="w-4 h-4 mr-2" />
+                                  Similar Parts Found ({analysisResults.similarImages.length})
+                                </div>
+                                <div className="flex items-center space-x-2">
+                                  {analysisResults.similarImages.some((img: any) => img.isEbay) && (
+                                    <span className="text-xs bg-blue-600/20 text-blue-300 px-2 py-1 rounded-full border border-blue-500/30">
+                                      eBay Results
+                                    </span>
+                                  )}
+                                </div>
                               </div>
                               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                                {analysisResults.similarImages.slice(0, 6).map((image, index) => (
+                                {analysisResults.similarImages.slice(0, 6).map((image: any, index) => (
                                   <div key={index} className="relative group">
-                                    <div className="aspect-square rounded-lg overflow-hidden border border-white/10 bg-gray-800">
+                                    <div className="aspect-square rounded-lg overflow-hidden border border-white/10 bg-gray-800 relative">
                                       <ImageWithFallback
                                         src={image.url}
                                         alt={image.title}
                                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
                                       />
+                                      {/* eBay Badge */}
+                                      {image.isEbay && (
+                                        <div className="absolute top-2 left-2 bg-blue-600/90 text-white text-xs px-2 py-1 rounded-full font-medium">
+                                          eBay
+                                        </div>
+                                      )}
+                                      {/* Condition Badge */}
+                                      {image.condition && (
+                                        <div className="absolute top-2 right-2 bg-green-600/90 text-white text-xs px-2 py-1 rounded-full">
+                                          {image.condition}
+                                        </div>
+                                      )}
                                     </div>
-                                    <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity duration-200 rounded-lg flex flex-col justify-between p-2">
+                                    <div className="absolute inset-0 bg-black/70 opacity-0 group-hover:opacity-100 transition-opacity duration-200 rounded-lg flex flex-col justify-between p-2">
                                       <div className="flex justify-end">
                                         {image.metadata?.link && (
                                           <motion.a
@@ -1338,20 +1419,30 @@ const Upload = () => {
                                         )}
                                       </div>
                                       <div className="space-y-1">
-                                        <div className="text-white text-xs font-medium truncate" title={image.title}>
+                                        <div className="text-white text-xs font-medium line-clamp-2" title={image.title}>
                                           {image.title}
                                         </div>
                                         <div className="flex justify-between items-center text-xs">
-                                          <span className="text-green-300">{image.price}</span>
+                                          <span className="text-green-300 font-semibold">{image.price}</span>
                                           <span className="text-blue-300">
-                                            {Math.round(image.similarity_score * 100)}% match
+                                            {Math.round((image.similarity_score || 0) * 100)}% match
                                           </span>
                                         </div>
+                                        {image.partNumber && (
+                                          <div className="text-xs text-yellow-300 truncate">
+                                            Part #: {image.partNumber}
+                                          </div>
+                                        )}
+                                        {image.shipping && (
+                                          <div className="text-xs text-gray-300 truncate">
+                                            {image.shipping}
+                                          </div>
+                                        )}
                                         <div className="flex justify-between items-center text-xs">
                                           <span className="text-gray-300 truncate">{image.source}</span>
                                           {image.metadata?.link && (
                                             <span className="text-blue-400 cursor-pointer hover:text-blue-300">
-                                              View Details →
+                                              View →
                                             </span>
                                           )}
                                         </div>
@@ -1370,7 +1461,7 @@ const Upload = () => {
                             </motion.div>
                           )}
 
-                          {/* Detailed Similar Parts List */}
+                          {/* Enhanced Detailed Similar Parts List with eBay Focus */}
                           {analysisResults?.similarImages && analysisResults.similarImages.length > 0 && (
                             <motion.div
                               variants={fadeInScale}
@@ -1380,53 +1471,85 @@ const Upload = () => {
                                 <div className="flex items-center">
                                   <ExternalLink className="w-4 h-4 mr-2" />
                                   Available from Suppliers
+                                  {analysisResults.similarImages.some((img: any) => img.isEbay) && (
+                                    <span className="ml-2 text-xs bg-blue-600/20 text-blue-300 px-2 py-1 rounded-full border border-blue-500/30">
+                                      eBay Live
+                                    </span>
+                                  )}
                                 </div>
                                 <span className="text-xs">Click to view details</span>
                               </div>
-                              <div className="space-y-2 max-h-48 overflow-y-auto">
-                                {analysisResults.similarImages.slice(0, 8).map((image, index) => (
+                              <div className="space-y-2 max-h-64 overflow-y-auto">
+                                {analysisResults.similarImages.slice(0, 10).map((image: any, index) => (
                                   <motion.div
                                     key={index}
                                     whileHover={{ scale: 1.02 }}
-                                    className="flex items-center space-x-3 p-2 rounded-lg bg-white/5 hover:bg-white/10 transition-colors cursor-pointer"
+                                    className="flex items-center space-x-3 p-3 rounded-lg bg-white/5 hover:bg-white/10 transition-colors cursor-pointer border border-white/5 hover:border-white/10"
                                     onClick={() => {
                                       if (image.metadata?.link) {
                                         window.open(image.metadata.link, '_blank', 'noopener,noreferrer');
                                       }
                                     }}
                                   >
-                                    <div className="w-12 h-12 rounded-lg overflow-hidden bg-gray-800 flex-shrink-0">
+                                    <div className="w-16 h-16 rounded-lg overflow-hidden bg-gray-800 flex-shrink-0 relative">
                                       <ImageWithFallback
                                         src={image.url}
                                         alt={image.title}
                                         className="w-full h-full object-cover"
                                       />
-                                    </div>
-                                    <div className="flex-1 min-w-0">
-                                      <div className="text-white text-sm font-medium truncate" title={image.title}>
-                                        {image.title}
-                                      </div>
-                                      <div className="flex items-center justify-between text-xs mt-1">
-                                        <span className="text-gray-400">{image.source}</span>
-                                        <span className="text-green-300">{image.price}</span>
-                                      </div>
-                                      {image.metadata?.part_number && (
-                                        <div className="text-xs text-blue-300 truncate">
-                                          Part #: {image.metadata.part_number}
+                                      {image.isEbay && (
+                                        <div className="absolute bottom-0 left-0 right-0 bg-blue-600/90 text-white text-xs px-1 py-0.5 text-center">
+                                          eBay
                                         </div>
                                       )}
                                     </div>
-                                    <div className="flex items-center space-x-2 flex-shrink-0">
-                                      <span className="text-xs text-blue-300">
-                                        {Math.round(image.similarity_score * 100)}%
+                                    <div className="flex-1 min-w-0">
+                                      <div className="text-white text-sm font-medium line-clamp-2 mb-1" title={image.title}>
+                                        {image.title}
+                                      </div>
+                                      <div className="flex items-center justify-between text-xs mb-1">
+                                        <span className="text-gray-400 truncate">{image.source}</span>
+                                        <span className="text-green-300 font-semibold">{image.price}</span>
+                                      </div>
+                                      <div className="flex flex-wrap gap-1 text-xs">
+                                        {image.partNumber && (
+                                          <span className="text-yellow-300 bg-yellow-600/20 px-2 py-0.5 rounded">
+                                            #{image.partNumber}
+                                          </span>
+                                        )}
+                                        {image.condition && (
+                                          <span className="text-green-300 bg-green-600/20 px-2 py-0.5 rounded">
+                                            {image.condition}
+                                          </span>
+                                        )}
+                                        {image.shipping && (
+                                          <span className="text-blue-300 bg-blue-600/20 px-2 py-0.5 rounded truncate">
+                                            {image.shipping}
+                                          </span>
+                                        )}
+                                      </div>
+                                    </div>
+                                    <div className="flex flex-col items-end space-y-1 flex-shrink-0">
+                                      <span className="text-xs text-blue-300 font-medium">
+                                        {Math.round((image.similarity_score || 0) * 100)}% match
                                       </span>
                                       {image.metadata?.link && (
-                                        <ExternalLink className="w-3 h-3 text-blue-400" />
+                                        <div className="flex items-center text-xs text-blue-400 hover:text-blue-300">
+                                          <ExternalLink className="w-3 h-3 mr-1" />
+                                          View
+                                        </div>
                                       )}
                                     </div>
                                   </motion.div>
                                 ))}
                               </div>
+                              {analysisResults.similarImages.length > 10 && (
+                                <div className="text-center mt-3 pt-3 border-t border-white/10">
+                                  <span className="text-gray-400 text-xs">
+                                    +{analysisResults.similarImages.length - 10} more results available
+                                  </span>
+                                </div>
+                              )}
                             </motion.div>
                           )}
 

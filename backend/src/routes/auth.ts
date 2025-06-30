@@ -51,8 +51,9 @@ router.post('/register', authLimiter, registerValidation, async (req: Request, r
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
       return res.status(400).json({
+        success: false,
         error: 'Validation failed',
-        details: errors.array()
+        message: errors.array()[0].msg
       });
     }
 
@@ -69,25 +70,46 @@ router.post('/register', authLimiter, registerValidation, async (req: Request, r
     });
 
     // Check if user already exists in auth
-    const { data: existingAuthUser } = await supabase.auth.admin.listUsers();
+    const { data: existingAuthUser, error: authCheckError } = await supabase.auth.admin.listUsers();
+    
+    if (authCheckError) {
+      console.error('Auth check error:', authCheckError);
+      return res.status(500).json({
+        success: false,
+        error: 'Registration failed',
+        message: 'Failed to check existing users'
+      });
+    }
+    
     const userExists = existingAuthUser?.users?.find(user => user.email === email);
     
     if (userExists) {
       return res.status(409).json({
+        success: false,
         error: 'User already exists',
         message: 'An account with this email already exists'
       });
     }
 
     // Check if profile already exists (additional safety check)
-    const { data: existingProfile } = await supabase
+    const { data: existingProfile, error: profileCheckError } = await supabase
       .from('profiles')
       .select('id, email')
       .eq('email', email)
       .single();
 
+    if (profileCheckError && profileCheckError.code !== 'PGRST116') { // PGRST116 means no rows found
+      console.error('Profile check error:', profileCheckError);
+      return res.status(500).json({
+        success: false,
+        error: 'Registration failed',
+        message: 'Failed to check existing profile'
+      });
+    }
+
     if (existingProfile) {
       return res.status(409).json({
+        success: false,
         error: 'User already exists',
         message: 'An account with this email already exists'
       });
@@ -107,6 +129,7 @@ router.post('/register', authLimiter, registerValidation, async (req: Request, r
     if (authError) {
       console.error('Auth creation error:', authError);
       return res.status(400).json({
+        success: false,
         error: 'Registration failed',
         message: authError.message
       });
@@ -114,6 +137,7 @@ router.post('/register', authLimiter, registerValidation, async (req: Request, r
 
     if (!authData?.user?.id) {
       return res.status(500).json({
+        success: false,
         error: 'Registration failed',
         message: 'Failed to create user account'
       });
@@ -137,42 +161,6 @@ router.post('/register', authLimiter, registerValidation, async (req: Request, r
     if (profileError) {
       console.error('Profile creation error:', profileError);
       
-      // If it's a duplicate key error, the user might already exist
-      if (profileError.code === '23505') {
-        // Check if profile exists and return it
-        const { data: existingProfile } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', authData.user.id)
-          .single();
-        
-        if (existingProfile) {
-          // Generate JWT token for existing user
-          const token = jwt.sign(
-            { 
-              userId: existingProfile.id,
-              email: existingProfile.email,
-              role: existingProfile.role
-            },
-            process.env.JWT_SECRET!,
-            { expiresIn: '7d' }
-          );
-
-          return res.status(200).json({
-            message: 'User already exists, logged in successfully',
-            token,
-            user: {
-              id: existingProfile.id,
-              email: existingProfile.email,
-              full_name: existingProfile.full_name,
-              company: existingProfile.company,
-              role: existingProfile.role,
-              created_at: existingProfile.created_at
-            }
-          });
-        }
-      }
-      
       // Clean up auth user if profile creation fails
       try {
         await supabase.auth.admin.deleteUser(authData.user.id);
@@ -181,6 +169,7 @@ router.post('/register', authLimiter, registerValidation, async (req: Request, r
       }
       
       return res.status(500).json({
+        success: false,
         error: 'Registration failed',
         message: 'Failed to create user profile'
       });
@@ -198,6 +187,7 @@ router.post('/register', authLimiter, registerValidation, async (req: Request, r
     );
 
     return res.status(201).json({
+      success: true,
       message: 'Registration successful',
       token,
       user: {
@@ -213,6 +203,7 @@ router.post('/register', authLimiter, registerValidation, async (req: Request, r
   } catch (error) {
     console.error('Registration error:', error);
     return res.status(500).json({
+      success: false,
       error: 'Internal server error',
       message: 'An unexpected error occurred during registration'
     });

@@ -210,7 +210,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Debug logging
       console.log('🔍 AuthContext signUp called with:', {
         email,
-        password: password ? '[HIDDEN]' : 'EMPTY',
+        hasPassword: !!password,
         metadata
       });
 
@@ -230,18 +230,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       console.log('🔍 API Response:', response);
 
-      if (response.success && response.data) {
-        handleAuthSuccess(response.data)
-        toast.success('Account created successfully!')
-      } else {
+      if (!response.success) {
         throw new Error(response.error || 'Registration failed')
       }
-    } catch (error) {
-      const authError = {
-        message: error instanceof Error ? error.message : 'Registration failed'
+
+      if (response.data) {
+        // Only set user and token if we have valid data
+        handleAuthSuccess(response.data)
+        toast.success('Account created successfully!')
+        return response.data
+      } else {
+        throw new Error('Invalid response data')
       }
-      setError(authError)
-      toast.error(authError.message)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Registration failed'
+      console.error('Registration error:', error)
+      setError({ message })
+      toast.error(message)
       throw error
     } finally {
       setIsLoading(false)
