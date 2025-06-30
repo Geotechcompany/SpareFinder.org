@@ -26,6 +26,17 @@ const Register = () => {
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    // Debug logging
+    console.log('🔍 Form data before submission:', formData);
+    console.log('🔍 Data being sent to signUp:', {
+      email: formData.email,
+      password: formData.password,
+      metadata: {
+        full_name: formData.name,
+        company: formData.company,
+      }
+    });
+    
     if (formData.password !== formData.confirmPassword) {
       toast.error('Passwords do not match');
       return;
@@ -36,12 +47,18 @@ const Register = () => {
       return;
     }
 
+    // Additional validation for name
+    if (!formData.name || formData.name.trim().length < 2) {
+      toast.error('Please enter your full name (at least 2 characters)');
+      return;
+    }
+
     setIsLoading(true);
     
     try {
       await signUp(formData.email, formData.password, {
-        full_name: formData.name,
-        company: formData.company,
+        full_name: formData.name.trim(),
+        company: formData.company.trim(),
       });
       
       toast.success('Registration successful! Please check your email for verification.');

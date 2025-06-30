@@ -12,9 +12,32 @@ const router = Router();
 const registerValidation = [
   body('email').isEmail().normalizeEmail().withMessage('Please provide a valid email'),
   body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters long'),
-  body('full_name').trim().isLength({ min: 2 }).withMessage('Full name must be at least 2 characters long'),
+  body('full_name')
+    .optional()
+    .trim()
+    .isLength({ min: 2 })
+    .withMessage('Full name must be at least 2 characters long'),
+  body('name')
+    .optional()
+    .trim()
+    .isLength({ min: 2 })
+    .withMessage('Name must be at least 2 characters long'),
   body('company').optional().trim().isLength({ min: 2 }).withMessage('Company name must be at least 2 characters long')
-];
+].concat([
+  // Custom validation to ensure either 'name' or 'full_name' is provided
+  body().custom((body) => {
+    if (!body.full_name && !body.name) {
+      throw new Error('Either full_name or name is required');
+    }
+    if (body.full_name && body.full_name.trim().length < 2) {
+      throw new Error('Full name must be at least 2 characters long');
+    }
+    if (body.name && body.name.trim().length < 2) {
+      throw new Error('Name must be at least 2 characters long');
+    }
+    return true;
+  })
+]);
 
 const loginValidation = [
   body('email').isEmail().normalizeEmail().withMessage('Please provide a valid email'),
@@ -33,7 +56,17 @@ router.post('/register', authLimiter, registerValidation, async (req: Request, r
       });
     }
 
-    const { email, password, full_name, company } = req.body;
+    const { email, password, full_name, name, company } = req.body;
+
+    // Use full_name if provided, otherwise use name (for backward compatibility)
+    const userName = full_name || name;
+
+    console.log('📝 Registration request:', {
+      email,
+      userName,
+      company: company || 'None',
+      hasPassword: !!password
+    });
 
     // Check if user already exists in auth
     const { data: existingAuthUser } = await supabase.auth.admin.listUsers();
@@ -65,7 +98,7 @@ router.post('/register', authLimiter, registerValidation, async (req: Request, r
       email,
       password,
       user_metadata: {
-        full_name,
+        full_name: userName,
         company: company || null
       },
       email_confirm: true // Auto-confirm for now
@@ -92,7 +125,7 @@ router.post('/register', authLimiter, registerValidation, async (req: Request, r
       .upsert({
         id: authData.user.id,
         email,
-        full_name,
+        full_name: userName,
         company: company || null,
         role: 'user'
       }, {
