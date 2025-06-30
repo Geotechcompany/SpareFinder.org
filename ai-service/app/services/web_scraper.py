@@ -1431,6 +1431,24 @@ class AutomotivePartsScraper:
         except Exception as e:
             logger.error(f"❌ Google Search API test failed: {e}")
 
+    async def initialize(self):
+        """Initialize the automotive parts scraper."""
+        logger.info("AutomotivePartsScraper initialized")
+        return True
+    
+    async def search_automotive_part(self, part_name: str) -> List[Dict[str, Any]]:
+        """Search for automotive parts - alias for search_parts."""
+        return await self.search_parts(part_name, max_sites=1)  # Only eBay UK
+    
+    async def cleanup(self):
+        """Cleanup automotive parts scraper resources."""
+        try:
+            if hasattr(self, 'driver') and self.driver:
+                self.driver.quit()
+            logger.info("AutomotivePartsScraper cleanup completed")
+        except Exception as e:
+            logger.error(f"Error during AutomotivePartsScraper cleanup: {e}")
+
 
 # Create WebScraper alias for compatibility
 class WebScraper(AutomotivePartsScraper):
