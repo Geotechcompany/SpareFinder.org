@@ -23,7 +23,7 @@ except ImportError as e:
 
 # Import web scraper
 try:
-    from .web_scraper import WebScraper
+    from .web_scraper import get_automotive_scraper
     WEB_SCRAPER_AVAILABLE = True
 except ImportError as e:
     logging.warning(f"Web scraper import failed: {str(e)}")
@@ -78,7 +78,7 @@ class AIService:
             # Initialize web scraper if available
             if self.web_scraper_available:
                 logger.info("Initializing web scraper...")
-                self.web_scraper = WebScraper()
+                self.web_scraper = get_automotive_scraper()
                 await self.web_scraper.initialize()
                 logger.info("Web scraper initialized successfully")
             

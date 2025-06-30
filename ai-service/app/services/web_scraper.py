@@ -44,11 +44,12 @@ class AutomotivePartsScraper:
         self.google_search_enabled = bool(self.google_api_key and self.google_search_engine_id)
         
         if self.google_search_enabled:
-            logger.info("Google Search API enabled - testing connection...")
-            # Test Google Search API connection
-            asyncio.create_task(self._test_google_search_api())
+            logger.info("Google Search API enabled - will test connection on first use")
         else:
             logger.info("Google Search API not configured - will use direct site scraping only")
+        
+        # Flag to track if Google API has been tested
+        self._google_api_tested = False
         
         # Enhanced Chrome options with maximum stealth
         self.chrome_options = Options()
@@ -1123,6 +1124,11 @@ class AutomotivePartsScraper:
         if not self.google_api_key or not self.google_search_engine_id:
             logger.warning("Google Search API credentials not configured")
             return []
+        
+        # Test Google API on first use
+        if not self._google_api_tested:
+            await self._test_google_search_api()
+            self._google_api_tested = True
             
         try:
             # Construct enhanced search queries for automotive parts
@@ -1392,10 +1398,6 @@ class AutomotivePartsScraper:
         
         return results
 
-
-
-
-
     async def _test_google_search_api(self):
         """Test Google Search API connectivity and configuration."""
         try:
@@ -1452,5 +1454,12 @@ class WebScraper(AutomotivePartsScraper):
         except Exception as e:
             logger.error(f"Error during WebScraper cleanup: {e}")
 
-# Global instance
-automotive_scraper = AutomotivePartsScraper() 
+# Global instance - will be created lazily to avoid event loop issues
+automotive_scraper = None
+
+def get_automotive_scraper():
+    """Get or create the global automotive scraper instance."""
+    global automotive_scraper
+    if automotive_scraper is None:
+        automotive_scraper = AutomotivePartsScraper()
+    return automotive_scraper 
