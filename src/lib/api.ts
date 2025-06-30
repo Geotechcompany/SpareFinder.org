@@ -47,8 +47,17 @@ export interface User {
 
 export interface AuthResponse {
   token: string;
-  user: User;
-  message: string;
+  user: {
+    id: string;
+    email: string;
+    full_name: string;
+    company?: string;
+    role: string;
+    created_at: string;
+  };
+  success: boolean;
+  message?: string;
+  error?: string;
 }
 
 export interface LoginRequest {
@@ -179,16 +188,41 @@ class ApiClient {
   }
 
   async register(userData: RegisterRequest): Promise<ApiResponse<AuthResponse>> {
-    const response = await this.request<AuthResponse>('/api/auth/register', {
-      method: 'POST',
-      body: JSON.stringify(userData),
-    });
-
-    if (response.success && response.data?.token) {
-      this.setToken(response.data.token);
+    try {
+      const response = await this.request<AuthResponse>('/api/auth/register', {
+        method: 'POST',
+        body: JSON.stringify(userData),
+      });
+      
+      console.log('🔍 API Register Response:', response.data);
+      
+      // If we have a successful response with token
+      if (response.data && response.data.success && response.data.token) {
+        // Save token to localStorage
+        this.setToken(response.data.token);
+        
+        return {
+          success: true,
+          data: response.data
+        };
+      }
+      
+      // If we have an error message in the response
+      if (response.data && !response.data.success) {
+        throw new Error(response.data.message || response.data.error || 'Registration failed');
+      }
+      
+      // Fallback error
+      throw new Error('Invalid registration response');
+    } catch (error: any) {
+      console.error('❌ Registration error:', error);
+      // Handle both axios error responses and regular errors
+      const errorMessage = error.response?.data?.message || error.response?.data?.error || error.message || 'Registration failed';
+      return {
+        success: false,
+        error: errorMessage
+      };
     }
-
-    return response;
   }
 
   async logout(): Promise<ApiResponse> {
@@ -478,18 +512,14 @@ export const api = {
         error: 'Invalid login response'
       };
     },
-    register: async (userData: { email: string; password: string; full_name: string; company?: string }) => {
+    register: async (userData: { email: string; password: string; full_name: string; company?: string }): Promise<ApiResponse<AuthResponse>> => {
       try {
         const response = await client.post<any>(endpoints.auth.register, userData);
-        console.log('API Register Response:', response.data);
+        console.log('🔍 API Register Response:', response.data);
         
-        if (!response.data) {
-          throw new Error('Invalid registration response');
-        }
-        
-        // Backend returns { token, user, message } directly
-        if (response.data.token) {
-          // Save token to localStorage for the class-based client
+        // If we have a successful response with token
+        if (response.data && response.data.success && response.data.token) {
+          // Save token to localStorage
           localStorage.setItem('auth_token', response.data.token);
           
           return {
@@ -498,13 +528,20 @@ export const api = {
           };
         }
         
-        // If we get here, something went wrong
-        throw new Error(response.data.error || response.data.message || 'Registration failed');
+        // If we have an error message in the response
+        if (response.data && !response.data.success) {
+          throw new Error(response.data.message || response.data.error || 'Registration failed');
+        }
+        
+        // Fallback error
+        throw new Error('Invalid registration response');
       } catch (error: any) {
-        console.error('Registration error:', error);
+        console.error('❌ Registration error:', error);
+        // Handle both axios error responses and regular errors
+        const errorMessage = error.response?.data?.message || error.response?.data?.error || error.message || 'Registration failed';
         return {
           success: false,
-          error: error.response?.data?.message || error.message || 'Registration failed'
+          error: errorMessage
         };
       }
     },

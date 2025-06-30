@@ -202,10 +202,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setError(null)
   }
 
-  const signUp = async (email: string, password: string, metadata?: { [key: string]: any }) => {
+  const signUp = async (email: string, password: string, metadata?: { [key: string]: any }): Promise<void> => {
     try {
-      setIsLoading(true)
-      setError(null)
+      setIsLoading(true);
+      setError(null);
 
       // Debug logging
       console.log('🔍 AuthContext signUp called with:', {
@@ -226,32 +226,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         password: '[HIDDEN]'
       });
 
-      const response = await api.auth.register(registrationData)
+      const response = await api.auth.register(registrationData);
 
       console.log('🔍 API Response:', response);
 
       if (!response.success) {
-        throw new Error(response.error || 'Registration failed')
+        throw new Error(response.error || 'Registration failed');
       }
 
       if (response.data) {
         // Only set user and token if we have valid data
-        handleAuthSuccess(response.data)
-        toast.success('Account created successfully!')
-        return response.data
+        handleAuthSuccess(response.data);
+        toast.success('Account created successfully!');
       } else {
-        throw new Error('Invalid response data')
+        throw new Error('Invalid response data');
       }
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Registration failed'
-      console.error('Registration error:', error)
-      setError({ message })
-      toast.error(message)
-      throw error
+      const message = error instanceof Error ? error.message : 'Registration failed';
+      console.error('❌ Registration error:', error);
+      setError({ message });
+      toast.error(message);
+      throw error;
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }
+  };
 
   const signIn = async (email: string, password: string) => {
     try {
