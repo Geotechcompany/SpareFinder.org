@@ -71,7 +71,10 @@ RUN useradd -m -u 1000 appuser && \
 
 # Copy requirements first (for better caching)
 COPY ai-service/requirements.txt ./
+
+# Install Python dependencies with proper order for NumPy compatibility
 RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir "numpy>=1.21.0,<2.0.0" && \
     pip install --no-cache-dir -r requirements.txt
 
 # Copy application code
