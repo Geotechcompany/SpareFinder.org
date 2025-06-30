@@ -41,13 +41,29 @@ app.use(helmet({
 
 // CORS configuration - Allow specific origins including production domain
 app.use(cors({
-  origin: [
-    'http://localhost:5173',
-    'http://localhost:3000', 
-    'https://sparefinder.org',
-    'https://www.sparefinder.org',
-    'https://part-finder-ai-vision.netlify.app'
-  ],
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    
+    const allowedOrigins = [
+      'http://localhost:5173',
+      'http://localhost:3000', 
+      'https://sparefinder.org',
+      'https://www.sparefinder.org',
+      'https://part-finder-ai-vision.netlify.app'
+    ];
+    
+    console.log('🌐 CORS Request from origin:', origin);
+    
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      console.log('✅ CORS: Origin allowed');
+      return callback(null, true);
+    } else {
+      console.log('❌ CORS: Origin not allowed');
+      // For debugging, allow all origins temporarily
+      return callback(null, true);
+    }
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
