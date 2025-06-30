@@ -2,7 +2,7 @@ import { useState, useCallback, useRef } from 'react';
 import { toast } from '@/hooks/use-toast';
 import { validateImageFile, type ProcessedImage, type ImageProcessingOptions } from '@/lib/imageService';
 import { config } from '@/lib/config';
-import { apiClient } from '@/lib/api';
+import { api } from '@/lib/api';
 
 export interface UploadedFile {
   id: string;
@@ -360,16 +360,8 @@ export const useFileUpload = (options: UseFileUploadOptions = {}): UseFileUpload
     setError(null);
 
     try {
-      const formData = new FormData();
-      formData.append('file', file);
-
-      const response = await apiClient.post('/api/upload', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      });
-
-      return response.data;
+      const response = await api.upload.image(file);
+      return response;
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to upload file';
       setError(errorMessage);

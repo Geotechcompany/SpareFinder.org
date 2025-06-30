@@ -230,7 +230,7 @@ class GoogleVisionService:
     def _identify_from_labels(self, labels: List[Dict], description: str) -> Dict[str, Any]:
         """Identify part from Google Vision labels."""
         if not labels:
-            return None
+            return self._create_generic_identification(description, [])
         
         # First, try to extract part name from detected text
         text_part_name = self._extract_part_name_from_text(description)
@@ -256,8 +256,9 @@ class GoogleVisionService:
         else:
             # Fall back to labels, but skip generic ones
             part_name = self._get_meaningful_label(labels)
-            # Use vision API's confidence score
-            confidence = labels[0].get('score', 0) * 100 + 10
+            # Use vision API's confidence score if available, otherwise use base confidence
+            first_label = next((label for label in labels if label.get('score')), None)
+            confidence = (first_label.get('score', 0) * 100 + 10) if first_label else 35.0
         
         # Determine category and price range
         category = self._determine_category(part_name, description)
