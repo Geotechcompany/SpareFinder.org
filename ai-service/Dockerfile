@@ -110,4 +110,4 @@ CMD gunicorn \
     --worker-class uvicorn.workers.UvicornWorker \
     --worker-tmp-dir /dev/shm \
     --log-file - \
-    start:app 
+    app.main:app 
