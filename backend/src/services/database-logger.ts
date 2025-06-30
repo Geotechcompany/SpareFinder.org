@@ -1,10 +1,26 @@
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.SUPABASE_URL!;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 // Create Supabase client with service role key for database operations
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
+let supabase: ReturnType<typeof createClient> | null = null;
+
+// Initialize Supabase client only if environment variables are available
+if (supabaseUrl && supabaseServiceKey) {
+  try {
+    supabase = createClient(supabaseUrl, supabaseServiceKey);
+    console.log('✅ Supabase client initialized successfully');
+  } catch (error) {
+    console.error('❌ Failed to initialize Supabase client:', error);
+  }
+} else {
+  console.warn('⚠️ Supabase environment variables not found. Database logging will be disabled.');
+  console.warn('Missing variables:', {
+    SUPABASE_URL: !!supabaseUrl,
+    SUPABASE_SERVICE_ROLE_KEY: !!supabaseServiceKey
+  });
+}
 
 export interface PartSearchData {
   id: string; // AI service request_id
@@ -46,6 +62,11 @@ export class DatabaseLogger {
    */
   static async logPartSearch(data: PartSearchData): Promise<{ success: boolean; error?: string }> {
     try {
+      if (!supabase) {
+        console.warn('⚠️ Supabase not initialized. Skipping database logging.');
+        return { success: false, error: 'Database not available' };
+      }
+
       console.log('🗄️ Logging part search to database:', {
         id: data.id,
         user_id: data.user_id,
@@ -64,7 +85,7 @@ export class DatabaseLogger {
           predictions: data.predictions || [],
           confidence_score: data.confidence_score || 0,
           processing_time: data.processing_time || 0,
-          ai_model_version: data.ai_model_version || 'Google Vision API v1',
+          ai_model_version: data.ai_model_version || 'SpareFinder AI v1',
           similar_images: data.similar_images || [],
           web_scraping_used: data.web_scraping_used || false,
           sites_searched: data.sites_searched || 0,
@@ -97,6 +118,11 @@ export class DatabaseLogger {
    */
   static async logSearchHistory(data: SearchHistoryData): Promise<{ success: boolean; error?: string }> {
     try {
+      if (!supabase) {
+        console.warn('⚠️ Supabase not initialized. Skipping search history logging.');
+        return { success: false, error: 'Database not available' };
+      }
+
       const { error } = await supabase
         .from('user_search_history')
         .insert({
@@ -129,6 +155,11 @@ export class DatabaseLogger {
    */
   static async getUserStatistics(userId: string): Promise<any> {
     try {
+      if (!supabase) {
+        console.warn('⚠️ Supabase not initialized. Cannot get user statistics.');
+        return null;
+      }
+
       const { data, error } = await supabase
         .from('user_statistics')
         .select('*')
@@ -163,6 +194,11 @@ export class DatabaseLogger {
     }
   ): Promise<{ data: any[]; total: number; page: number; limit: number }> {
     try {
+      if (!supabase) {
+        console.warn('⚠️ Supabase not initialized. Cannot get user history.');
+        return { data: [], total: 0, page, limit };
+      }
+
       let query = supabase
         .from('part_searches')
         .select('*', { count: 'exact' })
@@ -216,6 +252,11 @@ export class DatabaseLogger {
     dateTo?: string
   ): Promise<any[]> {
     try {
+      if (!supabase) {
+        console.warn('⚠️ Supabase not initialized. Cannot get daily stats.');
+        return [];
+      }
+
       let query = supabase
         .from('daily_usage_stats')
         .select('*')
@@ -248,6 +289,11 @@ export class DatabaseLogger {
    */
   static async updateUserStatistics(userId: string): Promise<{ success: boolean; error?: string }> {
     try {
+      if (!supabase) {
+        console.warn('⚠️ Supabase not initialized. Cannot update user statistics.');
+        return { success: false, error: 'Database not available' };
+      }
+
       // Get aggregated data from part_searches
       const { data: searchData, error: searchError } = await supabase
         .from('part_searches')
@@ -265,18 +311,20 @@ export class DatabaseLogger {
       // Calculate statistics
       const totalUploads = searchData.length;
       const totalSuccessful = searchData.filter(s => 
-        s.analysis_status === 'completed' && s.predictions && s.predictions.length > 0
+        s.analysis_status === 'completed' && s.predictions && Array.isArray(s.predictions) && s.predictions.length > 0
       ).length;
       const totalFailed = searchData.filter(s => s.analysis_status === 'failed').length;
       const totalWebScraping = searchData.filter(s => s.web_scraping_used).length;
       const totalSimilarParts = searchData.reduce((sum, s) => 
-        sum + (s.similar_images ? s.similar_images.length : 0), 0
+        sum + (Array.isArray(s.similar_images) ? s.similar_images.length : 0), 0
       );
-      const avgConfidence = searchData.reduce((sum, s) => sum + (s.confidence_score || 0), 0) / totalUploads;
-      const avgProcessingTime = searchData.reduce((sum, s) => sum + (s.processing_time || 0), 0) / totalUploads;
-      const lastUpload = searchData.sort((a, b) => 
-        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-      )[0]?.created_at;
+      const avgConfidence = searchData.reduce((sum, s) => sum + (typeof s.confidence_score === 'number' ? s.confidence_score : 0), 0) / totalUploads;
+      const avgProcessingTime = searchData.reduce((sum, s) => sum + (typeof s.processing_time === 'number' ? s.processing_time : 0), 0) / totalUploads;
+      const lastUpload = searchData.sort((a, b) => {
+        const dateA = typeof a.created_at === 'string' ? new Date(a.created_at).getTime() : 0;
+        const dateB = typeof b.created_at === 'string' ? new Date(b.created_at).getTime() : 0;
+        return dateB - dateA;
+      })[0]?.created_at;
 
       // Update or insert user statistics
       const { error: upsertError } = await supabase
@@ -311,6 +359,11 @@ export class DatabaseLogger {
    */
   static async deleteUserData(userId: string): Promise<{ success: boolean; error?: string }> {
     try {
+      if (!supabase) {
+        console.warn('⚠️ Supabase not initialized. Cannot delete user data.');
+        return { success: false, error: 'Database not available' };
+      }
+
       // Delete in order to respect foreign key constraints
       await supabase.from('user_search_history').delete().eq('user_id', userId);
       await supabase.from('user_statistics').delete().eq('user_id', userId);

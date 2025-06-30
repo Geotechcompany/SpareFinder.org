@@ -35,14 +35,25 @@ router.post('/register', authLimiter, registerValidation, async (req: Request, r
 
     const { email, password, full_name, company } = req.body;
 
-    // Check if user already exists
-    const { data: existingUser } = await supabase
+    // Check if user already exists in auth
+    const { data: existingAuthUser } = await supabase.auth.admin.listUsers();
+    const userExists = existingAuthUser?.users?.find(user => user.email === email);
+    
+    if (userExists) {
+      return res.status(409).json({
+        error: 'User already exists',
+        message: 'An account with this email already exists'
+      });
+    }
+
+    // Check if profile already exists (additional safety check)
+    const { data: existingProfile } = await supabase
       .from('profiles')
-      .select('id')
+      .select('id, email')
       .eq('email', email)
       .single();
 
-    if (existingUser) {
+    if (existingProfile) {
       return res.status(409).json({
         error: 'User already exists',
         message: 'An account with this email already exists'
@@ -68,25 +79,74 @@ router.post('/register', authLimiter, registerValidation, async (req: Request, r
       });
     }
 
-    // Create profile
+    if (!authData?.user?.id) {
+      return res.status(500).json({
+        error: 'Registration failed',
+        message: 'Failed to create user account'
+      });
+    }
+
+    // Create profile with upsert to handle race conditions
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
-      .insert([
-        {
-          id: authData.user.id,
-          email,
-          full_name,
-          company: company || null,
-          role: 'user'
-        }
-      ])
+      .upsert({
+        id: authData.user.id,
+        email,
+        full_name,
+        company: company || null,
+        role: 'user'
+      }, {
+        onConflict: 'id'
+      })
       .select()
       .single();
 
     if (profileError) {
       console.error('Profile creation error:', profileError);
+      
+      // If it's a duplicate key error, the user might already exist
+      if (profileError.code === '23505') {
+        // Check if profile exists and return it
+        const { data: existingProfile } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', authData.user.id)
+          .single();
+        
+        if (existingProfile) {
+          // Generate JWT token for existing user
+          const token = jwt.sign(
+            { 
+              userId: existingProfile.id,
+              email: existingProfile.email,
+              role: existingProfile.role
+            },
+            process.env.JWT_SECRET!,
+            { expiresIn: '7d' }
+          );
+
+          return res.status(200).json({
+            message: 'User already exists, logged in successfully',
+            token,
+            user: {
+              id: existingProfile.id,
+              email: existingProfile.email,
+              full_name: existingProfile.full_name,
+              company: existingProfile.company,
+              role: existingProfile.role,
+              created_at: existingProfile.created_at
+            }
+          });
+        }
+      }
+      
       // Clean up auth user if profile creation fails
-      await supabase.auth.admin.deleteUser(authData.user.id);
+      try {
+        await supabase.auth.admin.deleteUser(authData.user.id);
+      } catch (cleanupError) {
+        console.error('Failed to cleanup auth user:', cleanupError);
+      }
+      
       return res.status(500).json({
         error: 'Registration failed',
         message: 'Failed to create user profile'

@@ -40,6 +40,61 @@ import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious
 import { useFileUpload } from '@/hooks/useFileUpload';
 import { cn } from '@/lib/utils';
 
+// Image component with fallback handling
+const ImageWithFallback = ({ src, alt, className, onError }: { 
+  src: string; 
+  alt: string; 
+  className: string; 
+  onError?: () => void;
+}) => {
+  const [imageError, setImageError] = useState(false);
+  const [imageLoaded, setImageLoaded] = useState(false);
+
+  const handleImageError = () => {
+    setImageError(true);
+    onError?.();
+  };
+
+  const handleImageLoad = () => {
+    setImageLoaded(true);
+  };
+
+  if (imageError) {
+    return (
+      <div className={`${className} bg-gray-700 flex items-center justify-center text-gray-400`}>
+        <div className="text-center">
+          <div className="w-8 h-8 mx-auto mb-1 opacity-50">
+            <svg viewBox="0 0 24 24" fill="currentColor">
+              <path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/>
+            </svg>
+          </div>
+          <div className="text-xs">Image unavailable</div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className={`${className} relative`}>
+      {!imageLoaded && (
+        <div className="absolute inset-0 bg-gray-700 flex items-center justify-center">
+          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-400"></div>
+        </div>
+      )}
+      <img
+        src={src}
+        alt={alt}
+        className={`w-full h-full object-cover transition-opacity duration-200 ${
+          imageLoaded ? 'opacity-100' : 'opacity-0'
+        }`}
+        onError={handleImageError}
+        onLoad={handleImageLoad}
+        loading="lazy"
+      />
+    </div>
+  );
+};
+
 // Types for analysis functionality
 interface AnalysisProgress {
   status: string;
@@ -254,15 +309,15 @@ const Upload = () => {
 
       await new Promise(resolve => setTimeout(resolve, 600));
 
-      // Step 3: Google Vision Analysis
+      // Step 3: AI Analysis
       onProgress?.({
         status: 'ai_analysis',
-        message: 'Running Google Vision analysis...',
+        message: 'Running AI analysis...',
         progress: 35,
-        currentStep: 'Google Vision AI',
+        currentStep: 'SpareFinder AI',
         currentStepIndex: 3,
         totalSteps: 6,
-        details: 'Google Vision API analyzing automotive components and features'
+        details: 'SpareFinder AI analyzing automotive components and features'
       });
 
       await new Promise(resolve => setTimeout(resolve, 1500));
@@ -279,7 +334,7 @@ const Upload = () => {
         searchResults: {
           sitesSearched: 1,
           partsFound: 0,
-          databasesQueried: ['eBay UK Motors']
+          databasesQueried: ['Automotive Parts Database']
         }
       });
 
@@ -293,19 +348,19 @@ const Upload = () => {
         currentStep: 'Data Processing',
         currentStepIndex: 5,
         totalSteps: 6,
-        details: 'Analyzing scraped results and matching with Google Vision identification'
+        details: 'Analyzing scraped results and matching with SpareFinder AI identification'
       });
 
-      // Make the actual API call to Google Vision + Web Scraper integration
+      // Make the actual API call to SpareFinder AI + Web Scraper integration
       const response = await api.upload.image(file) as unknown as AIServiceResponse;
-      console.log('🤖 Google Vision + Web Scraper Response:', response);
+      console.log('🤖 SpareFinder AI Response:', response);
 
       if (response && response.predictions && response.predictions.length > 0) {
         const prediction = response.predictions[0];
         const identifiedPart = prediction.class_name;
         const confidence = Math.round(prediction.confidence * 100);
         
-        console.log(`✅ Google Vision identified: "${identifiedPart}" with ${confidence}% confidence`);
+        console.log(`✅ SpareFinder AI identified: "${identifiedPart}" with ${confidence}% confidence`);
         if (response.similar_images && response.similar_images.length > 0) {
           console.log(`🖼️ Found ${response.similar_images.length} similar images from web scraping`);
         }
@@ -320,11 +375,11 @@ const Upload = () => {
           totalSteps: 6,
           identifiedPart: identifiedPart,
           confidence: confidence,
-          details: 'Compiling Google Vision analysis with scraped market data',
+          details: 'Compiling SpareFinder AI analysis with scraped market data',
           searchResults: {
             sitesSearched: 1,
             partsFound: response.similar_images?.length || 0,
-            databasesQueried: ['eBay UK Motors - Live Results']
+            databasesQueried: ['Automotive Parts Database - Live Results']
           }
         });
 
@@ -340,11 +395,11 @@ const Upload = () => {
           totalSteps: 6,
           identifiedPart: identifiedPart,
           confidence: confidence,
-          details: `Google Vision + Web Scraping found ${response.similar_images?.length || 0} similar parts with pricing and availability`,
+          details: `SpareFinder AI found ${response.similar_images?.length || 0} similar parts with pricing and availability`,
           searchResults: {
             sitesSearched: 1,
             partsFound: response.similar_images?.length || 0,
-            databasesQueried: ['eBay UK Motors - Live Results']
+            databasesQueried: ['Automotive Parts Database - Live Results']
           }
         });
 
@@ -365,7 +420,7 @@ const Upload = () => {
           metadata: {
             imageSize: file.size,
             imageFormat: file.type,
-            modelVersion: response.model_version || 'Google Vision API v1',
+            modelVersion: 'SpareFinder AI v1',
             confidence: prediction.confidence * 100,
             webScrapingUsed: response.image_metadata?.web_scraping_used || false,
             sitesSearched: 1
@@ -640,7 +695,7 @@ const Upload = () => {
                   >
                     <Sparkles className="w-4 h-4 text-purple-400" />
                   </motion.div>
-                  <span className="text-purple-300 text-sm font-semibold">Google Vision AI-Powered</span>
+                  <span className="text-purple-300 text-sm font-semibold">SpareFinder AI-Powered</span>
                 </motion.div>
                 <motion.h1 
                   className="text-3xl lg:text-4xl font-bold bg-gradient-to-r from-white via-purple-200 to-blue-200 bg-clip-text text-transparent mb-3"
@@ -725,10 +780,23 @@ const Upload = () => {
                         {/* Image Preview */}
                         <div className="relative mx-auto w-full max-w-md">
                           <div className="aspect-video rounded-xl overflow-hidden border border-white/10">
-                            <img
+                            <ImageWithFallback
                               src={imagePreview}
                               alt="Uploaded part"
                               className="w-full h-full object-cover"
+                              onError={() => {
+                                const target = document.createElement('img');
+                                target.src = '/images/placeholder.png';
+                                target.alt = 'Placeholder image';
+                                target.className = 'w-full h-full object-cover';
+                                target.style.display = 'block';
+                                target.onerror = () => {
+                                  const placeholder = document.createElement('div');
+                                  placeholder.className = 'w-full h-full bg-gray-700 flex items-center justify-center text-gray-400 text-xs';
+                                  placeholder.innerHTML = '<div class="text-center"><div class="w-8 h-8 mx-auto mb-1 opacity-50"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg></div>Image unavailable</div>';
+                                  target.parentNode?.appendChild(placeholder);
+                                };
+                              }}
                             />
                           </div>
                           <div className="absolute top-2 right-2">
@@ -1247,14 +1315,10 @@ const Upload = () => {
                                 {analysisResults.similarImages.slice(0, 6).map((image, index) => (
                                   <div key={index} className="relative group">
                                     <div className="aspect-square rounded-lg overflow-hidden border border-white/10 bg-gray-800">
-                                      <img
+                                      <ImageWithFallback
                                         src={image.url}
                                         alt={image.title}
                                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
-                                        onError={(e) => {
-                                          const target = e.target as HTMLImageElement;
-                                          target.src = '/placeholder.svg';
-                                        }}
                                       />
                                     </div>
                                     <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity duration-200 rounded-lg flex flex-col justify-between p-2">
@@ -1332,14 +1396,10 @@ const Upload = () => {
                                     }}
                                   >
                                     <div className="w-12 h-12 rounded-lg overflow-hidden bg-gray-800 flex-shrink-0">
-                                      <img
+                                      <ImageWithFallback
                                         src={image.url}
                                         alt={image.title}
                                         className="w-full h-full object-cover"
-                                        onError={(e) => {
-                                          const target = e.target as HTMLImageElement;
-                                          target.src = '/placeholder.svg';
-                                        }}
                                       />
                                     </div>
                                     <div className="flex-1 min-w-0">

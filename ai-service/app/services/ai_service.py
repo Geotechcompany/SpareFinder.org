@@ -359,7 +359,7 @@ class AIService:
     
     def get_model_version(self) -> str:
         """Get the model version string."""
-        return "Google Vision API v1"
+        return "SpareFinder AI v1"
     
     async def cleanup(self) -> None:
         """Clean up resources."""

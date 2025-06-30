@@ -207,7 +207,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setIsLoading(true)
       setError(null)
 
-      const response = await api.auth.register({ email, password, name: metadata?.full_name || email })
+      const response = await api.auth.register({ 
+        email, 
+        password, 
+        full_name: metadata?.full_name || email,
+        company: metadata?.company 
+      })
 
       if (response.success && response.data) {
         handleAuthSuccess(response.data)
