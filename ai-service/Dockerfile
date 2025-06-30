@@ -49,20 +49,33 @@ RUN apt-get update && apt-get install -y \
     xvfb \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Google Chrome for Selenium web scraping
-RUN wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | apt-key add - \
-    && sh -c 'echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google-chrome.list' \
+# Install Chrome and ChromeDriver with version matching and fallback
+RUN apt-get update && apt-get install -y \
+    wget \
+    unzip \
+    xvfb \
+    curl \
+    && wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | apt-key add - \
+    && echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google-chrome.list \
     && apt-get update \
     && apt-get install -y google-chrome-stable \
-    && rm -rf /var/lib/apt/lists/*
-
-# Install ChromeDriver for Selenium
-RUN CHROMEDRIVER_VERSION="119.0.6045.105" \
-    && wget -O /tmp/chromedriver.zip "https://storage.googleapis.com/chrome-for-testing-public/${CHROMEDRIVER_VERSION}/linux64/chromedriver-linux64.zip" \
+    && CHROME_VERSION=$(google-chrome --version | cut -d " " -f3 | cut -d "." -f1-3) \
+    && echo "Chrome version: $CHROME_VERSION" \
+    && (CHROMEDRIVER_VERSION=$(curl -s "https://googlechromelabs.github.io/chrome-for-testing/LATEST_RELEASE_$CHROME_VERSION") \
+    && echo "ChromeDriver version: $CHROMEDRIVER_VERSION" \
+    && wget -O /tmp/chromedriver.zip "https://edgedl.me.gvt1.com/edgedl/chrome/chrome-for-testing/$CHROMEDRIVER_VERSION/linux64/chromedriver-linux64.zip" \
+    || (echo "Chrome for Testing API failed, using stable version" \
+    && CHROMEDRIVER_VERSION=$(curl -s "https://chromedriver.storage.googleapis.com/LATEST_RELEASE") \
+    && echo "Fallback ChromeDriver version: $CHROMEDRIVER_VERSION" \
+    && wget -O /tmp/chromedriver.zip "https://chromedriver.storage.googleapis.com/$CHROMEDRIVER_VERSION/chromedriver_linux64.zip")) \
     && unzip /tmp/chromedriver.zip -d /tmp/ \
-    && mv /tmp/chromedriver-linux64/chromedriver /usr/local/bin/ \
+    && (mv /tmp/chromedriver-linux64/chromedriver /usr/local/bin/ || mv /tmp/chromedriver /usr/local/bin/) \
+    && chmod +x /usr/local/bin/chromedriver \
     && rm -rf /tmp/chromedriver* \
-    && chmod +x /usr/local/bin/chromedriver
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/* \
+    && chromedriver --version \
+    && google-chrome --version
 
 # Create non-root user
 RUN useradd -m -u 1000 appuser && \
