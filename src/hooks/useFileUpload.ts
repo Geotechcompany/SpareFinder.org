@@ -2,7 +2,7 @@ import { useState, useCallback, useRef } from 'react';
 import { toast } from '@/hooks/use-toast';
 import { validateImageFile, type ProcessedImage, type ImageProcessingOptions } from '@/lib/imageService';
 import { config } from '@/lib/config';
-import { api } from '@/lib/api';
+import { api, apiClient } from '@/lib/api';
 
 export interface UploadedFile {
   id: string;
@@ -25,7 +25,7 @@ export interface UseFileUploadOptions {
   processingOptions?: ImageProcessingOptions;
 }
 
-interface UploadResponse {
+export interface UploadResponse {
   success: boolean;
   part_info?: {
     name: string;
@@ -45,8 +45,27 @@ interface UploadResponse {
       title: string;
       price: string;
     }>;
+    technical_description?: string;
+    material_composition?: string;
+    performance_characteristics?: string;
+    estimated_price_range?: string;
+    typical_vehicle_models?: string[];
+    replacement_frequency?: string;
+    visual_match_confidence?: number;
+    technical_identification_confidence?: number;
+    confidence_reasoning?: string;
+    additional_details?: Record<string, string>;
   };
   error?: string;
+  additional_details?: {
+    full_analysis?: string;
+    technical_specifications?: string;
+    market_information?: string;
+    confidence_reasoning?: string;
+    replacement_frequency?: string;
+    typical_vehicle_models?: string[];
+    [key: string]: any;
+  };
 }
 
 export interface UseFileUploadReturn {
@@ -361,6 +380,15 @@ export const useFileUpload = (options: UseFileUploadOptions = {}): UseFileUpload
 
     try {
       const response = await api.upload.image(file);
+      
+      // If upload was successful, refresh statistics
+      if (response.success) {
+        // Refresh statistics
+        await Promise.all([
+          api.statistics.refresh()  // Keep only the known working method
+        ]);
+      }
+      
       return response;
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to upload file';

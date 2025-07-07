@@ -6,6 +6,10 @@ from pathlib import Path
 from typing import List, Optional, Dict, Any, Union, Tuple
 from PIL import Image
 import numpy as np
+import time
+import uuid
+from datetime import datetime
+import cv2
 
 import structlog
 
@@ -13,194 +17,182 @@ from app.models.prediction import Prediction
 from app.utils.exceptions import AIServiceException
 from app.core.config import get_settings
 
-# Import Google Vision service
-try:
-    from .google_vision_service import GoogleVisionService
-    GOOGLE_VISION_AVAILABLE = True
-except ImportError as e:
-    logging.warning(f"Google Vision service import failed: {str(e)}")
-    GOOGLE_VISION_AVAILABLE = False
-
-# Import web scraper
-try:
-    from .web_scraper import get_automotive_scraper
-    WEB_SCRAPER_AVAILABLE = True
-except ImportError as e:
-    logging.warning(f"Web scraper import failed: {str(e)}")
-    WEB_SCRAPER_AVAILABLE = False
+# Import OpenAI and Google Vision Services
+from app.services.google_vision_service import GoogleVisionService
+from app.services.openai_image_analysis import OpenAIImageAnalyzer
 
 logger = structlog.get_logger()
 settings = get_settings()
 
 
 class AIService:
-    """Google Vision + Web Scraping AI service for automotive part identification."""
+    """AI Service for part recognition and analysis."""
     
     def __init__(self):
-        """Initialize the Google Vision + Web Scraping AI service."""
-        self.google_vision_service = None
-        self.web_scraper = None
-        self.is_initialized = False
-        self.web_scraper_available = WEB_SCRAPER_AVAILABLE and settings.WEB_SCRAPING_ENABLED
-        self.google_vision_available = GOOGLE_VISION_AVAILABLE
-        
-        # Initialize services status
-        if self.web_scraper_available:
-            logger.info("Web scraper available")
-        else:
-            logger.warning("Web scraper not available")
-        
-        if self.google_vision_available:
-            logger.info("Google Vision service available")
-        else:
-            logger.warning("Google Vision service not available")
+        """Initialize AI Service."""
+        self._google_vision_service = GoogleVisionService()
+        self._openai_image_analyzer = OpenAIImageAnalyzer()
     
-    async def load_model(self) -> None:
-        """Initialize Google Vision + Web Scraping services."""
+    async def load_model(self):
+        """
+        Load and initialize image analysis services.
+        """
         try:
-            if not self.google_vision_available:
-                raise AIServiceException(
-                    error_type="google_vision_unavailable",
-                    message="Google Vision service is not available",
-                    status_code=500
-                )
+            # Verify Google Vision service connection
+            logger.info("Google Vision Service initialized")
             
-            logger.info("Initializing Google Vision API service...")
-            
-            # Initialize Google Vision service
-            self.google_vision_service = GoogleVisionService()
-            
-            # Test the connection
-            connection_test = await self.google_vision_service.test_connection()
-            if not connection_test:
-                raise ValueError("Google Vision API connection test failed")
-            
-            # Initialize web scraper if available
-            if self.web_scraper_available:
-                logger.info("Initializing web scraper...")
-                self.web_scraper = get_automotive_scraper()
-                await self.web_scraper.initialize()
-                logger.info("Web scraper initialized successfully")
-            
-            self.is_initialized = True
-            logger.info("Google Vision + Web Scraping AI service initialized successfully")
-                
+            # Verify OpenAI service connection
+            logger.info("OpenAI Image Analysis Service initialized")
         except Exception as e:
-            logger.error(f"Failed to initialize services: {str(e)}")
-            raise AIServiceException(
-                error_type="service_initialization_error",
-                message=f"Failed to initialize services: {str(e)}",
-                status_code=500
-            )
+            logger.error(f"Failed to initialize image analysis service: {e}")
+            raise AIServiceException(f"Failed to initialize services: {e}")
     
-    async def predict(
-        self,
-        image: np.ndarray,
-        confidence_threshold: float = 0.5,
-        max_predictions: int = 5
-    ) -> List[Prediction]:
-        """Make predictions using Google Vision API."""
-        if not self.is_initialized:
-            raise AIServiceException(
-                error_type="model_not_ready",
-                message="Google Vision service is not initialized",
-                status_code=503
-            )
-        
-        try:
-            # Convert numpy array to PIL Image then to bytes
-            pil_image = await self._convert_numpy_to_pil(image)
-            image_bytes = await self._convert_pil_to_bytes(pil_image)
-            
-            # Use Google Vision for image analysis
-            analysis_result = await self.google_vision_service.analyze_automotive_part(image_bytes)
-            
-            # Convert Google Vision result to predictions
-            predictions = await self._convert_google_vision_to_predictions(
-                analysis_result, 
-                confidence_threshold, 
-                max_predictions
-            )
-            
-            logger.info(f"Google Vision identified {len(predictions)} automotive parts")
-            return predictions
-                
-        except Exception as e:
-            logger.error(f"Google Vision prediction failed: {str(e)}")
-            raise AIServiceException(
-                error_type="google_vision_prediction_error",
-                message=f"Google Vision prediction failed: {str(e)}",
-                status_code=500
-            )
-    
-    async def predict_with_web_scraping(
+    async def predict_with_vision(
         self,
         image: np.ndarray,
         confidence_threshold: float = 0.5,
         max_predictions: int = 5,
-        include_scraping: bool = True
+        keywords: Optional[str] = None
     ) -> Tuple[List[Prediction], List[Dict[str, Any]]]:
         """
-        Predict automotive parts using Google Vision and optionally search for similar parts via web scraping.
+        Predict automotive parts using Google Vision and OpenAI analysis.
+        
+        Args:
+            image (np.ndarray): Input image
+            confidence_threshold (float): Minimum confidence for predictions
+            max_predictions (int): Maximum number of predictions
+            keywords (Optional[str]): Additional keywords for analysis
+        
+        Returns:
+            Tuple of predictions and similar images/details
         """
         try:
-            # Get predictions from Google Vision
-            predictions = await self.predict(image, confidence_threshold, max_predictions)
+            # Convert numpy image to bytes
+            _, image_bytes = cv2.imencode('.jpg', image)
+            image_bytes = image_bytes.tobytes()
+
+            # Step 1: Analyze image using Google Vision service
+            google_vision_result = await self._google_vision_service.analyze_image(
+                image_bytes, 
+                confidence_threshold=confidence_threshold,
+                max_predictions=max_predictions
+            )
             
-            similar_images = []
+            # Step 2: Use OpenAI to enhance and validate Google Vision analysis
+            openai_analysis = await self._openai_image_analyzer.analyze_image(
+                image_bytes, 
+                google_vision_data=google_vision_result,
+                keywords=keywords
+            )
             
-            # If we have predictions and web scraping is enabled, search for similar parts
-            if predictions and include_scraping and self.web_scraper_available:
-                try:
-                    # Use the top prediction for web scraping
-                    top_prediction = predictions[0]
-                    part_name = top_prediction.class_name
-                    
-                    logger.info(f"Searching for similar parts: {part_name}")
-                    
-                    # Search for similar parts
-                    scraping_results = await self.web_scraper.search_automotive_part(part_name)
-                    
-                    if scraping_results:
-                        similar_images = scraping_results
-                        logger.info(f"Found {len(similar_images)} similar parts via web scraping")
-                    else:
-                        logger.warning("No similar parts found via web scraping")
-                        
-                except Exception as scraping_error:
-                    logger.warning(f"Web scraping failed: {str(scraping_error)}")
-                    # Continue without scraping results
+            # Prioritize OpenAI predictions if available, otherwise use Google Vision
+            if openai_analysis and openai_analysis.get('predictions'):
+                # Transform OpenAI predictions to Prediction objects
+                predictions = [
+                    Prediction(
+                        class_name=pred.get('class_name', 'Automotive Part'),
+                        confidence=pred.get('confidence', 0.0) / 100.0,  # Convert to 0-1 scale
+                        category=pred.get('category', 'Automotive Component'),
+                        description=pred.get('description', ''),
+                        manufacturer=pred.get('manufacturer', ''),
+                        part_number=None,
+                        estimated_price=pred.get('estimated_price', ''),
+                        compatibility=pred.get('compatibility', [])
+                    )
+                    for pred in openai_analysis.get('predictions', [])
+                    if pred.get('confidence', 0.0) >= (confidence_threshold * 100)
+                ][:max_predictions]
+                
+                # Prepare similar images from OpenAI analysis
+                similar_images = []
+            else:
+                # Fallback to Google Vision results
+                prediction = Prediction(
+                    class_name=google_vision_result.get('part_name', 'Automotive Part'),
+                    confidence=google_vision_result.get('confidence_score', 0.0) / 100.0,
+                    category=google_vision_result.get('technical_details', {}).get('key_components', ['Automotive Part'])[0],
+                    description=google_vision_result.get('raw_description', '')
+                )
+                
+                similar_images = [{
+                    'url': None,
+                    'metadata': {
+                        'description': google_vision_result.get('raw_description', '')
+                    },
+                    'similarity_score': google_vision_result.get('confidence_score', 0.0) / 100.0,
+                    'source': 'Google Vision',
+                    'title': google_vision_result.get('part_name', 'Automotive Part')
+                }]
+                
+                predictions = [prediction] if prediction.confidence >= confidence_threshold else []
             
             return predictions, similar_images
-            
+
         except Exception as e:
-            logger.error(f"Prediction with web scraping failed: {str(e)}")
+            logger.error(f"Multi-service prediction failed: {e}")
             raise AIServiceException(
-                error_type="prediction_with_scraping_error",
-                message=f"Prediction with web scraping failed: {str(e)}",
+                error_type="multi_service_prediction_error",
+                message=f"Failed to analyze image across services: {str(e)}",
                 status_code=500
             )
     
-    async def process_part_image(self, image_data: bytes) -> Dict[str, Any]:
+    async def process_part_image(
+        self, 
+        image_data: bytes, 
+        user_id: Optional[str] = None,
+        keywords: Optional[str] = None,
+        confidence_threshold: float = 0.3,
+        max_predictions: int = 3
+    ) -> Dict[str, Any]:
         """Process automotive part image and return comprehensive analysis."""
         try:
+            start_time = time.time()
+            
             # Convert bytes to numpy array
             image = await self._convert_bytes_to_numpy(image_data)
             
-            # Get predictions with web scraping
-            predictions, similar_images = await self.predict_with_web_scraping(
-                image=image,
-                confidence_threshold=0.3,  # Lower threshold for more results
-                max_predictions=3,
-                include_scraping=True
+            # Convert numpy image to bytes for services
+            _, image_bytes = cv2.imencode('.jpg', image)
+            image_bytes = image_bytes.tobytes()
+            
+            # Analyze image using Google Vision service
+            google_vision_result = await self._google_vision_service.analyze_image(
+                image_bytes, 
+                confidence_threshold=confidence_threshold,
+                max_predictions=max_predictions
             )
             
+            # Get predictions from Google Vision and OpenAI
+            predictions, similar_images = await self.predict_with_vision(
+                image=image,
+                confidence_threshold=confidence_threshold,
+                max_predictions=max_predictions,
+                keywords=keywords
+            )
+            
+            processing_time = time.time() - start_time
+            
             if not predictions:
+                error_msg = "No automotive parts detected in the image"
+                
                 raise AIServiceException(
                     error_type="no_predictions",
-                    message="No automotive parts detected in the image",
+                    message=error_msg,
                     status_code=400
                 )
+            
+            # Capture OpenAI analysis result
+            openai_analysis = await self._openai_image_analyzer.analyze_image(
+                image_bytes, 
+                google_vision_data=google_vision_result,
+                keywords=keywords,
+                confidence_threshold=confidence_threshold,
+                max_predictions=max_predictions
+            )
+            
+            # Calculate average confidence
+            confidence_scores = [pred.confidence for pred in predictions if pred.confidence is not None]
+            avg_confidence = sum(confidence_scores) / len(confidence_scores) if confidence_scores else 0.0
             
             # Format the response
             result = {
@@ -220,16 +212,20 @@ class AIService:
                 ],
                 "similar_images": similar_images,
                 "model_version": self.get_model_version(),
-                "processing_time": 0.0,
+                "processing_time": processing_time,
                 "image_metadata": {
-                    "web_scraping_used": len(similar_images) > 0
-                }
+                    "content_type": "image/jpeg",
+                    "size_bytes": len(image_data) if isinstance(image_data, bytes) else None
+                },
+                # Add additional details from OpenAI analysis
+                "additional_details": openai_analysis.get('additional_details', {}) if openai_analysis else {}
             }
             
             return result
             
         except Exception as e:
             logger.error(f"Failed to process part image: {str(e)}")
+            
             raise AIServiceException(
                 error_type="image_processing_error",
                 message=f"Failed to process part image: {str(e)}",
@@ -288,88 +284,29 @@ class AIService:
                 status_code=400
             )
     
-    async def _convert_google_vision_to_predictions(
-        self, 
-        analysis_result: Dict[str, Any], 
-        confidence_threshold: float, 
-        max_predictions: int
-    ) -> List[Prediction]:
-        """Convert Google Vision analysis result to predictions."""
-        try:
-            predictions = []
-            
-            # Safely extract fields with defaults
-            part_name = analysis_result.get('part_name', 'Unknown Part')
-            confidence = analysis_result.get('confidence', 35.0)
-            description = analysis_result.get('description', f'{part_name} component for general applications.')
-            category = analysis_result.get('category', 'General')
-            price_range = analysis_result.get('price_range', '£5 - £100')
-            
-            # Use a more generous confidence threshold for automotive parts
-            effective_threshold = min(confidence_threshold * 100, 30.0)  # Never require more than 30% confidence
-            
-            if confidence >= effective_threshold:
-                prediction = Prediction(
-                    class_name=part_name,
-                    confidence=confidence / 100.0,
-                    description=description,
-                    category=category,
-                    manufacturer="Unknown",
-                    part_number=await self._generate_part_number(part_name),
-                    estimated_price=price_range,
-                    compatibility=[]
-                )
-                predictions.append(prediction)
-            else:
-                # If confidence is too low, still create a prediction but with adjusted confidence
-                logger.info(f"Low confidence ({confidence:.1f}%) but creating prediction anyway")
-                prediction = Prediction(
-                    class_name=part_name,
-                    confidence=max(confidence / 100.0, 0.25),  # Minimum 25% confidence
-                    description=description,
-                    category=category,
-                    manufacturer="Unknown",
-                    part_number=await self._generate_part_number(part_name),
-                    estimated_price=price_range,
-                    compatibility=[]
-                )
-                predictions.append(prediction)
-            
-            return predictions[:max_predictions]
-            
-        except Exception as e:
-            logger.error(f"Failed to convert Google Vision result: {str(e)}")
-            logger.error(f"Analysis result was: {analysis_result}")
-            raise AIServiceException(
-                error_type="prediction_conversion_error",
-                message=f"Failed to convert Google Vision result: {str(e)}",
-                status_code=500
-            )
-    
-    async def _generate_part_number(self, class_name: str) -> str:
-        """Generate a generic part number based on class name."""
-        clean_name = class_name.upper().replace(" ", "").replace("_", "")[:8]
-        import random
-        number = random.randint(1000, 9999)
-        return f"{clean_name}-{number}"
-    
     def is_ready(self) -> bool:
         """Check if the AI service is ready to make predictions."""
-        return self.is_initialized and self.google_vision_service is not None
+        return self._google_vision_service is not None
     
     def get_model_version(self) -> str:
         """Get the model version string."""
-        return "SpareFinder AI v1"
+        return "SpareFinder AI v2 (Google Vision)"
     
     async def cleanup(self) -> None:
         """Clean up resources."""
         try:
-            if self.web_scraper:
-                await self.web_scraper.cleanup()
-            
-            if self.google_vision_service:
-                pass
-                
-            logger.info("Google Vision service cleanup completed")
+            logger.info("Google Vision Service cleanup completed")
         except Exception as e:
-            logger.error(f"Error during cleanup: {str(e)}") 
+            logger.error(f"Error during cleanup: {str(e)}")
+    
+    def get_google_vision_service(self):
+        """
+        Get the initialized Google Vision service.
+        
+        Returns:
+            GoogleVisionService: Initialized Google Vision service instance
+        """
+        return self._google_vision_service
+
+# Singleton instance
+ai_service = AIService() 

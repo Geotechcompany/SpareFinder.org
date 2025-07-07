@@ -12,6 +12,7 @@ import io
 from PIL import Image
 import requests
 import json
+import re
 
 from app.core.config import get_settings
 
@@ -206,6 +207,8 @@ class GoogleVisionService:
         best_match = self._identify_from_labels(labels, description)
         
         if best_match and best_match['confidence'] > 40:
+            # Extract technical description
+            best_match['description'] = self._extract_technical_description(best_match, description)
             return best_match
         
         # Try to identify from detected text
@@ -222,8 +225,8 @@ class GoogleVisionService:
         if not best_match or best_match['confidence'] < 25:
             best_match = self._create_generic_identification(description, labels)
         
-        # Add detailed description
-        best_match['description'] = self._generate_part_description(best_match, description[:100])
+        # Add detailed description with technical focus
+        best_match['description'] = self._extract_technical_description(best_match, description)
         
         return best_match
     
@@ -521,6 +524,47 @@ class GoogleVisionService:
             base_desc += f" Detected features: {vision_description}."
         
         return base_desc
+    
+    def _extract_technical_description(self, part_match: Dict, description: str) -> str:
+        """
+        Extract a clean, focused technical description from the analysis.
+        
+        Args:
+            part_match (Dict): The part identification dictionary
+            description (str): Full description text
+        
+        Returns:
+            str: Cleaned technical description
+        """
+        try:
+            # Remove AI inability messages and focus on technical details
+            # Use regex to extract meaningful technical content
+            technical_patterns = [
+                r'Technical\s*Specifications:(.+?)(?:\n\n|$)',  # Explicit tech specs section
+                r'Detailed\s*Description:(.+?)(?:\n\n|$)',      # Detailed description section
+                r'Component\s*Details:(.+?)(?:\n\n|$)',         # Component details section
+            ]
+            
+            for pattern in technical_patterns:
+                match = re.search(pattern, description, re.DOTALL | re.IGNORECASE)
+                if match:
+                    return match.group(1).strip()
+            
+            # Fallback: Use the generated part description with additional context
+            base_desc = self._generate_part_description(part_match, description[:100])
+            
+            # Try to extract meaningful text after the last colon
+            parts = description.split(':')
+            if len(parts) > 1:
+                technical_text = parts[-1].strip()
+                if len(technical_text) > 20:  # Ensure it's not just a few words
+                    return f"{base_desc} Additional details: {technical_text}"
+            
+            return base_desc
+        
+        except Exception as e:
+            logger.warning(f"Technical description extraction error: {e}")
+            return self._generate_part_description(part_match, description[:100])
 
     async def test_connection(self) -> bool:
         """Test Google Vision API connection."""
@@ -538,4 +582,55 @@ class GoogleVisionService:
             
         except Exception as e:
             logger.error(f"❌ Google Vision API connection test failed: {e}")
-            return False 
+            return False
+
+    async def analyze_image(
+        self, 
+        image_data: bytes, 
+        confidence_threshold: float = 0.5, 
+        max_predictions: int = 5,
+        keywords: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        Wrapper method to match the expected interface for image analysis.
+        
+        Args:
+            image_data (bytes): Image data to analyze
+            confidence_threshold (float): Minimum confidence for predictions
+            max_predictions (int): Maximum number of predictions to return
+            keywords (Optional[str]): Additional keywords for analysis
+        
+        Returns:
+            Dict with analysis results
+        """
+        try:
+            # Call the existing automotive part analysis method
+            result = await self.analyze_automotive_part(image_data)
+            
+            # Normalize confidence to be between 0 and 1
+            confidence = min(result.get('confidence', 0.0) / 100.0, 1.0)
+            
+            # Modify result to match expected output format
+            return {
+                "success": True,
+                "predictions": [{
+                    "class_name": result.get('part_name', 'Unknown Part'),
+                    "confidence": confidence,
+                    "description": result.get('description', ''),
+                    "category": result.get('category', 'General'),
+                    "manufacturer": None,
+                    "part_number": None,
+                    "estimated_price": result.get('price_range', '£5 - £100'),
+                    "compatibility": []
+                }],
+                "similar_images": [],
+                "model_version": "Google Vision v1",
+                "processing_time": 0.5,  # Placeholder processing time
+                "image_metadata": {
+                    "content_type": "image/png",
+                    "size_bytes": len(image_data)
+                }
+            }
+        except Exception as e:
+            logger.error(f"Image analysis failed: {e}")
+            raise 

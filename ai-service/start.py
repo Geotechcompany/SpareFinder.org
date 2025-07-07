@@ -15,11 +15,21 @@ import os
 import sys
 import asyncio
 from pathlib import Path
+import subprocess
+import logging
+from dotenv import load_dotenv
 
 # Add app directory to path for imports
 sys.path.append(str(Path(__file__).parent / "app"))
 
 from app.core.config import get_settings
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO, 
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
 def main():
     """Main startup function."""
@@ -135,5 +145,56 @@ def main():
     print(f"\n🚀 Starting server...")
     os.system(f"uvicorn app.main:app --host {settings.HOST} --port {settings.PORT} --reload")
 
+def start_services():
+    """
+    Start multiple AI services
+    """
+    # Load environment variables
+    load_dotenv()
+
+    # Services to start
+    services = [
+        {
+            'name': 'Main AI Service',
+            'module': 'uvicorn',
+            'args': ['app.main:app', '--host', '0.0.0.0', '--port', '8000', '--reload']
+        },
+        {
+            'name': 'OpenAI Image Analysis Service',
+            'module': 'uvicorn',
+            'args': ['openai_image_analysis:app', '--host', '0.0.0.0', '--port', '9000', '--reload']
+        }
+    ]
+
+    # Processes to track
+    processes = []
+
+    try:
+        # Start each service
+        for service in services:
+            logger.info(f"Starting {service['name']}...")
+            process = subprocess.Popen(
+                [sys.executable, '-m', service['module']] + service['args'],
+                cwd=os.path.dirname(os.path.abspath(__file__))
+            )
+            processes.append(process)
+            logger.info(f"{service['name']} started successfully.")
+
+        # Wait for all processes to complete
+        for process in processes:
+            process.wait()
+
+    except Exception as e:
+        logger.error(f"Error starting services: {e}")
+        # Terminate all processes if something goes wrong
+        for process in processes:
+            process.terminate()
+
+    except KeyboardInterrupt:
+        logger.info("Services stopped by user.")
+        # Terminate all processes on keyboard interrupt
+        for process in processes:
+            process.terminate()
+
 if __name__ == "__main__":
-    main() 
+    start_services() 

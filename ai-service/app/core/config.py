@@ -2,7 +2,7 @@ import os
 from functools import lru_cache
 from typing import List, Optional
 
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator as validator, AliasChoices
 from pydantic_settings import BaseSettings
 
 
@@ -13,7 +13,10 @@ class Settings(BaseSettings):
     HOST: str = Field(default="0.0.0.0", description="Server host")
     PORT: int = Field(default=8000, description="Server port")
     DEBUG: bool = Field(default=False, description="Debug mode")
-    ENVIRONMENT: str = Field(default="development", description="Environment (development/staging/production)")
+    ENVIRONMENT: str = Field(
+        default="development",
+        description="Application environment (development, staging, production)"
+    )
     
     # Security
     API_KEY: str = Field(description="API key for authentication")
@@ -49,20 +52,6 @@ class Settings(BaseSettings):
     SUPABASE_STORAGE_BUCKET: str = Field(
         default="part-images",
         description="Supabase storage bucket name"
-    )
-    
-    # Google APIs Configuration
-    GOOGLE_API_KEY: Optional[str] = Field(
-        default=None,
-        description="Google API key for custom search"
-    )
-    GOOGLE_SEARCH_ENGINE_ID: Optional[str] = Field(
-        default=None,
-        description="Google Custom Search Engine ID"
-    )
-    GOOGLE_VISION_API_KEY: Optional[str] = Field(
-        default=None,
-        description="Google Vision API key for image analysis"
     )
     
     # Web Scraping Configuration
@@ -115,7 +104,28 @@ class Settings(BaseSettings):
     
     # Model type validation removed - using Google Vision API only
     
-    @field_validator("ENVIRONMENT")
+    # You.com API Configuration
+    YOU_API_KEY: Optional[str] = Field(
+        default=None,
+        description="You.com API key for image analysis and web search"
+    )
+    YOU_API_BASE_URL: str = Field(
+        default="https://chat-api.you.com/smart",
+        description="Base URL for You.com API requests"
+    )
+    
+    # OpenAI API Configuration
+    OPENAI_API_KEY: Optional[str] = os.getenv('OPENAI_API_KEY', None)
+    
+    # Google Vision API Configuration
+    GOOGLE_VISION_API_KEY: Optional[str] = Field(
+        default=None, 
+        description="Google Vision API Key",
+        validation_alias=AliasChoices('GOOGLE_VISION_API_KEY', 'google_vision_api_key')
+    )
+    GOOGLE_API_KEY: Optional[str] = os.getenv('GOOGLE_API_KEY', None)
+    
+    @validator("ENVIRONMENT")
     @classmethod
     def validate_environment(cls, v):
         """Validate environment."""
@@ -124,7 +134,7 @@ class Settings(BaseSettings):
             raise ValueError(f"ENVIRONMENT must be one of: {allowed_envs}")
         return v
     
-    @field_validator("DEFAULT_CONFIDENCE_THRESHOLD")
+    @validator("DEFAULT_CONFIDENCE_THRESHOLD")
     @classmethod
     def validate_confidence_threshold(cls, v):
         """Validate confidence threshold range."""
@@ -159,14 +169,35 @@ class Settings(BaseSettings):
         """Check if web scraping is enabled."""
         return self.WEB_SCRAPING_ENABLED
     
+    # Ensure environment variables are loaded
     model_config = {
         "env_file": ".env",
         "env_file_encoding": "utf-8",
-        "case_sensitive": True
+        "case_sensitive": False,  # Make it case-insensitive
+        "extra": "ignore",
+        "env_prefix": "",  # Remove any prefix
+        "populate_by_name": True  # Allow population by field name
     }
+
+    def __init__(self, **data):
+        """Custom initialization to ensure environment variables are loaded."""
+        # Explicitly load from os.environ first
+        env_vars = {
+            k: v for k, v in os.environ.items() 
+            if k in ['GOOGLE_VISION_API_KEY', 'google_vision_api_key']
+        }
+        data.update(env_vars)
+        super().__init__(**data)
 
 
 @lru_cache()
 def get_settings() -> Settings:
     """Get cached settings instance."""
-    return Settings() 
+    settings = Settings()
+    print(f"DEBUG: Google Vision API Key: {settings.GOOGLE_VISION_API_KEY}")  # Debug print
+    
+    # Raise error if key is not set
+    if not settings.GOOGLE_VISION_API_KEY:
+        raise ValueError("GOOGLE_VISION_API_KEY must be set in .env file")
+    
+    return settings 

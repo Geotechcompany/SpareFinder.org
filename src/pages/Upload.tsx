@@ -25,11 +25,13 @@ import {
   ImagePlus,
   Loader2,
   Info,
-  Menu
+  Menu,
+  Plus,
+  ChevronDown
 } from 'lucide-react';
 import DashboardSidebar from '@/components/DashboardSidebar';
 import MobileSidebar from '@/components/MobileSidebar';
-import { apiClient, api } from '@/lib/api';
+import { apiClient } from '@/lib/api';
 import { toast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { Input } from '@/components/ui/input';
@@ -39,6 +41,11 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '@/components/ui/carousel';
 import { useFileUpload } from '@/hooks/useFileUpload';
 import { cn } from '@/lib/utils';
+import axios from 'axios';
+import { AxiosProgressEvent } from 'axios';
+import { PartDetailsAnalysis } from '@/components/PartDetailsAnalysis';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/components/ui/collapsible';
 
 // Image component with fallback handling
 const ImageWithFallback = ({ src, alt, className, onError }: { 
@@ -106,72 +113,58 @@ interface AnalysisProgress {
   totalSteps?: number;
   currentStepIndex?: number;
   details?: string;
-  searchResults?: {
-    sitesSearched: number;
-    partsFound: number;
-    databasesQueried: string[];
-  };
 }
 
 interface PartPrediction {
-  name: string;
+  class_name: string;
   confidence: number;
-  details: string;
-  partNumber?: string;
-  category?: string;
-  manufacturer?: string;
-  estimatedPrice?: string;
+  description: string;
+  category: string;
+  manufacturer: string;
+  estimated_price: string;
+  part_number?: string | null;
   compatibility?: string[];
 }
 
-interface AIServiceResponse {
-  request_id: string;
-  predictions: Array<{
-    class_name: string;
-    confidence: number;
-    part_number?: string;
-    description: string;
-    category: string;
-    manufacturer: string;
-    compatibility: string[];
-    estimated_price: string;
-  }>;
-  processing_time: number;
-  model_version: string;
-  image_metadata?: {
-    web_scraping_used: boolean;
+interface SimilarImage {
+  url: string;
+  title: string;
+  price: string;
+  metadata?: {
+    link?: string;
+    isEbay?: boolean;
+    similarity_score?: number;
+    source?: string;
   };
-  similar_images?: Array<{
-    url: string;
-    metadata: Record<string, any>;
-    similarity_score: number;
-    source: string;
-    title: string;
-    price: string;
-  }>;
+}
+
+interface AnalysisMetadata {
+  imageSize?: number;
+  imageFormat?: string;
+  modelVersion?: string;
+  confidence: number;
+  processingTime: number;
 }
 
 interface AnalysisResponse {
   success: boolean;
-  analysisId: string;
   predictions: PartPrediction[];
-  processingTime: number;
-  metadata: {
-    imageSize: number;
-    imageFormat: string;
-    modelVersion: string;
-    confidence: number;
-    webScrapingUsed?: boolean;
-    sitesSearched?: number;
+  similar_images?: any[];
+  model_version: string;
+  processing_time: number;
+  image_metadata: {
+    content_type: string;
+    size_bytes: number;
   };
-  similarImages?: Array<{
-    url: string;
-    metadata: Record<string, any>;
-    similarity_score: number;
-    source: string;
-    title: string;
-    price: string;
-  }>;
+  additional_details?: {
+    full_analysis?: string;
+    technical_specifications?: string;
+    market_information?: string;
+    confidence_reasoning?: string;
+    replacement_frequency?: string;
+    typical_vehicle_models?: string[];
+    [key: string]: any;
+  };
   error?: string;
 }
 
@@ -198,6 +191,27 @@ const pulseAnimation = {
   }
 };
 
+// Define interface for OpenAI image upload response
+interface OpenAIImageUploadResponse {
+  success: boolean;
+  predictions: Array<{
+    class_name: string;
+    confidence: number;
+    description: string;
+    category: string;
+    manufacturer: string;
+    estimated_price: string;
+    part_number?: string;
+    compatibility?: string[];
+  }>;
+  processing_time: number;
+  model_version: string;
+  image_metadata: {
+    content_type: string;
+    size_bytes: number;
+  };
+}
+
 const Upload = () => {
   const [dragActive, setDragActive] = useState(false);
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
@@ -210,7 +224,13 @@ const Upload = () => {
   const [selectedPrediction, setSelectedPrediction] = useState<PartPrediction | null>(null);
   const [partInfo, setPartInfo] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(false);
+  
+  // New state for keywords
+  const [keywords, setKeywords] = useState<string>('');
+  const [savedKeywords, setSavedKeywords] = useState<string[]>([]);
+  
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const keywordsInputRef = useRef<HTMLInputElement>(null);
 
   const { toast } = useToast();
   const { uploadFile } = useFileUpload();
@@ -223,14 +243,8 @@ const Upload = () => {
         return 'from-cyan-500 to-teal-500';
       case 'ai_analysis':
         return 'from-purple-500 to-pink-500';
-      case 'database_search':
-        return 'from-orange-500 to-red-500';
       case 'part_matching':
         return 'from-red-500 to-rose-500';
-      case 'supplier_search':
-        return 'from-green-500 to-emerald-500';
-      case 'data_enrichment':
-        return 'from-emerald-500 to-teal-500';
       case 'finalizing':
         return 'from-indigo-500 to-purple-500';
       case 'complete':
@@ -250,14 +264,8 @@ const Upload = () => {
         return <CheckCircle className="w-4 h-4" />;
       case 'ai_analysis':
         return <Brain className="w-4 h-4" />;
-      case 'database_search':
-        return <Target className="w-4 h-4" />;
       case 'part_matching':
         return <Zap className="w-4 h-4" />;
-      case 'supplier_search':
-        return <ExternalLink className="w-4 h-4" />;
-      case 'data_enrichment':
-        return <Sparkles className="w-4 h-4" />;
       case 'finalizing':
         return <RefreshCw className="w-4 h-4" />;
       case 'complete':
@@ -277,6 +285,36 @@ const Upload = () => {
     return `${symbol}${price.min} - ${symbol}${price.max}`;
   };
 
+  const extractCategory = (text: string): string => {
+    const categoryMatches = text.match(/Category:\s*([^.\n]+)/i);
+    return categoryMatches ? categoryMatches[1].trim() : 'Automotive Component';
+  };
+
+  const extractManufacturer = (text: string): string => {
+    const manufacturerMatches = text.match(/Manufacturer:\s*([^.\n]+)/i);
+    return manufacturerMatches ? manufacturerMatches[1].trim() : 'Unknown';
+  };
+
+  const extractPrice = (text: string): string => {
+    const priceMatches = text.match(/Price\s*Range:\s*([^.\n]+)/i);
+    return priceMatches ? priceMatches[1].trim() : 'Price not available';
+  };
+
+  // Add keyword functionality
+  const handleAddKeyword = () => {
+    const trimmedKeyword = keywords.trim();
+    if (trimmedKeyword && !savedKeywords.includes(trimmedKeyword)) {
+      setSavedKeywords(prev => [...prev, trimmedKeyword]);
+      setKeywords(''); // Clear input after adding
+      keywordsInputRef.current?.focus();
+    }
+  };
+
+  // Remove a specific keyword
+  const handleRemoveKeyword = (keywordToRemove: string) => {
+    setSavedKeywords(prev => prev.filter(keyword => keyword !== keywordToRemove));
+  };
+
   const analyzeImage = async (
     file: File,
     options: any = {},
@@ -294,217 +332,118 @@ const Upload = () => {
         details: 'Transferring image data and performing security checks'
       });
 
-      await new Promise(resolve => setTimeout(resolve, 800));
+      // Combine keywords from options and saved keywords
+      const combinedKeywords = [
+        ...(options.keywords || []),
+        ...savedKeywords,
+        'engine components',
+        'automotive parts'
+      ].join(', ');
 
-      // Step 2: Image validation
-      onProgress?.({
-        status: 'validating',
-        message: 'Validating image quality and format...',
-        progress: 15,
-        currentStep: 'Image Analysis',
-        currentStepIndex: 2,
-        totalSteps: 6,
-        details: 'Checking resolution, format compatibility, and image clarity'
-      });
+      // Create form data
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('keywords', combinedKeywords);
+      formData.append('confidence_threshold', '0.3');
+      formData.append('max_predictions', '3');
 
-      await new Promise(resolve => setTimeout(resolve, 600));
+      // Track upload progress
+      const config = {
+        onUploadProgress: (progressEvent: AxiosProgressEvent) => {
+          const percentCompleted = Math.round((progressEvent.loaded * 50) / (progressEvent.total || 1));
+          onProgress?.({
+            status: 'uploading',
+            message: 'Uploading image...',
+            progress: percentCompleted,
+            currentStep: 'Upload & Validation',
+            currentStepIndex: 1,
+            totalSteps: 6,
+            details: 'Transferring image data'
+          });
+        }
+      };
 
-      // Step 3: AI Analysis
+      // Step 2: AI Analysis Progress
       onProgress?.({
         status: 'ai_analysis',
-        message: 'Running AI analysis...',
-        progress: 35,
-        currentStep: 'SpareFinder AI',
-        currentStepIndex: 3,
+        message: 'Initializing AI analysis...',
+        progress: 30,
+        currentStep: 'AI Analysis',
+        currentStepIndex: 2,
         totalSteps: 6,
-        details: 'SpareFinder AI analyzing automotive components and features'
+        details: 'Analyzing image with AI services'
       });
 
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      // Call image analysis endpoint
+      const response = await apiClient.post<OpenAIImageUploadResponse>('/openai/upload/image', formData, config);
 
-      // Step 4: Web Scraping
-      onProgress?.({
-        status: 'database_search',
-        message: 'Searching automotive parts online...',
-        progress: 60,
-        currentStep: 'Web Scraping',
-        currentStepIndex: 4,
-        totalSteps: 6,
-        details: 'Searching  automotive websites for similar parts and pricing data',
-        searchResults: {
-          sitesSearched: 1,
-          partsFound: 0,
-          databasesQueried: ['Automotive Parts Database']
-        }
-      });
-
-      await new Promise(resolve => setTimeout(resolve, 1000));
-
-      // Step 5: Data Processing
-      onProgress?.({
-        status: 'data_enrichment',
-        message: 'Processing scraped data...',
-        progress: 80,
-        currentStep: 'Data Processing',
-        currentStepIndex: 5,
-        totalSteps: 6,
-        details: 'Analyzing results and matching with SpareFinder AI identification'
-      });
-
-      // Make the actual API call to SpareFinder AI + Web Scraper integration
-      const response = await api.upload.image(file) as unknown as AIServiceResponse;
-      console.log('🤖 SpareFinder AI Response:', response);
-
-      if (response && response.predictions && response.predictions.length > 0) {
-        const prediction = response.predictions[0];
-        const identifiedPart = prediction.class_name;
-        
-        // Fix confidence score calculation - ensure it's properly converted to percentage
-        let confidence = prediction.confidence;
-        if (confidence <= 1.0) {
-          confidence = Math.round(confidence * 100); // Convert decimal to percentage
-        } else {
-          confidence = Math.round(confidence); // Already in percentage
-        }
-        
-        console.log(`✅ SpareFinder AI identified: "${identifiedPart}" with ${confidence}% confidence`);
-        
-        // Enhanced similar images logging
-        if (response.similar_images && response.similar_images.length > 0) {
-          console.log(`🖼️ Found ${response.similar_images.length} similar images from web scraping`);
-          console.log('Similar images sources:', response.similar_images.map(img => img.source));
-          
-          // Log eBay specific results
-          const ebayImages = response.similar_images.filter(img => 
-            img.source && img.source.toLowerCase().includes('ebay')
-          );
-          if (ebayImages.length > 0) {
-            console.log(`🛒 Found ${ebayImages.length} eBay listings with prices`);
-          }
-        }
-
-        // Step 6: Finalizing
-        onProgress?.({
-          status: 'finalizing',
-          message: 'Finalizing analysis and generating report...',
-          progress: 95,
-          currentStep: 'Report Generation',
-          currentStepIndex: 6,
-          totalSteps: 6,
-          identifiedPart: identifiedPart,
-          confidence: confidence,
-          details: 'Compiling SpareFinder AI analysis with eBay and market data',
-          searchResults: {
-            sitesSearched: 1,
-            partsFound: response.similar_images?.length || 0,
-            databasesQueried: ['eBay UK - Live Results', 'Automotive Parts Database']
-          }
-        });
-
-        await new Promise(resolve => setTimeout(resolve, 600));
-
-        // Complete
-        onProgress?.({
-          status: 'complete',
-          message: 'Analysis complete! Part identified successfully.',
-          progress: 100,
-          currentStep: 'Complete',
-          currentStepIndex: 6,
-          totalSteps: 6,
-          identifiedPart: identifiedPart,
-          confidence: confidence,
-          details: `SpareFinder AI found ${response.similar_images?.length || 0} similar parts with pricing and availability`,
-          searchResults: {
-            sitesSearched: 1,
-            partsFound: response.similar_images?.length || 0,
-            databasesQueried: ['eBay UK - Live Results', 'Automotive Parts Database']
-          }
-        });
-
-        // Enhanced price formatting
-        const formatEstimatedPrice = (priceStr?: string) => {
-          if (!priceStr) return 'Price not available';
-          
-          // Handle various price formats from AI service
-          if (priceStr.includes('£') || priceStr.includes('$')) {
-            return priceStr; // Already formatted
-          }
-          
-          // Try to extract price range or single price
-          const priceMatch = priceStr.match(/(\d+(?:\.\d+)?)\s*-?\s*(\d+(?:\.\d+)?)?/);
-          if (priceMatch) {
-            const minPrice = parseFloat(priceMatch[1]);
-            const maxPrice = priceMatch[2] ? parseFloat(priceMatch[2]) : null;
-            
-            if (maxPrice && maxPrice > minPrice) {
-              return `£${minPrice.toFixed(2)} - £${maxPrice.toFixed(2)}`;
-            } else {
-              return `£${minPrice.toFixed(2)}`;
-            }
-          }
-          
-          return priceStr; // Return as-is if can't parse
-        };
-
-        return {
-          success: true,
-          analysisId: response.request_id || 'temp-id',
-          predictions: [{
-            name: prediction.class_name,
-            confidence: confidence, // Use the corrected confidence value
-            details: prediction.description || '',
-            partNumber: prediction.part_number,
-            category: prediction.category,
-            manufacturer: prediction.manufacturer,
-            estimatedPrice: formatEstimatedPrice(prediction.estimated_price),
-            compatibility: prediction.compatibility || []
-          }],
-          processingTime: response.processing_time || 0,
-          metadata: {
-            imageSize: file.size,
-            imageFormat: file.type,
-            modelVersion: 'SpareFinder AI v1',
-            confidence: confidence, // Use the corrected confidence value
-            webScrapingUsed: response.image_metadata?.web_scraping_used || false,
-            sitesSearched: 1
-          },
-          // Enhanced similar images with better validation
-          similarImages: response.similar_images?.map(img => ({
-            ...img,
-            // Ensure image URL is valid and accessible
-            url: img.url || '',
-            // Enhanced price formatting for similar images
-            price: img.price || 'Price not available',
-            // Ensure source is properly formatted
-            source: img.source || 'Unknown source',
-            // Add eBay-specific enhancements
-            isEbay: img.source && img.source.toLowerCase().includes('ebay'),
-            // Extract part number from metadata if available
-            partNumber: img.metadata?.part_number || img.metadata?.partNumber || null,
-            // Extract condition from metadata
-            condition: img.metadata?.condition || null,
-            // Extract shipping info
-            shipping: img.metadata?.shipping || null
-          })) || []
-        };
-      } else {
-        throw new Error('No predictions found');
+      // Check for successful response
+      if (!response.data.success || !response.data.predictions || response.data.predictions.length === 0) {
+        throw new Error('No predictions found in the image analysis');
       }
+
+      // Transform response to match existing interface
+      const analysisResults: AnalysisResponse = {
+        success: response.data.success,
+        predictions: response.data.predictions.map(prediction => ({
+          class_name: prediction.class_name || 'Automotive Component',
+          confidence: prediction.confidence || 75,
+          description: prediction.description,
+          category: prediction.category || 'Unspecified',
+          manufacturer: prediction.manufacturer || 'Unknown',
+          estimated_price: prediction.estimated_price || 'Price not available',
+          part_number: prediction.part_number,
+          compatibility: prediction.compatibility
+        })),
+        similar_images: [], // Remove similar images
+        model_version: response.data.model_version || 'SpareFinder AI v2',
+        processing_time: response.data.processing_time,
+        image_metadata: response.data.image_metadata,
+        additional_details: {
+          full_analysis: ''
+        }
+      };
+
+      // Final progress update
+      onProgress?.({
+        status: 'complete',
+        message: `Found ${analysisResults.predictions.length} potential matches`,
+        progress: 100,
+        currentStep: 'Analysis Complete',
+        currentStepIndex: 6,
+        totalSteps: 6,
+        details: 'Comprehensive part analysis finished',
+        identifiedPart: analysisResults.predictions[0]?.class_name,
+        confidence: analysisResults.predictions[0]?.confidence
+      });
+
+      return analysisResults;
     } catch (error) {
+      // Detailed error handling
+      console.error('Image analysis error:', error);
+      
+      const errorMessage = axios.isAxiosError(error) 
+        ? error.response?.data?.message || error.message
+        : error instanceof Error 
+        ? error.message 
+        : 'Unknown error occurred during image analysis';
+
       onProgress?.({
         status: 'error',
-        message: 'Analysis failed - please try again',
+        message: errorMessage,
         progress: 0,
-        currentStep: 'Error',
-        details: error instanceof Error ? error.message : 'Unknown error occurred'
+        currentStep: 'Analysis Failed',
+        currentStepIndex: 0,
+        totalSteps: 6,
+        details: 'Unable to complete image analysis'
       });
-      
-      console.error('Image analysis error:', error);
+
       toast({
         title: 'Analysis Failed',
-        description: error instanceof Error ? error.message : 'Failed to analyze image',
-        variant: 'destructive',
+        description: errorMessage,
+        variant: 'destructive'
       });
+
       return null;
     }
   };
@@ -638,7 +577,7 @@ const Upload = () => {
         }
         toast({
           title: 'Analysis Complete',
-          description: `Found ${result.predictions.length} potential matches with ${result.metadata.confidence.toFixed(1)}% confidence`,
+          description: `Found ${result.predictions.length} potential matches`,
         });
       }
     } catch (error) {
@@ -935,6 +874,56 @@ const Upload = () => {
                     )}
                   </div>
 
+                  {/* Keyword Input Section */}
+                  <div className="mb-4 space-y-2">
+                    <div className="flex space-x-2">
+                      <Input
+                        ref={keywordsInputRef}
+                        value={keywords}
+                        onChange={(e) => setKeywords(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            handleAddKeyword();
+                          }
+                        }}
+                        placeholder="Add keywords to refine analysis (e.g., brake, suspension)"
+                        className="flex-grow"
+                      />
+                      <Button 
+                        onClick={handleAddKeyword}
+                        variant="outline"
+                        className="px-4"
+                      >
+                        <Plus className="w-4 h-4 mr-2" /> Add
+                      </Button>
+                    </div>
+                    
+                    {/* Saved Keywords Display */}
+                    {savedKeywords.length > 0 && (
+                      <div className="flex flex-wrap gap-2">
+                        {savedKeywords.map((keyword, index) => (
+                          <motion.div
+                            key={index}
+                            initial={{ opacity: 0, scale: 0.8 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0, scale: 0.8 }}
+                            className="flex items-center bg-purple-600/20 text-purple-300 px-3 py-1 rounded-full text-sm"
+                          >
+                            {keyword}
+                            <Button 
+                              variant="ghost" 
+                              size="sm" 
+                              className="ml-2 p-0 h-4 w-4 hover:bg-purple-700/30"
+                              onClick={() => handleRemoveKeyword(keyword)}
+                            >
+                              <X className="w-3 h-3" />
+                            </Button>
+                          </motion.div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
                   {/* Modern Progress Bar */}
                   <AnimatePresence>
                     {isAnalyzing && analysisProgress && (
@@ -1018,66 +1007,6 @@ const Upload = () => {
                             </div>
                           )}
                         </div>
-
-                        {/* Database Search Results */}
-                        {analysisProgress.searchResults && (
-                          <motion.div
-                            initial={{ opacity: 0, scale: 0.95 }}
-                            animate={{ opacity: 1, scale: 1 }}
-                            className="grid grid-cols-3 gap-3"
-                          >
-                            <div className="bg-blue-600/10 border border-blue-500/20 rounded-lg p-3 text-center">
-                              <div className="text-blue-400 text-lg font-bold">
-                                {analysisProgress.searchResults.sitesSearched}
-                              </div>
-                              <div className="text-blue-300 text-xs">Sites Searched</div>
-                            </div>
-                            <div className="bg-green-600/10 border border-green-500/20 rounded-lg p-3 text-center">
-                              <div className="text-green-400 text-lg font-bold">
-                                {analysisProgress.searchResults.partsFound}
-                              </div>
-                              <div className="text-green-300 text-xs">Parts Found</div>
-                            </div>
-                            <div className="bg-purple-600/10 border border-purple-500/20 rounded-lg p-3 text-center">
-                              <div className="text-purple-400 text-lg font-bold">
-                                {analysisProgress.searchResults.databasesQueried.length}
-                              </div>
-                              <div className="text-purple-300 text-xs">Databases</div>
-                            </div>
-                          </motion.div>
-                        )}
-
-                        {/* Active Databases List */}
-                        {analysisProgress.searchResults?.databasesQueried && analysisProgress.searchResults.databasesQueried.length > 0 && (
-                          <motion.div
-                            initial={{ opacity: 0, y: 10 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            className="bg-gray-800/30 border border-gray-700/50 rounded-lg p-3"
-                          >
-                            <div className="text-gray-400 text-xs mb-2 flex items-center">
-                              <Target className="w-3 h-3 mr-1" />
-                              Currently Searching:
-                            </div>
-                            <div className="flex flex-wrap gap-1">
-                              {analysisProgress.searchResults.databasesQueried.map((db, index) => (
-                                <motion.span
-                                  key={index}
-                                  initial={{ opacity: 0, scale: 0.8 }}
-                                  animate={{ opacity: 1, scale: 1 }}
-                                  transition={{ delay: index * 0.1 }}
-                                  className="inline-flex items-center px-2 py-1 rounded-full bg-gradient-to-r from-blue-600/20 to-purple-600/20 border border-blue-500/30 text-blue-300 text-xs"
-                                >
-                                  <motion.div
-                                    animate={{ scale: [1, 1.2, 1] }}
-                                    transition={{ duration: 1, repeat: Infinity, delay: index * 0.2 }}
-                                    className="w-1 h-1 bg-blue-400 rounded-full mr-1"
-                                  />
-                                  {db}
-                                </motion.span>
-                              ))}
-                            </div>
-                          </motion.div>
-                        )}
 
                         {/* Identified Part Display */}
                         {analysisProgress.identifiedPart && (
@@ -1174,448 +1103,168 @@ const Upload = () => {
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <AnimatePresence mode="wait">
-                    {isAnalyzing ? (
-                      <motion.div
-                        key="analyzing"
-                        {...fadeInScale}
-                        className="flex flex-col items-center justify-center py-12 space-y-6"
+                  <div className="space-y-6">
+                    {analysisResults && analysisResults.predictions && analysisResults.predictions.length > 0 ? (
+                      <motion.div 
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.3 }}
+                        className="bg-black/20 backdrop-blur-xl border border-white/10 rounded-2xl p-6 space-y-6"
                       >
-                        <motion.div
-                          animate={{ rotate: 360 }}
-                          transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
-                          className="relative w-20 h-20"
-                        >
-                          <div className="absolute inset-0 rounded-full bg-gradient-to-r from-purple-600 to-blue-600 blur-lg opacity-50" />
-                          <div className="relative w-full h-full border-4 border-purple-600/30 border-t-purple-600 rounded-full" />
-                        </motion.div>
-                        <motion.div
-                          {...pulseAnimation}
-                          className="text-center"
-                        >
-                          <p className="text-white font-medium text-lg">Analyzing your part...</p>
-                          <p className="text-gray-400 text-sm mt-1">Our AI is processing the image</p>
-                        </motion.div>
-                      </motion.div>
-                    ) : selectedPrediction ? (
-                      <motion.div
-                        key="results"
-                        {...slideInRight}
-                        className="space-y-6"
-                      >
-                        {/* Confidence Score with Radial Progress */}
-                        <motion.div
-                          className="relative w-32 h-32 mx-auto"
-                          initial={{ scale: 0 }}
-                          animate={{ scale: 1 }}
-                          transition={{ type: "spring", stiffness: 200, damping: 15 }}
-                        >
-                          <svg className="w-full h-full" viewBox="0 0 100 100">
-                            <circle
-                              cx="50"
-                              cy="50"
-                              r="45"
-                              fill="none"
-                              stroke="rgba(74, 222, 128, 0.1)"
-                              strokeWidth="10"
-                            />
-                            <motion.circle
-                              cx="50"
-                              cy="50"
-                              r="45"
-                              fill="none"
-                              stroke="rgba(74, 222, 128, 0.5)"
-                              strokeWidth="10"
-                              strokeLinecap="round"
-                              initial={{ pathLength: 0 }}
-                              animate={{ pathLength: selectedPrediction.confidence / 100 }}
-                              transition={{ duration: 1, ease: "easeOut" }}
-                              transform="rotate(-90 50 50)"
-                              strokeDasharray="283"
-                              strokeDashoffset="0"
-                            />
-                            <text
-                              x="50"
-                              y="50"
-                              textAnchor="middle"
-                              dy="0.3em"
-                              className="text-2xl font-bold fill-green-400"
+                        {/* Part Identification Section */}
+                        <div>
+                          <div className="flex items-center justify-between mb-4">
+                            <h2 className="text-2xl font-bold text-white flex items-center">
+                              <Target className="w-6 h-6 mr-3 text-blue-400" />
+                              {analysisResults.predictions[0].class_name}
+                            </h2>
+                            <Badge 
+                              className={`
+                                ${analysisResults.predictions[0].confidence > 0.8 ? 'bg-green-600/20 text-green-300 border-green-500/30' : 
+                                  analysisResults.predictions[0].confidence > 0.5 ? 'bg-yellow-600/20 text-yellow-300 border-yellow-500/30' : 
+                                  'bg-red-600/20 text-red-300 border-red-500/30'}
+                              `}
                             >
-                              {selectedPrediction.confidence.toFixed(1)}%
-                            </text>
-                          </svg>
-                          <div className="text-green-300 text-sm text-center mt-2">Confidence Score</div>
-                        </motion.div>
+                              Confidence: {(analysisResults.predictions[0].confidence * 100).toFixed(1)}%
+                            </Badge>
+                          </div>
+                          
+                          <div className="grid md:grid-cols-2 gap-6">
+                            {/* Dynamically generate sections based on available data */}
+                            {[
+                              {
+                                title: "Part Details",
+                                icon: <Info className="w-5 h-5 mr-2 text-blue-400" />,
+                                content: [
+                                  { label: "Category", value: analysisResults.predictions[0].category },
+                                  { label: "Manufacturers", value: analysisResults.predictions[0].manufacturer },
+                                  { label: "Estimated Price", value: analysisResults.predictions[0].estimated_price },
+                                  { label: "Part Number", value: analysisResults.predictions[0].part_number || "Not Available" }
+                                ]
+                              },
+                              {
+                                title: "Description",
+                                icon: <FileText className="w-5 h-5 mr-2 text-blue-400" />,
+                                content: analysisResults.predictions[0].description
+                              }
+                            ].map((section, index) => (
+                              <div key={index} className="bg-white/5 rounded-xl p-4 border border-white/10">
+                                <h3 className="text-lg font-semibold text-blue-300 mb-2 flex items-center">
+                                  {section.icon}
+                                  {section.title}
+                                </h3>
+                                {Array.isArray(section.content) ? (
+                                  <div className="space-y-2 text-gray-300 text-sm">
+                                    {section.content.map((item, idx) => (
+                                      <p key={idx}>
+                                        <strong>{item.label}:</strong> {item.value}
+                                      </p>
+                                    ))}
+                                  </div>
+                                ) : (
+                                  <p className="text-gray-300 text-sm">{section.content}</p>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
 
-                        {/* Part Details */}
-                        <motion.div
-                          variants={{
-                            initial: { opacity: 0 },
-                            animate: { opacity: 1, transition: { staggerChildren: 0.1 } }
-                          }}
-                          initial="initial"
-                          animate="animate"
-                          className="space-y-4"
-                        >
-                          {/* Part Name */}
-                          <motion.div
-                            variants={fadeInScale}
-                            className="p-4 rounded-xl bg-gradient-to-r from-purple-600/10 to-blue-600/10 border border-white/10 hover:border-white/20 transition-colors"
-                          >
-                            <div className="flex justify-between items-start">
-                              <div className="flex-1">
-                                <div className="text-gray-400 text-sm mb-1">Part Name</div>
-                                <div className="text-white font-medium text-lg">{selectedPrediction.name}</div>
+                        {/* Compatibility Section */}
+                        {analysisResults.predictions[0].compatibility && analysisResults.predictions[0].compatibility.length > 0 && (
+                          <div className="bg-white/5 rounded-xl p-4 border border-white/10 mt-6">
+                            <h3 className="text-lg font-semibold text-blue-300 mb-2 flex items-center">
+                              <Target className="w-5 h-5 mr-2 text-blue-400" />
+                              Compatibility
+                            </h3>
+                            <div className="text-gray-300 text-sm">
+                              {analysisResults.predictions[0].compatibility.map((model, index) => (
+                                <p key={index}>• {model}</p>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Dynamically generate additional sections from additional_details */}
+                        {[
+                          {
+                            key: 'technical_specifications',
+                            title: 'Technical Specifications',
+                            icon: <Zap className="w-5 h-5 mr-2 text-blue-400" />
+                          },
+                          {
+                            key: 'market_information',
+                            title: 'Market Information',
+                            icon: <Info className="w-5 h-5 mr-2 text-blue-400" />
+                          },
+                          {
+                            key: 'confidence_reasoning',
+                            title: 'Confidence Assessment',
+                            icon: <CheckCircle className="w-5 h-5 mr-2 text-blue-400" />
+                          },
+                          {
+                            key: 'replacement_frequency',
+                            title: 'Maintenance Insights',
+                            icon: <RefreshCw className="w-5 h-5 mr-2 text-blue-400" />
+                          }
+                        ].map((section, index) => {
+                          const sectionContent = analysisResults.additional_details?.[section.key];
+                          
+                          return sectionContent ? (
+                            <div 
+                              key={index} 
+                              className="bg-white/5 rounded-xl p-4 border border-white/10 mt-6"
+                            >
+                              <h3 className="text-lg font-semibold text-blue-300 mb-2 flex items-center">
+                                {section.icon}
+                                {section.title}
+                              </h3>
+                              <div className="text-gray-300 text-sm">
+                                <p>{sectionContent}</p>
                               </div>
                             </div>
-                          </motion.div>
+                          ) : null;
+                        })}
 
-                          {/* Part Number with Copy */}
-                          {selectedPrediction.partNumber && (
-                            <motion.div
-                              variants={fadeInScale}
-                              className="p-4 rounded-xl bg-gradient-to-r from-blue-600/10 to-purple-600/10 border border-white/10 hover:border-white/20 transition-colors"
-                            >
-                              <div className="flex justify-between items-center">
-                                <div className="flex-1">
-                                  <div className="text-gray-400 text-sm mb-1">Part Number</div>
-                                  <div className="text-white font-medium font-mono">{selectedPrediction.partNumber}</div>
+                        {/* Metadata Section */}
+                        <div className="text-xs text-gray-500 text-right mt-6 space-y-1">
+                          <p><strong>Model:</strong> {analysisResults.model_version}</p>
+                          <p><strong>Processing Time:</strong> {analysisResults.processing_time.toFixed(2)} seconds</p>
+                          <p><strong>Image Size:</strong> {analysisResults.image_metadata.size_bytes} bytes</p>
+                          <p><strong>Image Type:</strong> {analysisResults.image_metadata.content_type}</p>
+                        </div>
+
+                        {/* Full Analysis Expandable Section */}
+                        {analysisResults.additional_details?.full_analysis && (
+                          <div className="mt-6 bg-white/5 rounded-xl border border-white/10">
+                            <Collapsible>
+                              <CollapsibleTrigger className="w-full">
+                                <div className="flex items-center justify-between p-4 hover:bg-white/10 transition-colors">
+                                  <div className="flex items-center">
+                                    <FileText className="w-5 h-5 mr-2 text-blue-400" />
+                                    <span className="text-blue-300 font-semibold">Full AI Analysis</span>
+                                  </div>
+                                  <ChevronDown className="w-5 h-5 text-gray-400" />
                                 </div>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => handleCopyPartNumber(selectedPrediction.partNumber || '')}
-                                  className="text-blue-400 hover:text-blue-300 hover:bg-blue-400/10 transition-colors h-8 w-8 p-0"
-                                >
-                                  <Copy className="w-4 h-4" />
-                                </Button>
-                              </div>
-                            </motion.div>
-                          )}
-
-                          {/* Category and Manufacturer */}
-                          <div className="grid grid-cols-2 gap-4">
-                            <motion.div
-                              variants={fadeInScale}
-                              className="p-4 rounded-xl bg-gradient-to-r from-green-600/10 to-emerald-600/10 border border-white/10 hover:border-white/20 transition-colors"
-                            >
-                              <div className="text-gray-400 text-sm mb-1">Category</div>
-                              <div className="text-white font-medium">{selectedPrediction.category || 'Unknown'}</div>
-                            </motion.div>
-                            <motion.div
-                              variants={fadeInScale}
-                              className="p-4 rounded-xl bg-gradient-to-r from-emerald-600/10 to-green-600/10 border border-white/10 hover:border-white/20 transition-colors"
-                            >
-                              <div className="text-gray-400 text-sm mb-1">Manufacturer</div>
-                              <div className="text-white font-medium">{selectedPrediction.manufacturer || 'Unknown'}</div>
-                            </motion.div>
+                              </CollapsibleTrigger>
+                              <CollapsibleContent>
+                                <div className="p-4 border-t border-white/10">
+                                  <pre className="text-xs text-gray-300 whitespace-pre-wrap break-words">
+                                    {analysisResults.additional_details.full_analysis}
+                                  </pre>
+                                </div>
+                              </CollapsibleContent>
+                            </Collapsible>
                           </div>
-
-                          {/* Estimated Price */}
-                          <motion.div
-                            variants={fadeInScale}
-                            className="p-4 rounded-xl bg-gradient-to-r from-yellow-600/10 to-orange-600/10 border border-white/10 hover:border-white/20 transition-colors"
-                          >
-                            <div className="text-gray-400 text-sm mb-1">Estimated Price</div>
-                            <div className="text-white font-medium text-lg">{selectedPrediction.estimatedPrice || 'Price not available'}</div>
-                          </motion.div>
-
-                          {/* Analysis Stats */}
-                          {analysisResults?.metadata && (
-                            <motion.div
-                              variants={fadeInScale}
-                              className="p-4 rounded-xl bg-gradient-to-r from-gray-600/10 to-slate-600/10 border border-white/10 hover:border-white/20 transition-colors"
-                            >
-                              <div className="text-gray-400 text-sm mb-2">Analysis Information</div>
-                              <div className="grid grid-cols-2 gap-3 text-sm">
-                                <div>
-                                  <span className="text-gray-400">Processing Time:</span>
-                                  <span className="text-white ml-2">{analysisResults.processingTime.toFixed(1)}s</span>
-                                </div>
-                                <div>
-                                  <span className="text-gray-400">Model:</span>
-                                  <span className="text-white ml-2">{analysisResults.metadata.modelVersion}</span>
-                                </div>
-                                {analysisResults.metadata.webScrapingUsed && (
-                                  <div>
-                                    <span className="text-gray-400">Sites Searched:</span>
-                                    <span className="text-white ml-2">{analysisResults.metadata.sitesSearched || 'Multiple'}</span>
-                                  </div>
-                                )}
-                                <div>
-                                  <span className="text-gray-400">Confidence:</span>
-                                  <span className="text-green-300 ml-2">{analysisResults.metadata.confidence.toFixed(1)}%</span>
-                                </div>
-                              </div>
-                            </motion.div>
-                          )}
-
-                          {/* Description */}
-                          {selectedPrediction.details && (
-                            <motion.div
-                              variants={fadeInScale}
-                              className="p-4 rounded-xl bg-gradient-to-r from-indigo-600/10 to-violet-600/10 border border-white/10 hover:border-white/20 transition-colors"
-                            >
-                              <div className="text-gray-400 text-sm mb-2">Description</div>
-                              <div className="text-white text-sm leading-relaxed">{selectedPrediction.details}</div>
-                            </motion.div>
-                          )}
-
-                          {/* Enhanced Similar Images Section with eBay Focus */}
-                          {analysisResults?.similarImages && analysisResults.similarImages.length > 0 && (
-                            <motion.div
-                              variants={fadeInScale}
-                              className="p-4 rounded-xl bg-gradient-to-r from-emerald-600/10 to-teal-600/10 border border-white/10 hover:border-white/20 transition-colors"
-                            >
-                              <div className="text-gray-400 text-sm mb-3 flex items-center justify-between">
-                                <div className="flex items-center">
-                                  <ImagePlus className="w-4 h-4 mr-2" />
-                                  Similar Parts Found ({analysisResults.similarImages.length})
-                                </div>
-                                <div className="flex items-center space-x-2">
-                                  {analysisResults.similarImages.some((img: any) => img.isEbay) && (
-                                    <span className="text-xs bg-blue-600/20 text-blue-300 px-2 py-1 rounded-full border border-blue-500/30">
-                                      eBay Results
-                                    </span>
-                                  )}
-                                </div>
-                              </div>
-                              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                                {analysisResults.similarImages.slice(0, 6).map((image: any, index) => (
-                                  <div key={index} className="relative group">
-                                    <div className="aspect-square rounded-lg overflow-hidden border border-white/10 bg-gray-800 relative">
-                                      <ImageWithFallback
-                                        src={image.url}
-                                        alt={image.title}
-                                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
-                                      />
-                                      {/* eBay Badge */}
-                                      {image.isEbay && (
-                                        <div className="absolute top-2 left-2 bg-blue-600/90 text-white text-xs px-2 py-1 rounded-full font-medium">
-                                          eBay
-                                        </div>
-                                      )}
-                                      {/* Condition Badge */}
-                                      {image.condition && (
-                                        <div className="absolute top-2 right-2 bg-green-600/90 text-white text-xs px-2 py-1 rounded-full">
-                                          {image.condition}
-                                        </div>
-                                      )}
-                                    </div>
-                                    <div className="absolute inset-0 bg-black/70 opacity-0 group-hover:opacity-100 transition-opacity duration-200 rounded-lg flex flex-col justify-between p-2">
-                                      <div className="flex justify-end">
-                                        {image.metadata?.link && (
-                                          <motion.a
-                                            href={image.metadata.link}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            whileHover={{ scale: 1.1 }}
-                                            whileTap={{ scale: 0.9 }}
-                                            className="bg-blue-600/80 hover:bg-blue-500/90 text-white p-1.5 rounded-full transition-colors"
-                                            onClick={(e) => e.stopPropagation()}
-                                          >
-                                            <ExternalLink className="w-3 h-3" />
-                                          </motion.a>
-                                        )}
-                                      </div>
-                                      <div className="space-y-1">
-                                        <div className="text-white text-xs font-medium line-clamp-2" title={image.title}>
-                                          {image.title}
-                                        </div>
-                                        <div className="flex justify-between items-center text-xs">
-                                          <span className="text-green-300 font-semibold">{image.price}</span>
-                                          <span className="text-blue-300">
-                                            {Math.round((image.similarity_score || 0) * 100)}% match
-                                          </span>
-                                        </div>
-                                        {image.partNumber && (
-                                          <div className="text-xs text-yellow-300 truncate">
-                                            Part #: {image.partNumber}
-                                          </div>
-                                        )}
-                                        {image.shipping && (
-                                          <div className="text-xs text-gray-300 truncate">
-                                            {image.shipping}
-                                          </div>
-                                        )}
-                                        <div className="flex justify-between items-center text-xs">
-                                          <span className="text-gray-300 truncate">{image.source}</span>
-                                          {image.metadata?.link && (
-                                            <span className="text-blue-400 cursor-pointer hover:text-blue-300">
-                                              View →
-                                            </span>
-                                          )}
-                                        </div>
-                                      </div>
-                                    </div>
-                                  </div>
-                                ))}
-                              </div>
-                              {analysisResults.similarImages.length > 6 && (
-                                <div className="text-center mt-3">
-                                  <span className="text-gray-400 text-xs">
-                                    +{analysisResults.similarImages.length - 6} more similar parts found
-                                  </span>
-                                </div>
-                              )}
-                            </motion.div>
-                          )}
-
-                          {/* Enhanced Detailed Similar Parts List with eBay Focus */}
-                          {analysisResults?.similarImages && analysisResults.similarImages.length > 0 && (
-                            <motion.div
-                              variants={fadeInScale}
-                              className="p-4 rounded-xl bg-gradient-to-r from-blue-600/10 to-purple-600/10 border border-white/10 hover:border-white/20 transition-colors"
-                            >
-                              <div className="text-gray-400 text-sm mb-3 flex items-center justify-between">
-                                <div className="flex items-center">
-                                  <ExternalLink className="w-4 h-4 mr-2" />
-                                  Available from Suppliers
-                                  {analysisResults.similarImages.some((img: any) => img.isEbay) && (
-                                    <span className="ml-2 text-xs bg-blue-600/20 text-blue-300 px-2 py-1 rounded-full border border-blue-500/30">
-                                      eBay Live
-                                    </span>
-                                  )}
-                                </div>
-                                <span className="text-xs">Click to view details</span>
-                              </div>
-                              <div className="space-y-2 max-h-64 overflow-y-auto">
-                                {analysisResults.similarImages.slice(0, 10).map((image: any, index) => (
-                                  <motion.div
-                                    key={index}
-                                    whileHover={{ scale: 1.02 }}
-                                    className="flex items-center space-x-3 p-3 rounded-lg bg-white/5 hover:bg-white/10 transition-colors cursor-pointer border border-white/5 hover:border-white/10"
-                                    onClick={() => {
-                                      if (image.metadata?.link) {
-                                        window.open(image.metadata.link, '_blank', 'noopener,noreferrer');
-                                      }
-                                    }}
-                                  >
-                                    <div className="w-16 h-16 rounded-lg overflow-hidden bg-gray-800 flex-shrink-0 relative">
-                                      <ImageWithFallback
-                                        src={image.url}
-                                        alt={image.title}
-                                        className="w-full h-full object-cover"
-                                      />
-                                      {image.isEbay && (
-                                        <div className="absolute bottom-0 left-0 right-0 bg-blue-600/90 text-white text-xs px-1 py-0.5 text-center">
-                                          eBay
-                                        </div>
-                                      )}
-                                    </div>
-                                    <div className="flex-1 min-w-0">
-                                      <div className="text-white text-sm font-medium line-clamp-2 mb-1" title={image.title}>
-                                        {image.title}
-                                      </div>
-                                      <div className="flex items-center justify-between text-xs mb-1">
-                                        <span className="text-gray-400 truncate">{image.source}</span>
-                                        <span className="text-green-300 font-semibold">{image.price}</span>
-                                      </div>
-                                      <div className="flex flex-wrap gap-1 text-xs">
-                                        {image.partNumber && (
-                                          <span className="text-yellow-300 bg-yellow-600/20 px-2 py-0.5 rounded">
-                                            #{image.partNumber}
-                                          </span>
-                                        )}
-                                        {image.condition && (
-                                          <span className="text-green-300 bg-green-600/20 px-2 py-0.5 rounded">
-                                            {image.condition}
-                                          </span>
-                                        )}
-                                        {image.shipping && (
-                                          <span className="text-blue-300 bg-blue-600/20 px-2 py-0.5 rounded truncate">
-                                            {image.shipping}
-                                          </span>
-                                        )}
-                                      </div>
-                                    </div>
-                                    <div className="flex flex-col items-end space-y-1 flex-shrink-0">
-                                      <span className="text-xs text-blue-300 font-medium">
-                                        {Math.round((image.similarity_score || 0) * 100)}% match
-                                      </span>
-                                      {image.metadata?.link && (
-                                        <div className="flex items-center text-xs text-blue-400 hover:text-blue-300">
-                                          <ExternalLink className="w-3 h-3 mr-1" />
-                                          View
-                                        </div>
-                                      )}
-                                    </div>
-                                  </motion.div>
-                                ))}
-                              </div>
-                              {analysisResults.similarImages.length > 10 && (
-                                <div className="text-center mt-3 pt-3 border-t border-white/10">
-                                  <span className="text-gray-400 text-xs">
-                                    +{analysisResults.similarImages.length - 10} more results available
-                                  </span>
-                                </div>
-                              )}
-                            </motion.div>
-                          )}
-
-                          {/* Actions */}
-                          <motion.div
-                            variants={fadeInScale}
-                            className="flex flex-col sm:flex-row gap-3 pt-4"
-                          >
-                            <motion.div
-                              whileHover={{ scale: 1.02 }}
-                              whileTap={{ scale: 0.98 }}
-                              className="flex-1"
-                            >
-                              <Button className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 h-12 shadow-lg shadow-purple-500/25">
-                                <Download className="w-4 h-4 mr-2" />
-                                Save Results
-                              </Button>
-                            </motion.div>
-                            <motion.div
-                              whileHover={{ scale: 1.02 }}
-                              whileTap={{ scale: 0.98 }}
-                              className="flex-1"
-                            >
-                              <Button 
-                                variant="outline" 
-                                className="w-full border-gray-600 text-gray-300 hover:bg-white/10 h-12"
-                                onClick={() => {
-                                  if (analysisResults?.similarImages && analysisResults.similarImages.length > 0) {
-                                    const firstLink = analysisResults.similarImages.find(img => img.metadata?.link)?.metadata?.link;
-                                    if (firstLink) {
-                                      window.open(firstLink, '_blank', 'noopener,noreferrer');
-                                    }
-                                  }
-                                }}
-                              >
-                                <ExternalLink className="w-4 h-4 mr-2" />
-                                Find Suppliers
-                              </Button>
-                            </motion.div>
-                          </motion.div>
-                        </motion.div>
+                        )}
                       </motion.div>
                     ) : (
-                      <motion.div
-                        key="empty"
-                        {...fadeInScale}
-                        className="flex flex-col items-center justify-center py-12 text-center"
-                      >
-                        <motion.div
-                          animate={{ 
-                            scale: [1, 1.1, 1],
-                            rotate: [0, 5, -5, 0]
-                          }}
-                          transition={{ 
-                            duration: 3,
-                            repeat: Infinity,
-                            ease: "easeInOut"
-                          }}
-                        >
-                          <FileText className="w-16 h-16 text-gray-400 mb-4" />
-                        </motion.div>
-                        <p className="text-gray-400 text-lg">Upload an image to get started</p>
-                        <p className="text-gray-500 text-sm">AI analysis will appear here</p>
-                      </motion.div>
+                      <div className="text-center text-gray-400 p-8 bg-black/20 rounded-2xl border border-white/10">
+                        <Info className="w-16 h-16 mx-auto mb-4 text-blue-400 opacity-50" />
+                        <p>No analysis results available</p>
+                        <p className="text-sm mt-2">Please upload a clear image of an automotive part</p>
+                      </div>
                     )}
-                  </AnimatePresence>
+                  </div>
                 </CardContent>
               </Card>
             </motion.div>
