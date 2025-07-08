@@ -26,7 +26,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { format } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
-import { apiClient } from '@/lib/api';
+import { api, DashboardStatsResponse, RecentUploadResponse, RecentActivityResponse, PerformanceMetricsResponse } from '@/lib/api';
 
 const Dashboard = () => {
   const [isCollapsed, setIsCollapsed] = useState(false);
@@ -85,20 +85,23 @@ const Dashboard = () => {
         setIsDataLoading(true);
         
         // Fetch dashboard stats
-        const statsResponse = await apiClient.getDashboardStats();
-        if (statsResponse.success && statsResponse.data) {
+        const statsResponse = await api.dashboard.getStats();
+        if (statsResponse.data) {
+          const { totalUploads, successfulUploads, avgConfidence, avgProcessTime } = 
+            statsResponse.data as unknown as DashboardStatsResponse;
           setStats({
-            totalUploads: statsResponse.data.totalUploads,
-            successfulUploads: statsResponse.data.successfulUploads,
-            avgConfidence: statsResponse.data.avgConfidence,
-            avgProcessTime: statsResponse.data.avgProcessTime
+            totalUploads,
+            successfulUploads,
+            avgConfidence,
+            avgProcessTime
           });
         }
 
         // Fetch recent uploads
-        const uploadsResponse = await apiClient.getRecentUploads(5);
-        if (uploadsResponse.success && uploadsResponse.data?.uploads) {
-          setRecentUploads(uploadsResponse.data.uploads.map(upload => ({
+        const uploadsResponse = await api.dashboard.getRecentUploads(5);
+        if (uploadsResponse.data) {
+          const uploads = uploadsResponse.data as unknown as RecentUploadResponse;
+          setRecentUploads(uploads.uploads.map(upload => ({
             id: upload.id,
             name: upload.image_name || 'Unknown',
             date: format(new Date(upload.created_at), 'PPp'),
@@ -108,9 +111,10 @@ const Dashboard = () => {
         }
 
         // Fetch recent activities
-        const activitiesResponse = await apiClient.getRecentActivities(5);
-        if (activitiesResponse.success && activitiesResponse.data?.activities) {
-          setRecentActivities(activitiesResponse.data.activities.map(activity => ({
+        const activitiesResponse = await api.dashboard.getRecentActivities(5);
+        if (activitiesResponse.data) {
+          const activities = activitiesResponse.data as unknown as RecentActivityResponse;
+          setRecentActivities(activities.activities.map(activity => ({
             id: activity.id,
             type: activity.resource_type,
             title: activity.action,
@@ -122,28 +126,28 @@ const Dashboard = () => {
         }
 
         // Fetch performance metrics
-        const metricsResponse = await apiClient.getPerformanceMetrics();
-        if (metricsResponse.success && metricsResponse.data) {
-          const data = metricsResponse.data;
+        const metricsResponse = await api.dashboard.getPerformanceMetrics();
+        if (metricsResponse.data) {
+          const metrics = metricsResponse.data as unknown as PerformanceMetricsResponse;
           setPerformanceMetrics([
             {
               label: 'AI Model Accuracy',
-              value: `${data.modelAccuracy.toFixed(1)}%`,
-              change: `${(data.accuracyChange > 0 ? '+' : '')}${data.accuracyChange.toFixed(1)}%`,
+              value: `${metrics.modelAccuracy.toFixed(1)}%`,
+              change: `${(metrics.accuracyChange > 0 ? '+' : '')}${metrics.accuracyChange.toFixed(1)}%`,
               icon: Cpu,
               color: 'from-green-600 to-emerald-600'
             },
             {
               label: 'Total Searches',
-              value: `${data.totalSearches}`,
-              change: `${(data.searchesGrowth > 0 ? '+' : '')}${data.searchesGrowth.toFixed(1)}%`,
+              value: `${metrics.totalSearches}`,
+              change: `${(metrics.searchesGrowth > 0 ? '+' : '')}${metrics.searchesGrowth.toFixed(1)}%`,
               icon: Database,
               color: 'from-blue-600 to-cyan-600'
             },
             {
               label: 'Response Time',
-              value: `${data.avgResponseTime}ms`,
-              change: `${(data.responseTimeChange < 0 ? '' : '+')}${data.responseTimeChange}ms`,
+              value: `${metrics.avgResponseTime}ms`,
+              change: `${(metrics.responseTimeChange < 0 ? '' : '+')}${metrics.responseTimeChange}ms`,
               icon: Activity,
               color: 'from-purple-600 to-violet-600'
             }

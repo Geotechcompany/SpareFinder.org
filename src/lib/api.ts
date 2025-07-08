@@ -6,10 +6,26 @@ const AI_SERVICE_URL = import.meta.env.VITE_AI_SERVICE_URL || 'http://localhost:
 
 // Type definitions
 export interface ApiResponse<T = any> {
-    success: boolean;
-    data?: T;
-    error?: string;
-    message?: string;
+  success?: boolean;
+  data: T & { 
+    totalUploads?: number; 
+    successfulUploads?: number; 
+    avgConfidence?: number; 
+    avgProcessTime?: number;
+    uploads?: any[];
+    activities?: any[];
+    modelAccuracy?: number;
+    accuracyChange?: number;
+    totalSearches?: number;
+    searchesGrowth?: number;
+    avgResponseTime?: number;
+    responseTimeChange?: number;
+    token?: string;
+    user?: User;
+    [key: string]: any;
+  };
+  error?: string;
+  message?: string;
 }
 
 export interface UploadResponse {
@@ -109,6 +125,52 @@ export interface AIServiceResponse {
   };
 }
 
+// Define response interfaces
+export interface DashboardStatsResponse {
+  totalUploads: number;
+  successfulUploads: number;
+  avgConfidence: number;
+  avgProcessTime: number;
+}
+
+export interface RecentUploadResponse {
+  uploads: Array<{
+    id: string;
+    image_name: string;
+    created_at: string;
+    confidence_score: number;
+  }>;
+}
+
+export interface RecentActivityResponse {
+  activities: Array<{
+    id: string;
+    resource_type: string;
+    action: string;
+    details?: {
+      description?: string;
+      confidence?: number;
+      status?: string;
+    };
+    created_at: string;
+  }>;
+}
+
+export interface PerformanceMetricsResponse {
+  modelAccuracy: number;
+  accuracyChange: number;
+  totalSearches: number;
+  searchesGrowth: number;
+  avgResponseTime: number;
+  responseTimeChange: number;
+}
+
+// Extend AxiosInstance type to include custom methods
+interface ExtendedAxiosInstance extends AxiosInstance {
+  adminLogin: (credentials: { email: string; password: string }) => Promise<ApiResponse<AuthResponse>>;
+  setToken: (token: string) => void;
+}
+
 // Create an axios instance with base configuration
 export const apiClient = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:9000',
@@ -160,13 +222,48 @@ export const endpoints = {
 } as const;
 
 // Create axios instance for new approach
-const client: AxiosInstance = axios.create({
+const client: ExtendedAxiosInstance = axios.create({
   baseURL: API_BASE_URL,
   timeout: 30000,
   headers: {
     'Content-Type': 'application/json',
   },
-});
+}) as ExtendedAxiosInstance;
+
+// Extend the client with admin login method
+client.adminLogin = async ({ email, password }: { email: string; password: string }): Promise<ApiResponse<AuthResponse>> => {
+  try {
+    const response = await client.post<ApiResponse<AuthResponse>>(endpoints.auth.login, { 
+      email, 
+      password,
+      isAdminLogin: true 
+    });
+
+    if (response.data) {
+      return {
+        success: true,
+        data: response.data as any
+      };
+    }
+
+    return {
+      success: false,
+      data: {} as any,
+      error: 'Admin login failed'
+    };
+  } catch (error: any) {
+    console.error('Admin login error:', error);
+    return {
+      success: false,
+      data: {} as any,
+      error: error.response?.data?.message || 'Admin login failed'
+    };
+  }
+};
+
+client.setToken = (token: string) => {
+  client.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+};
 
 client.interceptors.request.use((config) => {
   const token = localStorage.getItem('auth_token');
@@ -223,6 +320,7 @@ export const api = {
       
       return {
         success: false,
+        data: null,
         error: 'Invalid login response'
       };
     },
@@ -255,6 +353,7 @@ export const api = {
         const errorMessage = error.response?.data?.message || error.response?.data?.error || error.message || 'Registration failed';
         return {
           success: false,
+          data: null,
           error: errorMessage
         };
       }
@@ -345,7 +444,18 @@ export const api = {
           error: error instanceof Error ? error.message : 'Failed to refresh statistics'
         };
       }
-    }
+    },
+    getAnalytics: (timeRange: string = '30d') => 
+      client.get('/statistics/analytics', { params: { range: timeRange } })
+  },
+  dashboard: {
+    getStats: () => client.get<ApiResponse<DashboardStatsResponse>>('/dashboard/stats'),
+    getRecentUploads: (limit: number = 5) => 
+      client.get<ApiResponse<RecentUploadResponse>>('/dashboard/recent-uploads', { params: { limit } }),
+    getRecentActivities: (limit: number = 5) => 
+      client.get<ApiResponse<RecentActivityResponse>>('/dashboard/recent-activities', { params: { limit } }),
+    getPerformanceMetrics: () => 
+      client.get<ApiResponse<PerformanceMetricsResponse>>('/dashboard/performance-metrics')
   }
 };
 

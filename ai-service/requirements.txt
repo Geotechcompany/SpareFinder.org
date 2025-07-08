@@ -26,6 +26,7 @@ pydantic-settings==2.0.3
 # Database & Storage
 asyncpg==0.29.0
 supabase>=2.3.0
+supabase==1.0.3
 
 # HTTP Client for external APIs (compatible with supabase)
 httpx==0.24.1

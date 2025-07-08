@@ -2,6 +2,7 @@ import { Router, Response } from 'express';
 import { authenticateToken } from '../middleware/auth';
 import { AuthRequest } from '../types/auth';
 import { supabase } from '../server';
+import { DatabaseLogger } from '../services/database-logger';
 
 const router = Router();
 
@@ -9,106 +10,39 @@ const router = Router();
 router.get('/stats', authenticateToken, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.user!.userId;
-
-    // Get comprehensive user stats
-    const { data: userStats, error: _statsError } = await supabase
-      .from('profiles')
-      .select(`
-        id,
-        current_streak,
-        longest_streak,
-        created_at,
-        subscriptions!inner(tier, status),
-        usage_tracking!inner(searches_count, api_calls_count)
-      `)
-      .eq('id', userId)
-      .eq('usage_tracking.month', new Date().getMonth() + 1)
-      .eq('usage_tracking.year', new Date().getFullYear())
-      .single();
-
-    // Get upload statistics
-    const { data: uploads, error: uploadsError } = await supabase
-      .from('part_searches')
-      .select('id, confidence_score, processing_time, created_at, status')
-      .eq('user_id', userId);
-
-    if (uploadsError) {
-      console.error('Error fetching uploads:', uploadsError);
-      return res.status(500).json({
-        error: 'Failed to fetch upload statistics'
-      });
-    }
-
-    const allUploads = uploads || [];
-    const totalUploads = allUploads.length;
     
-    // Calculate successful uploads (confidence > 0.5)
-    const successfulUploads = allUploads.filter(upload => 
-      upload.status === 'completed' && upload.confidence_score && upload.confidence_score > 0.5
-    );
-
-    // Calculate averages
-    const avgConfidence = successfulUploads.length > 0
-      ? successfulUploads.reduce((sum, upload) => sum + (upload.confidence_score || 0), 0) / successfulUploads.length
+    // Fetch user's part search statistics
+    const { data: searches } = await DatabaseLogger.getUserHistory(userId, 1, 1000);
+    
+    const totalUploads = searches.length;
+    const successfulUploads = searches.filter(
+      search => search.analysis_status === 'completed' && 
+                search.predictions && 
+                search.predictions.length > 0
+    ).length;
+    
+    const avgConfidence = totalUploads > 0 
+      ? searches.reduce((sum, search) => sum + (search.confidence_score || 0), 0) / totalUploads * 100 
       : 0;
-
-    const avgProcessTime = allUploads.length > 0
-      ? allUploads.reduce((sum, upload) => sum + (upload.processing_time || 0), 0) / allUploads.length
+    
+    const avgProcessTime = totalUploads > 0
+      ? searches.reduce((sum, search) => sum + (search.processing_time || 0), 0) / totalUploads / 1000
       : 0;
-
-    // Calculate monthly growth
-    const now = new Date();
-    const currentMonth = now.getMonth();
-    const currentYear = now.getFullYear();
-    const previousMonth = currentMonth === 0 ? 11 : currentMonth - 1;
-    const previousYear = currentMonth === 0 ? currentYear - 1 : currentYear;
-
-    const currentMonthUploads = allUploads.filter(upload => {
-      const uploadDate = new Date(upload.created_at);
-      return uploadDate.getMonth() === currentMonth && uploadDate.getFullYear() === currentYear;
-    }).length;
-
-    const previousMonthUploads = allUploads.filter(upload => {
-      const uploadDate = new Date(upload.created_at);
-      return uploadDate.getMonth() === previousMonth && uploadDate.getFullYear() === previousYear;
-    }).length;
-
-    const monthlyGrowth = previousMonthUploads > 0 
-      ? ((currentMonthUploads - previousMonthUploads) / previousMonthUploads) * 100
-      : currentMonthUploads > 0 ? 100 : 0;
-
-    // Get achievements count
-    const { data: achievements } = await supabase
-      .from('user_achievements')
-      .select('id')
-      .eq('user_id', userId);
-
-    // Get billing analytics for savings calculation
-    const { data: billingAnalytics } = await supabase
-      .from('billing_analytics')
-      .select('total_saved')
-      .eq('user_id', userId)
-      .eq('month', new Date().getMonth() + 1)
-      .eq('year', new Date().getFullYear())
-      .single();
 
     return res.json({
-      totalUploads,
-      successfulUploads: successfulUploads.length,
-      avgConfidence: Math.round(avgConfidence * 100) / 100,
-      avgProcessTime: Math.round(avgProcessTime / 1000 * 100) / 100,
-      monthlyGrowth: Math.round(monthlyGrowth * 100) / 100,
-      currentStreak: userStats?.current_streak || 0,
-      longestStreak: userStats?.longest_streak || 0,
-      totalAchievements: achievements?.length || 0,
-      totalSaved: billingAnalytics?.total_saved || 0,
-      subscriptionTier: userStats?.subscriptions?.[0]?.tier || 'free',
-      uploadsThisMonth: currentMonthUploads
+      success: true,
+      data: {
+        totalUploads,
+        successfulUploads,
+        avgConfidence: Number(avgConfidence.toFixed(2)),
+        avgProcessTime: Number(avgProcessTime.toFixed(2))
+      }
     });
 
   } catch (error) {
     console.error('Dashboard stats error:', error);
     return res.status(500).json({
+      success: false,
       error: 'Failed to fetch dashboard statistics'
     });
   }
@@ -120,27 +54,26 @@ router.get('/recent-uploads', authenticateToken, async (req: AuthRequest, res: R
     const userId = req.user!.userId;
     const limit = parseInt(req.query.limit as string) || 5;
 
-    const { data: uploads, error } = await supabase
-      .from('part_searches')
-      .select('id, image_name, created_at, confidence_score, predictions')
-      .eq('user_id', userId)
-      .order('created_at', { ascending: false })
-      .limit(limit);
-
-    if (error) {
-      console.error('Error fetching recent uploads:', error);
-      return res.status(500).json({
-        error: 'Failed to fetch recent uploads'
-      });
-    }
+    const { data: uploads } = await DatabaseLogger.getUserHistory(userId, 1, limit, {
+      analysis_status: 'completed'
+    });
 
     return res.json({
-      uploads: uploads || []
+      success: true,
+      data: {
+        uploads: uploads.map(upload => ({
+          id: upload.id,
+          image_name: upload.image_name,
+          created_at: upload.created_at,
+          confidence_score: upload.confidence_score
+        }))
+      }
     });
 
   } catch (error) {
     console.error('Recent uploads error:', error);
     return res.status(500).json({
+      success: false,
       error: 'Failed to fetch recent uploads'
     });
   }
@@ -152,59 +85,32 @@ router.get('/recent-activities', authenticateToken, async (req: AuthRequest, res
     const userId = req.user!.userId;
     const limit = parseInt(req.query.limit as string) || 5;
 
-    // Try to get from user_activities table first
-    const { data: activities, error: activitiesError } = await supabase
-      .from('user_activities')
-      .select('id, action, resource_type, details, created_at')
-      .eq('user_id', userId)
-      .order('created_at', { ascending: false })
-      .limit(limit);
+    // Fetch user's search history and part searches
+    const { data: searches } = await DatabaseLogger.getUserHistory(userId, 1, limit);
 
-    if (activitiesError && activitiesError.code !== 'PGRST116') {
-      console.error('Error fetching activities:', activitiesError);
-    }
-
-    // If no activities table or no data, create activities from part_searches
-    if (!activities || activities.length === 0) {
-      const { data: searches, error: searchError } = await supabase
-        .from('part_searches')
-        .select('id, image_name, created_at, confidence_score, predictions')
-        .eq('user_id', userId)
-        .order('created_at', { ascending: false })
-        .limit(limit);
-
-      if (searchError) {
-        console.error('Error fetching searches for activities:', searchError);
-        return res.status(500).json({
-          error: 'Failed to fetch recent activities'
-        });
-      }
-
-      // Convert searches to activities format
-      const searchActivities = (searches || []).map(search => ({
-        id: search.id,
-        action: 'Part Upload',
-        resource_type: 'upload',
-        details: {
-          description: `Uploaded ${search.image_name || 'image'} for analysis`,
-          confidence: search.confidence_score ? Math.round(search.confidence_score * 100) : null,
-          predictions_count: Array.isArray(search.predictions) ? search.predictions.length : 0
-        },
-        created_at: search.created_at
-      }));
-
-      return res.json({
-        activities: searchActivities
-      });
-    }
+    const activities = searches.map(search => ({
+      id: search.id,
+      resource_type: 'upload',
+      action: 'Part Search',
+      details: {
+        description: `Searched for part using ${search.image_name || 'an image'}`,
+        confidence: search.confidence_score ? Math.round(search.confidence_score * 100) : null,
+        status: search.analysis_status || 'completed'
+      },
+      created_at: search.created_at
+    }));
 
     return res.json({
-      activities: activities || []
+      success: true,
+      data: {
+        activities
+      }
     });
 
   } catch (error) {
     console.error('Recent activities error:', error);
     return res.status(500).json({
+      success: false,
       error: 'Failed to fetch recent activities'
     });
   }
@@ -215,83 +121,67 @@ router.get('/performance-metrics', authenticateToken, async (req: AuthRequest, r
   try {
     const userId = req.user!.userId;
 
-    // Get all user's searches for analysis
-    const { data: searches, error } = await supabase
-      .from('part_searches')
-      .select('confidence_score, processing_time, created_at')
-      .eq('user_id', userId);
+    // Fetch user's part search statistics
+    const { data: searches } = await DatabaseLogger.getUserHistory(userId, 1, 1000);
 
-    if (error) {
-      console.error('Error fetching performance data:', error);
-      return res.status(500).json({
-        error: 'Failed to fetch performance metrics'
-      });
-    }
+    // Calculate metrics
+    const totalSearches = searches.length;
+    const completedSearches = searches.filter(
+      search => search.analysis_status === 'completed' && 
+                search.predictions && 
+                search.predictions.length > 0
+    );
 
-    const allSearches = searches || [];
-    
-    // Calculate model accuracy (percentage of searches with confidence > 0.7)
-    const highConfidenceSearches = allSearches.filter(s => s.confidence_score && s.confidence_score > 0.7);
-    const modelAccuracy = allSearches.length > 0 
-      ? (highConfidenceSearches.length / allSearches.length) * 100 
+    const modelAccuracy = totalSearches > 0 
+      ? (completedSearches.length / totalSearches) * 100 
       : 0;
 
-    // Calculate average response time
-    const avgResponseTime = allSearches.length > 0
-      ? allSearches.reduce((sum, s) => sum + (s.processing_time || 0), 0) / allSearches.length
+    // Compare with previous period (last 30 days)
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+    const previousPeriodSearches = searches.filter(
+      search => new Date(search.created_at) >= thirtyDaysAgo
+    );
+
+    const previousPeriodCompletedSearches = previousPeriodSearches.filter(
+      search => search.analysis_status === 'completed' && 
+                search.predictions && 
+                search.predictions.length > 0
+    );
+
+    const accuracyChange = previousPeriodSearches.length > 0
+      ? ((completedSearches.length - previousPeriodCompletedSearches.length) / previousPeriodSearches.length) * 100
       : 0;
 
-    // Calculate changes compared to previous month
-    const now = new Date();
-    const currentMonth = now.getMonth();
-    const currentYear = now.getFullYear();
-    const previousMonth = currentMonth === 0 ? 11 : currentMonth - 1;
-    const previousYear = currentMonth === 0 ? currentYear - 1 : currentYear;
-
-    const currentMonthSearches = allSearches.filter(s => {
-      const searchDate = new Date(s.created_at);
-      return searchDate.getMonth() === currentMonth && searchDate.getFullYear() === currentYear;
-    });
-
-    const previousMonthSearches = allSearches.filter(s => {
-      const searchDate = new Date(s.created_at);
-      return searchDate.getMonth() === previousMonth && searchDate.getFullYear() === previousYear;
-    });
-
-    // Calculate previous month metrics
-    const prevHighConfidence = previousMonthSearches.filter(s => s.confidence_score && s.confidence_score > 0.7);
-    const prevModelAccuracy = previousMonthSearches.length > 0 
-      ? (prevHighConfidence.length / previousMonthSearches.length) * 100 
+    const avgResponseTime = totalSearches > 0
+      ? searches.reduce((sum, search) => sum + (search.processing_time || 0), 0) / totalSearches
       : 0;
 
-    const prevAvgResponseTime = previousMonthSearches.length > 0
-      ? previousMonthSearches.reduce((sum, s) => sum + (s.processing_time || 0), 0) / previousMonthSearches.length
+    const previousAvgResponseTime = previousPeriodSearches.length > 0
+      ? previousPeriodSearches.reduce((sum, search) => sum + (search.processing_time || 0), 0) / previousPeriodSearches.length
       : 0;
 
-    const accuracyChange = prevModelAccuracy > 0 
-      ? modelAccuracy - prevModelAccuracy 
+    const responseTimeChange = previousAvgResponseTime > 0
+      ? ((avgResponseTime - previousAvgResponseTime) / previousAvgResponseTime) * 100
       : 0;
-
-    const responseTimeChange = prevAvgResponseTime > 0 
-      ? avgResponseTime - prevAvgResponseTime 
-      : 0;
-
-    const searchesGrowth = previousMonthSearches.length > 0
-      ? ((currentMonthSearches.length - previousMonthSearches.length) / previousMonthSearches.length) * 100
-      : currentMonthSearches.length > 0 ? 100 : 0;
 
     return res.json({
-      modelAccuracy: Math.round(modelAccuracy * 100) / 100,
-      accuracyChange: Math.round(accuracyChange * 100) / 100,
-      avgResponseTime: Math.round(avgResponseTime),
-      responseTimeChange: Math.round(responseTimeChange),
-      totalSearches: allSearches.length,
-      searchesGrowth: Math.round(searchesGrowth * 100) / 100
+      success: true,
+      data: {
+        modelAccuracy: Number(modelAccuracy.toFixed(2)),
+        accuracyChange: Number(accuracyChange.toFixed(2)),
+        totalSearches,
+        searchesGrowth: Number(accuracyChange.toFixed(2)),
+        avgResponseTime: Number(avgResponseTime.toFixed(2)),
+        responseTimeChange: Number(responseTimeChange.toFixed(2))
+      }
     });
 
   } catch (error) {
     console.error('Performance metrics error:', error);
     return res.status(500).json({
+      success: false,
       error: 'Failed to fetch performance metrics'
     });
   }

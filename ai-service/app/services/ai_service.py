@@ -10,6 +10,8 @@ import time
 import uuid
 from datetime import datetime
 import cv2
+import os
+from supabase import create_client, Client
 
 import structlog
 
@@ -24,6 +26,10 @@ from app.services.openai_image_analysis import OpenAIImageAnalyzer
 logger = structlog.get_logger()
 settings = get_settings()
 
+# Add Supabase client initialization
+supabase_url = os.getenv('SUPABASE_URL')
+supabase_key = os.getenv('SUPABASE_SERVICE_KEY')
+supabase_client = create_client(supabase_url, supabase_key)
 
 class AIService:
     """AI Service for part recognition and analysis."""
@@ -175,6 +181,17 @@ class AIService:
             if not predictions:
                 error_msg = "No automotive parts detected in the image"
                 
+                # Save failed analysis result
+                if user_id:
+                    await self.save_analysis_result(
+                        user_id=user_id,
+                        image_data=image_data,
+                        predictions=[],
+                        similar_images=[],
+                        processing_time=processing_time,
+                        confidence_threshold=confidence_threshold
+                    )
+                
                 raise AIServiceException(
                     error_type="no_predictions",
                     message=error_msg,
@@ -194,6 +211,17 @@ class AIService:
             confidence_scores = [pred.confidence for pred in predictions if pred.confidence is not None]
             avg_confidence = sum(confidence_scores) / len(confidence_scores) if confidence_scores else 0.0
             
+            # Save analysis result to Supabase if user_id is provided
+            if user_id:
+                save_result = await self.save_analysis_result(
+                    user_id=user_id,
+                    image_data=image_data,
+                    predictions=predictions,
+                    similar_images=similar_images,
+                    processing_time=processing_time,
+                    confidence_threshold=confidence_threshold
+                )
+            
             # Format the response
             result = {
                 "success": True,
@@ -201,8 +229,8 @@ class AIService:
                     {
                         "class_name": pred.class_name,
                         "confidence": pred.confidence,
-                        "description": pred.description,
                         "category": pred.category,
+                        "description": pred.description,
                         "manufacturer": pred.manufacturer,
                         "part_number": pred.part_number,
                         "estimated_price": pred.estimated_price,
@@ -211,24 +239,32 @@ class AIService:
                     for pred in predictions
                 ],
                 "similar_images": similar_images,
-                "model_version": self.get_model_version(),
                 "processing_time": processing_time,
-                "image_metadata": {
-                    "content_type": "image/jpeg",
-                    "size_bytes": len(image_data) if isinstance(image_data, bytes) else None
-                },
-                # Add additional details from OpenAI analysis
-                "additional_details": openai_analysis.get('additional_details', {}) if openai_analysis else {}
+                "avg_confidence": avg_confidence,
+                "search_id": save_result.get('search_id') if user_id and save_result.get('success') else None,
+                "raw_google_vision_result": google_vision_result,
+                "raw_openai_analysis": openai_analysis
             }
             
             return result
-            
+
         except Exception as e:
-            logger.error(f"Failed to process part image: {str(e)}")
+            logger.error(f"Image processing error: {e}")
+            
+            # Save failed analysis result if user_id is provided
+            if user_id:
+                await self.save_analysis_result(
+                    user_id=user_id,
+                    image_data=image_data,
+                    predictions=[],
+                    similar_images=[],
+                    processing_time=time.time() - start_time,
+                    confidence_threshold=confidence_threshold
+                )
             
             raise AIServiceException(
                 error_type="image_processing_error",
-                message=f"Failed to process part image: {str(e)}",
+                message=f"Failed to process image: {str(e)}",
                 status_code=500
             )
     
@@ -307,6 +343,102 @@ class AIService:
             GoogleVisionService: Initialized Google Vision service instance
         """
         return self._google_vision_service
+
+    async def save_analysis_result(
+        self,
+        user_id: str,
+        image_data: bytes,
+        predictions: List[Prediction],
+        similar_images: List[Dict[str, Any]],
+        processing_time: float,
+        confidence_threshold: float = 0.3
+    ) -> Dict[str, Any]:
+        """
+        Save analysis result to Supabase part_searches table
+        
+        Args:
+            user_id (str): UUID of the user
+            image_data (bytes): Original image data
+            predictions (List[Prediction]): AI predictions
+            similar_images (List[Dict]): Similar images found
+            processing_time (float): Time taken for processing in seconds
+            confidence_threshold (float): Confidence threshold used
+        
+        Returns:
+            Dict with saved record details
+        """
+        try:
+            # Generate a unique ID for the search
+            search_id = str(uuid.uuid4())
+            
+            # Prepare predictions for storage
+            predictions_data = [
+                {
+                    'class_name': pred.class_name,
+                    'confidence': pred.confidence,
+                    'category': pred.category,
+                    'description': pred.description,
+                    'manufacturer': pred.manufacturer,
+                    'part_number': pred.part_number,
+                    'estimated_price': pred.estimated_price,
+                    'compatibility': pred.compatibility
+                }
+                for pred in predictions
+            ]
+            
+            # Prepare similar images data
+            similar_images_data = similar_images or []
+            
+            # Save image to Supabase storage
+            image_filename = f"{user_id}/{search_id}.jpg"
+            storage_path = f"part_searches/{image_filename}"
+            
+            # Upload image to storage
+            storage_result = supabase_client.storage.from_('parts').upload(
+                file=image_data,
+                path=storage_path,
+                file_options={"content-type": "image/jpeg"}
+            )
+            
+            # Get public URL of the uploaded image
+            image_url = supabase_client.storage.from_('parts').get_public_url(storage_path)
+            
+            # Prepare record for part_searches table
+            record = {
+                'id': search_id,
+                'user_id': user_id,
+                'image_url': image_url,
+                'image_name': image_filename,
+                'predictions': predictions_data,
+                'similar_images': similar_images_data,
+                'confidence_score': max([pred.confidence for pred in predictions], default=0.0),
+                'processing_time': int(processing_time * 1000),  # Convert to milliseconds
+                'ai_model_version': self.get_model_version(),
+                'analysis_status': 'completed' if predictions else 'failed',
+                'web_scraping_used': bool(similar_images),
+                'sites_searched': len(similar_images),
+                'confidence_threshold': confidence_threshold,
+                'metadata': {
+                    'total_predictions': len(predictions),
+                    'image_size_bytes': len(image_data)
+                }
+            }
+            
+            # Insert record into part_searches table
+            result = supabase_client.table('part_searches').insert(record).execute()
+            
+            return {
+                'success': True,
+                'search_id': search_id,
+                'record': record
+            }
+        
+        except Exception as e:
+            logger.error(f"Error saving analysis result: {e}")
+            return {
+                'success': False,
+                'error': str(e)
+            }
 
 # Singleton instance
 ai_service = AIService() 
