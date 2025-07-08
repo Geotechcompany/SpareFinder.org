@@ -95,6 +95,7 @@ class PredictionResponse(BaseModel):
         json_encoders = {
             datetime: lambda v: v.isoformat()
         }
+        protected_namespaces = ()
 
 
 class BatchPredictionRequest(BaseModel):

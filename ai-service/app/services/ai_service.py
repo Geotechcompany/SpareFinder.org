@@ -27,9 +27,19 @@ logger = structlog.get_logger()
 settings = get_settings()
 
 # Add Supabase client initialization
-supabase_url = os.getenv('SUPABASE_URL')
-supabase_key = os.getenv('SUPABASE_SERVICE_KEY')
-supabase_client = create_client(supabase_url, supabase_key)
+supabase_url = os.getenv('SUPABASE_URL', '')
+supabase_key = os.getenv('SUPABASE_SERVICE_KEY', '')
+
+# Validate Supabase credentials before creating client
+if not supabase_url or not supabase_key:
+    logger.error("Missing Supabase credentials. Please set SUPABASE_URL and SUPABASE_SERVICE_KEY.")
+    supabase_client = None
+else:
+    try:
+        supabase_client = create_client(supabase_url, supabase_key)
+    except Exception as e:
+        logger.error(f"Failed to create Supabase client: {e}")
+        supabase_client = None
 
 class AIService:
     """AI Service for part recognition and analysis."""
@@ -354,90 +364,75 @@ class AIService:
         confidence_threshold: float = 0.3
     ) -> Dict[str, Any]:
         """
-        Save analysis result to Supabase part_searches table
+        Save analysis result to Supabase database.
         
         Args:
-            user_id (str): UUID of the user
+            user_id (str): User identifier
             image_data (bytes): Original image data
             predictions (List[Prediction]): AI predictions
-            similar_images (List[Dict]): Similar images found
-            processing_time (float): Time taken for processing in seconds
+            similar_images (List[Dict[str, Any]]): Similar images
+            processing_time (float): Time taken for processing
             confidence_threshold (float): Confidence threshold used
         
         Returns:
-            Dict with saved record details
+            Dict[str, Any]: Saved record details or error information
         """
+        # Check if Supabase client is available
+        if supabase_client is None:
+            logger.warning("Supabase client not initialized. Skipping result storage.")
+            return {
+                "status": "warning",
+                "message": "Supabase client not initialized. Result not saved.",
+                "user_id": user_id
+            }
+        
         try:
-            # Generate a unique ID for the search
-            search_id = str(uuid.uuid4())
-            
-            # Prepare predictions for storage
-            predictions_data = [
+            # Prepare prediction data for storage
+            prediction_data = [
                 {
-                    'class_name': pred.class_name,
-                    'confidence': pred.confidence,
-                    'category': pred.category,
-                    'description': pred.description,
-                    'manufacturer': pred.manufacturer,
-                    'part_number': pred.part_number,
-                    'estimated_price': pred.estimated_price,
-                    'compatibility': pred.compatibility
+                    "class_name": pred.class_name,
+                    "confidence": pred.confidence,
+                    "category": pred.category,
+                    "description": pred.description,
+                    "manufacturer": pred.manufacturer,
+                    "part_number": pred.part_number,
+                    "estimated_price": pred.estimated_price,
+                    "compatibility": pred.compatibility
                 }
                 for pred in predictions
             ]
             
-            # Prepare similar images data
-            similar_images_data = similar_images or []
+            # Encode image to base64 for storage
+            image_base64 = base64.b64encode(image_data).decode('utf-8')
             
-            # Save image to Supabase storage
-            image_filename = f"{user_id}/{search_id}.jpg"
-            storage_path = f"part_searches/{image_filename}"
-            
-            # Upload image to storage
-            storage_result = supabase_client.storage.from_('parts').upload(
-                file=image_data,
-                path=storage_path,
-                file_options={"content-type": "image/jpeg"}
-            )
-            
-            # Get public URL of the uploaded image
-            image_url = supabase_client.storage.from_('parts').get_public_url(storage_path)
-            
-            # Prepare record for part_searches table
+            # Prepare record for insertion
             record = {
-                'id': search_id,
-                'user_id': user_id,
-                'image_url': image_url,
-                'image_name': image_filename,
-                'predictions': predictions_data,
-                'similar_images': similar_images_data,
-                'confidence_score': max([pred.confidence for pred in predictions], default=0.0),
-                'processing_time': int(processing_time * 1000),  # Convert to milliseconds
-                'ai_model_version': self.get_model_version(),
-                'analysis_status': 'completed' if predictions else 'failed',
-                'web_scraping_used': bool(similar_images),
-                'sites_searched': len(similar_images),
-                'confidence_threshold': confidence_threshold,
-                'metadata': {
-                    'total_predictions': len(predictions),
-                    'image_size_bytes': len(image_data)
-                }
+                "user_id": user_id,
+                "image_data": image_base64,
+                "predictions": prediction_data,
+                "similar_images": similar_images,
+                "processing_time": processing_time,
+                "confidence_threshold": confidence_threshold,
+                "created_at": datetime.utcnow().isoformat()
             }
             
-            # Insert record into part_searches table
-            result = supabase_client.table('part_searches').insert(record).execute()
+            # Insert record into Supabase
+            response = supabase_client.table("part_analysis_results").insert(record).execute()
             
+            # Return saved record details
             return {
-                'success': True,
-                'search_id': search_id,
-                'record': record
+                "status": "success",
+                "message": "Analysis result saved successfully",
+                "record_id": response.data[0].get('id') if response.data else None,
+                "user_id": user_id
             }
         
         except Exception as e:
-            logger.error(f"Error saving analysis result: {e}")
+            logger.error(f"Failed to save analysis result: {e}")
             return {
-                'success': False,
-                'error': str(e)
+                "status": "error",
+                "message": f"Failed to save analysis result: {str(e)}",
+                "user_id": user_id
             }
 
 # Singleton instance
