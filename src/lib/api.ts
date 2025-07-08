@@ -1088,7 +1088,7 @@ export const uploadPartImage = async (
         content_type: string;
         size_bytes: number;
       };
-    }>('/openai/upload/image', formData, {
+    }>('/upload/image', formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
       }
