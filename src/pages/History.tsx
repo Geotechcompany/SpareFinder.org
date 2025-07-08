@@ -66,7 +66,7 @@ const History = () => {
         status: activeTab !== 'all' ? activeTab : undefined
       };
 
-      const response = await apiClient.getUploadHistory(pagination.page, pagination.limit, filters);
+      const response = await apiClient.history.getUploads(pagination.page, pagination.limit, filters);
       
       if (response.success && response.data) {
         const mappedHistory = response.data.uploads.map(upload => ({
@@ -104,7 +104,7 @@ const History = () => {
 
   const handleExportHistory = async () => {
     try {
-      const response = await apiClient.exportHistory('csv');
+      const response = await apiClient.history.exportHistory('csv');
       if (response.success) {
         toast({
           title: "Success",
@@ -123,7 +123,7 @@ const History = () => {
 
   const handleDeleteUpload = async (uploadId: string) => {
     try {
-      const response = await apiClient.deleteUpload(uploadId);
+      const response = await apiClient.history.deleteUpload(uploadId);
       if (response.success) {
         toast({
           title: "Success",

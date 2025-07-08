@@ -184,8 +184,26 @@ interface ExtendedAxiosInstance extends AxiosInstance {
   
   // New methods
   getAchievements?: () => Promise<{ success: boolean; data?: any; error?: string }>;
+  getRecentActivities?: (limit?: number) => Promise<{ success: boolean; data?: any; error?: string }>;
   getDashboardStats?: () => Promise<{ success: boolean; data?: any; error?: string }>;
   getBillingInfo?: () => Promise<{ success: boolean; data?: any; error?: string }>;
+  getInvoices?: (page?: number, limit?: number) => Promise<{ success: boolean; data?: any; error?: string }>;
+  updateSubscription?: (planId: 'free' | 'pro' | 'enterprise') => Promise<{ success: boolean; data?: any; error?: string }>;
+  cancelSubscription?: () => Promise<{ success: boolean; data?: any; error?: string }>;
+  
+  // History methods
+  history?: {
+    getUploads: (
+      page: number, 
+      limit: number, 
+      filters?: { 
+        search?: string; 
+        status?: string 
+      }
+    ) => Promise<{ success: boolean; data?: any; error?: string }>;
+    exportHistory: (format: 'csv' | 'json') => Promise<{ success: boolean; data?: any; error?: string }>;
+    deleteUpload: (uploadId: string) => Promise<{ success: boolean; data?: any; error?: string }>;
+  }
 }
 
 // Create an axios instance with base configuration
@@ -278,6 +296,22 @@ apiClient.getAdminStats = async () => {
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Failed to fetch admin stats'
+    };
+  }
+};
+
+apiClient.getDashboardStats = async () => {
+  try {
+    const response = await apiClient.get('/api/dashboard/stats');
+    return {
+      success: true,
+      data: response.data
+    };
+  } catch (error) {
+    console.error('Failed to fetch dashboard stats:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to fetch dashboard stats'
     };
   }
 };
@@ -388,7 +422,7 @@ apiClient.adminLogout = async () => {
 // Extend apiClient with additional methods
 apiClient.getAchievements = async () => {
   try {
-    const response = await apiClient.get('/api/user/achievements');
+    const response = await apiClient.get('/api/dashboard/achievements');
     return {
       success: true,
       data: response.data
@@ -402,25 +436,28 @@ apiClient.getAchievements = async () => {
   }
 };
 
-apiClient.getDashboardStats = async () => {
+apiClient.getRecentActivities = async (limit = 5) => {
   try {
-    const response = await apiClient.get('/api/user/dashboard-stats');
+    const response = await apiClient.get('/api/dashboard/recent-activities', {
+      params: { limit }
+    });
     return {
       success: true,
       data: response.data
     };
   } catch (error) {
-    console.error('Failed to fetch dashboard stats:', error);
+    console.error('Failed to fetch recent activities:', error);
     return {
       success: false,
-      error: error instanceof Error ? error.message : 'Failed to fetch dashboard stats'
+      error: error instanceof Error ? error.message : 'Failed to fetch recent activities'
     };
   }
 };
 
+// Update billing methods to use the correct route
 apiClient.getBillingInfo = async () => {
   try {
-    const response = await apiClient.get('/api/billing/info');
+    const response = await apiClient.get('/api/billing');
     return {
       success: true,
       data: response.data
@@ -431,6 +468,125 @@ apiClient.getBillingInfo = async () => {
       success: false,
       error: error instanceof Error ? error.message : 'Failed to fetch billing information'
     };
+  }
+};
+
+apiClient.getInvoices = async (page = 1, limit = 10) => {
+  try {
+    const response = await apiClient.get('/api/billing/invoices', { 
+      params: { page, limit } 
+    });
+    return {
+      success: true,
+      data: response.data
+    };
+  } catch (error) {
+    console.error('Failed to fetch invoices:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to fetch invoices'
+    };
+  }
+};
+
+// Add subscription methods to apiClient
+apiClient.updateSubscription = async (planId: 'free' | 'pro' | 'enterprise') => {
+  try {
+    const response = await apiClient.post('/api/billing/update-subscription', { planId });
+    return {
+      success: true,
+      data: response.data
+    };
+  } catch (error) {
+    console.error('Failed to update subscription:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to update subscription'
+    };
+  }
+};
+
+apiClient.cancelSubscription = async () => {
+  try {
+    const response = await apiClient.post('/api/billing/cancel-subscription');
+    return {
+      success: true,
+      data: response.data
+    };
+  } catch (error) {
+    console.error('Failed to cancel subscription:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to cancel subscription'
+    };
+  }
+};
+
+// Add history methods to apiClient
+apiClient.history = {
+  getUploads: async (page = 1, limit = 20, filters = {}) => {
+    try {
+      const response = await apiClient.get('/api/history/uploads', { 
+        params: { 
+          page, 
+          limit, 
+          ...filters 
+        } 
+      });
+      return {
+        success: true,
+        data: response.data
+      };
+    } catch (error) {
+      console.error('Failed to fetch upload history:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to fetch upload history'
+      };
+    }
+  },
+  exportHistory: async (format = 'csv') => {
+    try {
+      const response = await apiClient.get('/api/history/export', { 
+        params: { format },
+        responseType: 'blob'
+      });
+      
+      // Create a download link
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `upload_history.${format}`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+
+      return {
+        success: true,
+        data: response.data
+      };
+    } catch (error) {
+      console.error('Failed to export history:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to export history'
+      };
+    }
+  },
+  deleteUpload: async (uploadId) => {
+    try {
+      const response = await apiClient.delete(`/api/history/uploads/${uploadId}`);
+      return {
+        success: true,
+        data: response.data
+      };
+    } catch (error) {
+      console.error('Failed to delete upload:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to delete upload'
+      };
+    }
   }
 };
 
@@ -564,10 +720,14 @@ client.interceptors.request.use((config) => {
 client.interceptors.response.use(
   (response) => response,
   async (error) => {
-    if (error.response?.status === 401) {
+    const token = localStorage.getItem('auth_token');
+    
+    // Only log out if there's no token or the error is a 401 unauthorized
+    if (!token || error.response?.status === 401) {
       localStorage.removeItem('auth_token');
       window.location.href = '/login';
     }
+    
     return Promise.reject(error);
   }
 );
@@ -825,6 +985,56 @@ export const api = {
       client.get<ApiResponse<RecentActivityResponse>>('/api/dashboard/recent-activities', { params: { limit } }),
     getPerformanceMetrics: () => 
       client.get<ApiResponse<PerformanceMetricsResponse>>('/api/dashboard/performance-metrics')
+  },
+  billing: {
+    getInfo: () => client.get<ApiResponse>('/api/billing'),
+    getInvoices: (page = 1, limit = 10) => 
+      client.get<ApiResponse>('/api/billing/invoices', { params: { page, limit } }),
+    updateSubscription: (planId: 'free' | 'pro' | 'enterprise') => 
+      client.post<ApiResponse>('/api/billing/subscription', { tier: planId }),
+    cancelSubscription: () => 
+      client.post<ApiResponse>('/api/billing/cancel-subscription')
+  },
+  history: {
+    getUploads: (page = 1, limit = 20, filters = {}) => 
+      client.get<ApiResponse>('/api/history/uploads', { 
+        params: { 
+          page, 
+          limit, 
+          ...filters 
+        } 
+      }),
+    exportHistory: (format: 'csv' | 'json' = 'csv') => 
+      client.get<ApiResponse>('/api/history/export', { 
+        params: { format },
+        responseType: 'blob'
+      }),
+    deleteUpload: (uploadId: string) => 
+      client.delete<ApiResponse>(`/api/history/uploads/${uploadId}`)
+  },
+  achievements: {
+    getAchievements: async () => {
+      try {
+        console.log('🔍 Fetching Achievements');
+        const response = await client.get<ApiResponse>('/api/dashboard/achievements');
+        
+        console.log('🔍 Achievements Response:', {
+          success: response.data?.success,
+          data: response.data
+        });
+        
+        return {
+          success: true,
+          data: response.data
+        };
+      } catch (error) {
+        console.error('❌ Failed to fetch achievements:', error);
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : 'Failed to fetch achievements'
+        };
+      }
+    }
   }
 };
 
