@@ -5,29 +5,6 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 const AI_SERVICE_URL = import.meta.env.VITE_AI_SERVICE_URL || 'https://part-finder-ai-vision-1.onrender.com/';
 
 // Type definitions
-export interface ApiResponse<T = any> {
-  success?: boolean;
-  data: T & { 
-    totalUploads?: number; 
-    successfulUploads?: number; 
-    avgConfidence?: number; 
-    avgProcessTime?: number;
-    uploads?: any[];
-    activities?: any[];
-    modelAccuracy?: number;
-    accuracyChange?: number;
-    totalSearches?: number;
-    searchesGrowth?: number;
-    avgResponseTime?: number;
-    responseTimeChange?: number;
-    token?: string;
-    user?: User;
-    [key: string]: any;
-  };
-  error?: string;
-  message?: string;
-}
-
 export interface UploadResponse {
   success: boolean;
   part_info?: {
@@ -52,6 +29,26 @@ export interface UploadResponse {
   error?: string;
 }
 
+export interface ApiResponse<T = any> {
+  success: boolean;
+  data: T & {
+    token?: string;
+    user?: User;
+    profile?: User;
+    [key: string]: any;
+  };
+  error?: string;
+  message?: string;
+}
+
+export interface AuthResponse {
+  token: string;
+  user: User;
+  success: boolean;
+  message?: string;
+  error?: string;
+}
+
 export interface User {
   id: string;
   email: string;
@@ -60,21 +57,6 @@ export interface User {
   role: string;
   avatar_url?: string;
   created_at: string;
-}
-
-export interface AuthResponse {
-  token: string;
-  user: {
-    id: string;
-    email: string;
-    full_name: string;
-    company?: string;
-    role: string;
-    created_at: string;
-  };
-  success: boolean;
-  message?: string;
-  error?: string;
 }
 
 export interface LoginRequest {
@@ -165,39 +147,214 @@ export interface PerformanceMetricsResponse {
   responseTimeChange: number;
 }
 
-// Extend AxiosInstance type to include custom methods
+// Extend AxiosInstance type to include admin methods
 interface ExtendedAxiosInstance extends AxiosInstance {
   adminLogin: (credentials: { email: string; password: string }) => Promise<ApiResponse<AuthResponse>>;
   setToken: (token: string) => void;
+  getAdminStats?: () => Promise<{ success: boolean; data?: any; error?: string }>;
+  getCurrentUser?: () => Promise<{ success: boolean; data?: any; error?: string }>;
+  getUsers?: (page: number, limit: number) => Promise<{ success: boolean; data?: any; error?: string }>;
+  updateUserRole?: (userId: string, role: string) => Promise<{ success: boolean; data?: any; error?: string }>;
+  deleteAdminUser?: (userId: string) => Promise<{ success: boolean; data?: any; error?: string }>;
+  adminLogout?: () => Promise<{ success: boolean; error?: string }>;
 }
 
 // Create an axios instance with base configuration
 export const apiClient = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:9000',
+  baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000',
   timeout: 30000, // 30 seconds timeout
   headers: {
     'Content-Type': 'multipart/form-data',
   }
+}) as ExtendedAxiosInstance;
+
+// Add request interceptor to include token
+apiClient.interceptors.request.use((config) => {
+  const token = localStorage.getItem('auth_token');
+  
+  console.log('🔐 API Request Interceptor:', {
+    url: config.url,
+    method: config.method,
+    hasToken: !!token
+  });
+
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  } else {
+    console.warn('🚨 No authentication token found');
+  }
+
+  return config;
+}, (error) => {
+  return Promise.reject(error);
 });
 
-// Add a response interceptor to handle errors globally
+// Add response interceptor to handle authentication errors
 apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
-    // Default error handling
-    const errorMessage = error.response?.data?.message 
-      || error.message 
-      || 'An unexpected error occurred';
-
-    toast({
-      title: 'Error',
-      description: errorMessage,
-      variant: 'destructive'
+    console.error('🚨 API Error:', {
+      status: error.response?.status,
+      data: error.response?.data,
+      message: error.message
     });
+
+    // Handle specific authentication errors
+    if (error.response?.status === 401 || error.response?.data?.message === 'No token provided') {
+      // Clear stored token
+      localStorage.removeItem('auth_token');
+      
+      // Redirect to login page
+      window.location.href = '/login';
+
+      // Show toast notification
+      toast({
+        title: 'Authentication Error',
+        description: 'Your session has expired. Please log in again.',
+        variant: 'destructive'
+      });
+    }
 
     return Promise.reject(error);
   }
 );
+
+// Modify getAdminStats to handle authentication more robustly
+apiClient.getAdminStats = async () => {
+  try {
+    const token = localStorage.getItem('auth_token');
+    
+    if (!token) {
+      console.error('🚨 No authentication token found');
+      return {
+        success: false,
+        error: 'No authentication token'
+      };
+    }
+
+    const response = await apiClient.get('/api/admin/stats');
+    return {
+      success: true,
+      data: response.data
+    };
+  } catch (error) {
+    console.error('Failed to fetch admin stats:', error);
+    
+    // Check if it's an authentication error
+    if (error.response?.status === 401) {
+      localStorage.removeItem('auth_token');
+      window.location.href = '/login';
+    }
+
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to fetch admin stats'
+    };
+  }
+};
+
+apiClient.getCurrentUser = async () => {
+  try {
+    const response = await apiClient.get('/api/user/profile');
+    return {
+      success: true,
+      data: response.data
+    };
+  } catch (error) {
+    console.error('Failed to fetch current user:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to fetch user profile'
+    };
+  }
+};
+
+// Extend apiClient with admin methods after the existing extensions
+apiClient.getUsers = async (page = 1, limit = 20) => {
+  try {
+    const response = await apiClient.get('/api/admin/users', { 
+      params: { page, limit } 
+    });
+    return {
+      success: true,
+      data: response.data
+    };
+  } catch (error) {
+    console.error('Failed to fetch users:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to fetch users'
+    };
+  }
+};
+
+apiClient.updateUserRole = async (userId, role) => {
+  try {
+    const response = await apiClient.patch(`/api/admin/users/${userId}/role`, { role });
+    return {
+      success: true,
+      data: response.data
+    };
+  } catch (error) {
+    console.error('Failed to update user role:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to update user role'
+    };
+  }
+};
+
+apiClient.deleteAdminUser = async (userId) => {
+  try {
+    const response = await apiClient.delete(`/api/admin/users/${userId}`);
+    return {
+      success: true,
+      data: response.data
+    };
+  } catch (error) {
+    console.error('Failed to delete user:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to delete user'
+    };
+  }
+};
+
+// Add adminLogout method to apiClient
+apiClient.adminLogout = async () => {
+  try {
+    console.log('🔐 Attempting Admin Logout');
+    
+    // Call backend logout endpoint
+    const response = await apiClient.post('/api/auth/logout');
+    
+    // Clear local storage
+    localStorage.removeItem('auth_token');
+    
+    // Remove authorization header
+    delete apiClient.defaults.headers.common['Authorization'];
+    
+    console.log('🔐 Logout successful');
+    
+    return {
+      success: true
+    };
+  } catch (error) {
+    console.error('🚨 Logout error:', error);
+    
+    // Even if backend logout fails, clear local token
+    localStorage.removeItem('auth_token');
+    delete apiClient.defaults.headers.common['Authorization'];
+    
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Logout failed'
+    };
+  } finally {
+    // Always redirect to login page
+    window.location.href = '/login';
+  }
+};
 
 // API endpoints for the new approach
 export const endpoints = {
@@ -233,30 +390,83 @@ const client: ExtendedAxiosInstance = axios.create({
 // Extend the client with admin login method
 client.adminLogin = async ({ email, password }: { email: string; password: string }): Promise<ApiResponse<AuthResponse>> => {
   try {
+    console.log('🔐 API Client Admin Login Attempt:', { email });
     const response = await client.post<ApiResponse<AuthResponse>>(endpoints.auth.login, { 
       email, 
       password,
       isAdminLogin: true 
     });
 
+    console.log('🔐 API Client Login Response:', {
+      success: response.data?.success,
+      hasData: !!response.data
+    });
+
     if (response.data) {
+      const authData = {
+        token: (response.data as any).token || '',
+        user: (response.data as any).user || { 
+          id: '', 
+          email: '', 
+          full_name: '', 
+          role: '' 
+        },
+        success: response.data.success ?? true
+      } as AuthResponse;
+
+      console.log('🔐 API Client Login Data:', {
+        userId: authData.user.id,
+        email: authData.user.email,
+        role: authData.user.role
+      });
+
       return {
         success: true,
-        data: response.data as any
+        data: authData,
+        message: 'Login successful'
       };
     }
 
-    return {
-      success: false,
-      data: {} as any,
-      error: 'Admin login failed'
+    console.log('🔐 API Client Login Failed: No Data');
+    const defaultAuthResponse: AuthResponse = { 
+      token: '', 
+      user: { 
+        id: '', 
+        email: '', 
+        full_name: '', 
+        company: undefined,
+        role: '', 
+        avatar_url: undefined,
+        created_at: '' 
+      },
+      success: false
     };
-  } catch (error: any) {
-    console.error('Admin login error:', error);
+
     return {
       success: false,
-      data: {} as any,
-      error: error.response?.data?.message || 'Admin login failed'
+      data: defaultAuthResponse,
+      error: 'Login failed: No data received'
+    };
+  } catch (error) {
+    console.error('🔐 API Client Login Error:', error);
+    const defaultAuthResponse: AuthResponse = { 
+      token: '', 
+      user: { 
+        id: '', 
+        email: '', 
+        full_name: '', 
+        company: undefined,
+        role: '', 
+        avatar_url: undefined,
+        created_at: '' 
+      },
+      success: false
+    };
+
+    return {
+      success: false,
+      data: defaultAuthResponse,
+      error: error instanceof Error ? error.message : 'Login failed'
     };
   }
 };
@@ -304,25 +514,47 @@ aiClient.interceptors.request.use((config) => {
 export const api = {
   auth: {
     login: async (email: string, password: string) => {
-      const response = await client.post<any>(endpoints.auth.login, { email, password });
-      console.log('API Login Response:', response.data);
-      
-      // Backend returns { token, user, message } directly
-      if (response.data && response.data.token) {
-        // Save token to localStorage for the class-based client
-        localStorage.setItem('auth_token', response.data.token);
+      try {
+        console.log('🔐 Attempting Login:', { email });
+        
+        const response = await client.post<any>(endpoints.auth.login, { email, password });
+        console.log('🔐 Login Response:', response.data);
+        
+        // Backend returns { token, user, message } directly
+        if (response.data && response.data.token) {
+          // Save token to localStorage
+          localStorage.setItem('auth_token', response.data.token);
+          
+          // Set token in client headers for future requests
+          client.defaults.headers.common['Authorization'] = `Bearer ${response.data.token}`;
+          
+          return {
+            success: true,
+            data: response.data
+          };
+        }
+        
+        console.error('🚨 Invalid login response:', response.data);
+        return {
+          success: false,
+          data: null,
+          error: 'Invalid login response'
+        };
+      } catch (error: any) {
+        console.error('🚨 Login error:', error);
+        
+        // Handle specific error scenarios
+        const errorMessage = error.response?.data?.message 
+          || error.response?.data?.error 
+          || error.message 
+          || 'Login failed';
         
         return {
-          success: true,
-          data: response.data
+          success: false,
+          data: null,
+          error: errorMessage
         };
       }
-      
-      return {
-        success: false,
-        data: null,
-        error: 'Invalid login response'
-      };
     },
     register: async (userData: { email: string; password: string; full_name: string; company?: string }): Promise<ApiResponse<AuthResponse>> => {
       try {
@@ -359,8 +591,36 @@ export const api = {
       }
     },
     logout: async () => {
-      const response = await client.post<ApiResponse>(endpoints.auth.logout);
-      return response.data;
+      try {
+        console.log('🔐 Attempting Logout');
+        
+        // Call backend logout endpoint
+        const response = await client.post<ApiResponse>(endpoints.auth.logout);
+        
+        // Clear local storage
+        localStorage.removeItem('auth_token');
+        
+        // Remove authorization header
+        delete client.defaults.headers.common['Authorization'];
+        
+        console.log('🔐 Logout successful');
+        
+        // Redirect to login page
+        window.location.href = '/login';
+        
+        return response.data;
+      } catch (error) {
+        console.error('🚨 Logout error:', error);
+        
+        // Even if backend logout fails, clear local token
+        localStorage.removeItem('auth_token');
+        delete client.defaults.headers.common['Authorization'];
+        
+        // Redirect to login page
+        window.location.href = '/login';
+        
+        throw error;
+      }
     },
   },
   upload: {
@@ -424,8 +684,39 @@ export const api = {
   },
   user: {
     getProfile: async () => {
-      const response = await client.get<ApiResponse>(endpoints.user.profile);
-      return response.data;
+      try {
+        console.log('🔍 Fetching User Profile - Endpoint:', endpoints.user.profile);
+        const response = await client.get<ApiResponse<{ user?: User; profile?: User }>>(endpoints.user.profile);
+        
+        console.log('🔍 User Profile Raw Response:', {
+          success: response.data?.success,
+          data: response.data,
+          status: response.status
+        });
+        
+        // More flexible response handling
+        if (response.data) {
+          const userData = (response.data as any).user || (response.data as any).profile;
+          return {
+            success: response.data.success ?? true,
+            data: userData || null
+          };
+        }
+        
+        console.error('🔍 Invalid profile response structure');
+        return {
+          success: false,
+          data: null,
+          error: 'Invalid profile response'
+        };
+      } catch (error) {
+        console.error('🔍 User Profile Fetch Error:', error);
+        return {
+          success: false,
+          data: null,
+          error: error instanceof Error ? error.message : 'Failed to fetch profile'
+        };
+      }
     },
     updateProfile: async (profileData: any) => {
       const response = await client.put<ApiResponse>(endpoints.user.profile, profileData);
@@ -449,13 +740,13 @@ export const api = {
       client.get('/statistics/analytics', { params: { range: timeRange } })
   },
   dashboard: {
-    getStats: () => client.get<ApiResponse<DashboardStatsResponse>>('/dashboard/stats'),
+    getStats: () => client.get<ApiResponse<DashboardStatsResponse>>('/api/dashboard/stats'),
     getRecentUploads: (limit: number = 5) => 
-      client.get<ApiResponse<RecentUploadResponse>>('/dashboard/recent-uploads', { params: { limit } }),
+      client.get<ApiResponse<RecentUploadResponse>>('/api/dashboard/recent-uploads', { params: { limit } }),
     getRecentActivities: (limit: number = 5) => 
-      client.get<ApiResponse<RecentActivityResponse>>('/dashboard/recent-activities', { params: { limit } }),
+      client.get<ApiResponse<RecentActivityResponse>>('/api/dashboard/recent-activities', { params: { limit } }),
     getPerformanceMetrics: () => 
-      client.get<ApiResponse<PerformanceMetricsResponse>>('/dashboard/performance-metrics')
+      client.get<ApiResponse<PerformanceMetricsResponse>>('/api/dashboard/performance-metrics')
   }
 };
 
@@ -522,4 +813,4 @@ export const uploadPartImage = async (
   }
 };
 
-export default apiClient; 
+export { client, apiClient as defaultApiClient }; 
