@@ -120,6 +120,7 @@ export interface AIServiceSimilarImage {
 }
 
 export interface AIServiceResponse {
+  success: boolean;
   request_id: string;
   predictions: AIServicePrediction[];
   processing_time: number;
@@ -738,6 +739,7 @@ const aiClient: AxiosInstance = axios.create({
   timeout: 120000, // Increased to 2 minutes for AI processing
   headers: {
     'Content-Type': 'application/json',
+    'Authorization': `Bearer ${import.meta.env.VITE_AI_SERVICE_API_KEY || 'geotech-dev-key-2024'}`
   },
 });
 
@@ -864,58 +866,36 @@ export const api = {
   upload: {
     image: async (
       file: File, 
+      keywords?: string[], 
       options: {
-        keywords?: string;
         confidenceThreshold?: number;
         maxPredictions?: number;
         includeWebScraping?: boolean;
       } = {}
-    ): Promise<UploadResponse> => {
+    ): Promise<AIServiceResponse> => {
+      const formData = new FormData();
+      formData.append('file', file);
+      
+      // Add keywords
+      if (keywords && keywords.length > 0) {
+        formData.append('keywords', keywords.join(', '));
+      }
+      
+      // Add optional parameters
+      formData.append('confidence_threshold', (options.confidenceThreshold || 0.3).toString());
+      formData.append('max_predictions', (options.maxPredictions || 3).toString());
+      formData.append('include_web_scraping', (options.includeWebScraping ?? true).toString());
+
       try {
-        const formData = new FormData();
-        formData.append('file', file);
-        
-        // Add optional parameters
-        const {
-          keywords,
-          confidenceThreshold = 0.5,
-          maxPredictions = 5,
-          includeWebScraping = true
-        } = options;
-        
-        if (keywords) {
-          formData.append('keywords', keywords);
-        }
-        
-        // Add query parameters for AI service
-        const params = new URLSearchParams({
-          confidence_threshold: confidenceThreshold.toString(),
-          max_predictions: maxPredictions.toString(),
-          include_web_scraping: includeWebScraping.toString()
-        });
-        
-        console.log('Uploading to AI service:', `${AI_SERVICE_URL}/predict?${params}`);
-        
-        const response = await aiClient.post<UploadResponse>(`/predict?${params}`, formData, {
+        const response = await aiClient.post<AIServiceResponse>('/openai/upload/image', formData, {
           headers: {
             'Content-Type': 'multipart/form-data',
-          },
-          timeout: 120000, // 2 minutes timeout for this specific request
+          }
         });
-        
-        console.log('AI service response:', response.data);
+
         return response.data;
       } catch (error) {
-        console.error('AI service error:', error);
-        
-        if (error.code === 'ECONNABORTED') {
-          throw new Error('AI analysis is taking longer than expected. Please try with a smaller image or try again later.');
-        } else if (error.response?.status === 500) {
-          throw new Error('AI service is currently unavailable. Please try again later.');
-        } else if (error.code === 'ECONNREFUSED') {
-          throw new Error('Cannot connect to AI service. Please make sure the AI service is running.');
-        }
-        
+        console.error('Image upload error:', error);
         throw error;
       }
     },
@@ -1061,7 +1041,7 @@ export const uploadPartImage = async (
   formData.append('include_web_scraping', (options.includeWebScraping ?? true).toString());
 
   try {
-    const response = await apiClient.post<{
+    const response = await aiClient.post<{
       success: boolean;
       predictions: Array<{
         class_name: string;
@@ -1088,7 +1068,7 @@ export const uploadPartImage = async (
         content_type: string;
         size_bytes: number;
       };
-    }>('/upload/image', formData, {
+    }>('/openai/upload/image', formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
       }
@@ -1101,4 +1081,4 @@ export const uploadPartImage = async (
   }
 };
 
-export { client, apiClient as defaultApiClient }; 
+export { client, apiClient as defaultApiClient, aiClient }; 

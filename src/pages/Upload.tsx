@@ -46,6 +46,7 @@ import { AxiosProgressEvent } from 'axios';
 import { PartDetailsAnalysis } from '@/components/PartDetailsAnalysis';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/components/ui/collapsible';
+import { aiClient } from '@/lib/api';
 
 // Image component with fallback handling
 const ImageWithFallback = ({ src, alt, className, onError }: { 
@@ -375,7 +376,7 @@ const Upload = () => {
       });
 
       // Call image analysis endpoint
-      const response = await apiClient.post<OpenAIImageUploadResponse>('/openai/upload/image', formData, config);
+      const response = await aiClient.post<OpenAIImageUploadResponse>('/openai/upload/image', formData, config);
 
       // Check for successful response
       if (!response.data.success || !response.data.predictions || response.data.predictions.length === 0) {

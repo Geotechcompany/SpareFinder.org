@@ -2,13 +2,13 @@ import asyncio
 import logging
 import time
 from contextlib import asynccontextmanager
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Any
 from datetime import datetime
 
 import cv2
 import numpy as np
 import structlog
-from fastapi import FastAPI, HTTPException, UploadFile, File, Depends, BackgroundTasks, Query, status
+from fastapi import FastAPI, HTTPException, UploadFile, File, BackgroundTasks, Query, status, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.responses import JSONResponse
@@ -328,6 +328,7 @@ async def log_prediction_analytics(
         )
 
 # Define the upload and analyze image function
+@app.post("/openai/upload/image", response_model=Dict[str, Any])
 async def upload_and_analyze_image(
     file: UploadFile = File(...), 
     keywords: Optional[str] = None,
@@ -392,13 +393,6 @@ def log_routes():
     print("Registered routes:")
     for route in app.routes:
         print(f"{route.path}: {route.methods}")
-
-# Explicitly add the upload image route to the main app
-app.add_api_route(
-    "/openai/upload/image", 
-    upload_and_analyze_image, 
-    methods=["POST"]
-)
 
 if __name__ == "__main__":
     settings = get_settings()
