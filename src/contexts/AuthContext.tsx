@@ -72,8 +72,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       try {
         // Check for existing token
         const token = localStorage.getItem('auth_token')
+        const supabaseToken = localStorage.getItem('sb-access-token')
+        
+        // Prioritize Supabase session first
+        if (supabaseToken) {
+          try {
+            const { auth } = await import('../lib/supabase/client')
+            const { session, error } = await auth.getSession()
+            
+            if (session?.user) {
+              await handleOAuthSession(session)
+              return
+            }
+          } catch (supabaseError) {
+            console.log('Supabase session check failed:', supabaseError)
+          }
+        }
+
+        // Fallback to backend token
         if (token) {
-          // Try to get current user from backend
           try {
             const response = await api.user.getProfile()
             if (response.success && response.data?.profile) {
@@ -84,23 +101,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 user: authUser
               })
               console.log('Session restored from backend:', authUser.email, 'role:', authUser.role)
+              return
             }
           } catch (backendError) {
-            console.log('Backend session check failed, trying Supabase:', backendError)
+            console.log('Backend session check failed:', backendError)
+            // Remove invalid token
+            localStorage.removeItem('auth_token')
           }
         }
 
-        // Check Supabase session
-        try {
-          const { auth } = await import('../lib/supabase/client')
-          const { session, error } = await auth.getSession()
-          
-          if (session?.user) {
-            await handleOAuthSession(session)
-          }
-        } catch (supabaseError) {
-          console.log('Supabase session check failed:', supabaseError)
-        }
+        // If no valid session found, clear any stale tokens
+        localStorage.removeItem('auth_token')
+        localStorage.removeItem('sb-access-token')
       } catch (error) {
         console.error('Session check failed:', error)
       } finally {
@@ -118,6 +130,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           if (event === 'SIGNED_IN' && supabaseSession) {
             await handleOAuthSession(supabaseSession)
           } else if (event === 'SIGNED_OUT') {
+            // Clear all auth-related storage
+            localStorage.removeItem('auth_token')
+            localStorage.removeItem('sb-access-token')
             setUser(null)
             setAuthSession(null)
             setError(null)
@@ -130,6 +145,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     checkSession()
     setupAuthListener()
+
+    // Periodic session validation
+    const sessionValidationInterval = setInterval(async () => {
+      if (user) {
+        try {
+          await refreshProfile()
+        } catch (error) {
+          console.log('Periodic session validation failed, logging out', error)
+          signOut()
+        }
+      }
+    }, 15 * 60 * 1000) // Every 15 minutes
+
+    return () => {
+      clearInterval(sessionValidationInterval)
+    }
   }, [])
 
   const handleOAuthSession = async (supabaseSession: any) => {
@@ -312,33 +343,41 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       setIsLoading(true)
       
-      // Clear backend session if exists
-      await api.auth.logout()
-      
-      // Clear Supabase session if exists  
+      // Try to sign out from Supabase
       try {
         const { auth } = await import('../lib/supabase/client')
         await auth.signOut()
       } catch (supabaseError) {
-        console.log('Supabase signout not needed or failed:', supabaseError)
+        console.log('Supabase sign out failed:', supabaseError)
       }
+
+      // Try to sign out from backend
+      try {
+        await api.auth.logout()
+      } catch (backendError) {
+        console.log('Backend sign out failed:', backendError)
+      }
+
+      // Clear all authentication-related storage
+      localStorage.removeItem('auth_token')
+      localStorage.removeItem('sb-access-token')
       
-      // Clear local state
+      // Reset context state
       setUser(null)
       setAuthSession(null)
       setError(null)
-      
-      toast.success('Signed out successfully')
+
+      // Optional: Redirect to login page or home
+      window.location.href = '/login'
+
+      toast.success('Logged out successfully')
     } catch (error) {
-      console.error('Logout error:', error)
-      // Even if logout fails on backend, clear local state
-      setUser(null)
-      setAuthSession(null)
-      localStorage.removeItem('auth_token')
+      console.error('Logout failed:', error)
+      toast.error('Failed to log out')
     } finally {
       setIsLoading(false)
     }
-  }
+  };
 
   const resetPassword = async (email: string) => {
     try {

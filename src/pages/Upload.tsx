@@ -47,6 +47,7 @@ import { PartDetailsAnalysis } from '@/components/PartDetailsAnalysis';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/components/ui/collapsible';
 import { aiClient } from '@/lib/api';
+import { uploadPartImage } from '@/lib/api';
 
 // Image component with fallback handling
 const ImageWithFallback = ({ src, alt, className, onError }: { 
@@ -322,32 +323,22 @@ const Upload = () => {
     onProgress?: (progress: AnalysisProgress) => void
   ): Promise<AnalysisResponse | null> => {
     try {
-      // Step 1: Upload and validate
-      onProgress?.({
-        status: 'uploading',
-        message: 'Uploading image to secure server...',
-        progress: 5,
-        currentStep: 'Upload & Validation',
-        currentStepIndex: 1,
-        totalSteps: 6,
-        details: 'Transferring image data and performing security checks'
-      });
-
-      // Combine keywords from options and saved keywords
+      // Prepare form data
+      const formData = new FormData();
+      formData.append('file', file);
+      
+      // Add optional parameters
+      formData.append('confidence_threshold', (options.confidenceThreshold || 0.3).toString());
+      formData.append('max_predictions', (options.maxPredictions || 3).toString());
+      
+      // Add keywords if available
       const combinedKeywords = [
         ...(options.keywords || []),
-        ...savedKeywords,
         'engine components',
         'automotive parts'
       ].join(', ');
-
-      // Create form data
-      const formData = new FormData();
-      formData.append('file', file);
       formData.append('keywords', combinedKeywords);
-      formData.append('confidence_threshold', '0.3');
-      formData.append('max_predictions', '3');
-
+      
       // Track upload progress
       const config = {
         onUploadProgress: (progressEvent: AxiosProgressEvent) => {
@@ -502,17 +493,71 @@ const Upload = () => {
 
     setIsLoading(true);
     try {
-      const result = await uploadFile(uploadedFile);
-      if (result.success && result.part_info) {
-        setPartInfo(result.part_info);
+      console.log('Uploading file:', uploadedFile);
+      const result = await uploadPartImage(uploadedFile, keywords ? [keywords] : [], {
+        confidenceThreshold: 0.3,
+        maxPredictions: 3,
+        includeWebScraping: true
+      });
+      console.log('Upload result:', result);
+      
+      if (!result) {
+        throw new Error('No result returned from upload');
+      }
+      
+      if (result.success && result.predictions && result.predictions.length > 0) {
+        const firstPrediction = result.predictions[0];
+        
+        // Prepare additional details dynamically
+        const additionalDetails = {
+          full_analysis: `A. PART IDENTIFICATION
+- Precise Part Name: ${firstPrediction.class_name}
+- Confidence Level: ${(firstPrediction.confidence * 100).toFixed(1)}%
+
+B. TECHNICAL SPECIFICATIONS
+- Category: ${firstPrediction.category}
+- Manufacturer: ${firstPrediction.manufacturer}
+- Estimated Price: ${firstPrediction.estimated_price}
+
+C. COMPATIBILITY
+${firstPrediction.compatibility ? firstPrediction.compatibility.map(model => `- ${model}`).join('\n') : 'No specific compatibility information available'}`,
+          technical_specifications: `
+- Material Composition: Detailed material information not available
+- Performance Characteristics: Additional details pending`,
+          market_information: `
+- Estimated Price Range: ${firstPrediction.estimated_price}
+- Typical Applications: ${firstPrediction.category}`,
+          confidence_reasoning: `
+- Visual Match Confidence: ${(firstPrediction.confidence * 100).toFixed(1)}%
+- Technical Identification Confidence: ${(firstPrediction.confidence * 100).toFixed(1)}%`
+        };
+
+        // Set analysis results to trigger full display
+        setAnalysisResults({
+          success: result.success,
+          predictions: result.predictions,
+          similar_images: result.similar_images || [],
+          model_version: result.model_version || 'SpareFinder AI',
+          processing_time: result.processing_time,
+          image_metadata: {
+            content_type: result.image_metadata?.content_type || '',
+            size_bytes: result.image_metadata?.size_bytes || 0
+          },
+          additional_details: additionalDetails
+        });
+
+        // Set the first prediction as selected
+        setSelectedPrediction(firstPrediction);
+
         toast({
           title: "Success",
-          description: "Part information retrieved successfully.",
+          description: `Part identified: ${firstPrediction.class_name}`,
         });
       } else {
-        throw new Error(result.error || 'Failed to process image');
+        throw new Error('No predictions found');
       }
     } catch (error) {
+      console.error('Upload error:', error);
       toast({
         title: "Error",
         description: error instanceof Error ? error.message : "Failed to process image",
@@ -1228,10 +1273,10 @@ const Upload = () => {
 
                         {/* Metadata Section */}
                         <div className="text-xs text-gray-500 text-right mt-6 space-y-1">
-                          <p><strong>Model:</strong> {analysisResults.model_version}</p>
-                          <p><strong>Processing Time:</strong> {analysisResults.processing_time.toFixed(2)} seconds</p>
-                          <p><strong>Image Size:</strong> {analysisResults.image_metadata.size_bytes} bytes</p>
-                          <p><strong>Image Type:</strong> {analysisResults.image_metadata.content_type}</p>
+                          <p><strong>Model:</strong> {analysisResults.model_version || 'Unknown'}</p>
+                          <p><strong>Processing Time:</strong> {analysisResults.processing_time ? `${analysisResults.processing_time.toFixed(2)} seconds` : 'N/A'}</p>
+                          <p><strong>Image Size:</strong> {analysisResults.image_metadata?.size_bytes || 0} bytes</p>
+                          <p><strong>Image Type:</strong> {analysisResults.image_metadata?.content_type || 'Unknown'}</p>
                         </div>
 
                         {/* Full Analysis Expandable Section */}

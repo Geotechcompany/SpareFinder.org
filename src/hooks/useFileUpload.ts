@@ -374,18 +374,37 @@ export const useFileUpload = (options: UseFileUploadOptions = {}): UseFileUpload
     ref: inputRef,
   }), [accept, maxFiles, handleInputChange]);
 
-  const uploadFile = async (file: File): Promise<UploadResponse> => {
+  const uploadFile = async (
+    file: File, 
+    keywords: string[] | { 
+      confidenceThreshold?: number; 
+      maxPredictions?: number; 
+      includeWebScraping?: boolean; 
+    } = [], 
+    options: {
+      confidenceThreshold?: number;
+      maxPredictions?: number;
+      includeWebScraping?: boolean;
+    } = {}
+  ): Promise<UploadResponse> => {
     setIsUploading(true);
     setError(null);
 
+    // Normalize keywords and options
+    const keywordsList = Array.isArray(keywords) ? keywords : [];
+    const processOptions = Array.isArray(keywords) ? options : keywords;
+
     try {
-      const response = await api.upload.image(file);
+      const response = await api.upload.image(file, keywordsList, {
+        confidenceThreshold: processOptions.confidenceThreshold,
+        maxPredictions: processOptions.maxPredictions,
+        includeWebScraping: processOptions.includeWebScraping
+      });
       
       // If upload was successful, refresh statistics
       if (response.success) {
-        // Refresh statistics
         await Promise.all([
-          api.statistics.refresh()  // Keep only the known working method
+          api.statistics.refresh()
         ]);
       }
       

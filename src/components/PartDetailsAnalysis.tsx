@@ -5,7 +5,7 @@ import { UploadResponse } from '@/hooks/useFileUpload';
 import { 
   Target, 
   Info, 
-  DollarSign, 
+  DollarSign,
   CheckCircle,
   AlertTriangle,
   Zap,
@@ -57,7 +57,7 @@ const Section: React.FC<{
 export const PartDetailsAnalysis: React.FC<{ 
   partInfo: NonNullable<UploadResponse['part_info']> 
 }> = ({ partInfo }) => {
-  // Destructure and parse the additional details from the part info
+  // Ensure additional details is always an object
   const additionalDetails = partInfo.additional_details || {};
 
   // Determine if sections have meaningful data
@@ -84,6 +84,14 @@ export const PartDetailsAnalysis: React.FC<{
     (partInfo.technical_identification_confidence || 0) > 0 || 
     partInfo.confidence_reasoning
   );
+
+  // Safely handle typical vehicle models
+  const parseVehicleModels = (models?: string | string[]) => {
+    if (!models) return [];
+    return Array.isArray(models) 
+      ? models 
+      : models.split(',').map(model => model.trim()).filter(Boolean);
+  };
 
   return (
     <div className="space-y-6">
@@ -170,8 +178,8 @@ export const PartDetailsAnalysis: React.FC<{
             <div>
               <strong className="block mb-2">Compatible Vehicles:</strong>
               <ul className="list-disc list-inside text-muted-foreground">
-                {additionalDetails['Typical Vehicle Models'].split(',').map((model, index) => (
-                  <li key={index}>{model.trim()}</li>
+                {parseVehicleModels(additionalDetails['Typical Vehicle Models']).map((model, index) => (
+                  <li key={index}>{model}</li>
                 ))}
               </ul>
             </div>
@@ -191,15 +199,16 @@ export const PartDetailsAnalysis: React.FC<{
       <Section 
         title="Confidence Assessment" 
         icon={<CheckCircle className="w-5 h-5 text-green-400" />}
+        isEmpty={!hasConfidenceData}
       >
         <div className="space-y-3">
           <div className="flex justify-between items-center">
             <div className="text-sm text-gray-400">Visual Match Confidence</div>
             <Badge 
               variant={
-                (partInfo.visual_match_confidence || 0) > 80 
+                (partInfo.visual_match_confidence || 0) > 0.8 
                   ? 'default' 
-                  : (partInfo.visual_match_confidence || 0) > 60 
+                  : (partInfo.visual_match_confidence || 0) > 0.6 
                   ? 'secondary' 
                   : 'destructive'
               }
@@ -211,9 +220,9 @@ export const PartDetailsAnalysis: React.FC<{
             <div className="text-sm text-gray-400">Technical Identification</div>
             <Badge 
               variant={
-                (partInfo.technical_identification_confidence || 0) > 80 
+                (partInfo.technical_identification_confidence || 0) > 0.8 
                   ? 'default' 
-                  : (partInfo.technical_identification_confidence || 0) > 60 
+                  : (partInfo.technical_identification_confidence || 0) > 0.6 
                   ? 'secondary' 
                   : 'destructive'
               }
@@ -234,7 +243,7 @@ export const PartDetailsAnalysis: React.FC<{
       </Section>
 
       {/* Additional Details Section */}
-      {partInfo.additional_details && (
+      {(partInfo.additional_details && Object.keys(partInfo.additional_details).length > 0) && (
         <Section 
           title="Additional Analysis Details" 
           icon={<Sparkles className="w-5 h-5 text-purple-400" />}
@@ -260,18 +269,11 @@ export const PartDetailsAnalysis: React.FC<{
               <div>
                 <div className="text-sm font-semibold text-gray-200 mb-1">Compatible Vehicle Models</div>
                 <div className="flex flex-wrap gap-2">
-                  {Array.isArray(partInfo.additional_details.typical_vehicle_models) 
-                    ? partInfo.additional_details.typical_vehicle_models.map((model, index) => (
-                        <Badge key={index} variant="outline" className="text-gray-300">
-                          {model}
-                        </Badge>
-                      ))
-                    : (
-                        <Badge variant="outline" className="text-gray-300">
-                          {partInfo.additional_details.typical_vehicle_models}
-                        </Badge>
-                      )
-                  }
+                  {parseVehicleModels(partInfo.additional_details.typical_vehicle_models).map((model, index) => (
+                    <Badge key={index} variant="outline" className="text-gray-300">
+                      {model}
+                    </Badge>
+                  ))}
                 </div>
               </div>
             )}

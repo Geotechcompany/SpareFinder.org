@@ -738,16 +738,24 @@ const aiClient: AxiosInstance = axios.create({
   baseURL: AI_SERVICE_URL,
   timeout: 120000, // Increased to 2 minutes for AI processing
   headers: {
-    'Content-Type': 'application/json',
+    'Content-Type': 'multipart/form-data',
     'Authorization': `Bearer ${import.meta.env.VITE_AI_SERVICE_API_KEY || 'geotech-dev-key-2024'}`
   },
 });
 
 aiClient.interceptors.request.use((config) => {
-  // Use the AI service API key
-  const apiKey = 'geotech-dev-key-2024';
+  // Ensure Authorization header is set
+  const apiKey = import.meta.env.VITE_AI_SERVICE_API_KEY || 'geotech-dev-key-2024';
   config.headers.Authorization = `Bearer ${apiKey}`;
+  
+  // Ensure Content-Type is multipart/form-data for file uploads
+  if (config.data instanceof FormData) {
+    config.headers['Content-Type'] = 'multipart/form-data';
+  }
+  
   return config;
+}, (error) => {
+  return Promise.reject(error);
 });
 
 // API functions for the new approach

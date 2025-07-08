@@ -259,6 +259,21 @@ export const db = {
   },
 }
 
+// Method to fetch database tables
+export const schema = {
+  getTables: async () => {
+    const { data, error } = await supabase
+      .rpc('list_tables');
+
+    if (error) {
+      console.error('Error fetching tables:', error);
+      return { tables: [], error };
+    }
+
+    return { tables: data, error: null };
+  }
+};
+
 // For backwards compatibility
 export const createClient = () => {
   console.warn('createClient() is deprecated. Please use the default export instead.');
