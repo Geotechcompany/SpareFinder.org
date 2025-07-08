@@ -364,7 +364,7 @@ class AIService:
         confidence_threshold: float = 0.3
     ) -> Dict[str, Any]:
         """
-        Save analysis result to Supabase database.
+        Save analysis result to Supabase database and storage.
         
         Args:
             user_id (str): User identifier
@@ -402,13 +402,25 @@ class AIService:
                 for pred in predictions
             ]
             
-            # Encode image to base64 for storage
-            image_base64 = base64.b64encode(image_data).decode('utf-8')
+            # Generate unique filename for the image
+            filename = f"{user_id}/{uuid.uuid4()}.jpg"
+            
+            # Upload image to Supabase storage
+            try:
+                storage_response = supabase_client.storage.from_(settings.SUPABASE_STORAGE_BUCKET).upload(
+                    file=image_data,
+                    path=filename,
+                    file_options={"content-type": "image/jpeg"}
+                )
+                image_url = supabase_client.storage.from_(settings.SUPABASE_STORAGE_BUCKET).get_public_url(filename)
+            except Exception as storage_error:
+                logger.warning(f"Failed to upload image to storage: {storage_error}")
+                image_url = None
             
             # Prepare record for insertion
             record = {
                 "user_id": user_id,
-                "image_data": image_base64,
+                "image_url": image_url,
                 "predictions": prediction_data,
                 "similar_images": similar_images,
                 "processing_time": processing_time,
@@ -424,7 +436,9 @@ class AIService:
                 "status": "success",
                 "message": "Analysis result saved successfully",
                 "record_id": response.data[0].get('id') if response.data else None,
-                "user_id": user_id
+                "user_id": user_id,
+                "image_url": image_url,
+                "search_id": response.data[0].get('id') if response.data else None
             }
         
         except Exception as e:
