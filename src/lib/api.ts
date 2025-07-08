@@ -2,7 +2,7 @@ import axios, { AxiosInstance } from 'axios';
 import { toast } from '@/hooks/use-toast';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
-const AI_SERVICE_URL = import.meta.env.VITE_AI_SERVICE_URL || 'http://localhost:9000';
+const AI_SERVICE_URL = import.meta.env.VITE_AI_SERVICE_URL || 'https://part-finder-ai-vision-1.onrender.com/';
 
 // Type definitions
 export interface ApiResponse<T = any> {
