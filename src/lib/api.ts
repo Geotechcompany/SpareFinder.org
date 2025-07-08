@@ -31,11 +31,35 @@ export interface UploadResponse {
 
 export interface ApiResponse<T = any> {
   success: boolean;
-  data: T & {
-    token?: string;
-    user?: User;
-    profile?: User;
-    [key: string]: any;
+  data?: T & {
+    statistics?: T;
+    uploads?: Array<{
+      id: string;
+      image_name: string;
+      created_at: string;
+      confidence_score: number;
+    }>;
+    activities?: Array<{
+      id: string;
+      resource_type: string;
+      action: string;
+      details?: {
+        description?: string;
+        confidence?: number;
+        status?: string;
+      };
+      created_at: string;
+    }>;
+    totalUploads?: number;
+    successfulUploads?: number;
+    avgConfidence?: number;
+    avgProcessTime?: number;
+    modelAccuracy?: number;
+    accuracyChange?: number;
+    totalSearches?: number;
+    searchesGrowth?: number;
+    avgResponseTime?: number;
+    responseTimeChange?: number;
   };
   error?: string;
   message?: string;
@@ -107,16 +131,16 @@ export interface AIServiceResponse {
   };
 }
 
-// Define response interfaces
+// Simplified type definitions
 export interface DashboardStatsResponse {
-  totalUploads: number;
-  successfulUploads: number;
-  avgConfidence: number;
-  avgProcessTime: number;
+  totalUploads?: number;
+  successfulUploads?: number;
+  avgConfidence?: number;
+  avgProcessTime?: number;
 }
 
 export interface RecentUploadResponse {
-  uploads: Array<{
+  uploads?: Array<{
     id: string;
     image_name: string;
     created_at: string;
@@ -125,7 +149,7 @@ export interface RecentUploadResponse {
 }
 
 export interface RecentActivityResponse {
-  activities: Array<{
+  activities?: Array<{
     id: string;
     resource_type: string;
     action: string;
@@ -139,12 +163,12 @@ export interface RecentActivityResponse {
 }
 
 export interface PerformanceMetricsResponse {
-  modelAccuracy: number;
-  accuracyChange: number;
-  totalSearches: number;
-  searchesGrowth: number;
-  avgResponseTime: number;
-  responseTimeChange: number;
+  modelAccuracy?: number;
+  accuracyChange?: number;
+  totalSearches?: number;
+  searchesGrowth?: number;
+  avgResponseTime?: number;
+  responseTimeChange?: number;
 }
 
 // Extend AxiosInstance type to include admin methods
@@ -157,6 +181,11 @@ interface ExtendedAxiosInstance extends AxiosInstance {
   updateUserRole?: (userId: string, role: string) => Promise<{ success: boolean; data?: any; error?: string }>;
   deleteAdminUser?: (userId: string) => Promise<{ success: boolean; data?: any; error?: string }>;
   adminLogout?: () => Promise<{ success: boolean; error?: string }>;
+  
+  // New methods
+  getAchievements?: () => Promise<{ success: boolean; data?: any; error?: string }>;
+  getDashboardStats?: () => Promise<{ success: boolean; data?: any; error?: string }>;
+  getBillingInfo?: () => Promise<{ success: boolean; data?: any; error?: string }>;
 }
 
 // Create an axios instance with base configuration
@@ -353,6 +382,55 @@ apiClient.adminLogout = async () => {
   } finally {
     // Always redirect to login page
     window.location.href = '/login';
+  }
+};
+
+// Extend apiClient with additional methods
+apiClient.getAchievements = async () => {
+  try {
+    const response = await apiClient.get('/api/user/achievements');
+    return {
+      success: true,
+      data: response.data
+    };
+  } catch (error) {
+    console.error('Failed to fetch achievements:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to fetch achievements'
+    };
+  }
+};
+
+apiClient.getDashboardStats = async () => {
+  try {
+    const response = await apiClient.get('/api/user/dashboard-stats');
+    return {
+      success: true,
+      data: response.data
+    };
+  } catch (error) {
+    console.error('Failed to fetch dashboard stats:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to fetch dashboard stats'
+    };
+  }
+};
+
+apiClient.getBillingInfo = async () => {
+  try {
+    const response = await apiClient.get('/api/billing/info');
+    return {
+      success: true,
+      data: response.data
+    };
+  } catch (error) {
+    console.error('Failed to fetch billing info:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to fetch billing information'
+    };
   }
 };
 

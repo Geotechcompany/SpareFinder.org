@@ -3,10 +3,9 @@ import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
 import compression from 'compression';
-import rateLimit from 'express-rate-limit';
 import dotenv from 'dotenv';
 import { createClient } from '@supabase/supabase-js';
-import { apiLimiter } from './middleware/rate-limit';
+// Removed rate limiter import
 
 // Load environment variables
 dotenv.config();
@@ -69,16 +68,6 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
 }));
 
-// Rate limiting
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // limit each IP to 100 requests per windowMs
-  message: 'Too many requests from this IP, please try again later.',
-  standardHeaders: true,
-  legacyHeaders: false,
-});
-app.use(limiter);
-
 // Body parsing middleware
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
@@ -99,8 +88,7 @@ app.get('/health', (_req, res) => {
   });
 });
 
-// Apply global rate limiter to all routes
-app.use(apiLimiter);
+// Removed rate limiter usage
 
 // API routes
 app.use('/api/auth', authRoutes);

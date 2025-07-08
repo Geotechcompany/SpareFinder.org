@@ -86,77 +86,100 @@ const Dashboard = () => {
         
         // Fetch dashboard stats
         const statsResponse = await api.dashboard.getStats();
-        if (statsResponse.data) {
-          const { totalUploads, successfulUploads, avgConfidence, avgProcessTime } = 
-            statsResponse.data as unknown as DashboardStatsResponse;
-          setStats({
-            totalUploads,
-            successfulUploads,
-            avgConfidence,
-            avgProcessTime
-          });
-        }
+        const statsData = (statsResponse.data || {}) as DashboardStatsResponse;
+        setStats({
+          totalUploads: statsData.totalUploads || 0,
+          successfulUploads: statsData.successfulUploads || 0,
+          avgConfidence: statsData.avgConfidence || 0,
+          avgProcessTime: statsData.avgProcessTime || 0
+        });
 
         // Fetch recent uploads
         const uploadsResponse = await api.dashboard.getRecentUploads(5);
-        if (uploadsResponse.data) {
-          const uploads = uploadsResponse.data as unknown as RecentUploadResponse;
-          setRecentUploads(uploads.uploads.map(upload => ({
-            id: upload.id,
-            name: upload.image_name || 'Unknown',
-            date: format(new Date(upload.created_at), 'PPp'),
-            status: 'completed',
-            confidence: upload.confidence_score ? Math.round(upload.confidence_score * 100) : 0
-          })));
-        }
+        const uploadsData = (uploadsResponse.data || {}) as RecentUploadResponse;
+        setRecentUploads((uploadsData.uploads || []).map(upload => ({
+          id: upload.id || '',
+          name: upload.image_name || 'Unknown',
+          date: upload.created_at ? format(new Date(upload.created_at), 'PPp') : 'N/A',
+          status: 'completed',
+          confidence: upload.confidence_score ? Math.round(upload.confidence_score * 100) : 0
+        })));
 
         // Fetch recent activities
         const activitiesResponse = await api.dashboard.getRecentActivities(5);
-        if (activitiesResponse.data) {
-          const activities = activitiesResponse.data as unknown as RecentActivityResponse;
-          setRecentActivities(activities.activities.map(activity => ({
-            id: activity.id,
-            type: activity.resource_type,
-            title: activity.action,
-            description: activity.details?.description || '',
-            time: format(new Date(activity.created_at), 'PPp'),
-            confidence: activity.details?.confidence || null,
-            status: activity.details?.status || 'success'
-          })));
-        }
+        const activitiesData = (activitiesResponse.data || {}) as RecentActivityResponse;
+        setRecentActivities((activitiesData.activities || []).map(activity => ({
+          id: activity.id || '',
+          type: activity.resource_type || 'unknown',
+          title: activity.action || 'No Action',
+          description: activity.details?.description || '',
+          time: activity.created_at ? format(new Date(activity.created_at), 'PPp') : 'N/A',
+          confidence: activity.details?.confidence || null,
+          status: activity.details?.status || 'success'
+        })));
 
         // Fetch performance metrics
         const metricsResponse = await api.dashboard.getPerformanceMetrics();
-        if (metricsResponse.data) {
-          const metrics = metricsResponse.data as unknown as PerformanceMetricsResponse;
-          setPerformanceMetrics([
-            {
-              label: 'AI Model Accuracy',
-              value: `${metrics.modelAccuracy.toFixed(1)}%`,
-              change: `${(metrics.accuracyChange > 0 ? '+' : '')}${metrics.accuracyChange.toFixed(1)}%`,
-              icon: Cpu,
-              color: 'from-green-600 to-emerald-600'
-            },
-            {
-              label: 'Total Searches',
-              value: `${metrics.totalSearches}`,
-              change: `${(metrics.searchesGrowth > 0 ? '+' : '')}${metrics.searchesGrowth.toFixed(1)}%`,
-              icon: Database,
-              color: 'from-blue-600 to-cyan-600'
-            },
-            {
-              label: 'Response Time',
-              value: `${metrics.avgResponseTime}ms`,
-              change: `${(metrics.responseTimeChange < 0 ? '' : '+')}${metrics.responseTimeChange}ms`,
-              icon: Activity,
-              color: 'from-purple-600 to-violet-600'
-            }
-          ]);
-        }
+        const metricsData = (metricsResponse.data || {}) as PerformanceMetricsResponse;
+        setPerformanceMetrics([
+          {
+            label: 'AI Model Accuracy',
+            value: `${(metricsData.modelAccuracy || 0).toFixed(1)}%`,
+            change: `${(metricsData.accuracyChange && metricsData.accuracyChange > 0 ? '+' : '')}${(metricsData.accuracyChange || 0).toFixed(1)}%`,
+            icon: Cpu,
+            color: 'from-green-600 to-emerald-600'
+          },
+          {
+            label: 'Total Searches',
+            value: `${metricsData.totalSearches || 0}`,
+            change: `${(metricsData.searchesGrowth && metricsData.searchesGrowth > 0 ? '+' : '')}${(metricsData.searchesGrowth || 0).toFixed(1)}%`,
+            icon: Database,
+            color: 'from-blue-600 to-cyan-600'
+          },
+          {
+            label: 'Response Time',
+            value: `${(metricsData.avgResponseTime || 0)}ms`,
+            change: `${(metricsData.responseTimeChange && metricsData.responseTimeChange < 0 ? '' : '+')}${(metricsData.responseTimeChange || 0)}ms`,
+            icon: Activity,
+            color: 'from-purple-600 to-violet-600'
+          }
+        ]);
 
       } catch (error) {
         console.error('Error fetching dashboard data:', error);
-        // Dashboard will still load with default/empty data
+        
+        // Set default/empty states in case of error
+        setStats({
+          totalUploads: 0,
+          successfulUploads: 0,
+          avgConfidence: 0,
+          avgProcessTime: 0
+        });
+        setRecentUploads([]);
+        setRecentActivities([]);
+        setPerformanceMetrics([
+          {
+            label: 'AI Model Accuracy',
+            value: '0%',
+            change: '0%',
+            icon: Cpu,
+            color: 'from-green-600 to-emerald-600'
+          },
+          {
+            label: 'Database Coverage',
+            value: '0',
+            change: '0',
+            icon: Database,
+            color: 'from-blue-600 to-cyan-600'
+          },
+          {
+            label: 'Response Time',
+            value: '0ms',
+            change: '0ms',
+            icon: Activity,
+            color: 'from-purple-600 to-violet-600'
+          }
+        ]);
       } finally {
         setIsDataLoading(false);
       }

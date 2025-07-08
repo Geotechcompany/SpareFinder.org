@@ -4,7 +4,7 @@ import jwt from 'jsonwebtoken';
 import { supabase } from '../server';
 import { authenticateToken } from '../middleware/auth';
 import { AuthRequest } from '../types/auth';
-import { authLimiter, strictLimiter } from '../middleware/rate-limit';
+// Removed rate limiter import
 
 const router = Router();
 
@@ -45,7 +45,7 @@ const loginValidation = [
 ];
 
 // Register endpoint
-router.post('/register', authLimiter, registerValidation, async (req: Request, res: Response) => {
+router.post('/register', registerValidation, async (req: Request, res: Response) => {
   try {
     // Check validation errors
     const errors = validationResult(req);
@@ -211,7 +211,7 @@ router.post('/register', authLimiter, registerValidation, async (req: Request, r
 });
 
 // Login endpoint
-router.post('/login', authLimiter, loginValidation, async (req: Request, res: Response) => {
+router.post('/login', loginValidation, async (req: Request, res: Response) => {
   try {
     // Check validation errors
     const errors = validationResult(req);
@@ -628,7 +628,7 @@ router.post('/refresh', async (req: Request, res: Response) => {
 });
 
 // Reset password endpoint
-router.post('/reset-password', strictLimiter, [
+router.post('/reset-password', [
   body('email').isEmail().normalizeEmail().withMessage('Please provide a valid email')
 ], async (req: Request, res: Response) => {
   try {
