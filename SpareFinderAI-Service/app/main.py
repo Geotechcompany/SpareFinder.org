@@ -3,7 +3,10 @@ import uuid
 import logging
 import json
 import asyncio
+import sys
+import signal
 from typing import Dict, Any, Optional, List
+import time
 
 import uvicorn
 from fastapi import (
@@ -25,25 +28,60 @@ from dotenv import load_dotenv
 from .services.ai_service import analyze_part_image
 from .core.config import settings
 
-# Configure logging with a more robust method
+# Enhanced logging configuration
 def configure_logging():
     """
-    Configure logging with thread-safe and interrupt-resistant setup
+    Configure logging with enhanced thread-safe and interrupt-resistant setup
     """
-    logging.basicConfig(
-        level=logging.INFO, 
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-        handlers=[
-            logging.StreamHandler(),  # Output to console
-            logging.FileHandler('app.log', mode='a', encoding='utf-8')  # Output to file
-        ]
+    # Create a custom log formatter
+    formatter = logging.Formatter(
+        fmt='%(asctime)s - %(name)s - %(levelname)s - [%(filename)s:%(lineno)d] - %(message)s',
+        datefmt='%Y-%m-%d %H:%M:%S'
     )
+    
+    # Configure root logger
+    logging.basicConfig(level=logging.INFO)
+    
+    # Console handler
+    console_handler = logging.StreamHandler(sys.stdout)
+    console_handler.setFormatter(formatter)
+    console_handler.setLevel(logging.INFO)
+    
+    # File handler with rotation-like behavior
+    try:
+        log_dir = os.path.join(os.getcwd(), 'logs')
+        os.makedirs(log_dir, exist_ok=True)
+        log_file = os.path.join(log_dir, 'app.log')
+        
+        # Rotate log if it gets too large
+        if os.path.exists(log_file) and os.path.getsize(log_file) > 10 * 1024 * 1024:  # 10 MB
+            backup_file = os.path.join(log_dir, f'app_{int(time.time())}.log')
+            os.rename(log_file, backup_file)
+        
+        file_handler = logging.FileHandler(log_file, mode='a', encoding='utf-8')
+        file_handler.setFormatter(formatter)
+        file_handler.setLevel(logging.DEBUG)
+    except Exception as e:
+        print(f"Could not set up file logging: {e}")
+        file_handler = logging.NullHandler()
+    
+    # Get the root logger and add handlers
+    root_logger = logging.getLogger()
+    
+    # Remove existing handlers to prevent duplicate logs
+    for handler in root_logger.handlers[:]:
+        root_logger.removeHandler(handler)
+    
+    root_logger.addHandler(console_handler)
+    root_logger.addHandler(file_handler)
     
     # Suppress overly verbose logs from libraries
     logging.getLogger('uvicorn').setLevel(logging.WARNING)
     logging.getLogger('uvicorn.access').setLevel(logging.WARNING)
     logging.getLogger('uvicorn.error').setLevel(logging.WARNING)
     logging.getLogger('fastapi').setLevel(logging.WARNING)
+    logging.getLogger('openai').setLevel(logging.WARNING)
+    logging.getLogger('httpx').setLevel(logging.WARNING)
 
 # Configure logging before app initialization
 configure_logging()
@@ -106,6 +144,16 @@ class AnalysisResponse(BaseModel):
     processing_time: Optional[float] = None
     model_version: Optional[str] = None
 
+# Graceful shutdown handler
+def graceful_shutdown(signum, frame):
+    """Handle graceful shutdown signals"""
+    logger.info(f"Received signal {signum}. Initiating graceful shutdown...")
+    sys.exit(0)
+
+# Register signal handlers
+signal.signal(signal.SIGINT, graceful_shutdown)
+signal.signal(signal.SIGTERM, graceful_shutdown)
+
 # Startup event to ensure directories are created
 @app.on_event("startup")
 async def startup_event():
@@ -114,14 +162,44 @@ async def startup_event():
         uploads_dir = os.path.join(os.getcwd(), "uploads")
         os.makedirs(uploads_dir, exist_ok=True)
         logger.info(f"Uploads directory ensured: {uploads_dir}")
+        
+        # Additional startup checks can be added here
     except Exception as e:
-        logger.error(f"Failed to create uploads directory: {e}")
+        logger.error(f"Startup event error: {e}")
+        # Optionally raise a critical error that prevents app startup
+        raise RuntimeError(f"Critical startup failure: {e}")
 
 # Shutdown event for cleanup
 @app.on_event("shutdown")
 async def shutdown_event():
-    logger.info("Application is shutting down")
-    # Optionally clear analysis results or perform cleanup
+    try:
+        logger.info("Initiating application shutdown")
+        
+        # Clear analysis results safely
+        if analysis_results:
+            logger.info(f"Clearing {len(analysis_results)} analysis results")
+            analysis_results.clear()
+        
+        # Optional: Clean up upload directory
+        uploads_dir = os.path.join(os.getcwd(), "uploads")
+        try:
+            for filename in os.listdir(uploads_dir):
+                file_path = os.path.join(uploads_dir, filename)
+                if os.path.isfile(file_path):
+                    try:
+                        os.unlink(file_path)
+                    except Exception as file_error:
+                        logger.warning(f"Could not delete file {filename}: {file_error}")
+            logger.info("Cleaned up temporary upload files")
+        except Exception as cleanup_error:
+            logger.warning(f"Error during upload directory cleanup: {cleanup_error}")
+        
+        logger.info("Application shutdown completed successfully")
+    except Exception as e:
+        logger.error(f"Error during application shutdown: {e}")
+    finally:
+        # Ensure logging is flushed
+        logging.shutdown()
 
 @app.post("/analyze-part/")
 async def analyze_part(
