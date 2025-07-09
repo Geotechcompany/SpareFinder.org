@@ -1,15 +1,41 @@
 services:
   - type: web
-    name: sparefinder-ai-service
+    name: sparefinderai-service
     env: python
+    region: oregon
+    branch: main
     buildCommand: |
-      python -m pip install --upgrade pip
-      pip install setuptools wheel build
-      pip install -r requirements.txt
-      pip install .
-    startCommand: python start.py
+      python3 -m pip install --upgrade pip
+      python3 -m pip install setuptools wheel build
+      python3 -m build
+    startCommand: |
+      python3 -m uvicorn app.main:app --host 0.0.0.0 --port $PORT
     envVars:
       - key: PYTHON_VERSION
-        value: 3.10.0
+        value: 3.11.7
+      - key: PORT
+        fromService:
+          type: web
+          name: sparefinderai-service
+          property: port
+      - key: ENVIRONMENT
+        value: production
       - key: OPENAI_API_KEY
-        sync: false 
+        sync: false  # Ensure this is set in Render dashboard
+
+  - type: worker
+    name: sparefinderai-background-tasks
+    env: python
+    region: oregon
+    branch: main
+    buildCommand: |
+      python3 -m pip install --upgrade pip
+      python3 -m pip install setuptools wheel build
+      python3 -m build
+    startCommand: |
+      python3 background_tasks.py
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.7
+      - key: ENVIRONMENT
+        value: production 

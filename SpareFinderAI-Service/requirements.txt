@@ -1,4 +1,4 @@
-# Build dependencies
+# Build and packaging dependencies
 setuptools>=61.0
 wheel
 build
