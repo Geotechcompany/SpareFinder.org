@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/components/ui/use-toast';
-import { apiClient } from '@/lib/api';
+import { api } from '@/lib/api';
 import AdminDesktopSidebar from '@/components/AdminDesktopSidebar';
 import MobileSidebar from '@/components/MobileSidebar';
 import { 

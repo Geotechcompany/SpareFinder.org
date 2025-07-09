@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { apiClient } from '../lib/api';
+import { useState, useEffect, useCallback } from 'react';
+import { api, type ApiType } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
 
 interface Achievement {
@@ -44,57 +44,67 @@ export const useProfileData = () => {
     error: null
   });
 
-  useEffect(() => {
-    const fetchProfileData = async () => {
-      if (!user) {
-        setData(prev => ({ ...prev, loading: false }));
-        return;
-      }
-
-      try {
-        setData(prev => ({ ...prev, loading: true, error: null }));
-
-        // Fetch achievements and activities in parallel
-        const [achievementsResponse, activitiesResponse] = await Promise.all([
-          apiClient.getAchievements(),
-          apiClient.getRecentActivities(4)
-        ]);
-
-        if (achievementsResponse.success && activitiesResponse.success) {
-          setData({
-            achievements: achievementsResponse.data?.achievements || [],
-            totalEarned: achievementsResponse.data?.totalEarned || 0,
-            totalAvailable: achievementsResponse.data?.totalAvailable || 0,
-            activities: activitiesResponse.data?.activities || [],
-            loading: false,
-            error: null
-          });
-        } else {
-          setData(prev => ({
-            ...prev,
-            loading: false,
-            error: achievementsResponse.error || activitiesResponse.error || 'Failed to fetch profile data'
-          }));
-        }
-      } catch (error) {
-        console.error('Error fetching profile data:', error);
-        setData(prev => ({
-          ...prev,
-          loading: false,
-          error: 'An unexpected error occurred'
-        }));
-      }
-    };
-
-    fetchProfileData();
-  }, [user]);
-
-  const refetch = () => {
-    if (user) {
-      setData(prev => ({ ...prev, loading: true }));
-      // Re-trigger the effect by updating a dependency or call fetchProfileData directly
+  const fetchProfileData = useCallback(async () => {
+    if (!user) {
+      setData(prev => ({ ...prev, loading: false }));
+      return {
+        achievements: [],
+        totalEarned: 0,
+        totalAvailable: 0,
+        activities: [],
+        loading: false,
+        error: null
+      };
     }
-  };
+
+    try {
+      setData(prev => ({ ...prev, loading: true, error: null }));
+
+      // Fetch achievements and activities in parallel
+      const [achievementsResponse, activitiesResponse] = await Promise.all([
+        api.profile.getAchievements(),
+        api.profile.getRecentActivities(4)
+      ]);
+
+      if (achievementsResponse.success && activitiesResponse.success) {
+        const newData = {
+          achievements: achievementsResponse.data?.achievements || [],
+          totalEarned: achievementsResponse.data?.totalEarned || 0,
+          totalAvailable: achievementsResponse.data?.totalAvailable || 0,
+          activities: activitiesResponse.data?.activities || [],
+          loading: false,
+          error: null
+        };
+        setData(newData);
+        return newData;
+      } else {
+        const errorData = {
+          ...data,
+          loading: false,
+          error: achievementsResponse.error || activitiesResponse.error || 'Failed to fetch profile data'
+        };
+        setData(errorData);
+        return errorData;
+      }
+    } catch (error) {
+      console.error('Error fetching profile data:', error);
+      const errorData = {
+        ...data,
+        loading: false,
+        error: 'An unexpected error occurred'
+      };
+      setData(errorData);
+      return errorData;
+    }
+  }, [user, data]);
+
+  useEffect(() => {
+    fetchProfileData();
+  }, [fetchProfileData]);
+
+  const refetch = useCallback(() => {
+    return fetchProfileData();
+  }, [fetchProfileData]);
 
   return { ...data, refetch };
 }; 

@@ -2,7 +2,7 @@ import { useState, useCallback, useRef } from 'react';
 import { toast } from '@/hooks/use-toast';
 import { validateImageFile, type ProcessedImage, type ImageProcessingOptions } from '@/lib/imageService';
 import { config } from '@/lib/config';
-import { api, apiClient } from '@/lib/api';
+import { api } from '@/lib/api';
 
 export interface UploadedFile {
   id: string;
@@ -415,6 +415,7 @@ export const useFileUpload = (options: UseFileUploadOptions = {}): UseFileUpload
       return {
         success: false,
         error: errorMessage,
+        part_info: undefined
       };
     } finally {
       setIsUploading(false);

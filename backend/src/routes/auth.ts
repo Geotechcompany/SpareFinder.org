@@ -57,10 +57,16 @@ router.post('/register', registerValidation, async (req: Request, res: Response)
       });
     }
 
-    const { email, password, full_name, name, company } = req.body;
+    const { 
+      email, 
+      password, 
+      full_name = '', 
+      name = '', 
+      company = null 
+    } = req.body;
 
     // Use full_name if provided, otherwise use name (for backward compatibility)
-    const userName = full_name || name;
+    const userName = full_name || name || 'User';
 
     console.log('📝 Registration request:', {
       email,
@@ -69,36 +75,14 @@ router.post('/register', registerValidation, async (req: Request, res: Response)
       hasPassword: !!password
     });
 
-    // Check if user already exists in auth
-    const { data: existingAuthUser, error: authCheckError } = await supabase.auth.admin.listUsers();
-    
-    if (authCheckError) {
-      console.error('Auth check error:', authCheckError);
-      return res.status(500).json({
-        success: false,
-        error: 'Registration failed',
-        message: 'Failed to check existing users'
-      });
-    }
-    
-    const userExists = existingAuthUser?.users?.find(user => user.email === email);
-    
-    if (userExists) {
-      return res.status(409).json({
-        success: false,
-        error: 'User already exists',
-        message: 'An account with this email already exists'
-      });
-    }
-
-    // Check if profile already exists (additional safety check)
+    // Check if profile already exists
     const { data: existingProfile, error: profileCheckError } = await supabase
       .from('profiles')
       .select('id, email')
       .eq('email', email)
       .single();
 
-    if (profileCheckError && profileCheckError.code !== 'PGRST116') { // PGRST116 means no rows found
+    if (profileCheckError && profileCheckError.code !== 'PGRST116') { 
       console.error('Profile check error:', profileCheckError);
       return res.status(500).json({
         success: false,
@@ -107,6 +91,7 @@ router.post('/register', registerValidation, async (req: Request, res: Response)
       });
     }
 
+    // If profile exists, return error
     if (existingProfile) {
       return res.status(409).json({
         success: false,
@@ -115,15 +100,16 @@ router.post('/register', registerValidation, async (req: Request, res: Response)
       });
     }
 
-    // Create user in Supabase Auth
-    const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+    // Create user in Supabase Auth with more lenient settings
+    const { data: authData, error: authError } = await supabase.auth.signUp({
       email,
       password,
-      user_metadata: {
-        full_name: userName,
-        company: company || null
-      },
-      email_confirm: true // Auto-confirm for now
+      options: {
+        data: {
+          full_name: userName,
+          company: company || null
+        }
+      }
     });
 
     if (authError) {
@@ -131,10 +117,11 @@ router.post('/register', registerValidation, async (req: Request, res: Response)
       return res.status(400).json({
         success: false,
         error: 'Registration failed',
-        message: authError.message
+        message: authError.message || 'Failed to create user account'
       });
     }
 
+    // Ensure we have a user ID
     if (!authData?.user?.id) {
       return res.status(500).json({
         success: false,
@@ -143,17 +130,15 @@ router.post('/register', registerValidation, async (req: Request, res: Response)
       });
     }
 
-    // Create profile with upsert to handle race conditions
+    // Create profile 
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
-      .upsert({
+      .insert({
         id: authData.user.id,
         email,
         full_name: userName,
         company: company || null,
         role: 'user'
-      }, {
-        onConflict: 'id'
       })
       .select()
       .single();
@@ -180,7 +165,7 @@ router.post('/register', registerValidation, async (req: Request, res: Response)
       { 
         userId: authData.user.id,
         email: authData.user.email,
-        role: profile.role
+        role: 'user'
       },
       process.env.JWT_SECRET!,
       { expiresIn: '7d' }
@@ -213,12 +198,22 @@ router.post('/register', registerValidation, async (req: Request, res: Response)
 // Login endpoint
 router.post('/login', loginValidation, async (req: Request, res: Response) => {
   try {
+    console.log('🔐 Login Request Received:', {
+      email: req.body.email,
+      hasPassword: !!req.body.password,
+      headers: req.headers,
+      method: req.method,
+      originalUrl: req.originalUrl
+    });
+
     // Check validation errors
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
+      console.error('🚫 Login Validation Error:', errors.array());
       return res.status(400).json({
+        success: false,
         error: 'Validation failed',
-        details: errors.array()
+        message: errors.array()[0].msg
       });
     }
 
@@ -231,13 +226,16 @@ router.post('/login', loginValidation, async (req: Request, res: Response) => {
     });
 
     if (authError) {
+      console.error('🔒 Login Authentication Error:', authError);
       return res.status(401).json({
+        success: false,
         error: 'Authentication failed',
-        message: 'Invalid email or password'
+        message: authError.message || 'Invalid email or password'
       });
     }
 
-    // Get user profile
+    // Fetch user profile with more robust error handling
+    let userProfile: any = null;
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
       .select('*')
@@ -245,11 +243,33 @@ router.post('/login', loginValidation, async (req: Request, res: Response) => {
       .single();
 
     if (profileError) {
-      console.error('Profile fetch error:', profileError);
-      return res.status(500).json({
-        error: 'Login failed',
-        message: 'Failed to retrieve user profile'
-      });
+      console.error('👤 Profile Fetch Error:', profileError);
+      
+      // Create profile if it doesn't exist
+      const { data: newProfile, error: newProfileError } = await supabase
+        .from('profiles')
+        .insert({
+          id: authData.user.id,
+          email: authData.user.email,
+          full_name: authData.user.user_metadata?.full_name || 'User',
+          role: 'user'
+        })
+        .select()
+        .single();
+
+      if (newProfileError) {
+        console.error('Failed to create profile:', newProfileError);
+        return res.status(500).json({
+          success: false,
+          error: 'Login failed',
+          message: 'Unable to create user profile'
+        });
+      }
+
+      // Use newly created profile
+      userProfile = newProfile;
+    } else {
+      userProfile = profile;
     }
 
     // Generate JWT token
@@ -257,35 +277,30 @@ router.post('/login', loginValidation, async (req: Request, res: Response) => {
       { 
         userId: authData.user.id,
         email: authData.user.email,
-        role: profile.role
+        role: userProfile.role || 'user'
       },
       process.env.JWT_SECRET!,
       { expiresIn: '7d' }
     );
 
-    // Update last login
-    await supabase
-      .from('profiles')
-      .update({ updated_at: new Date().toISOString() })
-      .eq('id', authData.user.id);
-
-    return res.json({
+    return res.status(200).json({
+      success: true,
       message: 'Login successful',
       token,
       user: {
-        id: profile.id,
-        email: profile.email,
-        full_name: profile.full_name,
-        company: profile.company,
-        role: profile.role,
-        avatar_url: profile.avatar_url,
-        created_at: profile.created_at
+        id: userProfile.id,
+        email: userProfile.email,
+        full_name: userProfile.full_name,
+        company: userProfile.company,
+        role: userProfile.role || 'user',
+        created_at: userProfile.created_at
       }
     });
 
   } catch (error) {
-    console.error('Login error:', error);
+    console.error('Unexpected login error:', error);
     return res.status(500).json({
+      success: false,
       error: 'Internal server error',
       message: 'An unexpected error occurred during login'
     });
@@ -707,6 +722,59 @@ router.get('/me', authenticateToken, async (req: AuthRequest, res: Response) => 
     return res.status(500).json({
       error: 'Internal server error',
       message: 'An unexpected error occurred while fetching user data'
+    });
+  }
+});
+
+// Get current user profile
+router.get('/current-user', authenticateToken, async (req: AuthRequest, res: Response) => {
+  try {
+    // The authenticateToken middleware should have added the userId to the request
+    const userId = req.user?.userId;
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        error: 'Authentication failed',
+        message: 'Invalid user authentication'
+      });
+    }
+
+    // Fetch user profile with more robust error handling
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', userId)
+      .single();
+
+    if (profileError) {
+      console.error('👤 Current User Profile Fetch Error:', profileError);
+      return res.status(404).json({
+        success: false,
+        error: 'User not found',
+        message: 'Unable to retrieve user profile'
+      });
+    }
+
+    // Return user profile without sensitive information
+    return res.status(200).json({
+      success: true,
+      data: {
+        id: profile.id,
+        email: profile.email,
+        full_name: profile.full_name,
+        company: profile.company,
+        role: profile.role,
+        created_at: profile.created_at,
+        avatar_url: profile.avatar_url
+      }
+    });
+  } catch (error) {
+    console.error('Current User Retrieval Error:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'Internal server error',
+      message: 'An unexpected error occurred while retrieving user profile'
     });
   }
 });

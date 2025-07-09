@@ -1,437 +1,358 @@
-import { Router, Response } from 'express';
-import { authenticateToken } from '../middleware/auth';
-import { AuthRequest } from '../types/auth';
-import { supabase } from '../server';
-import { DatabaseLogger } from '../services/database-logger';
+import { Router, Request, Response } from 'express';
+import { createClient } from '@supabase/supabase-js';
+import dotenv from 'dotenv';
+import path from 'path';
+import { z } from 'zod';
+import winston from 'winston';
+import { authenticateToken } from '../middleware/auth';  // Import authentication middleware
+
+// Enhanced logging setup
+const logger = winston.createLogger({
+  level: 'info',
+  format: winston.format.combine(
+    winston.format.timestamp(),
+    winston.format.json()
+  ),
+  transports: [
+    new winston.transports.Console(),
+    new winston.transports.File({ filename: 'error.log', level: 'error' })
+  ]
+});
+
+// Extend Request type to include user with zod validation
+const UserSchema = z.object({
+  id: z.string().uuid(),
+  email: z.string().email(),
+  role: z.string()
+});
+
+interface AuthenticatedRequest extends Request {
+  user?: z.infer<typeof UserSchema>;
+}
+
+// Performance Metrics Result Type with Zod
+const PerformanceMetricsSchema = z.object({
+  total_searches: z.number().int().min(0),
+  avg_confidence: z.number().min(0).max(100),
+  avg_process_time: z.number().min(0),
+  match_rate: z.number().min(0).max(1)
+});
+
+type PerformanceMetricsResult = z.infer<typeof PerformanceMetricsSchema>;
+
+// Environment Variable Validation
+const validateEnvVars = () => {
+  const requiredVars = ['SUPABASE_URL', 'SUPABASE_SERVICE_KEY'];
+  const missingVars = requiredVars.filter(varName => !process.env[varName]);
+
+  if (missingVars.length > 0) {
+    const errorMsg = `Missing environment variables: ${missingVars.join(', ')}`;
+    logger.error(errorMsg);
+    throw new Error(errorMsg);
+  }
+};
+
+// Load and validate environment variables
+dotenv.config({ 
+  path: path.resolve(__dirname, '../../../.env') 
+});
+validateEnvVars();
+
+const supabaseUrl = process.env.SUPABASE_URL!;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY!;
+
+const supabase = createClient(supabaseUrl, supabaseServiceKey, { 
+  auth: { persistSession: false } 
+});
 
 const router = Router();
 
-// Get dashboard statistics
-router.get('/stats', authenticateToken, async (req: AuthRequest, res: Response) => {
+// Apply authentication middleware to all dashboard routes
+router.use(authenticateToken);
+
+// Middleware for input validation
+const validateQueryParams = (req: Request, res: Response, next: () => void) => {
   try {
-    const userId = req.user!.userId;
-    
-    // Fetch user's part search statistics
-    const { data: searches } = await DatabaseLogger.getUserHistory(userId, 1, 1000);
-    
-    const totalUploads = searches.length;
-    const successfulUploads = searches.filter(
-      search => search.analysis_status === 'completed' && 
-                search.predictions && 
-                search.predictions.length > 0
-    ).length;
-    
-    const avgConfidence = totalUploads > 0 
-      ? searches.reduce((sum, search) => sum + (search.confidence_score || 0), 0) / totalUploads * 100 
-      : 0;
-    
-    const avgProcessTime = totalUploads > 0
-      ? searches.reduce((sum, search) => sum + (search.processing_time || 0), 0) / totalUploads / 1000
-      : 0;
-
-    return res.json({
-      success: true,
-      data: {
-        totalUploads,
-        successfulUploads,
-        avgConfidence: Number(avgConfidence.toFixed(2)),
-        avgProcessTime: Number(avgProcessTime.toFixed(2))
-      }
-    });
-
-  } catch (error) {
-    console.error('Dashboard stats error:', error);
-    return res.status(500).json({
-      success: false,
-      error: 'Failed to fetch dashboard statistics'
-    });
-  }
-});
-
-// Get recent uploads
-router.get('/recent-uploads', authenticateToken, async (req: AuthRequest, res: Response) => {
-  try {
-    const userId = req.user!.userId;
     const limit = parseInt(req.query.limit as string) || 5;
-
-    const { data: uploads } = await DatabaseLogger.getUserHistory(userId, 1, limit, {
-      analysis_status: 'completed'
-    });
-
-    return res.json({
-      success: true,
-      data: {
-        uploads: uploads.map(upload => ({
-          id: upload.id,
-          image_name: upload.image_name,
-          created_at: upload.created_at,
-          confidence_score: upload.confidence_score
-        }))
-      }
-    });
-
+    if (limit < 1 || limit > 50) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Limit must be between 1 and 50' 
+      });
+    }
+    next();
   } catch (error) {
-    console.error('Recent uploads error:', error);
-    return res.status(500).json({
-      success: false,
-      error: 'Failed to fetch recent uploads'
+    logger.error('Query parameter validation error', { error });
+    res.status(400).json({ 
+      success: false, 
+      error: 'Invalid query parameters' 
     });
   }
-});
+};
+
+// Centralized error handler
+const handleDashboardError = (
+  res: Response, 
+  error: unknown, 
+  context: string
+) => {
+  logger.error(`${context} Error`, { error });
+  
+  if (error instanceof Error) {
+    res.status(500).json({ 
+      success: false, 
+      error: error.message 
+    });
+  } else {
+    res.status(500).json({ 
+      success: false, 
+      error: 'Unexpected server error' 
+    });
+  }
+};
+
+// Get recent uploads with enhanced validation
+router.get(
+  '/recent-uploads', 
+  validateQueryParams,
+  async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const limit = parseInt(req.query.limit as string) || 5;
+      const userId = req.user?.id;
+
+      if (!userId) {
+        return res.status(401).json({ 
+          success: false, 
+          error: 'Unauthorized' 
+        });
+      }
+
+      const { data, error } = await supabase
+        .from('part_searches')
+        .select(`
+          id,
+          search_term,
+          part_name,
+          part_number,
+          manufacturer,
+          confidence_score,
+          image_url,
+          created_at
+        `)
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false })
+        .limit(limit);
+
+      if (error) throw error;
+
+      res.json({
+        success: true,
+        uploads: (data || []).map(upload => ({
+          id: upload.id,
+          image_name: upload.part_name || upload.search_term,
+          created_at: upload.created_at,
+          confidence_score: upload.confidence_score,
+          part_details: {
+            part_number: upload.part_number,
+            manufacturer: upload.manufacturer
+          }
+        }))
+      });
+    } catch (error) {
+      handleDashboardError(res, error, 'Recent Uploads');
+    }
+  }
+);
 
 // Get recent activities
-router.get('/recent-activities', authenticateToken, async (req: AuthRequest, res: Response) => {
+router.get('/recent-activities', async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const userId = req.user!.userId;
     const limit = parseInt(req.query.limit as string) || 5;
+    const userId = req.user?.id; // Assuming middleware adds user info
 
-    // Fetch user's search history and part searches
-    const { data: searches } = await DatabaseLogger.getUserHistory(userId, 1, limit);
+    if (!userId) {
+      return res.status(401).json({ 
+        success: false, 
+        error: 'Unauthorized' 
+      });
+    }
 
-    const activities = searches.map(search => ({
-      id: search.id,
-      resource_type: 'upload',
-      action: 'Part Search',
-      details: {
-        description: `Searched for part using ${search.image_name || 'an image'}`,
-        confidence: search.confidence_score ? Math.round(search.confidence_score * 100) : null,
-        status: search.analysis_status || 'completed'
-      },
-      created_at: search.created_at
-    }));
+    // Fetch recent activities from part_searches
+    const { data, error } = await supabase
+      .from('part_searches')
+      .select(`
+        id,
+        search_term,
+        search_type,
+        part_name,
+        manufacturer,
+        confidence_score,
+        is_match,
+        analysis_status,
+        created_at
+      `)
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(limit);
 
-    return res.json({
+    if (error) {
+      console.error('Recent Activities Error:', error);
+      return res.status(500).json({ 
+        success: false, 
+        error: error.message 
+      });
+    }
+
+    res.json({
       success: true,
-      data: {
-        activities
-      }
+      activities: (data || []).map(activity => ({
+        id: activity.id,
+        resource_type: 'part_search',
+        action: activity.is_match ? 'match_found' : 'search_performed',
+        details: {
+          search_term: activity.search_term,
+          search_type: activity.search_type,
+          part_name: activity.part_name,
+          manufacturer: activity.manufacturer,
+          confidence: activity.confidence_score,
+          status: activity.analysis_status || (activity.is_match ? 'success' : 'pending')
+        },
+        created_at: activity.created_at
+      }))
     });
-
   } catch (error) {
-    console.error('Recent activities error:', error);
-    return res.status(500).json({
-      success: false,
-      error: 'Failed to fetch recent activities'
+    console.error('Recent Activities Unexpected Error:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Internal server error' 
     });
   }
 });
 
 // Get performance metrics
-router.get('/performance-metrics', authenticateToken, async (req: AuthRequest, res: Response) => {
+router.get('/performance-metrics', async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const userId = req.user!.userId;
+    const userId = req.user?.id; // Assuming middleware adds user info
 
-    // Fetch user's part search statistics
-    const { data: searches } = await DatabaseLogger.getUserHistory(userId, 1, 1000);
+    if (!userId) {
+      return res.status(401).json({ 
+        success: false, 
+        error: 'Unauthorized' 
+      });
+    }
 
-    // Calculate metrics
-    const totalSearches = searches.length;
-    const completedSearches = searches.filter(
-      search => search.analysis_status === 'completed' && 
-                search.predictions && 
-                search.predictions.length > 0
-    );
+    // Aggregate performance metrics from part_searches
+    const { data, error } = await supabase
+      .from('part_searches')
+      .select(`
+        count(*) as total_searches,
+        avg(confidence_score) as avg_confidence,
+        avg(processing_time_ms) as avg_process_time,
+        sum(CASE WHEN is_match THEN 1 ELSE 0 END)::float / count(*) as match_rate
+      `)
+      .eq('user_id', userId)
+      .single() as { data: PerformanceMetricsResult | null, error: any };
 
-    const modelAccuracy = totalSearches > 0 
-      ? (completedSearches.length / totalSearches) * 100 
-      : 0;
+    if (error) {
+      console.error('Performance Metrics Error:', error);
+      return res.status(500).json({ 
+        success: false, 
+        error: error.message 
+      });
+    }
 
-    // Compare with previous period (last 30 days)
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    // Safely handle null data
+    const metrics = data || {
+      total_searches: 0,
+      avg_confidence: 0,
+      avg_process_time: 0,
+      match_rate: 0
+    };
 
-    const previousPeriodSearches = searches.filter(
-      search => new Date(search.created_at) >= thirtyDaysAgo
-    );
-
-    const previousPeriodCompletedSearches = previousPeriodSearches.filter(
-      search => search.analysis_status === 'completed' && 
-                search.predictions && 
-                search.predictions.length > 0
-    );
-
-    const accuracyChange = previousPeriodSearches.length > 0
-      ? ((completedSearches.length - previousPeriodCompletedSearches.length) / previousPeriodSearches.length) * 100
-      : 0;
-
-    const avgResponseTime = totalSearches > 0
-      ? searches.reduce((sum, search) => sum + (search.processing_time || 0), 0) / totalSearches
-      : 0;
-
-    const previousAvgResponseTime = previousPeriodSearches.length > 0
-      ? previousPeriodSearches.reduce((sum, search) => sum + (search.processing_time || 0), 0) / previousPeriodSearches.length
-      : 0;
-
-    const responseTimeChange = previousAvgResponseTime > 0
-      ? ((avgResponseTime - previousAvgResponseTime) / previousAvgResponseTime) * 100
-      : 0;
-
-    return res.json({
+    res.json({
       success: true,
       data: {
-        modelAccuracy: Number(modelAccuracy.toFixed(2)),
-        accuracyChange: Number(accuracyChange.toFixed(2)),
-        totalSearches,
-        searchesGrowth: Number(accuracyChange.toFixed(2)),
-        avgResponseTime: Number(avgResponseTime.toFixed(2)),
-        responseTimeChange: Number(responseTimeChange.toFixed(2))
+        totalSearches: metrics.total_searches || 0,
+        avgConfidence: metrics.avg_confidence || 0,
+        avgProcessTime: metrics.avg_process_time || 0,
+        matchRate: metrics.match_rate || 0,
+        modelAccuracy: metrics.match_rate || 0,
+        accuracyChange: 0, // TODO: Implement historical tracking
+        searchesGrowth: 0, // TODO: Implement historical tracking
+        avgResponseTime: metrics.avg_process_time || 0,
+        responseTimeChange: 0 // TODO: Implement historical tracking
       }
     });
-
   } catch (error) {
-    console.error('Performance metrics error:', error);
-    return res.status(500).json({
-      success: false,
-      error: 'Failed to fetch performance metrics'
+    console.error('Performance Metrics Unexpected Error:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Internal server error' 
     });
   }
 });
 
-// Get user usage statistics
-router.get('/usage-stats', authenticateToken, async (req: AuthRequest, res: Response) => {
+// Get dashboard stats
+router.get('/stats', async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const userId = req.user!.userId;
+    const userId = req.user?.id;
 
-    // Try to get from usage_tracking table
-    const now = new Date();
-    const currentMonth = now.getMonth() + 1; // getMonth() returns 0-11
-    const currentYear = now.getFullYear();
-    const previousMonth = currentMonth === 1 ? 12 : currentMonth - 1;
-    const previousYear = currentMonth === 1 ? currentYear - 1 : currentYear;
-
-    const { data: currentUsage, error: currentError } = await supabase
-      .from('usage_tracking')
-      .select('searches_count, api_calls_count, storage_used')
-      .eq('user_id', userId)
-      .eq('month', currentMonth)
-      .eq('year', currentYear)
-      .single();
-
-    const { data: previousUsage, error: _previousError } = await supabase
-      .from('usage_tracking')
-      .select('searches_count, api_calls_count, storage_used')
-      .eq('user_id', userId)
-      .eq('month', previousMonth)
-      .eq('year', previousYear)
-      .single();
-
-    // If usage_tracking table doesn't exist or has no data, calculate from part_searches
-    if ((currentError && currentError.code === 'PGRST116') || !currentUsage) {
-      const { data: searches, error: searchError } = await supabase
-        .from('part_searches')
-        .select('created_at')
-        .eq('user_id', userId);
-
-      if (searchError) {
-        console.error('Error fetching searches for usage:', searchError);
-        return res.status(500).json({
-          error: 'Failed to fetch usage statistics'
-        });
-      }
-
-      const allSearches = searches || [];
-      
-      const currentMonthSearches = allSearches.filter(s => {
-        const searchDate = new Date(s.created_at);
-        return searchDate.getMonth() === (currentMonth - 1) && searchDate.getFullYear() === currentYear;
-      }).length;
-
-      const previousMonthSearches = allSearches.filter(s => {
-        const searchDate = new Date(s.created_at);
-        return searchDate.getMonth() === (previousMonth - 1) && searchDate.getFullYear() === previousYear;
-      }).length;
-
-      return res.json({
-        currentMonth: {
-          searches: currentMonthSearches,
-          apiCalls: currentMonthSearches, // Assume 1 API call per search
-          storageUsed: 0 // Would need to calculate from image sizes
-        },
-        previousMonth: {
-          searches: previousMonthSearches,
-          apiCalls: previousMonthSearches,
-          storageUsed: 0
-        }
+    if (!userId) {
+      return res.status(401).json({ 
+        success: false, 
+        error: 'Unauthorized' 
       });
     }
 
-    return res.json({
-      currentMonth: {
-        searches: currentUsage?.searches_count || 0,
-        apiCalls: currentUsage?.api_calls_count || 0,
-        storageUsed: currentUsage?.storage_used || 0
-      },
-      previousMonth: {
-        searches: previousUsage?.searches_count || 0,
-        apiCalls: previousUsage?.api_calls_count || 0,
-        storageUsed: previousUsage?.storage_used || 0
-      }
-    });
-
-  } catch (error) {
-    console.error('Usage stats error:', error);
-    return res.status(500).json({
-      error: 'Failed to fetch usage statistics'
-    });
-  }
-});
-
-// Get user achievements
-router.get('/achievements', authenticateToken, async (req: AuthRequest, res: Response) => {
-  try {
-    const userId = req.user!.userId;
-
-    // Define all possible achievements
-    const allAchievements = [
-      {
-        id: 'first_upload',
-        title: 'First Upload',
-        description: 'Uploaded your first part',
-        icon: 'Trophy',
-        color: 'from-yellow-600 to-orange-600',
-        requirement: { type: 'uploads', count: 1 }
-      },
-      {
-        id: 'speed_demon',
-        title: 'Speed Demon',
-        description: 'Identified 100 parts in a day',
-        icon: 'Zap',
-        color: 'from-blue-600 to-cyan-600',
-        requirement: { type: 'daily_uploads', count: 100 }
-      },
-      {
-        id: 'accuracy_expert',
-        title: 'Accuracy Expert',
-        description: 'Achieved 95% accuracy rate',
-        icon: 'Target',
-        color: 'from-green-600 to-emerald-600',
-        requirement: { type: 'accuracy', threshold: 0.95 }
-      },
-      {
-        id: 'part_master',
-        title: 'Part Master',
-        description: 'Identified 1000+ parts',
-        icon: 'Award',
-        color: 'from-purple-600 to-pink-600',
-        requirement: { type: 'uploads', count: 1000 }
-      },
-      {
-        id: 'streak_master',
-        title: 'Streak Master',
-        description: '30-day identification streak',
-        icon: 'Activity',
-        color: 'from-red-600 to-orange-600',
-        requirement: { type: 'streak', count: 30 }
-      },
-      {
-        id: 'explorer',
-        title: 'Explorer',
-        description: 'Used all part categories',
-        icon: 'TrendingUp',
-        color: 'from-indigo-600 to-purple-600',
-        requirement: { type: 'categories', count: 5 }
-      }
-    ];
-
-    // Get user's earned achievements from database
-    const { data: earnedAchievements, error: achievementError } = await supabase
-      .from('user_achievements')
-      .select('achievement_id, earned_at')
-      .eq('user_id', userId);
-
-    if (achievementError && achievementError.code !== 'PGRST116') {
-      console.error('Error fetching achievements:', achievementError);
-    }
-
-    // Get user stats to determine which achievements should be earned
-    const { data: userSearches, error: searchError } = await supabase
+    // Fetch total uploads
+    const { count: totalUploads, error: uploadsError } = await supabase
       .from('part_searches')
-      .select('id, confidence_score, created_at, predictions')
+      .select('*', { count: 'exact', head: true })
       .eq('user_id', userId);
 
-    if (searchError) {
-      console.error('Error fetching user searches:', searchError);
-      return res.status(500).json({
-        error: 'Failed to fetch user data for achievements'
+    // Fetch successful uploads
+    const { count: successfulUploads, error: successfulError } = await supabase
+      .from('part_searches')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', userId)
+      .eq('is_match', true);
+
+    // Calculate average confidence and processing time
+    const { data: statsData, error: statsError } = await supabase
+      .from('part_searches')
+      .select('confidence_score, processing_time_ms')
+      .eq('user_id', userId);
+
+    if (uploadsError || successfulError || statsError) {
+      console.error('Stats Fetch Errors:', { uploadsError, successfulError, statsError });
+      return res.status(500).json({ 
+        success: false, 
+        error: 'Failed to fetch dashboard statistics' 
       });
     }
 
-    const searches = userSearches || [];
-    const totalUploads = searches.length;
-    
-    // Calculate accuracy
-    const highConfidenceSearches = searches.filter(s => s.confidence_score && s.confidence_score > 0.95);
-    const accuracyRate = totalUploads > 0 ? highConfidenceSearches.length / totalUploads : 0;
+    const avgConfidence = statsData?.length 
+      ? statsData.reduce((sum, item) => sum + (item.confidence_score || 0), 0) / statsData.length 
+      : 0;
 
-    // Get user streak
-    const { data: userProfile } = await supabase
-      .from('profiles')
-      .select('current_streak')
-      .eq('id', userId)
-      .single();
+    const avgProcessTime = statsData?.length 
+      ? statsData.reduce((sum, item) => sum + (item.processing_time_ms || 0), 0) / statsData.length 
+      : 0;
 
-    const currentStreak = userProfile?.current_streak || 0;
-
-    // Calculate daily uploads for speed demon
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    
-    const todayUploads = searches.filter(s => {
-      const searchDate = new Date(s.created_at);
-      return searchDate >= today && searchDate < tomorrow;
-    }).length;
-
-    // Estimate categories used (simplified)
-    const categoriesUsed = Math.min(5, Math.floor(totalUploads / 10)); // Rough estimate
-
-    // Determine which achievements are earned
-    const earnedIds = new Set((earnedAchievements || []).map(a => a.achievement_id));
-    
-    const achievementsWithStatus = allAchievements.map(achievement => {
-      let earned = earnedIds.has(achievement.id);
-      
-      // Auto-check achievements based on current stats if not already in DB
-      if (!earned) {
-        switch (achievement.requirement.type) {
-          case 'uploads':
-            earned = totalUploads >= (achievement.requirement.count || 0);
-            break;
-          case 'accuracy':
-            earned = accuracyRate >= (achievement.requirement.threshold || 0);
-            break;
-          case 'streak':
-            earned = currentStreak >= (achievement.requirement.count || 0);
-            break;
-          case 'daily_uploads':
-            earned = todayUploads >= (achievement.requirement.count || 0);
-            break;
-          case 'categories':
-            earned = categoriesUsed >= (achievement.requirement.count || 0);
-            break;
-        }
+    res.json({
+      success: true,
+      data: {
+        totalUploads: totalUploads || 0,
+        successfulUploads: successfulUploads || 0,
+        avgConfidence: avgConfidence * 100, // Convert to percentage
+        avgProcessTime: avgProcessTime
       }
-
-      return {
-        ...achievement,
-        earned,
-        earnedAt: earnedIds.has(achievement.id) 
-          ? earnedAchievements?.find(a => a.achievement_id === achievement.id)?.earned_at 
-          : null
-      };
     });
-
-    return res.json({
-      achievements: achievementsWithStatus,
-      totalEarned: achievementsWithStatus.filter(a => a.earned).length,
-      totalAvailable: allAchievements.length
-    });
-
   } catch (error) {
-    console.error('Achievements error:', error);
-    return res.status(500).json({
-      error: 'Failed to fetch achievements'
+    console.error('Dashboard Stats Error:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Internal server error while fetching dashboard stats' 
     });
   }
 });

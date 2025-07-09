@@ -149,7 +149,7 @@ router.post('/image', authenticateToken, upload.single('image'), handleMulterErr
     let aiResponse;
     try {
       aiResponse = await axios.post(
-        `${process.env.AI_SERVICE_URL}/predict/image`,
+        `${process.env.AI_SERVICE_URL}/predict`,
         formData,
         {
           headers: {

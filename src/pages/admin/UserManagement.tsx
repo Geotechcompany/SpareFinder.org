@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/components/ui/use-toast';
-import { apiClient } from '@/lib/api';
+import { api } from '@/lib/api';
 import AdminDesktopSidebar from '@/components/AdminDesktopSidebar';
 import MobileSidebar from '@/components/MobileSidebar';
 import {
@@ -89,7 +89,7 @@ const UserManagement = () => {
   const fetchUsers = async () => {
     try {
       setIsLoading(true);
-      const response = await apiClient.getUsers(pagination.page, pagination.limit);
+      const response = await api.admin.getUsers(pagination.page, pagination.limit);
       
       if (response.success && response.data) {
         let filteredUsers = response.data.users || [];
@@ -129,7 +129,7 @@ const UserManagement = () => {
 
   const handleRoleUpdate = async (userId: string, newRole: 'user' | 'admin' | 'super_admin') => {
     try {
-      const response = await apiClient.updateUserRole(userId, newRole);
+      const response = await api.admin.updateUserRole(userId, newRole);
       
       if (response.success) {
         toast({
@@ -152,7 +152,7 @@ const UserManagement = () => {
 
   const handleDeleteUser = async (userId: string) => {
     try {
-      const response = await apiClient.deleteAdminUser(userId);
+      const response = await api.admin.deleteUser(userId);
       
       if (response.success) {
         toast({

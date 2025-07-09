@@ -1,4 +1,5 @@
 import type { Config } from "tailwindcss";
+import tailwindcssAnimate from 'tailwindcss-animate'
 
 export default {
 	darkMode: ["class"],
@@ -89,11 +90,41 @@ export default {
 			animation: {
 				'accordion-down': 'accordion-down 0.2s ease-out',
 				'accordion-up': 'accordion-up 0.2s ease-out'
-			}
+			},
+			typography: {
+				DEFAULT: {
+					css: {
+						color: 'white',
+						a: {
+							color: 'rgb(96 165 250)', // blue-400
+							'&:hover': {
+								color: 'rgb(59 130 246)', // blue-500
+							},
+						},
+						h1: { color: 'white' },
+						h2: { color: 'white' },
+						h3: { color: 'rgb(209 213 219)' }, // gray-300
+						strong: { color: 'white' },
+						code: {
+							backgroundColor: 'rgba(255,255,255,0.1)',
+							color: 'rgb(209 213 219)',
+							padding: '0.2rem 0.4rem',
+							borderRadius: '0.25rem',
+						},
+						pre: {
+							backgroundColor: 'rgba(255,255,255,0.05)',
+							color: 'white',
+							padding: '1rem',
+							borderRadius: '0.5rem',
+						},
+					},
+				},
+			},
 		}
 	},
 	plugins: [
-		require("tailwindcss-animate"),
-		require("@tailwindcss/line-clamp")
+		tailwindcssAnimate,
+		require("@tailwindcss/line-clamp"),
+		require('@tailwindcss/typography')
 	],
 } satisfies Config;

@@ -2,7 +2,8 @@ import os
 from functools import lru_cache
 from typing import List, Optional
 
-from pydantic import Field, field_validator as validator, AliasChoices
+from pydantic import Field, field_validator
+from pydantic.config import ConfigDict
 from pydantic_settings import BaseSettings
 
 
@@ -121,11 +122,11 @@ class Settings(BaseSettings):
     GOOGLE_VISION_API_KEY: Optional[str] = Field(
         default=None, 
         description="Google Vision API Key",
-        validation_alias=AliasChoices('GOOGLE_VISION_API_KEY', 'google_vision_api_key')
+        validation_alias="GOOGLE_VISION_API_KEY"  # Simplified to use primary key only
     )
     GOOGLE_API_KEY: Optional[str] = os.getenv('GOOGLE_API_KEY', None)
     
-    @validator("ENVIRONMENT")
+    @field_validator("ENVIRONMENT")
     @classmethod
     def validate_environment(cls, v):
         """Validate environment."""
@@ -134,7 +135,7 @@ class Settings(BaseSettings):
             raise ValueError(f"ENVIRONMENT must be one of: {allowed_envs}")
         return v
     
-    @validator("DEFAULT_CONFIDENCE_THRESHOLD")
+    @field_validator("DEFAULT_CONFIDENCE_THRESHOLD")
     @classmethod
     def validate_confidence_threshold(cls, v):
         """Validate confidence threshold range."""
@@ -170,14 +171,14 @@ class Settings(BaseSettings):
         return self.WEB_SCRAPING_ENABLED
     
     # Ensure environment variables are loaded
-    model_config = {
-        "env_file": ".env",
-        "env_file_encoding": "utf-8",
-        "case_sensitive": False,  # Make it case-insensitive
-        "extra": "ignore",
-        "env_prefix": "",  # Remove any prefix
-        "populate_by_name": True  # Allow population by field name
-    }
+    model_config = ConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        case_sensitive=False,  # Make it case-insensitive
+        extra="ignore",
+        env_prefix="",  # Remove any prefix
+        populate_by_name=True  # Allow population by field name
+    )
 
     def __init__(self, **data):
         """Custom initialization to ensure environment variables are loaded."""

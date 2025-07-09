@@ -8,7 +8,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/use-toast';
-import { apiClient } from '@/lib/api';
+import { api } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 import { useProfileData } from '@/hooks/useProfileData';
 import { Loader2 } from 'lucide-react';
@@ -94,7 +94,7 @@ const Profile = () => {
       }
 
       // Fallback to API if no auth context data
-      const response = await apiClient.getProfile();
+      const response = await api.profile.getProfile();
       
       if (response.success && response.data?.profile) {
         const profileData = response.data.profile;
@@ -125,7 +125,7 @@ const Profile = () => {
   const fetchUserStats = async () => {
     try {
       // Fetch dashboard stats which includes comprehensive user data
-      const response = await apiClient.getDashboardStats();
+      const response = await api.dashboard.getStats();
       
       if (response.success && response.data) {
         const stats = response.data;

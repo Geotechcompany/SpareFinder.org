@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/components/ui/use-toast';
-import { apiClient } from '@/lib/api';
+import { api } from '@/lib/api';
 import { 
   CreditCard, 
   Download, 
@@ -36,6 +36,7 @@ const Billing = () => {
   const [billingData, setBillingData] = useState(null);
   const [invoices, setInvoices] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
 
   const handleToggleSidebar = () => {
@@ -47,75 +48,108 @@ const Billing = () => {
   };
 
   useEffect(() => {
-    fetchBillingData();
-  }, []);
+    let isMounted = true;
+    const controller = new AbortController();
 
-  const fetchBillingData = async () => {
-    try {
-      setIsLoading(true);
-      
-      // Fetch billing info
-      const billingResponse = await apiClient.getBillingInfo();
-      if (billingResponse.success && billingResponse.data) {
-        setBillingData(billingResponse.data);
-        setCurrentPlan(billingResponse.data.subscription?.tier || 'free');
-      }
+    const fetchData = async () => {
+      if (!isMounted) return;
 
-      // Fetch invoices
-      const invoicesResponse = await apiClient.getInvoices();
-      if (invoicesResponse.success && invoicesResponse.data) {
-        setInvoices(invoicesResponse.data.invoices || []);
+      try {
+        setIsLoading(true);
+        setError(null);
+        
+        // Fetch billing info
+        const billingResponse = await api.billing.getBillingInfo({
+          signal: controller.signal
+        });
+        
+        if (isMounted && billingResponse) {
+          setBillingData(billingResponse);
+          setCurrentPlan(billingResponse.subscription?.tier || 'free');
+        }
+
+        // Fetch invoices
+        const invoicesResponse = await api.billing.getInvoices({
+          signal: controller.signal
+        });
+        
+        if (isMounted && invoicesResponse) {
+          setInvoices(invoicesResponse.invoices || []);
+        }
+      } catch (error) {
+        if (isMounted) {
+          const errorMessage = error instanceof Error 
+            ? error.message 
+            : 'Failed to load billing information';
+          
+          setError(errorMessage);
+          
+          toast({
+            variant: "destructive",
+            title: "Error",
+            description: errorMessage
+          });
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoading(false);
+        }
       }
-    } catch (error) {
-      console.error('Error fetching billing data:', error);
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Failed to load billing information."
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
+    };
+
+    fetchData();
+
+    // Cleanup function
+    return () => {
+      isMounted = false;
+      controller.abort(); // Cancel any ongoing requests
+    };
+  }, []); // Empty dependency array ensures this runs only once
 
   const handlePlanChange = async (planId: string) => {
     try {
-      const response = await apiClient.updateSubscription(planId as 'free' | 'pro' | 'enterprise');
-      if (response.success) {
+      const response = await api.billing.updateSubscription(planId as 'free' | 'pro' | 'enterprise');
+      
+      // Assuming the response contains updated subscription info
+      if (response) {
         setCurrentPlan(planId);
         toast({
-          title: "Success",
-          description: "Subscription updated successfully!"
+          title: "Subscription Updated",
+          description: `Successfully upgraded to ${planId} plan`
         });
-        fetchBillingData(); // Refresh data
       }
     } catch (error) {
       console.error('Error updating subscription:', error);
       toast({
         variant: "destructive",
         title: "Error",
-        description: "Failed to update subscription."
+        description: error instanceof Error 
+          ? error.message 
+          : "Failed to update subscription."
       });
     }
   };
 
   const handleCancelSubscription = async () => {
     try {
-      const response = await apiClient.cancelSubscription();
-      if (response.success) {
+      const response = await api.billing.cancelSubscription();
+      
+      // Assuming the response indicates successful cancellation
+      if (response) {
         setCurrentPlan('free');
         toast({
-          title: "Success",
-          description: "Subscription cancelled successfully!"
+          title: "Subscription Cancelled",
+          description: "Your subscription has been cancelled."
         });
-        fetchBillingData(); // Refresh data
       }
     } catch (error) {
       console.error('Error cancelling subscription:', error);
       toast({
         variant: "destructive",
         title: "Error",
-        description: "Failed to cancel subscription."
+        description: error instanceof Error 
+          ? error.message 
+          : "Failed to cancel subscription."
       });
     }
   };

@@ -1,0 +1,26 @@
+{
+    "name": "sparefinder-ai-migrations",
+    "version": "1.0.0",
+    "description": "Database migrations for SpareFinderAI Vision",
+    "main": "scripts/apply_migrations.js",
+    "scripts": {
+        "migrate": "node scripts/apply_migrations.js",
+        "migrate:list": "ls migrations/*.sql",
+        "migrate:create": "touch migrations/$(date +%Y%m%d%H%M%S)_migration.sql"
+    },
+    "dependencies": {
+        "@supabase/supabase-js": "^2.50.4",
+        "dotenv": "^16.6.1"
+    },
+    "engines": {
+        "node": ">=16.0.0"
+    },
+    "keywords": [
+        "supabase",
+        "migrations",
+        "database",
+        "sparefinder"
+    ],
+    "author": "SpareFinderAI Team",
+    "license": "MIT"
+}

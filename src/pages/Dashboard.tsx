@@ -26,12 +26,20 @@ import { useAuth } from '@/contexts/AuthContext';
 import { format } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
-import { api, DashboardStatsResponse, RecentUploadResponse, RecentActivityResponse, PerformanceMetricsResponse } from '@/lib/api';
+import { 
+  isDashboardStatsResponse, 
+  isRecentUploadResponse, 
+  isRecentActivityResponse, 
+  isPerformanceMetricsResponse,
+  extractData
+} from '@/lib/api';
+import { dashboardApi } from '@/lib/api';
+import { useToast } from '@/components/ui/use-toast';
 
 const Dashboard = () => {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const { user, isLoading: authLoading } = useAuth();
+  const { user, isLoading: authLoading, logout } = useAuth();
   const navigate = useNavigate();
   const [isDataLoading, setIsDataLoading] = useState(true);
   
@@ -69,85 +77,148 @@ const Dashboard = () => {
     }
   ]);
 
-  useEffect(() => {
-    // Check auth state - redirect to login if no user
-    if (!user) {
-      navigate('/login');
-      return;
-    }
+  const { toast } = useToast();
 
+  useEffect(() => {
     const fetchDashboardData = async () => {
-      if (!user?.id) {
+      // Only attempt to fetch if user is authenticated
+      if (!user?.id || !localStorage.getItem('token')) {
+        setIsDataLoading(false);
         return;
       }
 
       try {
         setIsDataLoading(true);
         
-        // Fetch dashboard stats
-        const statsResponse = await api.dashboard.getStats();
-        const statsData = (statsResponse.data || {}) as DashboardStatsResponse;
-        setStats({
-          totalUploads: statsData.totalUploads || 0,
-          successfulUploads: statsData.successfulUploads || 0,
-          avgConfidence: statsData.avgConfidence || 0,
-          avgProcessTime: statsData.avgProcessTime || 0
-        });
+        // Fetch dashboard stats with error handling
+        const statsResponse = await dashboardApi.getStats();
+        if (statsResponse.success && statsResponse.data) {
+          setStats({
+            totalUploads: statsResponse.data.totalUploads,
+            successfulUploads: statsResponse.data.successfulUploads,
+            avgConfidence: statsResponse.data.avgConfidence,
+            avgProcessTime: statsResponse.data.avgProcessTime
+          });
+        } else {
+          // Log the error and set default/empty stats
+          console.warn('Dashboard stats fetch returned unsuccessful response', statsResponse);
+          setStats({
+            totalUploads: 0,
+            successfulUploads: 0,
+            avgConfidence: 0,
+            avgProcessTime: 0
+          });
+        }
 
         // Fetch recent uploads
-        const uploadsResponse = await api.dashboard.getRecentUploads(5);
-        const uploadsData = (uploadsResponse.data || {}) as RecentUploadResponse;
-        setRecentUploads((uploadsData.uploads || []).map(upload => ({
-          id: upload.id || '',
-          name: upload.image_name || 'Unknown',
-          date: upload.created_at ? format(new Date(upload.created_at), 'PPp') : 'N/A',
-          status: 'completed',
-          confidence: upload.confidence_score ? Math.round(upload.confidence_score * 100) : 0
-        })));
+        const uploadsResponse = await dashboardApi.getRecentUploads();
+        if (uploadsResponse.success && uploadsResponse.data) {
+          setRecentUploads(uploadsResponse.data.uploads.map(upload => ({
+            id: upload.id,
+            name: upload.image_name,
+            date: format(new Date(upload.created_at), 'PPp'),
+            status: 'completed',
+            confidence: Math.round(upload.confidence_score * 100)
+          })));
+        } else {
+          console.warn('Recent uploads fetch returned unsuccessful response', uploadsResponse);
+          setRecentUploads([]);
+        }
 
         // Fetch recent activities
-        const activitiesResponse = await api.dashboard.getRecentActivities(5);
-        const activitiesData = (activitiesResponse.data || {}) as RecentActivityResponse;
-        setRecentActivities((activitiesData.activities || []).map(activity => ({
-          id: activity.id || '',
-          type: activity.resource_type || 'unknown',
-          title: activity.action || 'No Action',
-          description: activity.details?.description || '',
-          time: activity.created_at ? format(new Date(activity.created_at), 'PPp') : 'N/A',
-          confidence: activity.details?.confidence || null,
-          status: activity.details?.status || 'success'
-        })));
+        const activitiesResponse = await dashboardApi.getRecentActivities();
+        if (activitiesResponse.success && activitiesResponse.data) {
+          setRecentActivities(activitiesResponse.data.activities.map(activity => ({
+            id: activity.id,
+            type: activity.resource_type,
+            title: activity.action,
+            description: activity.details.description,
+            time: format(new Date(activity.created_at), 'PPp'),
+            confidence: activity.details.confidence ?? null,
+            status: activity.details.status
+          })));
+        } else {
+          console.warn('Recent activities fetch returned unsuccessful response', activitiesResponse);
+          setRecentActivities([]);
+        }
 
         // Fetch performance metrics
-        const metricsResponse = await api.dashboard.getPerformanceMetrics();
-        const metricsData = (metricsResponse.data || {}) as PerformanceMetricsResponse;
-        setPerformanceMetrics([
-          {
-            label: 'AI Model Accuracy',
-            value: `${(metricsData.modelAccuracy || 0).toFixed(1)}%`,
-            change: `${(metricsData.accuracyChange && metricsData.accuracyChange > 0 ? '+' : '')}${(metricsData.accuracyChange || 0).toFixed(1)}%`,
-            icon: Cpu,
-            color: 'from-green-600 to-emerald-600'
-          },
-          {
-            label: 'Total Searches',
-            value: `${metricsData.totalSearches || 0}`,
-            change: `${(metricsData.searchesGrowth && metricsData.searchesGrowth > 0 ? '+' : '')}${(metricsData.searchesGrowth || 0).toFixed(1)}%`,
-            icon: Database,
-            color: 'from-blue-600 to-cyan-600'
-          },
-          {
-            label: 'Response Time',
-            value: `${(metricsData.avgResponseTime || 0)}ms`,
-            change: `${(metricsData.responseTimeChange && metricsData.responseTimeChange < 0 ? '' : '+')}${(metricsData.responseTimeChange || 0)}ms`,
-            icon: Activity,
-            color: 'from-purple-600 to-violet-600'
-          }
-        ]);
+        const metricsResponse = await dashboardApi.getPerformanceMetrics();
+        if (metricsResponse.success && metricsResponse.data) {
+          setPerformanceMetrics([
+            {
+              label: 'AI Model Accuracy',
+              value: `${metricsResponse.data.modelAccuracy.toFixed(1)}%`,
+              change: `${metricsResponse.data.accuracyChange > 0 ? '+' : ''}${metricsResponse.data.accuracyChange.toFixed(1)}%`,
+              icon: Cpu,
+              color: 'from-green-600 to-emerald-600'
+            },
+            {
+              label: 'Total Searches',
+              value: `${metricsResponse.data.totalSearches}`,
+              change: `${metricsResponse.data.searchesGrowth > 0 ? '+' : ''}${metricsResponse.data.searchesGrowth.toFixed(1)}%`,
+              icon: Database,
+              color: 'from-blue-600 to-cyan-600'
+            },
+            {
+              label: 'Response Time',
+              value: `${metricsResponse.data.avgResponseTime}ms`,
+              change: `${metricsResponse.data.responseTimeChange < 0 ? '' : '+'}${metricsResponse.data.responseTimeChange}ms`,
+              icon: Activity,
+              color: 'from-purple-600 to-violet-600'
+            }
+          ]);
+        } else {
+          console.warn('Performance metrics fetch returned unsuccessful response', metricsResponse);
+          setPerformanceMetrics([
+            {
+              label: 'AI Model Accuracy',
+              value: '0%',
+              change: '0%',
+              icon: Cpu,
+              color: 'from-green-600 to-emerald-600'
+            },
+            {
+              label: 'Database Coverage',
+              value: '0',
+              change: '0',
+              icon: Database,
+              color: 'from-blue-600 to-cyan-600'
+            },
+            {
+              label: 'Response Time',
+              value: '0ms',
+              change: '0ms',
+              icon: Activity,
+              color: 'from-purple-600 to-violet-600'
+            }
+          ]);
+        }
 
-      } catch (error) {
-        console.error('Error fetching dashboard data:', error);
+      } catch (error: any) {
+        console.error('Dashboard data fetch error:', error);
         
+        // Specific handling for authentication errors
+        if (error.response?.status === 401 || error.response?.status === 403) {
+          toast({
+            title: 'Session Expired',
+            description: 'Your session has expired. Please log in again.',
+            variant: 'destructive'
+          });
+          
+          // Clear authentication state and redirect to login
+          logout();
+          navigate('/login');
+          return;
+        }
+
+        // Generic error handling
+        toast({
+          title: 'Error',
+          description: error.message || 'Failed to load dashboard data',
+          variant: 'destructive'
+        });
+
         // Set default/empty states in case of error
         setStats({
           totalUploads: 0,
@@ -186,7 +257,7 @@ const Dashboard = () => {
     };
 
     fetchDashboardData();
-  }, [user?.id, navigate]);
+  }, [user?.id, logout, navigate, toast]);
 
   const handleToggleSidebar = () => {
     setIsCollapsed(!isCollapsed);

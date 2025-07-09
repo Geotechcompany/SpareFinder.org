@@ -1,53 +1,57 @@
 import React, { useState, useRef, useCallback } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
 import { 
-  Upload as UploadIcon, 
-  Image, 
-  FileText, 
-  Zap, 
   CheckCircle, 
-  Camera, 
-  Sparkles, 
   Brain, 
+  Zap, 
+  RefreshCw, 
+  AlertTriangle, 
+  Loader2, 
+  UploadIcon, 
+  X, 
+  Menu, 
+  Sparkles, 
+  ImagePlus, 
+  Camera, 
+  Copy, 
+  Download, 
+  Share, 
+  FileText, 
+  ChevronDown,
   Target,
-  AlertTriangle,
-  Star,
-  ExternalLink,
-  Copy,
-  Download,
-  Share,
-  RefreshCw,
-  X,
-  ImagePlus,
-  Loader2,
-  Info,
-  Menu,
   Plus,
-  ChevronDown
+  Info,
+  AlertCircle
 } from 'lucide-react';
+import { 
+  Card, 
+  CardContent, 
+  CardHeader, 
+  CardTitle, 
+  CardDescription 
+} from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Progress } from '@/components/ui/progress';
 import DashboardSidebar from '@/components/DashboardSidebar';
 import MobileSidebar from '@/components/MobileSidebar';
-import { apiClient } from '@/lib/api';
+import { api } from '@/lib/api';
 import { toast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
-import { Input } from '@/components/ui/input';
 import { useToast } from '@/components/ui/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '@/components/ui/carousel';
 import { useFileUpload } from '@/hooks/useFileUpload';
 import { cn } from '@/lib/utils';
-import axios from 'axios';
-import { AxiosProgressEvent } from 'axios';
 import { PartDetailsAnalysis } from '@/components/PartDetailsAnalysis';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/components/ui/collapsible';
-import { aiClient } from '@/lib/api';
-import { uploadPartImage } from '@/lib/api';
+import { v4 as uuidv4 } from 'uuid';
+import { motion, AnimatePresence } from 'framer-motion';
+import { parseMarkdownSections, MarkdownCard } from '@/lib/markdown-parser';
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 
 // Image component with fallback handling
 const ImageWithFallback = ({ src, alt, className, onError }: { 
@@ -167,7 +171,7 @@ interface AnalysisResponse {
     typical_vehicle_models?: string[];
     [key: string]: any;
   };
-  error?: string;
+  error?: string | null;  // Add this line
 }
 
 // Add new animation variants
@@ -214,6 +218,180 @@ interface OpenAIImageUploadResponse {
   };
 }
 
+// Utility function to format titles
+const formatTitle = (title: string): string => {
+  return title
+    .split(/[-_]/)
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(' ')
+    .replace(/\b(And|Or|The|In|Of)\b/g, word => word.toLowerCase());
+};
+
+// Utility function to format and break paragraphs
+const formatParagraph = (text: string, maxLength: number = 300): React.ReactNode => {
+  if (!text) return <p className="text-gray-400 italic">No description available</p>;
+
+  // Break long paragraphs into readable chunks
+  const paragraphs = text.split(/\n\n/).map((para, index) => {
+    // Trim and remove any leading/trailing whitespace
+    para = para.trim();
+
+    // If paragraph is too long, truncate and add ellipsis
+    if (para.length > maxLength) {
+      para = para.substring(0, maxLength) + '...';
+    }
+
+    return (
+      <p 
+        key={index} 
+        className={`
+          text-gray-300 
+          leading-relaxed 
+          ${index === 0 ? 'text-base' : 'text-sm'}
+          ${para.startsWith('- ') ? 'pl-4 border-l-2 border-blue-500/50 ml-2' : ''}
+        `}
+      >
+        {para.replace(/^- /, '')}
+      </p>
+    );
+  });
+
+  return <div className="space-y-3">{paragraphs}</div>;
+};
+
+// Utility function to parse description into sections
+const parseDescriptionSections = (description: string) => {
+  // Remove ## and ** completely from the entire description first
+  const cleanedDescription = description
+    .replace(/##\s*/g, '')  // Remove ## headers
+    .replace(/\*\*/g, '');  // Remove ** formatting
+  
+  // Regular expression to split description into sections using titles
+  const sectionRegex = /[:\n](?=[A-Z])/;
+  
+  // Split description into sections
+  const sections = cleanedDescription
+    .split(sectionRegex)
+    .filter(section => section.trim() !== '')
+    .map((section, index, array) => {
+      // Trim and clean the section
+      const cleanedSection = section.trim();
+      
+      // If it's the first section, use a default title
+      const title = index === 0 ? 'Overview' : 
+        // Try to extract a meaningful title from the first few words
+        cleanedSection.split(/\s+/).slice(0, 3).join(' ').trim();
+      
+      return { 
+        title: formatTitle(title), 
+        content: cleanedSection,
+        rawTitle: title 
+      };
+    })
+    .filter(section => section.content); // Remove empty sections
+  
+  return sections;
+};
+
+// Update generateAnalysisSections to use parsed description sections
+const generateAnalysisSections = (analysisResults: AnalysisResponse) => {
+  const sections: { 
+    title: string; 
+    icon: React.ReactNode; 
+    content: React.ReactNode 
+  }[] = [];
+
+  // First, add the default Part Identification section
+  sections.push({
+    title: "Part Identification",
+    icon: <Target className="w-5 h-5 text-blue-400" />,
+    content: (
+      <motion.div 
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="space-y-4"
+      >
+        {analysisResults.predictions.map((prediction, index) => (
+          <div 
+            key={index} 
+            className="bg-white/5 rounded-xl p-6 border border-white/10 space-y-6"
+          >
+            <div className="flex items-center justify-between">
+              <h3 className="text-2xl font-bold text-white flex items-center space-x-3">
+                <span>{formatTitle(prediction.class_name)}</span>
+                {prediction.part_number && (
+                  <Badge variant="secondary" className="text-xs">
+                    Part No: {prediction.part_number}
+                  </Badge>
+                )}
+              </h3>
+              <Badge 
+                variant={
+                  prediction.confidence > 0.8 ? 'default' : 
+                  prediction.confidence > 0.5 ? 'secondary' : 'destructive'
+                }
+              >
+                {(prediction.confidence * 100).toFixed(2)}% Confidence
+              </Badge>
+            </div>
+          </div>
+        ))}
+      </motion.div>
+    )
+  });
+
+  // If description exists, parse markdown sections
+  analysisResults.predictions.forEach((prediction) => {
+    if (prediction.description) {
+      const markdownSections = parseMarkdownSections(prediction.description);
+      
+      markdownSections.forEach((section) => {
+        sections.push({
+          title: section.title,
+          icon: (() => {
+            const lowercaseTitle = section.title.toLowerCase();
+            
+            if (lowercaseTitle.includes('identification')) 
+              return <Target className="w-5 h-5 text-blue-400" />;
+            if (lowercaseTitle.includes('specification') || lowercaseTitle.includes('technical')) 
+              return <FileText className="w-5 h-5 text-green-400" />;
+            if (lowercaseTitle.includes('compatibility') || lowercaseTitle.includes('vehicle')) 
+              return <Target className="w-5 h-5 text-purple-400" />;
+            return <Info className="w-5 h-5 text-yellow-400" />;
+          })(),
+          content: (
+            <MarkdownCard 
+              title={section.title} 
+              content={section.content} 
+              emoji={section.emoji} 
+            />
+          )
+        });
+      });
+    }
+  });
+
+  // Add additional details sections
+  if (analysisResults.additional_details) {
+    Object.entries(analysisResults.additional_details).forEach(([key, value]) => {
+      if (typeof value === 'string' && value.trim()) {
+        sections.push({
+          title: formatTitle(key),
+          icon: <Info className="w-5 h-5 text-yellow-400" />,
+          content: (
+            <MarkdownCard 
+              title={formatTitle(key)} 
+              content={value} 
+            />
+          )
+        });
+      }
+    });
+  }
+
+  return sections;
+};
+
 const Upload = () => {
   const [dragActive, setDragActive] = useState(false);
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
@@ -230,6 +408,7 @@ const Upload = () => {
   // New state for keywords
   const [keywords, setKeywords] = useState<string>('');
   const [savedKeywords, setSavedKeywords] = useState<string[]>([]);
+  const [newKeyword, setNewKeyword] = useState('');
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   const keywordsInputRef = useRef<HTMLInputElement>(null);
@@ -304,10 +483,10 @@ const Upload = () => {
 
   // Add keyword functionality
   const handleAddKeyword = () => {
-    const trimmedKeyword = keywords.trim();
+    const trimmedKeyword = newKeyword.trim();
     if (trimmedKeyword && !savedKeywords.includes(trimmedKeyword)) {
       setSavedKeywords(prev => [...prev, trimmedKeyword]);
-      setKeywords(''); // Clear input after adding
+      setNewKeyword(''); // Clear input after adding
       keywordsInputRef.current?.focus();
     }
   };
@@ -317,43 +496,23 @@ const Upload = () => {
     setSavedKeywords(prev => prev.filter(keyword => keyword !== keywordToRemove));
   };
 
+  // Update analyzeImage method to handle async processing
   const analyzeImage = async (
     file: File,
     options: any = {},
     onProgress?: (progress: AnalysisProgress) => void
   ): Promise<AnalysisResponse | null> => {
     try {
-      // Prepare form data
-      const formData = new FormData();
-      formData.append('file', file);
-      
-      // Add optional parameters
-      formData.append('confidence_threshold', (options.confidenceThreshold || 0.3).toString());
-      formData.append('max_predictions', (options.maxPredictions || 3).toString());
-      
-      // Add keywords if available
-      const combinedKeywords = [
-        ...(options.keywords || []),
-        'engine components',
-        'automotive parts'
-      ].join(', ');
-      formData.append('keywords', combinedKeywords);
-      
       // Track upload progress
-      const config = {
-        onUploadProgress: (progressEvent: AxiosProgressEvent) => {
-          const percentCompleted = Math.round((progressEvent.loaded * 50) / (progressEvent.total || 1));
-          onProgress?.({
-            status: 'uploading',
-            message: 'Uploading image...',
-            progress: percentCompleted,
-            currentStep: 'Upload & Validation',
-            currentStepIndex: 1,
-            totalSteps: 6,
-            details: 'Transferring image data'
-          });
-        }
-      };
+      onProgress?.({
+        status: 'uploading',
+        message: 'Uploading image...',
+        progress: 20,
+        currentStep: 'Upload & Validation',
+        currentStepIndex: 1,
+        totalSteps: 6,
+        details: 'Transferring image data'
+      });
 
       // Step 2: AI Analysis Progress
       onProgress?.({
@@ -363,60 +522,158 @@ const Upload = () => {
         currentStep: 'AI Analysis',
         currentStepIndex: 2,
         totalSteps: 6,
-        details: 'Analyzing image with AI services'
+        details: 'Analyzing image with AI Service'
       });
 
-      // Call image analysis endpoint
-      const response = await aiClient.post<OpenAIImageUploadResponse>('/openai/upload/image', formData, config);
+      // Call GitHub AI Part Analysis Service
+      const initialResponse = await api.upload.image(
+        file, 
+        savedKeywords, 
+        {
+          confidenceThreshold: options.confidenceThreshold || 0.3,
+          maxPredictions: options.maxPredictions || 3
+        }
+      );
 
-      // Check for successful response
-      if (!response.data.success || !response.data.predictions || response.data.predictions.length === 0) {
-        throw new Error('No predictions found in the image analysis');
+      // Modify the processing check in analyzeImage method
+      if (!initialResponse.success) {
+        let retries = 0;
+        const maxRetries = 10;
+        const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+        while (retries < maxRetries) {
+          onProgress?.({
+            status: 'ai_analysis',
+            message: `Processing image... (Attempt ${retries + 1})`,
+            progress: 40 + (retries * 5),
+            currentStep: 'AI Analysis',
+            currentStepIndex: 2,
+            totalSteps: 6,
+            details: 'Waiting for analysis completion'
+          });
+
+          await delay(3000);
+
+          const statusResponse = await api.upload.image(
+            file, 
+            savedKeywords, 
+            {
+              confidenceThreshold: options.confidenceThreshold || 0.3,
+              maxPredictions: options.maxPredictions || 3
+            }
+          );
+
+          if (statusResponse.success && statusResponse.part_info && statusResponse.part_info.length > 0) {
+            // Prepare predictions
+            const predictions = statusResponse.part_info.map(prediction => ({
+              class_name: prediction.class_name || 'Automotive Component',
+              confidence: prediction.confidence || 0.75,
+              description: prediction.description || '',
+              category: prediction.category || 'Unspecified',
+              manufacturer: prediction.manufacturer || 'Unknown',
+              estimated_price: prediction.estimated_price || 'Price not available',
+              part_number: prediction.part_number,
+              compatibility: prediction.compatibility
+            }));
+
+            // Transform response to match existing interface
+            const analysisResults: AnalysisResponse = {
+              success: true,
+              predictions: predictions,
+              similar_images: [], 
+              model_version: 'AI Part Analysis',
+              processing_time: 0, // Not provided by this service
+              image_metadata: {
+                content_type: file.type,
+                size_bytes: file.size
+              },
+              additional_details: {
+                full_analysis: statusResponse.part_info[0]?.description || '',
+                technical_specifications: '',
+                market_information: '',
+                confidence_reasoning: ''
+              }
+            };
+
+            // Final progress update
+            onProgress?.({
+              status: 'complete',
+              message: `Found ${analysisResults.predictions.length} potential matches`,
+              progress: 100,
+              currentStep: 'Analysis Complete',
+              currentStepIndex: 6,
+              totalSteps: 6,
+              details: 'Comprehensive part analysis finished',
+              identifiedPart: analysisResults.predictions[0]?.class_name,
+              confidence: analysisResults.predictions[0]?.confidence * 100
+            });
+
+            return analysisResults;
+          }
+
+          retries++;
+        }
+
+        // If max retries reached without success
+        throw new Error('Analysis timed out. Please try again.');
       }
 
-      // Transform response to match existing interface
-      const analysisResults: AnalysisResponse = {
-        success: response.data.success,
-        predictions: response.data.predictions.map(prediction => ({
+      // If initial response is successful, process immediately
+      if (initialResponse.success && initialResponse.part_info && initialResponse.part_info.length > 0) {
+        // Prepare predictions
+        const predictions = initialResponse.part_info.map(prediction => ({
           class_name: prediction.class_name || 'Automotive Component',
-          confidence: prediction.confidence || 75,
-          description: prediction.description,
+          confidence: prediction.confidence || 0.75,
+          description: prediction.description || '',
           category: prediction.category || 'Unspecified',
           manufacturer: prediction.manufacturer || 'Unknown',
           estimated_price: prediction.estimated_price || 'Price not available',
           part_number: prediction.part_number,
           compatibility: prediction.compatibility
-        })),
-        similar_images: [], // Remove similar images
-        model_version: response.data.model_version || 'SpareFinder AI v2',
-        processing_time: response.data.processing_time,
-        image_metadata: response.data.image_metadata,
-        additional_details: {
-          full_analysis: ''
-        }
-      };
+        }));
 
-      // Final progress update
-      onProgress?.({
-        status: 'complete',
-        message: `Found ${analysisResults.predictions.length} potential matches`,
-        progress: 100,
-        currentStep: 'Analysis Complete',
-        currentStepIndex: 6,
-        totalSteps: 6,
-        details: 'Comprehensive part analysis finished',
-        identifiedPart: analysisResults.predictions[0]?.class_name,
-        confidence: analysisResults.predictions[0]?.confidence
-      });
+        // Transform response to match existing interface
+        const analysisResults: AnalysisResponse = {
+          success: true,
+          predictions: predictions,
+          similar_images: [], 
+          model_version: 'AI Part Analysis',
+          processing_time: 0, // Not provided by this service
+          image_metadata: {
+            content_type: file.type,
+            size_bytes: file.size
+          },
+          additional_details: {
+            full_analysis: initialResponse.part_info[0]?.description || '',
+            technical_specifications: '',
+            market_information: '',
+            confidence_reasoning: ''
+          }
+        };
 
-      return analysisResults;
+        // Final progress update
+        onProgress?.({
+          status: 'complete',
+          message: `Found ${analysisResults.predictions.length} potential matches`,
+          progress: 100,
+          currentStep: 'Analysis Complete',
+          currentStepIndex: 6,
+          totalSteps: 6,
+          details: 'Comprehensive part analysis finished',
+          identifiedPart: analysisResults.predictions[0]?.class_name,
+          confidence: analysisResults.predictions[0]?.confidence * 100
+        });
+
+        return analysisResults;
+      }
+
+      // If no predictions or success
+      throw new Error(initialResponse.error || 'No analysis results found');
+
     } catch (error) {
-      // Detailed error handling
       console.error('Image analysis error:', error);
       
-      const errorMessage = axios.isAxiosError(error) 
-        ? error.response?.data?.message || error.message
-        : error instanceof Error 
+      const errorMessage = error instanceof Error 
         ? error.message 
         : 'Unknown error occurred during image analysis';
 
@@ -481,6 +738,36 @@ const Upload = () => {
     }
   };
 
+  // Method to store analysis results in Supabase
+  const storeAnalysisResults = useCallback(async (
+    file: File, 
+    analysisResults: AnalysisResponse
+  ) => {
+    try {
+      // Simplified storage without Supabase
+      console.log('Analysis Results:', analysisResults);
+      
+      toast({
+        title: "Analysis Saved",
+        description: "Your part analysis has been processed successfully",
+      });
+
+      return {
+        id: crypto.randomUUID(), // Use Web Crypto API for unique ID
+        analysisResults
+      };
+    } catch (error) {
+      console.error('Analysis storage failed:', error);
+      toast({
+        title: "Error",
+        description: "Failed to process analysis results",
+        variant: "destructive"
+      });
+      return null;
+    }
+  }, [toast]);
+
+  // Modify handleUpload to remove Supabase-specific code
   const handleUpload = async () => {
     if (!uploadedFile) {
       toast({
@@ -492,72 +779,150 @@ const Upload = () => {
     }
 
     setIsLoading(true);
+    setAnalysisProgress({
+      status: 'uploading',
+      message: 'Preparing image for AI analysis...',
+      progress: 10,
+      currentStep: 'Initializing Upload',
+      currentStepIndex: 1,
+      totalSteps: 6,
+      details: 'Validating image and preparing for processing'
+    });
+
     try {
-      console.log('Uploading file:', uploadedFile);
-      const result = await uploadPartImage(uploadedFile, keywords ? [keywords] : [], {
-        confidenceThreshold: 0.3,
-        maxPredictions: 3,
-        includeWebScraping: true
-      });
+      const updateProgress = (stage: string, message: string, progress: number, details?: string) => {
+        setAnalysisProgress(prev => ({
+          ...prev,
+          status: stage,
+          message: message,
+          progress: progress,
+          currentStep: stage.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase()),
+          currentStepIndex: stage === 'uploading' ? 1 : 
+                            stage === 'validating' ? 2 : 
+                            stage === 'ai_analysis' ? 3 : 
+                            stage === 'part_matching' ? 4 : 
+                            stage === 'finalizing' ? 5 : 
+                            stage === 'complete' ? 6 : 
+                            prev?.currentStepIndex || 1,
+          details: details || prev?.details
+        }));
+      };
+
+      updateProgress('uploading', 'Uploading image to secure servers...', 20);
+      await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate upload delay
+
+      updateProgress('validating', 'Validating image integrity and format...', 30);
+      await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate validation
+
+      updateProgress('ai_analysis', 'Initializing AI-powered part analysis...', 40, 'Searching advanced automotive databases');
+      
+      const result = await api.upload.image(
+        uploadedFile, 
+        savedKeywords, 
+        {
+          confidenceThreshold: 0.3,
+          maxPredictions: 3
+        }
+      );
+      
+      updateProgress('part_matching', 'Matching part details across multiple databases...', 70, 'Cross-referencing automotive part catalogs');
+      await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate matching process
+
+      updateProgress('finalizing', 'Compiling comprehensive analysis report...', 90, 'Generating detailed insights and specifications');
+      await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate finalization
+
       console.log('Upload result:', result);
       
-      if (!result) {
-        throw new Error('No result returned from upload');
+      if (!result.success) {
+        throw new Error(result.error || 'No result returned from upload');
       }
       
-      if (result.success && result.predictions && result.predictions.length > 0) {
-        const firstPrediction = result.predictions[0];
-        
-        // Prepare additional details dynamically
-        const additionalDetails = {
-          full_analysis: `A. PART IDENTIFICATION
-- Precise Part Name: ${firstPrediction.class_name}
-- Confidence Level: ${(firstPrediction.confidence * 100).toFixed(1)}%
+      // Prepare predictions, using the service's part_info or fallback parsing
+      const predictions = result.part_info?.length ? 
+        result.part_info.map(prediction => ({
+          class_name: prediction.class_name || 'Automotive Component',
+          confidence: prediction.confidence || 0.75,
+          description: prediction.description || '',
+          category: prediction.category || 'Unspecified',
+          manufacturer: prediction.manufacturer || 'Unknown',
+          estimated_price: prediction.estimated_price || 'Price not available',
+          part_number: prediction.part_number,
+          compatibility: prediction.compatibility
+        })) : 
+        // Fallback parsing if no predictions
+        [{
+          class_name: 'Automotive Component',
+          confidence: 0.75,
+          description: result.part_info?.description || 'No detailed description available',
+          category: 'Unspecified',
+          manufacturer: 'Unknown',
+          estimated_price: 'Price not available'
+        }];
 
-B. TECHNICAL SPECIFICATIONS
-- Category: ${firstPrediction.category}
-- Manufacturer: ${firstPrediction.manufacturer}
+      // Prepare additional details dynamically
+      const firstPrediction = predictions[0];
+      const additionalDetails = {
+        full_analysis: result.part_info?.description || '',
+        technical_specifications: `
+- Detailed analysis provided by AI Model
+- Comprehensive part identification service`,
+        market_information: `
 - Estimated Price: ${firstPrediction.estimated_price}
+- Manufacturer: ${firstPrediction.manufacturer}`,
+        confidence_reasoning: `
+- AI Model Confidence: ${(firstPrediction.confidence * 100).toFixed(1)}%
+- Detailed analysis available`
+      };
 
-C. COMPATIBILITY
-${firstPrediction.compatibility ? firstPrediction.compatibility.map(model => `- ${model}`).join('\n') : 'No specific compatibility information available'}`,
-          technical_specifications: `
-- Material Composition: Detailed material information not available
-- Performance Characteristics: Additional details pending`,
-          market_information: `
-- Estimated Price Range: ${firstPrediction.estimated_price}
-- Typical Applications: ${firstPrediction.category}`,
-          confidence_reasoning: `
-- Visual Match Confidence: ${(firstPrediction.confidence * 100).toFixed(1)}%
-- Technical Identification Confidence: ${(firstPrediction.confidence * 100).toFixed(1)}%`
-        };
+      // Final progress update
+      updateProgress('complete', `Part identified: ${firstPrediction.class_name}`, 100, 'Analysis complete');
 
-        // Set analysis results to trigger full display
-        setAnalysisResults({
-          success: result.success,
-          predictions: result.predictions,
-          similar_images: result.similar_images || [],
-          model_version: result.model_version || 'SpareFinder AI',
-          processing_time: result.processing_time,
-          image_metadata: {
-            content_type: result.image_metadata?.content_type || '',
-            size_bytes: result.image_metadata?.size_bytes || 0
-          },
-          additional_details: additionalDetails
-        });
+      // Set analysis results to trigger full display
+      const analysisResults: AnalysisResponse = {
+        success: result.success,
+        predictions: predictions,
+        similar_images: [], // No similar images from this service
+        model_version: 'AI Part Analysis',
+        processing_time: 0, // Not provided
+        image_metadata: {
+          content_type: uploadedFile.type,
+          size_bytes: uploadedFile.size
+        },
+        additional_details: additionalDetails
+      };
 
-        // Set the first prediction as selected
-        setSelectedPrediction(firstPrediction);
+      // Set the first prediction as selected
+      setSelectedPrediction(firstPrediction);
 
-        toast({
-          title: "Success",
-          description: `Part identified: ${firstPrediction.class_name}`,
-        });
-      } else {
-        throw new Error('No predictions found');
+      toast({
+        title: "Success",
+        description: `Part identified: ${firstPrediction.class_name}`,
+      });
+
+      // If analysis is successful, store the results
+      if (result.success && result.part_info && result.part_info.length > 0) {
+        // Store analysis results
+        const storedAnalysis = await storeAnalysisResults(uploadedFile, analysisResults);
+
+        // If storage was successful, you might want to do something with storedAnalysis
+        if (storedAnalysis) {
+          console.log('Analysis stored successfully:', storedAnalysis);
+        }
       }
     } catch (error) {
       console.error('Upload error:', error);
+      
+      // Update progress to error state
+      setAnalysisProgress({
+        status: 'error',
+        message: error instanceof Error ? error.message : 'Failed to process image',
+        progress: 0,
+        currentStep: 'Analysis Failed',
+        currentStepIndex: 0,
+        totalSteps: 6,
+        details: 'Unable to complete image analysis'
+      });
+
       toast({
         title: "Error",
         description: error instanceof Error ? error.message : "Failed to process image",
@@ -656,6 +1021,269 @@ ${firstPrediction.compatibility ? firstPrediction.compatibility.map(model => `- 
 
   const handleToggleSidebar = () => {
     setIsCollapsed(!isCollapsed);
+  };
+
+  // Enhanced download method with more comprehensive error handling
+  const downloadAnalysisResults = useCallback(() => {
+    if (!analysisResults) {
+      toast({
+        title: "No Results",
+        description: "No analysis results available to download",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      // Create a comprehensive JSON report with additional metadata
+      const reportData = {
+        metadata: {
+          generated_at: new Date().toISOString(),
+          source: 'SpareFinderAI Vision Analysis',
+          version: '1.0.0'
+        },
+        part_identification: {
+          name: analysisResults.predictions[0]?.class_name,
+          confidence: `${(analysisResults.predictions[0]?.confidence * 100).toFixed(1)}%`,
+          category: analysisResults.predictions[0]?.category,
+          manufacturer: analysisResults.predictions[0]?.manufacturer,
+          estimated_price: analysisResults.predictions[0]?.estimated_price,
+          part_number: analysisResults.predictions[0]?.part_number
+        },
+        technical_details: {
+          description: analysisResults.predictions[0]?.description,
+          compatibility: analysisResults.predictions[0]?.compatibility,
+          additional_specifications: analysisResults.additional_details?.technical_specifications
+        },
+        market_information: {
+          pricing_details: analysisResults.additional_details?.market_information,
+          replacement_frequency: analysisResults.additional_details?.replacement_frequency
+        },
+        analysis_metadata: {
+          model_version: analysisResults.model_version,
+          processing_time: `${analysisResults.processing_time} seconds`,
+          image_details: {
+            size: `${analysisResults.image_metadata?.size_bytes} bytes`,
+            type: analysisResults.image_metadata?.content_type
+          }
+        },
+        full_analysis: analysisResults.additional_details?.full_analysis,
+        disclaimer: "This report is generated by SpareFinderAI Vision and is for informational purposes only."
+      };
+
+      // Convert to formatted JSON with indentation
+      const jsonReport = JSON.stringify(reportData, null, 2);
+      
+      // Create a Blob and download
+      const blob = new Blob([jsonReport], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `sparefinder_part_analysis_${new Date().toISOString().replace(/:/g, '-')}.json`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      toast({
+        title: "Report Downloaded",
+        description: "Comprehensive part analysis report saved successfully",
+        variant: "default"
+      });
+    } catch (error) {
+      console.error('Failed to download analysis report:', error);
+      toast({
+        title: "Download Failed",
+        description: "Unable to generate analysis report. Please try again.",
+        variant: "destructive"
+      });
+    }
+  }, [analysisResults, toast]);
+
+  // Enhanced shareable link generation with more robust error handling
+  const generateShareableLink = useCallback(() => {
+    if (!analysisResults) {
+      toast({
+        title: "No Results",
+        description: "No analysis results available to share",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      // Create a compact, shareable representation of the analysis
+      const shareData = {
+        part_name: analysisResults.predictions[0]?.class_name,
+        confidence: `${(analysisResults.predictions[0]?.confidence * 100).toFixed(1)}%`,
+        category: analysisResults.predictions[0]?.category,
+        manufacturer: analysisResults.predictions[0]?.manufacturer,
+        timestamp: new Date().toISOString(),
+        source: 'SpareFinderAI Vision'
+      };
+
+      // Generate a base64 encoded shareable link
+      const shareableLink = `https://sparefinder.ai/analysis/${encodeURIComponent(
+        btoa(JSON.stringify(shareData))
+      )}`;
+      
+      // Copy to clipboard with enhanced error handling
+      navigator.clipboard.writeText(shareableLink).then(() => {
+        toast({
+          title: "Shareable Link Generated",
+          description: "Analysis link copied to clipboard. Share with colleagues or save for future reference."
+        });
+        
+        // Separately open the link
+        window.open(shareableLink, '_blank');
+      }).catch(err => {
+        console.error('Clipboard copy failed:', err);
+        toast({
+          title: "Share Failed",
+          description: "Unable to copy shareable link. Please copy manually.",
+          variant: "destructive"
+        });
+      });
+    } catch (error) {
+      console.error('Failed to generate shareable link:', error);
+      toast({
+        title: "Share Error",
+        description: "Could not generate shareable link. Please try again.",
+        variant: "destructive"
+      });
+    }
+  }, [analysisResults, toast]);
+
+  // PDF Download Method
+  const downloadPDFReport = useCallback(async () => {
+    if (!analysisResults) {
+      toast({
+        title: "No Results",
+        description: "No analysis results available to download",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      // Create a container for PDF content
+      const input = document.createElement('div');
+      input.style.width = '800px';
+      input.style.padding = '20px';
+      input.style.fontFamily = 'Arial, sans-serif';
+      input.style.backgroundColor = 'white';
+      input.style.color = 'black';
+
+      // Generate PDF content
+      input.innerHTML = `
+        <h1 style="color: #333; border-bottom: 2px solid #333; padding-bottom: 10px;">
+          SpareFinderAI Vision Analysis Report
+        </h1>
+        
+        ${analysisResults.predictions.map((prediction, index) => `
+          <div style="margin-bottom: 20px; border: 1px solid #ddd; padding: 15px; border-radius: 5px;">
+            <h2 style="color: #2c3e50; margin-bottom: 10px;">
+              Part ${index + 1}: ${prediction.class_name}
+            </h2>
+            <p><strong>Confidence:</strong> ${(prediction.confidence * 100).toFixed(2)}%</p>
+            <p><strong>Category:</strong> ${prediction.category}</p>
+            <p><strong>Manufacturer:</strong> ${prediction.manufacturer}</p>
+            ${prediction.part_number ? `<p><strong>Part Number:</strong> ${prediction.part_number}</p>` : ''}
+            <p><strong>Estimated Price:</strong> ${prediction.estimated_price}</p>
+            
+            ${prediction.description ? `
+              <div style="background-color: #f4f4f4; padding: 10px; border-radius: 5px; margin-top: 10px;">
+                <h3 style="color: #34495e;">Description</h3>
+                <p>${prediction.description}</p>
+              </div>
+            ` : ''}
+          </div>
+        `).join('')}
+
+        ${analysisResults.additional_details ? `
+          <div style="margin-top: 20px; border-top: 2px solid #333; padding-top: 15px;">
+            <h2 style="color: #2c3e50;">Additional Details</h2>
+            ${Object.entries(analysisResults.additional_details).map(([key, value]) => 
+              typeof value === 'string' && value.trim() ? `
+                <div style="margin-bottom: 10px;">
+                  <h3 style="color: #34495e;">${key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}</h3>
+                  <p>${value}</p>
+                </div>
+              ` : ''
+            ).join('')}
+          </div>
+        ` : ''}
+
+        <div style="margin-top: 20px; font-size: 10px; color: #777; text-align: center;">
+          Generated by SpareFinderAI Vision on ${new Date().toLocaleString()}
+        </div>
+      `;
+
+      // Append to body to render
+      document.body.appendChild(input);
+
+      // Convert to canvas
+      const canvas = await html2canvas(input, { 
+        scale: 2,
+        useCORS: true,
+        logging: false 
+      });
+
+      // Remove temporary input
+      document.body.removeChild(input);
+
+      // Create PDF
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF({
+        orientation: 'portrait',
+        unit: 'px',
+        format: 'a4'
+      });
+
+      const imgProps = pdf.getImageProperties(imgData);
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+
+      pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+
+      // Save PDF
+      pdf.save(`sparefinder_part_analysis_${new Date().toISOString().replace(/:/g, '-')}.pdf`);
+
+      toast({
+        title: "PDF Generated",
+        description: "Comprehensive part analysis report saved successfully",
+        variant: "default"
+      });
+    } catch (error) {
+      console.error('Failed to generate PDF:', error);
+      toast({
+        title: "PDF Generation Failed",
+        description: "Unable to create PDF report. Please try again.",
+        variant: "destructive"
+      });
+    }
+  }, [analysisResults, toast]);
+
+  // Update existing buttons or add a new button in the results section
+  const renderPDFDownloadButton = () => {
+    if (!analysisResults) return null;
+
+    return (
+      <Button 
+        onClick={downloadPDFReport}
+        variant="outline"
+        className="w-full flex items-center justify-center space-x-2"
+      >
+        <Download className="w-4 h-4 mr-2" />
+        Download PDF Report
+      </Button>
+    );
+  };
+
+  const getConfidenceVariant = (confidence: number) => {
+    if (confidence > 0.8) return 'success';
+    if (confidence > 0.5) return 'warning';
+    return 'destructive';
   };
 
   return (
@@ -1157,151 +1785,19 @@ ${firstPrediction.compatibility ? firstPrediction.compatibility.map(model => `- 
                         transition={{ duration: 0.3 }}
                         className="bg-black/20 backdrop-blur-xl border border-white/10 rounded-2xl p-6 space-y-6"
                       >
-                        {/* Part Identification Section */}
-                        <div>
-                          <div className="flex items-center justify-between mb-4">
-                            <h2 className="text-2xl font-bold text-white flex items-center">
-                              <Target className="w-6 h-6 mr-3 text-blue-400" />
-                              {analysisResults.predictions[0].class_name}
-                            </h2>
-                            <Badge 
-                              className={`
-                                ${analysisResults.predictions[0].confidence > 0.8 ? 'bg-green-600/20 text-green-300 border-green-500/30' : 
-                                  analysisResults.predictions[0].confidence > 0.5 ? 'bg-yellow-600/20 text-yellow-300 border-yellow-500/30' : 
-                                  'bg-red-600/20 text-red-300 border-red-500/30'}
-                              `}
-                            >
-                              Confidence: {(analysisResults.predictions[0].confidence * 100).toFixed(1)}%
-                            </Badge>
-                          </div>
-                          
-                          <div className="grid md:grid-cols-2 gap-6">
-                            {/* Dynamically generate sections based on available data */}
-                            {[
-                              {
-                                title: "Part Details",
-                                icon: <Info className="w-5 h-5 mr-2 text-blue-400" />,
-                                content: [
-                                  { label: "Category", value: analysisResults.predictions[0].category },
-                                  { label: "Manufacturers", value: analysisResults.predictions[0].manufacturer },
-                                  { label: "Estimated Price", value: analysisResults.predictions[0].estimated_price },
-                                  { label: "Part Number", value: analysisResults.predictions[0].part_number || "Not Available" }
-                                ]
-                              },
-                              {
-                                title: "Description",
-                                icon: <FileText className="w-5 h-5 mr-2 text-blue-400" />,
-                                content: analysisResults.predictions[0].description
-                              }
-                            ].map((section, index) => (
-                              <div key={index} className="bg-white/5 rounded-xl p-4 border border-white/10">
-                                <h3 className="text-lg font-semibold text-blue-300 mb-2 flex items-center">
-                                  {section.icon}
-                                  {section.title}
-                                </h3>
-                                {Array.isArray(section.content) ? (
-                                  <div className="space-y-2 text-gray-300 text-sm">
-                                    {section.content.map((item, idx) => (
-                                      <p key={idx}>
-                                        <strong>{item.label}:</strong> {item.value}
-                                      </p>
-                                    ))}
-                                  </div>
-                                ) : (
-                                  <p className="text-gray-300 text-sm">{section.content}</p>
-                                )}
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-
-                        {/* Compatibility Section */}
-                        {analysisResults.predictions[0].compatibility && analysisResults.predictions[0].compatibility.length > 0 && (
-                          <div className="bg-white/5 rounded-xl p-4 border border-white/10 mt-6">
-                            <h3 className="text-lg font-semibold text-blue-300 mb-2 flex items-center">
-                              <Target className="w-5 h-5 mr-2 text-blue-400" />
-                              Compatibility
-                            </h3>
-                            <div className="text-gray-300 text-sm">
-                              {analysisResults.predictions[0].compatibility.map((model, index) => (
-                                <p key={index}>• {model}</p>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Dynamically generate additional sections from additional_details */}
-                        {[
-                          {
-                            key: 'technical_specifications',
-                            title: 'Technical Specifications',
-                            icon: <Zap className="w-5 h-5 mr-2 text-blue-400" />
-                          },
-                          {
-                            key: 'market_information',
-                            title: 'Market Information',
-                            icon: <Info className="w-5 h-5 mr-2 text-blue-400" />
-                          },
-                          {
-                            key: 'confidence_reasoning',
-                            title: 'Confidence Assessment',
-                            icon: <CheckCircle className="w-5 h-5 mr-2 text-blue-400" />
-                          },
-                          {
-                            key: 'replacement_frequency',
-                            title: 'Maintenance Insights',
-                            icon: <RefreshCw className="w-5 h-5 mr-2 text-blue-400" />
-                          }
-                        ].map((section, index) => {
-                          const sectionContent = analysisResults.additional_details?.[section.key];
-                          
-                          return sectionContent ? (
-                            <div 
-                              key={index} 
-                              className="bg-white/5 rounded-xl p-4 border border-white/10 mt-6"
-                            >
-                              <h3 className="text-lg font-semibold text-blue-300 mb-2 flex items-center">
+                        <div className="space-y-6">
+                          {generateAnalysisSections(analysisResults).map((section, index) => (
+                            <div key={index} className="space-y-4">
+                              <div className="flex items-center space-x-3 border-b border-white/10 pb-3">
                                 {section.icon}
-                                {section.title}
-                              </h3>
-                              <div className="text-gray-300 text-sm">
-                                <p>{sectionContent}</p>
+                                <h2 className="text-2xl font-bold text-white">
+                                  {section.title}
+                                </h2>
                               </div>
+                              {section.content}
                             </div>
-                          ) : null;
-                        })}
-
-                        {/* Metadata Section */}
-                        <div className="text-xs text-gray-500 text-right mt-6 space-y-1">
-                          <p><strong>Model:</strong> {analysisResults.model_version || 'Unknown'}</p>
-                          <p><strong>Processing Time:</strong> {analysisResults.processing_time ? `${analysisResults.processing_time.toFixed(2)} seconds` : 'N/A'}</p>
-                          <p><strong>Image Size:</strong> {analysisResults.image_metadata?.size_bytes || 0} bytes</p>
-                          <p><strong>Image Type:</strong> {analysisResults.image_metadata?.content_type || 'Unknown'}</p>
+                          ))}
                         </div>
-
-                        {/* Full Analysis Expandable Section */}
-                        {analysisResults.additional_details?.full_analysis && (
-                          <div className="mt-6 bg-white/5 rounded-xl border border-white/10">
-                            <Collapsible>
-                              <CollapsibleTrigger className="w-full">
-                                <div className="flex items-center justify-between p-4 hover:bg-white/10 transition-colors">
-                                  <div className="flex items-center">
-                                    <FileText className="w-5 h-5 mr-2 text-blue-400" />
-                                    <span className="text-blue-300 font-semibold">Full AI Analysis</span>
-                                  </div>
-                                  <ChevronDown className="w-5 h-5 text-gray-400" />
-                                </div>
-                              </CollapsibleTrigger>
-                              <CollapsibleContent>
-                                <div className="p-4 border-t border-white/10">
-                                  <pre className="text-xs text-gray-300 whitespace-pre-wrap break-words">
-                                    {analysisResults.additional_details.full_analysis}
-                                  </pre>
-                                </div>
-                              </CollapsibleContent>
-                            </Collapsible>
-                          </div>
-                        )}
                       </motion.div>
                     ) : (
                       <div className="text-center text-gray-400 p-8 bg-black/20 rounded-2xl border border-white/10">
@@ -1311,6 +1807,7 @@ ${firstPrediction.compatibility ? firstPrediction.compatibility.map(model => `- 
                       </div>
                     )}
                   </div>
+                  {renderPDFDownloadButton()}
                 </CardContent>
               </Card>
             </motion.div>

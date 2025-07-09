@@ -1,0 +1,29 @@
+{
+    "supabase": {
+        "project_url": "https://qhtysayouknqrsdxniam.supabase.co",
+        "service_role_key": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFodHlzYXlvdWtucXJzZHhuaWFtIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc0OTYzNzg5MiwiZXhwIjoyMDY1MjEzODkyfQ.DGIEBUUWwwuZ2srK2LD2fAvAxE93lSGLTqGGQg7k9Pc",
+        "migrations_path": "./migrations",
+        "database_name": "postgres"
+    },
+    "migrations": [{
+            "name": "000_create_execute_sql_function",
+            "file": "000_create_execute_sql_function.sql",
+            "description": "Create a stored procedure to execute raw SQL"
+        },
+        {
+            "name": "001_create_part_analysis_results",
+            "file": "001_create_part_analysis_results.sql",
+            "description": "Create part_analysis_results table for AI part identification"
+        },
+        {
+            "name": "004_add_missing_tables",
+            "file": "004_add_missing_tables.sql",
+            "description": "Add missing tables referenced in the application"
+        },
+        {
+            "name": "005_create_part_analyses",
+            "file": "005_create_part_analyses.sql",
+            "description": "Create part_analyses table with RLS policies"
+        }
+    ]
+}

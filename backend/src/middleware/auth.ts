@@ -8,120 +8,143 @@ export const authenticateToken = async (req: AuthRequest, res: Response, next: N
     const authHeader = req.headers.authorization;
     const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
 
-    console.log('Auth check - hasToken:', !!token);
+    console.log('🔐 Auth Check - Token Present:', !!token);
+    console.log('🔐 Full Authorization Header:', authHeader);
 
     if (!token) {
-      console.log('No token provided');
+      console.warn('❌ No token provided');
       return res.status(401).json({
+        success: false,
         error: 'Access denied',
-        message: 'No token provided'
+        message: 'Authentication token is required'
       });
     }
 
-    // First try to verify as our custom JWT
-    try {
-      const decoded = jwt.verify(token, process.env.JWT_SECRET!) as JWTPayload;
-      
-      // Verify user still exists and is active
-      const { data: profile, error } = await supabase
-        .from('profiles')
-        .select('id, email, role')
-        .eq('id', decoded.userId)
-        .single();
-
-      if (error || !profile) {
-        return res.status(401).json({
-          error: 'Invalid token',
-          message: 'User not found or inactive'
-        });
-      }
-
-      // Add user info to request
-      req.user = {
-        userId: decoded.userId,
-        email: decoded.email,
-        role: decoded.role
-      };
-
-      return next();
-    } catch (jwtError) {
-      console.log('JWT verification failed, trying Supabase token...');
-      
-      // If JWT fails, try to verify as Supabase token
-      try {
-        const { data: { user }, error } = await supabase.auth.getUser(token);
-        
-        if (error || !user) {
-          console.log('Supabase token verification failed:', error?.message);
-          return res.status(403).json({ 
-            error: 'Invalid token', 
-            message: 'Token is not valid' 
-          });
-        }
-
-        // Get user profile from database, create if doesn't exist
-        let { data: profile, error: profileError } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', user.id)
-          .single();
-
-        // If profile doesn't exist, create it (common for OAuth users)
-        if (profileError && profileError.code === 'PGRST116') {
-          console.log('Creating profile for OAuth user:', user.email);
+    // Enhanced logging for token verification
+    const verificationAttempts = [
+      // 1. Supabase Token Verification
+      async () => {
+        try {
+          console.log('🔍 Attempting Supabase Token Verification');
+          const { data: { user }, error: supabaseError } = await supabase.auth.getUser(token);
           
-          const { data: newProfile, error: createError } = await supabase
+          if (supabaseError) {
+            console.warn('❌ Supabase Token Error:', supabaseError);
+            return null;
+          }
+
+          if (!user) {
+            console.warn('❌ No Supabase User Found');
+            return null;
+          }
+
+          // Detailed Supabase user logging
+          console.log('✅ Supabase User Verified:', {
+            id: user.id,
+            email: user.email,
+            metadata: Object.keys(user.user_metadata || {})
+          });
+
+          // Get or create profile with more robust error handling
+          let { data: profile, error: profileError } = await supabase
             .from('profiles')
-            .insert([
-              {
+            .select('*')
+            .eq('id', user.id)
+            .single();
+
+          if (profileError && profileError.code === 'PGRST116') {
+            console.log('🆕 Creating Profile for New Supabase User');
+            const { data: newProfile, error: createError } = await supabase
+              .from('profiles')
+              .insert([{
                 id: user.id,
                 email: user.email!,
                 full_name: user.user_metadata?.full_name || user.user_metadata?.name || '',
                 avatar_url: user.user_metadata?.avatar_url || user.user_metadata?.picture || null,
                 role: 'user'
-              }
-            ])
-            .select()
-            .single();
+              }])
+              .select()
+              .single();
 
-          if (createError) {
-            console.error('Profile creation error:', createError);
-            return res.status(500).json({
-              error: 'Profile creation failed',
-              message: 'Failed to create user profile'
-            });
+            if (createError) {
+              console.error('❌ Profile Creation Error:', createError);
+              return null;
+            }
+
+            profile = newProfile;
           }
 
-          profile = newProfile;
-        } else if (profileError) {
-          console.error('Profile fetch error:', profileError);
-          return res.status(500).json({
-            error: 'Profile fetch failed',
-            message: 'Failed to retrieve user profile'
-          });
+          return {
+            userId: user.id,
+            email: user.email || '',
+            role: profile?.role || 'user'
+          };
+        } catch (error) {
+          console.error('❌ Supabase Token Verification Unexpected Error:', error);
+          return null;
         }
+      },
 
-        req.user = {
-          userId: user.id,
-          email: user.email || '',
-          role: profile?.role || 'user'
-        };
-        
-        console.log('Supabase token verified for user:', user.email);
+      // 2. Custom JWT Token Verification
+      async () => {
+        try {
+          console.log('🔍 Attempting Custom JWT Token Verification');
+          const decoded = jwt.verify(token, process.env.JWT_SECRET!) as JWTPayload;
+          
+          console.log('✅ JWT Token Decoded:', {
+            userId: decoded.userId,
+            email: decoded.email,
+            role: decoded.role
+          });
+
+          // Verify user still exists and is active
+          const { data: profile, error } = await supabase
+            .from('profiles')
+            .select('id, email, role')
+            .eq('id', decoded.userId)
+            .single();
+
+          if (error || !profile) {
+            console.warn('❌ JWT User Verification Failed:', error);
+            return null;
+          }
+
+          return {
+            userId: decoded.userId,
+            email: decoded.email,
+            role: decoded.role || profile.role
+          };
+        } catch (error) {
+          console.warn('❌ JWT Verification Failed:', error);
+          return null;
+        }
+      }
+    ];
+
+    // Try verification methods sequentially with detailed logging
+    for (const verify of verificationAttempts) {
+      const verifiedUser = await verify();
+      
+      if (verifiedUser) {
+        console.log('🎉 User Successfully Authenticated:', verifiedUser);
+        req.user = verifiedUser;
         return next();
-      } catch (supabaseError) {
-        console.log('Supabase token verification error:', supabaseError);
-        return res.status(403).json({ 
-          error: 'Invalid token', 
-          message: 'Token is not valid' 
-        });
       }
     }
+
+    // If all verification methods fail
+    console.error('❌ All Token Verification Methods Failed');
+    return res.status(401).json({
+      success: false,
+      error: 'Invalid token',
+      message: 'Authentication token is invalid or expired. Please log in again.'
+    });
   } catch (error) {
-    console.error('Authentication error:', error);
+    console.error('🚨 Unexpected Authentication Error:', error);
     return res.status(500).json({
+      success: false,
       error: 'Authentication failed',
-      message: 'An error occurred during authentication'
+      message: 'An unexpected error occurred. Please try again later.'
     });
   }
 };

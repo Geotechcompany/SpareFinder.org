@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useToast } from '@/components/ui/use-toast';
-import { client, apiClient } from '@/lib/api';
+import { api } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 import { 
   Shield, 
@@ -29,7 +29,7 @@ const AdminLogin = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const navigate = useNavigate();
-  const { signIn } = useAuth();
+  const { login } = useAuth();
   const { toast } = useToast();
 
   useEffect(() => {
@@ -44,128 +44,23 @@ const AdminLogin = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    setError(null);
-
-    // Validate inputs
-    if (!email || !password) {
-      setError('Please enter both email and password');
-      setIsLoading(false);
-      return;
-    }
+    setError('');
 
     try {
-      console.group('🔐 Admin Login Process');
-      console.log('Login Attempt:', { email });
+      const response = await api.auth.signIn(email, password);
       
-      // Log full client object for debugging
-      console.log('Client Object:', {
-        methods: Object.keys(client),
-        adminLoginExists: 'adminLogin' in client
-      });
-
-      // Attempt login using different methods
-      let response;
-      try {
-        // Method 1: Direct client.adminLogin
-        response = await client.adminLogin({ email, password });
-        console.log('Method 1 (client.adminLogin) Response:', response);
-      } catch (method1Error) {
-        console.error('Method 1 Failed:', method1Error);
-        
-        try {
-          // Method 2: Fallback to apiClient
-          response = await apiClient.post('/api/auth/login', { 
-            email, 
-            password,
-            isAdminLogin: true 
-          });
-          console.log('Method 2 (apiClient) Response:', response);
-        } catch (method2Error) {
-          console.error('Method 2 Failed:', method2Error);
-          throw method2Error;
-        }
-      }
-
-      // Detailed response logging
-      console.log('Full Response:', {
-        status: response.status,
-        data: response.data,
-        headers: response.headers
-      });
-
-      // Check for successful login
-      if (response.data && response.data.success) {
-        const loginData = response.data;
-        
-        console.log('Login Data:', {
-          userId: loginData.user?.id,
-          email: loginData.user?.email,
-          role: loginData.user?.role
-        });
-
-        // Set the token and user data manually since we're using admin login
-        client.setToken(loginData.token);
-        
-        // Store token in localStorage for authentication
-        localStorage.setItem('auth_token', loginData.token);
-        
-        // Store admin session info in localStorage for persistence
-        const adminSession = {
-          isAdminLogin: true,
-          user: loginData.user,
-          loginTime: new Date().toISOString(),
-          role: loginData.user.role
-        };
-        localStorage.setItem('admin_session', JSON.stringify(adminSession));
-        
-        console.log('Admin Session Stored:', adminSession);
-        
+      if ('success' in response && response.success) {
         toast({
-          title: "Admin Login Successful",
-          description: "Welcome to the admin console.",
+          title: 'Login Successful',
+          description: 'Welcome back, Admin!',
         });
-        
-        // Multiple navigation attempts
-        console.log('Attempting to navigate to /admin/dashboard');
-        
-        // Try multiple navigation methods
-        setTimeout(() => {
-          try {
-            // Method 1: React Router
-            navigate('/admin/dashboard');
-          } catch (navError) {
-            console.error('React Router Navigation Failed:', navError);
-            
-            // Method 2: Window location
-            window.location.href = '/admin/dashboard';
-          }
-        }, 100);
+        navigate('/admin/dashboard');
       } else {
-        // Detailed error handling
-        const errorMessage = response.data?.error 
-          || response.data?.message 
-          || 'Admin login failed';
-        
-        console.error('Login Failed:', errorMessage);
-        
-        setError(errorMessage);
-        toast({
-          variant: "destructive",
-          title: "Admin Login Failed",
-          description: errorMessage,
-        });
+        setError(response.error || 'Login failed');
       }
-
-      console.groupEnd();
     } catch (err) {
-      console.error('🔐 Admin Login Error:', err);
-      const errorMessage = err instanceof Error ? err.message : 'Admin login failed';
-      setError(errorMessage);
-      toast({
-        variant: "destructive",
-        title: "Admin Login Failed",
-        description: errorMessage,
-      });
+      console.error('Admin Login Error:', err);
+      setError('An unexpected error occurred');
     } finally {
       setIsLoading(false);
     }

@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/components/ui/use-toast';
-import { apiClient } from '@/lib/api';
+import { api } from '@/lib/api';
 import { Database, Terminal, Play, History, Server, Code, FileText, Zap, Loader2, AlertTriangle, CheckCircle } from 'lucide-react';
 
 interface DatabaseStats {

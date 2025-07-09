@@ -9,7 +9,7 @@ import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/components/ui/use-toast';
 import { Loader2 } from 'lucide-react';
-import { apiClient } from '@/lib/api';
+import { api } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 import { 
   Settings as SettingsIcon, 
