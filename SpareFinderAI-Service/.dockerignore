@@ -1,0 +1,61 @@
+# Virtual Environment
+venv/
+.venv/
+env/
+.env/
+
+# Python cache files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# Logs
+*.log
+logs/
+
+# Local development files
+.git/
+.gitignore
+README.md
+
+# Temporary files
+*.tmp
+*.bak
+*.swp
+.DS_Store
+
+# Upload files (optional, comment out if you want to include sample uploads)
+uploads/*.jpeg
+uploads/*.jpg
+uploads/*.png
+
+# Development and testing files
+tests/
+test_*.py
+*.test.py
+
+# Configuration and environment files
+.env
+.env.local
+.env.development
+.env.test
+
+# IDE-specific files
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# Build and distribution files
+build/
+dist/
+*.egg-info/
+
+# Dependency directories
+node_modules/
+
+# Render-specific files
+render.yaml 

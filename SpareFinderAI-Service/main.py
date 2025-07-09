@@ -218,6 +218,23 @@ async def cleanup_analysis(filename: str):
             }
         )
 
+@app.get("/health")
+async def health_check():
+    """
+    Health check endpoint for monitoring service availability.
+    Returns a 200 OK status if the service is running.
+    """
+    try:
+        # You can add additional checks here if needed
+        # For example, check database connection, model loading, etc.
+        return {
+            "status": "healthy",
+            "message": "SpareFinderAI Service is running",
+            "version": "1.0.0"
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 # Main entry point
 if __name__ == "__main__":
     uvicorn.run(
