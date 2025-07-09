@@ -1,15 +1,36 @@
 from setuptools import setup, find_packages
 import os
+import sys
 
-# Robust version extraction
 def get_version():
-    version_file = os.path.join(os.path.dirname(__file__), 'VERSION')
-    try:
-        with open(version_file, 'r') as f:
-            return f.read().strip()
-    except FileNotFoundError:
-        return "1.0.1"  # Fallback version
+    # Multiple fallback methods for version extraction
+    version_paths = [
+        os.path.join(os.path.dirname(__file__), 'VERSION'),
+        os.path.join(os.path.dirname(__file__), 'version.txt'),
+        os.path.join(os.path.dirname(__file__), 'pyproject.toml')
+    ]
+    
+    # Print debugging information
+    print(f"Python Path: {sys.path}", file=sys.stderr)
+    print(f"Current Directory: {os.getcwd()}", file=sys.stderr)
+    print(f"Script Directory: {os.path.dirname(__file__)}", file=sys.stderr)
+    
+    for path in version_paths:
+        try:
+            print(f"Attempting to read version from: {path}", file=sys.stderr)
+            if os.path.exists(path):
+                with open(path, 'r') as f:
+                    content = f.read().strip()
+                    print(f"Found version: {content}", file=sys.stderr)
+                    return content
+        except Exception as e:
+            print(f"Error reading {path}: {e}", file=sys.stderr)
+    
+    # Absolute last resort
+    print("Falling back to default version", file=sys.stderr)
+    return "1.0.1"
 
+# Explicitly set version to avoid KeyError
 __version__ = get_version()
 
 setup(
