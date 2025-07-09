@@ -16,5 +16,8 @@ services:
     dockerfilePath: Dockerfile
     dockerContext: .
     maxRunTime: 300 # 5 minutes max run time
-    buildCommand: pip install -r requirements.txt
+    buildCommand: |
+      python -m pip install --upgrade pip
+      python -m pip install --upgrade setuptools wheel
+      python -m pip install -r requirements.txt
     startCommand: python -m gunicorn main:app --workers 4 --worker-class uvicorn.workers.UvicornWorker --bind 0.0.0.0:${PORT} 
