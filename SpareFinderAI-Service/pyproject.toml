@@ -6,20 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "SpareFinderAI-Service"
 version = "1.0.1"
 description = "AI-powered automotive part identification service"
-readme = "README.md"
 requires-python = ">=3.8,<3.13"
-license = {file = "LICENSE"}
-
-dependencies = [
-    "fastapi==0.110.1",
-    "uvicorn==0.28.0",
-    "python-multipart==0.0.9",
-    "httpx==0.27.0",
-    "pydantic==2.6.4",
-    "python-dotenv==1.0.1",
-    "openai==1.14.3",
-    "pillow==10.2.0"
-]
 
 [project.optional-dependencies]
 dev = [
@@ -28,13 +15,4 @@ dev = [
     "mypy",
     "black",
     "isort"
-]
-
-[project.scripts]
-sparefinderai-service = "app.main:main"
-
-[tool.setuptools]
-packages = ["app"]
-
-[tool.setuptools.package-data]
-"*" = ["*.txt", "*.rst", "*.md", "*.json"] 
+] 
