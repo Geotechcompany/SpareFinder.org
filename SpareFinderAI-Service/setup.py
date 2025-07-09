@@ -1,7 +1,38 @@
 from setuptools import setup, find_packages
+import os
+import sys
 
-# Hardcoded version to avoid any dynamic extraction issues
-VERSION = "1.0.1"
+def read_version():
+    """
+    Read version from multiple possible sources with extensive error handling
+    """
+    version_sources = [
+        os.environ.get('PACKAGE_VERSION'),  # Environment variable
+        os.path.join(os.path.dirname(__file__), 'VERSION'),
+        os.path.join(os.path.dirname(__file__), 'version.txt'),
+    ]
+    
+    for source in version_sources:
+        try:
+            if source and os.path.isfile(source):
+                with open(source, 'r') as f:
+                    version = f.read().strip()
+                    if version:
+                        print(f"Version found in {source}: {version}", file=sys.stderr)
+                        return version
+            elif source:
+                print(f"Using version from environment or direct source: {source}", file=sys.stderr)
+                return str(source)
+        except Exception as e:
+            print(f"Error reading version from {source}: {e}", file=sys.stderr)
+    
+    # Absolute fallback
+    fallback_version = "1.0.1"
+    print(f"WARNING: No version found. Using fallback: {fallback_version}", file=sys.stderr)
+    return fallback_version
+
+# Determine version
+VERSION = read_version()
 
 setup(
     name="SpareFinderAI-Service",
