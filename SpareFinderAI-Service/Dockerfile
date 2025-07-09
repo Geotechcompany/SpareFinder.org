@@ -1,52 +1,33 @@
-# Use an official Python runtime as a parent image
-FROM python:3.12-slim-bullseye
+FROM python:3.10-slim
 
-# Set environment variables
-ENV PYTHONDONTWRITEBYTECODE 1
-ENV PYTHONUNBUFFERED 1
-ENV PORT 8000
-
-# Set working directory in the container
+# Set working directory
 WORKDIR /app
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
     build-essential \
-    curl \
-    software-properties-common \
-    git \
-    libpq-dev \
-    python3-dev \
-    python3-pip \
-    zlib1g-dev \
-    libjpeg-dev \
-    libfreetype6-dev \
-    libwebp-dev \
+    libffi-dev \
+    libssl-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy the current directory contents into the container at /app
-COPY . /app
+# Copy requirements and install dependencies
+COPY requirements.txt setup.py pyproject.toml ./
+RUN pip install --no-cache-dir --upgrade pip setuptools wheel build
+RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir .
 
-# Create a virtual environment
-RUN python -m venv venv
+# Copy the entire project
+COPY . .
 
-# Upgrade pip and install dependencies
-RUN . venv/bin/activate && \
-    pip install --no-cache-dir --upgrade pip setuptools wheel && \
-    pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir --only-binary=:all: -r requirements.txt
+# Create uploads directory
+RUN mkdir -p /app/uploads
+
+# Set environment variables
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONDONTWRITEBYTECODE=1
 
 # Expose the port the app runs on
 EXPOSE 8000
 
-# Create a directory for uploads
-RUN mkdir -p /app/uploads
-
-# Set permissions for uploads directory
-RUN chmod 777 /app/uploads
-
-# Health check
-HEALTHCHECK CMD curl --fail http://localhost:8000/health || exit 1
-
-# Run the application using gunicorn
-CMD ["/bin/bash", "-c", ". venv/bin/activate && python -m gunicorn main:app --workers 4 --worker-class uvicorn.workers.UvicornWorker --bind 0.0.0.0:${PORT}"] 
+# Use the start script as the entrypoint
+CMD ["python", "start.py"] 
