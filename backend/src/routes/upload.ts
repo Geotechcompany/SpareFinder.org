@@ -6,6 +6,8 @@ import { authenticateToken } from '../middleware/auth';
 import { AuthRequest } from '../types/auth';
 import { supabase } from '../server';
 import { DatabaseLogger, PartSearchData, SearchHistoryData } from '../services/database-logger';
+import { z } from 'zod';
+import { Request } from 'express';
 
 const router = Router();
 
@@ -381,6 +383,75 @@ router.get('/statistics', authenticateToken, async (req: AuthRequest, res: Respo
     console.error('User statistics error:', error);
     return res.status(500).json({
       error: 'Failed to fetch user statistics'
+    });
+  }
+});
+
+// Validation Schema for Part Analysis
+const PartAnalysisSchema = z.object({
+  part_name: z.string(),
+  part_number: z.optional(z.string()),
+  manufacturer: z.string(),
+  category: z.string(),
+  confidence_score: z.number().min(0).max(100),
+  image_url: z.optional(z.string()),
+  description: z.optional(z.string()),
+  additional_details: z.optional(z.record(z.string(), z.any())),
+});
+
+// Store Part Analysis Endpoint
+router.post('/store-analysis', authenticateToken, async (req: Request, res: Response) => {
+  try {
+    // Validate request body
+    const validatedData = PartAnalysisSchema.parse(req.body);
+
+    // Get user ID from authenticated request
+    const userId = (req as any).user?.id;
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    // Prepare data for insertion
+    const analysisData = {
+      user_id: userId,
+      search_type: 'image',
+      part_name: validatedData.part_name,
+      part_number: validatedData.part_number,
+      manufacturer: validatedData.manufacturer,
+      category: validatedData.category,
+      confidence_score: validatedData.confidence_score,
+      image_url: validatedData.image_url,
+      device_info: {
+        user_agent: req.headers['user-agent'],
+        timestamp: new Date().toISOString()
+      },
+      additional_details: validatedData.additional_details || {}
+    };
+
+    // Insert into Supabase
+    const { data, error } = await supabase
+      .from('part_searches')
+      .insert(analysisData)
+      .select('id')
+      .single();
+
+    if (error) throw error;
+
+    res.status(201).json({
+      message: 'Part analysis stored successfully',
+      analysisId: data.id
+    });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ 
+        error: 'Invalid data', 
+        details: error.issues // Use .issues instead of .errors
+      });
+    }
+
+    return res.status(500).json({ 
+      error: 'Failed to store part analysis', 
+      details: error instanceof Error ? error.message : 'Unknown error' 
     });
   }
 });

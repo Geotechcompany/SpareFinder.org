@@ -2,6 +2,7 @@ import os
 import uuid
 import logging
 import json
+import asyncio
 from typing import Dict, Any, Optional, List
 
 import uvicorn
@@ -15,37 +16,73 @@ from fastapi import (
 )
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.exceptions import RequestValidationError
+from starlette.status import HTTP_422_UNPROCESSABLE_ENTITY
 from pydantic import BaseModel
 
 from dotenv import load_dotenv
 
-# Import the analysis function
-from github_ai_part_analysis import OpenAIImageAnalyzer
+from .services.ai_service import analyze_part_image
+from .core.config import settings
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO, 
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
+# Configure logging with a more robust method
+def configure_logging():
+    """
+    Configure logging with thread-safe and interrupt-resistant setup
+    """
+    logging.basicConfig(
+        level=logging.INFO, 
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+        handlers=[
+            logging.StreamHandler(),  # Output to console
+            logging.FileHandler('app.log', mode='a', encoding='utf-8')  # Output to file
+        ]
+    )
+    
+    # Suppress overly verbose logs from libraries
+    logging.getLogger('uvicorn').setLevel(logging.WARNING)
+    logging.getLogger('uvicorn.access').setLevel(logging.WARNING)
+    logging.getLogger('uvicorn.error').setLevel(logging.WARNING)
+    logging.getLogger('fastapi').setLevel(logging.WARNING)
+
+# Configure logging before app initialization
+configure_logging()
 logger = logging.getLogger(__name__)
 
 # Load environment variables
 load_dotenv()
 
-# Initialize FastAPI app
-app = FastAPI(title="Part Analysis Service")
+# Initialize FastAPI app with explicit lifespan management
+app = FastAPI(
+    title="SpareFinderAI Service",
+    description="AI-powered automotive part identification service",
+    version="1.0.0"
+)
 
 # Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allows all origins
+    allow_origins=["*"],
     allow_credentials=True,
-    allow_methods=["*"],  # Allows all methods
-    allow_headers=["*"]   # Allows all headers
+    allow_methods=["*"],
+    allow_headers=["*"]
 )
 
 # In-memory storage for analysis results (replace with Redis/database in production)
 analysis_results: Dict[str, Dict[str, Any]] = {}
+
+# Custom exception handler for validation errors
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request, exc):
+    return JSONResponse(
+        status_code=HTTP_422_UNPROCESSABLE_ENTITY,
+        content={
+            "success": False,
+            "status": "failed",
+            "error": "Validation Error",
+            "details": str(exc)
+        }
+    )
 
 # Prediction Model
 class PartPrediction(BaseModel):
@@ -69,8 +106,22 @@ class AnalysisResponse(BaseModel):
     processing_time: Optional[float] = None
     model_version: Optional[str] = None
 
-# Initialize AI Analyzer
-ai_analyzer = OpenAIImageAnalyzer()
+# Startup event to ensure directories are created
+@app.on_event("startup")
+async def startup_event():
+    try:
+        # Ensure uploads directory exists
+        uploads_dir = os.path.join(os.getcwd(), "uploads")
+        os.makedirs(uploads_dir, exist_ok=True)
+        logger.info(f"Uploads directory ensured: {uploads_dir}")
+    except Exception as e:
+        logger.error(f"Failed to create uploads directory: {e}")
+
+# Shutdown event for cleanup
+@app.on_event("shutdown")
+async def shutdown_event():
+    logger.info("Application is shutting down")
+    # Optionally clear analysis results or perform cleanup
 
 @app.post("/analyze-part/")
 async def analyze_part(
@@ -79,13 +130,11 @@ async def analyze_part(
     confidence_threshold: float = Query(0.3),
     max_predictions: int = Query(3)
 ):
+    filename = None
     try:
         # Generate unique filename
         filename = f"{uuid.uuid4()}.{file.filename.split('.')[-1]}"
         file_path = os.path.join("uploads", filename)
-        
-        # Ensure uploads directory exists
-        os.makedirs("uploads", exist_ok=True)
         
         # Save uploaded file
         with open(file_path, "wb") as buffer:
@@ -96,13 +145,40 @@ async def analyze_part(
         # Prepare keywords
         keyword_list = keywords.split(", ") if keywords else []
         
-        # Start async analysis
-        analysis_result = await ai_analyzer.analyze_image(
-            file_path, 
-            keywords=keyword_list, 
-            confidence_threshold=confidence_threshold,
-            max_predictions=max_predictions
-        )
+        # Start async analysis with timeout
+        try:
+            analysis_result = await asyncio.wait_for(
+                analyze_part_image(
+                    file_path, 
+                    keywords=keyword_list, 
+                    confidence_threshold=confidence_threshold,
+                    max_predictions=max_predictions
+                ),
+                timeout=300.0  # 5-minute timeout
+            )
+        except asyncio.TimeoutError:
+            logger.error(f"Analysis timed out for {filename}")
+            return JSONResponse(
+                status_code=504,  # Gateway Timeout
+                content={
+                    "success": False,
+                    "status": "failed",
+                    "error": "Analysis timed out",
+                    "filename": filename
+                }
+            )
+        
+        # If analysis failed, return error response
+        if not analysis_result.get('success'):
+            return JSONResponse(
+                status_code=500,
+                content={
+                    "success": False,
+                    "status": "failed",
+                    "error": analysis_result.get('error', 'Unknown error'),
+                    "filename": filename
+                }
+            )
         
         # Prepare response
         response_data = {
@@ -123,7 +199,7 @@ async def analyze_part(
             ],
             "analysis": analysis_result.get("full_analysis", ""),
             "processing_time": analysis_result.get("processing_time"),
-            "model_version": "GitHub AI Part Analysis v1.0"
+            "model_version": "SpareFinderAI Part Analysis v1.0"
         }
         
         # Store result for potential later retrieval
@@ -144,7 +220,7 @@ async def analyze_part(
                 "success": False,
                 "status": "failed",
                 "error": str(e),
-                "filename": filename if 'filename' in locals() else None
+                "filename": filename if filename else None
             }
         )
 
@@ -188,7 +264,6 @@ async def get_analysis_status(
             }
         )
 
-# Cleanup endpoint to remove old analysis results
 @app.delete("/analyze-part/cleanup/{filename}")
 async def cleanup_analysis(filename: str):
     try:
@@ -205,7 +280,8 @@ async def cleanup_analysis(filename: str):
             status_code=200,
             content={
                 "success": True,
-                "message": "File and analysis result cleaned up"
+                "status": "cleaned",
+                "filename": filename
             }
         )
     except Exception as e:
@@ -214,28 +290,21 @@ async def cleanup_analysis(filename: str):
             status_code=500,
             content={
                 "success": False,
-                "error": str(e)
+                "status": "failed",
+                "error": str(e),
+                "filename": filename
             }
         )
 
 @app.get("/health")
 async def health_check():
-    """
-    Health check endpoint for monitoring service availability.
-    Returns a 200 OK status if the service is running.
-    """
-    try:
-        # You can add additional checks here if needed
-        # For example, check database connection, model loading, etc.
-        return {
-            "status": "healthy",
-            "message": "SpareFinderAI Service is running",
-            "version": "1.0.0"
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    return {
+        "status": "healthy",
+        "service": "SpareFinderAI",
+        "version": "1.0.0"
+    }
 
-# Main entry point
+# If running the script directly
 if __name__ == "__main__":
     uvicorn.run(
         "main:app", 

@@ -65,6 +65,32 @@ export interface PerformanceMetricsResponse {
   responseTimeChange: number;
 }
 
+export interface AnalysisResponse {
+  description?: string;
+  predictions: Array<{
+    class_name: string;
+    confidence: number;
+    description: string;
+    category: string;
+    manufacturer: string;
+    part_number?: string | null;
+    estimated_price?: string;
+    compatibility?: string[];
+  }>;
+  additional_details?: {
+    full_analysis?: string;
+    technical_specifications?: string;
+    market_information?: string;
+  };
+  image_metadata?: {
+    content_type?: string;
+    size_bytes?: number;
+    base64_image?: string;
+  };
+  processing_time?: number;
+  model_version?: string;
+}
+
 // Type guards
 export function isDashboardStatsResponse(response: any): response is ApiResponse<DashboardStatsResponse> {
   return response && 
@@ -525,6 +551,41 @@ export const api = {
         };
       } catch (error) {
         console.error('Image upload to AI service failed:', error);
+        throw error;
+      }
+    },
+    storeAnalysis: async (analysisResults: AnalysisResponse) => {
+      try {
+        // Prepare data for backend
+        const storeData = {
+          part_name: analysisResults.predictions[0].class_name,
+          part_number: analysisResults.predictions[0].part_number,
+          manufacturer: analysisResults.predictions[0].manufacturer,
+          category: analysisResults.predictions[0].category,
+          confidence_score: analysisResults.predictions[0].confidence * 100,
+          image_url: analysisResults.image_metadata?.content_type && analysisResults.image_metadata?.base64_image
+            ? `data:${analysisResults.image_metadata.content_type};base64,${analysisResults.image_metadata.base64_image}`
+            : undefined,
+          description: analysisResults.predictions[0].description || 
+                       analysisResults.additional_details?.full_analysis,
+          additional_details: {
+            full_analysis: analysisResults.additional_details?.full_analysis,
+            technical_specifications: analysisResults.additional_details?.technical_specifications,
+            market_information: analysisResults.additional_details?.market_information,
+            processing_time: analysisResults.processing_time,
+            model_version: analysisResults.model_version
+          }
+        };
+
+        const response = await axios.post('/api/upload/store-analysis', storeData, {
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        });
+
+        return response.data;
+      } catch (error) {
+        console.error('Failed to store analysis:', error);
         throw error;
       }
     }

@@ -1,47 +1,86 @@
+#!/usr/bin/env python3
 import subprocess
 import sys
-import os
-import venv
+import platform
 
-def create_virtual_environment():
-    """Create a virtual environment"""
-    venv_path = os.path.join(os.path.dirname(__file__), 'venv')
-    venv.create(venv_path, with_pip=True)
-    print(f"Virtual environment created at {venv_path}")
-
-def install_dependencies():
-    """Install dependencies from requirements.txt"""
+def run_command(command):
+    """Run a shell command with error handling."""
     try:
-        # Determine the correct pip executable based on the operating system
-        pip_executable = os.path.join('venv', 'Scripts', 'pip') if sys.platform == 'win32' else os.path.join('venv', 'bin', 'pip')
-        
-        # Install dependencies
-        subprocess.check_call([pip_executable, 'install', '-r', 'requirements.txt'])
-        print("Dependencies installed successfully!")
+        result = subprocess.run(
+            command, 
+            shell=True, 
+            check=True, 
+            text=True, 
+            capture_output=True
+        )
+        print(result.stdout)
     except subprocess.CalledProcessError as e:
-        print(f"Error installing dependencies: {e}")
+        print(f"Error running {command}: {e}")
+        print(f"Stderr: {e.stderr}")
         sys.exit(1)
 
-def main():
-    """Main function to set up the project environment"""
-    print("Setting up GitHub AI Part Analysis Service...")
+def install_system_dependencies():
+    """Install system-level dependencies based on the operating system."""
+    os_name = platform.system().lower()
     
-    # Check if virtual environment exists, if not create one
-    venv_path = os.path.join(os.path.dirname(__file__), 'venv')
-    if not os.path.exists(venv_path):
-        create_virtual_environment()
+    if os_name == 'linux':
+        # Debian/Ubuntu style package management
+        run_command('sudo apt-get update')
+        run_command('sudo apt-get install -y python3-pip python3-venv')
+    elif os_name == 'darwin':  # macOS
+        run_command('brew update')
+        run_command('brew install python')
+    elif os_name == 'windows':
+        # For Windows, we'll assume Python is already installed
+        print("Windows detected. Ensure Python is installed via Python.org or Microsoft Store.")
+
+def create_virtual_environment():
+    """Create a virtual environment if it doesn't exist."""
+    run_command('python -m venv venv')
+
+def activate_virtual_environment():
+    """Activate the virtual environment based on the operating system."""
+    os_name = platform.system().lower()
+    
+    if os_name in ['linux', 'darwin']:
+        activate_script = 'source venv/bin/activate'
+    elif os_name == 'windows':
+        activate_script = 'venv\\Scripts\\activate'
+    else:
+        print(f"Unsupported OS: {os_name}")
+        sys.exit(1)
+    
+    return activate_script
+
+def install_python_dependencies():
+    """Install Python dependencies from requirements.txt."""
+    run_command('pip install --upgrade pip setuptools wheel')
+    run_command('pip install -r requirements.txt')
+
+def main():
+    print("🚀 SpareFinderAI Dependency Installer")
+    
+    # Check Python version
+    python_version = sys.version_info
+    print(f"Python Version: {python_version.major}.{python_version.minor}.{python_version.micro}")
+    
+    if python_version.major != 3 or python_version.minor < 8:
+        print("⚠️ Warning: This script is tested with Python 3.8+")
+    
+    # Install system dependencies
+    install_system_dependencies()
+    
+    # Create virtual environment
+    create_virtual_environment()
+    
+    # Activate virtual environment and install dependencies
+    activate_script = activate_virtual_environment()
+    print(f"Activating virtual environment: {activate_script}")
     
     # Install dependencies
-    install_dependencies()
+    install_python_dependencies()
     
-    # Provide next steps
-    print("\nSetup complete!")
-    print("Next steps:")
-    print("1. Activate the virtual environment:")
-    print("   - On Windows: .\\venv\\Scripts\\activate")
-    print("   - On Unix/MacOS: source venv/bin/activate")
-    print("2. Set your GitHub token in the .env file")
-    print("3. Run the part analysis script: python github_ai_part_analysis.py")
+    print("✅ Dependencies installed successfully!")
 
 if __name__ == '__main__':
     main() 

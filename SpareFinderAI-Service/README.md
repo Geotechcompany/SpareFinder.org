@@ -40,12 +40,46 @@ $Env:GITHUB_TOKEN="your_github_token_here"
 set GITHUB_TOKEN=your_github_token_here
 ```
 
-## Running the Service
+## Deployment
 
-### Start the API Server
+### Production Deployment
+For production, use Gunicorn with Uvicorn workers:
+
 ```bash
-uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+# Install gunicorn
+pip install gunicorn
+
+# Start the service
+gunicorn main:app \
+  --workers 4 \
+  --worker-class uvicorn.workers.UvicornWorker \
+  --bind 0.0.0.0:8000
 ```
+
+#### Render Deployment
+1. Create a new Web Service on Render
+2. Choose Docker environment
+3. Set environment variables:
+   - `OPENAI_API_KEY`: Your OpenAI API key
+   - `PORT`: 8000
+   - `ENVIRONMENT`: production
+
+### Docker Deployment
+```bash
+# Build Docker image
+docker build -t sparefinder-ai-service .
+
+# Run Docker container
+docker run -p 8000:8000 \
+  -e OPENAI_API_KEY=your_openai_api_key \
+  -e PORT=8000 \
+  sparefinder-ai-service
+```
+
+### Performance Optimization
+- Adjust `--workers` based on your CPU cores
+- Use a paid Render plan for better performance
+- Consider GPU-enabled instances for ML models
 
 ## API Endpoints
 

@@ -53,6 +53,16 @@ import { parseMarkdownSections, MarkdownCard } from '@/lib/markdown-parser';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 
+// Add this helper function before the Upload component
+const convertImageToBase64 = (file: File): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = error => reject(error);
+  });
+};
+
 // Image component with fallback handling
 const ImageWithFallback = ({ src, alt, className, onError }: { 
   src: string; 
@@ -161,6 +171,7 @@ interface AnalysisResponse {
   image_metadata: {
     content_type: string;
     size_bytes: number;
+    base64_image?: string; // Added for base64 image
   };
   additional_details?: {
     full_analysis?: string;
@@ -171,7 +182,7 @@ interface AnalysisResponse {
     typical_vehicle_models?: string[];
     [key: string]: any;
   };
-  error?: string | null;  // Add this line
+  error?: string | null;
 }
 
 // Add new animation variants
@@ -886,7 +897,8 @@ const Upload = () => {
         processing_time: 0, // Not provided
         image_metadata: {
           content_type: uploadedFile.type,
-          size_bytes: uploadedFile.size
+          size_bytes: uploadedFile.size,
+          base64_image: await convertImageToBase64(uploadedFile) // Add this helper function
         },
         additional_details: additionalDetails
       };
@@ -901,12 +913,45 @@ const Upload = () => {
 
       // If analysis is successful, store the results
       if (result.success && result.part_info && result.part_info.length > 0) {
-        // Store analysis results
-        const storedAnalysis = await storeAnalysisResults(uploadedFile, analysisResults);
+        try {
+          // Prepare analysis results in the expected format
+          const analysisResults: AnalysisResponse = {
+            success: result.success,
+            predictions: result.part_info.map(prediction => ({
+              class_name: prediction.class_name || 'Automotive Component',
+              confidence: prediction.confidence || 0.75,
+              description: prediction.description || '',
+              category: prediction.category || 'Unspecified',
+              manufacturer: prediction.manufacturer || 'Unknown',
+              estimated_price: prediction.estimated_price || 'Price not available',
+              part_number: prediction.part_number,
+              compatibility: prediction.compatibility
+            })),
+            similar_images: [], 
+            model_version: 'AI Part Analysis',
+            processing_time: 0, // Not provided by this service
+            image_metadata: {
+              content_type: uploadedFile.type,
+              size_bytes: uploadedFile.size,
+              base64_image: await convertImageToBase64(uploadedFile) // Add this helper function
+            },
+            additional_details: {
+              full_analysis: result.part_info[0]?.description || '',
+              technical_specifications: '',
+              market_information: '',
+              confidence_reasoning: ''
+            }
+          };
 
-        // If storage was successful, you might want to do something with storedAnalysis
-        if (storedAnalysis) {
-          console.log('Analysis stored successfully:', storedAnalysis);
+          // Store analysis in database
+          await api.upload.storeAnalysis(analysisResults);
+        } catch (storageError) {
+          console.error('Failed to store analysis:', storageError);
+          toast({
+            title: "Storage Error",
+            description: "Could not save analysis details",
+            variant: "destructive"
+          });
         }
       }
     } catch (error) {

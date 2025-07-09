@@ -17,6 +17,11 @@ RUN apt-get update && apt-get install -y \
     git \
     libpq-dev \
     python3-dev \
+    python3-pip \
+    zlib1g-dev \
+    libjpeg-dev \
+    libfreetype6-dev \
+    libwebp-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy the current directory contents into the container at /app
@@ -25,10 +30,11 @@ COPY . /app
 # Create a virtual environment
 RUN python -m venv venv
 
-# Activate virtual environment and install dependencies
+# Upgrade pip and install dependencies
 RUN . venv/bin/activate && \
     pip install --no-cache-dir --upgrade pip setuptools wheel && \
-    pip install --no-cache-dir -r requirements.txt
+    pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir --only-binary=:all: -r requirements.txt
 
 # Expose the port the app runs on
 EXPOSE 8000
