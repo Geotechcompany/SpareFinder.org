@@ -41,4 +41,4 @@ RUN chmod 777 /app/uploads
 HEALTHCHECK CMD curl --fail http://localhost:8000/health || exit 1
 
 # Run the application using gunicorn
-CMD ["/bin/bash", "-c", ". venv/bin/activate && gunicorn main:app --workers 4 --worker-class uvicorn.workers.UvicornWorker --bind 0.0.0.0:${PORT}"] 
+CMD ["/bin/bash", "-c", ". venv/bin/activate && python -m gunicorn main:app --workers 4 --worker-class uvicorn.workers.UvicornWorker --bind 0.0.0.0:${PORT}"] 
