@@ -1,7 +1,16 @@
 from setuptools import setup, find_packages
+import os
 
-# Explicitly define version
-__version__ = "1.0.1"
+# Robust version extraction
+def get_version():
+    version_file = os.path.join(os.path.dirname(__file__), 'VERSION')
+    try:
+        with open(version_file, 'r') as f:
+            return f.read().strip()
+    except FileNotFoundError:
+        return "1.0.1"  # Fallback version
+
+__version__ = get_version()
 
 setup(
     name="SpareFinderAI-Service",
