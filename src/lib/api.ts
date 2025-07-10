@@ -699,6 +699,193 @@ export const api = {
           error: error instanceof Error ? error.message : 'Unknown error'
         };
       }
+    },
+    getAdminStats: async () => {
+      try {
+        const response = await apiClient.get('/admin/stats');
+        return {
+          success: true,
+          data: response.data
+        };
+      } catch (error) {
+        console.error('Failed to get admin stats:', error);
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : 'Unknown error'
+        };
+      }
+    },
+    getAdminAnalytics: async (timeRange: string = '30d') => {
+      try {
+        const response = await apiClient.get('/admin/analytics', { params: { range: timeRange } });
+        return {
+          success: true,
+          data: response.data
+        };
+      } catch (error) {
+        console.error('Failed to get admin analytics:', error);
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : 'Unknown error'
+        };
+      }
+    },
+    getSystemLogs: async (page: number = 1, limit: number = 100, level?: string) => {
+      try {
+        const params: any = { page, limit };
+        if (level) params.level = level;
+        
+        const response = await apiClient.get('/admin/logs', { params });
+        return {
+          success: true,
+          data: response.data
+        };
+      } catch (error) {
+        console.error('Failed to get system logs:', error);
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : 'Unknown error'
+        };
+      }
+    },
+    getAuditLogs: async (page: number = 1, limit: number = 100) => {
+      try {
+        const response = await apiClient.get('/admin/audit-logs', { params: { page, limit } });
+        return {
+          success: true,
+          data: response.data
+        };
+      } catch (error) {
+        console.error('Failed to get audit logs:', error);
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : 'Unknown error'
+        };
+      }
+    },
+    // AI Models Management
+    getAIModels: async () => {
+      try {
+        const response = await apiClient.get('/admin/ai-models');
+        return {
+          success: true,
+          data: response.data
+        };
+      } catch (error) {
+        console.error('Failed to get AI models:', error);
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : 'Unknown error'
+        };
+      }
+    },
+    createAIModel: async (modelData: { provider: string; model_name: string; api_key: string; description?: string }) => {
+      try {
+        const response = await apiClient.post('/admin/ai-models', modelData);
+        return {
+          success: true,
+          data: response.data
+        };
+      } catch (error) {
+        console.error('Failed to create AI model:', error);
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : 'Unknown error'
+        };
+      }
+    },
+    updateAIModel: async (id: string, updateData: any) => {
+      try {
+        const response = await apiClient.patch(`/admin/ai-models/${id}`, updateData);
+        return {
+          success: true,
+          data: response.data
+        };
+      } catch (error) {
+        console.error('Failed to update AI model:', error);
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : 'Unknown error'
+        };
+      }
+    },
+    // Payment Methods Management
+    getPaymentMethods: async () => {
+      try {
+        const response = await apiClient.get('/admin/payment-methods');
+        return {
+          success: true,
+          data: response.data
+        };
+      } catch (error) {
+        console.error('Failed to get payment methods:', error);
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : 'Unknown error'
+        };
+      }
+    },
+    createPaymentMethod: async (methodData: { name: string; provider: string; api_key: string; secret_key: string; description?: string }) => {
+      try {
+        const response = await apiClient.post('/admin/payment-methods', methodData);
+        return {
+          success: true,
+          data: response.data
+        };
+      } catch (error) {
+        console.error('Failed to create payment method:', error);
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : 'Unknown error'
+        };
+      }
+    },
+    // Email Templates Management
+    getEmailTemplates: async () => {
+      try {
+        const response = await apiClient.get('/admin/email-templates');
+        return {
+          success: true,
+          data: response.data
+        };
+      } catch (error) {
+        console.error('Failed to get email templates:', error);
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : 'Unknown error'
+        };
+      }
+    },
+    // System Settings Management
+    getSystemSettings: async () => {
+      try {
+        const response = await apiClient.get('/admin/system-settings');
+        return {
+          success: true,
+          data: response.data
+        };
+      } catch (error) {
+        console.error('Failed to get system settings:', error);
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : 'Unknown error'
+        };
+      }
+    },
+    updateSystemSettings: async (settings: any) => {
+      try {
+        const response = await apiClient.patch('/admin/system-settings', { settings });
+        return {
+          success: true,
+          data: response.data
+        };
+      } catch (error) {
+        console.error('Failed to update system settings:', error);
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : 'Unknown error'
+        };
+      }
     }
   }
 };

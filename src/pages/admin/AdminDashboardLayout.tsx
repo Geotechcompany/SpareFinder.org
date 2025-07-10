@@ -74,13 +74,13 @@ const AdminDashboardLayout = () => {
       setError(null);
 
       // Fetch admin stats
-      const statsResponse = await apiClient.getAdminStats();
+      const statsResponse = await api.admin.getAdminStats();
       if (statsResponse.success && statsResponse.data?.statistics) {
         setStats(statsResponse.data.statistics);
       }
 
       // Fetch current admin user
-      const userResponse = await apiClient.getCurrentUser();
+      const userResponse = await api.auth.getCurrentUser();
       if (userResponse.success && userResponse.data?.user) {
         setAdminUser(userResponse.data.user);
       }

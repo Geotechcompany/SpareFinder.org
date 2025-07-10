@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import AdminDesktopSidebar from '@/components/AdminDesktopSidebar';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -7,6 +7,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useToast } from '@/components/ui/use-toast';
+import { api } from '@/lib/api';
 import { 
   BrainCircuit, 
   Plus, 
@@ -26,75 +28,78 @@ import {
   Bot,
   Shield,
   Globe,
-  BarChart3
+  BarChart3,
+  Loader2
 } from 'lucide-react';
+
+interface AIModel {
+  id: string;
+  provider: string;
+  model_name: string;
+  api_key: string;
+  status: 'active' | 'inactive' | 'pending' | 'error';
+  usage_count: number;
+  cost: number;
+  avg_response_time: number;
+  success_rate: number;
+  last_used_at?: string;
+  description?: string;
+  created_at: string;
+  updated_at: string;
+}
 
 const AIModelsManagement = () => {
   const [isCollapsed, setIsCollapsed] = useState(false);
-  const [showApiKeys, setShowApiKeys] = useState<{[key: number]: boolean}>({});
+  const [showApiKeys, setShowApiKeys] = useState<{[key: string]: boolean}>({});
   const [selectedProvider, setSelectedProvider] = useState<string | null>(null);
+  const [models, setModels] = useState<AIModel[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  
+  const { toast } = useToast();
   
   const handleToggleSidebar = () => {
     setIsCollapsed(!isCollapsed);
   };
 
-  const toggleApiKeyVisibility = (id: number) => {
+  const toggleApiKeyVisibility = (id: string) => {
     setShowApiKeys(prev => ({ ...prev, [id]: !prev[id] }));
   };
 
-  const [models, setModels] = useState([
-    { 
-      id: 1, 
-      provider: 'OpenAI', 
-      model: 'GPT-4 Turbo', 
-      apiKey: 'sk-proj-abc123def456ghi789jkl',
-      status: 'active',
-      usage: 45670,
-      cost: 1247.89,
-      avgResponseTime: 1.2,
-      successRate: 99.8,
-      lastUsed: '2 minutes ago',
-      description: 'Advanced language model for complex reasoning',
-      color: 'from-green-600 to-emerald-600',
-      icon: '🤖'
-    },
-    { 
-      id: 2, 
-      provider: 'Anthropic', 
-      model: 'Claude-3 Opus', 
-      apiKey: 'sk-ant-api03-abc123def456ghi789',
-      status: 'inactive',
-      usage: 12340,
-      cost: 456.78,
-      avgResponseTime: 0.9,
-      successRate: 99.5,
-      lastUsed: '2 hours ago',
-      description: 'Constitutional AI with strong safety measures',
-      color: 'from-orange-600 to-red-600',
-      icon: '🧠'
-    },
-    { 
-      id: 3, 
-      provider: 'Google', 
-      model: 'Gemini Pro', 
-      apiKey: 'AIzaSyAbc123Def456Ghi789Jkl',
-      status: 'pending',
-      usage: 8900,
-      cost: 234.56,
-      avgResponseTime: 1.5,
-      successRate: 98.2,
-      lastUsed: '1 day ago',
-      description: 'Multimodal AI with vision capabilities',
-      color: 'from-blue-600 to-indigo-600',
-      icon: '🎯'
+  useEffect(() => {
+    fetchAIModels();
+  }, []);
+
+  const fetchAIModels = async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+
+      const response = await api.admin.getAIModels();
+      
+      if (response.success && response.data?.models) {
+        setModels(response.data.models);
+      } else {
+        throw new Error('Failed to fetch AI models');
+      }
+    } catch (err) {
+      console.error('Error fetching AI models:', err);
+      setError(err instanceof Error ? err.message : 'Failed to fetch AI models');
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to load AI models. Please try again.",
+      });
+    } finally {
+      setIsLoading(false);
     }
-  ]);
+  };
 
   const modelStats = {
-    totalUsage: models.reduce((sum, model) => sum + model.usage, 0),
+    totalUsage: models.reduce((sum, model) => sum + model.usage_count, 0),
     totalCost: models.reduce((sum, model) => sum + model.cost, 0),
-    avgResponseTime: models.reduce((sum, model) => sum + model.avgResponseTime, 0) / models.length,
-    avgSuccessRate: models.reduce((sum, model) => sum + model.successRate, 0) / models.length
+    avgResponseTime: models.length > 0 ? models.reduce((sum, model) => sum + model.avg_response_time, 0) / models.length : 0,
+    avgSuccessRate: models.length > 0 ? models.reduce((sum, model) => sum + model.success_rate, 0) / models.length : 0
   };
 
   const getStatusColor = (status: string) => {
@@ -127,6 +132,31 @@ const AIModelsManagement = () => {
     { name: 'Google', models: ['Gemini Pro', 'Gemini Ultra', 'PaLM 2'], icon: '🎯' },
     { name: 'Cohere', models: ['Command', 'Command Light', 'Embed'], icon: '⚡' }
   ];
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-900 via-red-900/20 to-gray-900">
+        <div className="text-center">
+          <Loader2 className="w-10 h-10 animate-spin text-red-600 mx-auto mb-4" />
+          <p className="text-gray-400">Loading AI models...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-900 via-red-900/20 to-gray-900">
+        <div className="text-center">
+          <AlertTriangle className="w-10 h-10 text-red-500 mx-auto mb-4" />
+          <p className="text-gray-400 mb-4">{error}</p>
+          <Button onClick={fetchAIModels} variant="outline">
+            Try Again
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex w-full bg-gradient-to-br from-gray-900 via-red-900/20 to-gray-900 relative overflow-hidden">
@@ -305,18 +335,18 @@ const AIModelsManagement = () => {
                 whileHover={{ scale: 1.02, y: -2 }}
                 className="relative"
               >
-                <div className={`absolute inset-0 bg-gradient-to-r ${model.color} opacity-10 rounded-2xl blur-xl`} />
+                <div className={`absolute inset-0 bg-gradient-to-r from-${model.provider === 'OpenAI' ? 'green' : model.provider === 'Anthropic' ? 'orange' : 'blue'}-600/10 to-${model.provider === 'OpenAI' ? 'emerald' : model.provider === 'Anthropic' ? 'red' : 'indigo'}-600/10 rounded-2xl blur-xl`} />
                 <Card className="relative bg-black/20 backdrop-blur-xl border-white/10 hover:border-white/20 transition-all duration-300">
                   <CardHeader className="pb-4">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center space-x-3">
-                        <div className={`w-12 h-12 rounded-xl bg-gradient-to-r ${model.color} flex items-center justify-center text-2xl`}>
-                          {model.icon}
+                        <div className={`w-12 h-12 rounded-xl bg-gradient-to-r from-${model.provider === 'OpenAI' ? 'green' : model.provider === 'Anthropic' ? 'orange' : 'blue'}-600 to-${model.provider === 'OpenAI' ? 'emerald' : model.provider === 'Anthropic' ? 'red' : 'indigo'}-600 flex items-center justify-center text-2xl`}>
+                          {model.provider === 'OpenAI' ? '🤖' : model.provider === 'Anthropic' ? '🧠' : '🎯'}
                         </div>
                         <div>
                           <CardTitle className="text-white text-lg">{model.provider}</CardTitle>
                           <CardDescription className="text-gray-400 text-sm">
-                            {model.model}
+                            {model.model_name}
                           </CardDescription>
                         </div>
                       </div>
@@ -335,7 +365,7 @@ const AIModelsManagement = () => {
                     {/* Metrics */}
                     <div className="grid grid-cols-2 gap-4 p-3 rounded-xl bg-white/5">
                       <div className="text-center">
-                        <div className="text-lg font-bold text-white">{model.usage.toLocaleString()}</div>
+                        <div className="text-lg font-bold text-white">{model.usage_count.toLocaleString()}</div>
                         <div className="text-gray-400 text-xs">Requests</div>
                       </div>
                       <div className="text-center">
@@ -348,15 +378,17 @@ const AIModelsManagement = () => {
                     <div className="space-y-3">
                       <div className="flex justify-between items-center">
                         <span className="text-gray-300 text-sm">Response Time</span>
-                        <span className="text-white font-medium">{model.avgResponseTime}s</span>
+                        <span className="text-white font-medium">{model.avg_response_time}s</span>
                       </div>
                       <div className="flex justify-between items-center">
                         <span className="text-gray-300 text-sm">Success Rate</span>
-                        <span className="text-green-400 font-medium">{model.successRate}%</span>
+                        <span className="text-green-400 font-medium">{model.success_rate}%</span>
                       </div>
                       <div className="flex justify-between items-center">
                         <span className="text-gray-300 text-sm">Last Used</span>
-                        <span className="text-gray-400 text-sm">{model.lastUsed}</span>
+                        <span className="text-gray-400 text-sm">
+                          {model.last_used_at ? new Date(model.last_used_at).toLocaleString() : 'Never'}
+                        </span>
                       </div>
                     </div>
 
@@ -366,7 +398,7 @@ const AIModelsManagement = () => {
                       <div className="flex items-center space-x-2">
                         <Input
                           type={showApiKeys[model.id] ? 'text' : 'password'}
-                          value={model.apiKey}
+                          value={model.api_key}
                           readOnly
                           className="h-10 bg-white/5 border-white/10 text-white text-sm font-mono"
                         />
