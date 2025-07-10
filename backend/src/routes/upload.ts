@@ -437,7 +437,7 @@ router.post('/store-analysis', authenticateToken, async (req: Request, res: Resp
 
     if (error) throw error;
 
-    res.status(201).json({
+    return res.status(201).json({
       message: 'Part analysis stored successfully',
       analysisId: data.id
     });

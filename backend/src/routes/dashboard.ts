@@ -83,7 +83,7 @@ const validateQueryParams = (req: Request, res: Response, next: () => void) => {
     next();
   } catch (error) {
     logger.error('Query parameter validation error', { error });
-    res.status(400).json({ 
+    return res.status(400).json({ 
       success: false, 
       error: 'Invalid query parameters' 
     });
@@ -99,12 +99,12 @@ const handleDashboardError = (
   logger.error(`${context} Error`, { error });
   
   if (error instanceof Error) {
-    res.status(500).json({ 
+    return res.status(500).json({ 
       success: false, 
       error: error.message 
     });
   } else {
-    res.status(500).json({ 
+    return res.status(500).json({ 
       success: false, 
       error: 'Unexpected server error' 
     });
@@ -159,7 +159,7 @@ router.get(
         }))
       });
     } catch (error) {
-      handleDashboardError(res, error, 'Recent Uploads');
+      return handleDashboardError(res, error, 'Recent Uploads');
     }
   }
 );
@@ -222,7 +222,7 @@ router.get('/recent-activities', async (req: AuthenticatedRequest, res: Response
     });
   } catch (error) {
     console.error('Recent Activities Unexpected Error:', error);
-    res.status(500).json({ 
+    return res.status(500).json({ 
       success: false, 
       error: 'Internal server error' 
     });
@@ -285,7 +285,7 @@ router.get('/performance-metrics', async (req: AuthenticatedRequest, res: Respon
     });
   } catch (error) {
     console.error('Performance Metrics Unexpected Error:', error);
-    res.status(500).json({ 
+    return res.status(500).json({ 
       success: false, 
       error: 'Internal server error' 
     });
@@ -350,7 +350,7 @@ router.get('/stats', async (req: AuthenticatedRequest, res: Response) => {
     });
   } catch (error) {
     console.error('Dashboard Stats Error:', error);
-    res.status(500).json({ 
+    return res.status(500).json({ 
       success: false, 
       error: 'Internal server error while fetching dashboard stats' 
     });
