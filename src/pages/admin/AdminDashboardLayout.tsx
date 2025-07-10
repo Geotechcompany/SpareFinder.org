@@ -7,6 +7,7 @@ import { useToast } from '@/components/ui/use-toast';
 import { api } from '@/lib/api';
 import AdminDesktopSidebar from '@/components/AdminDesktopSidebar';
 import MobileSidebar from '@/components/MobileSidebar';
+import DashboardSkeleton from '@/components/DashboardSkeleton';
 import { 
   Loader2, 
   AlertCircle, 
@@ -114,14 +115,7 @@ const AdminDashboardLayout = () => {
   };
 
   if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-900 via-purple-900/20 to-blue-900/20">
-        <div className="text-center">
-          <Loader2 className="w-10 h-10 animate-spin text-purple-600 mx-auto mb-4" />
-          <p className="text-gray-400">Loading admin dashboard...</p>
-        </div>
-      </div>
-    );
+    return <DashboardSkeleton variant="admin" />;
   }
 
   if (error) {
