@@ -1,39 +1,32 @@
+from pydantic import BaseModel, Field
 from pydantic_settings import BaseSettings
 import os
 
 class Settings(BaseSettings):
-    # Application Settings
-    PROJECT_NAME: str = "SpareFinderAI Service"
-    ENVIRONMENT: str = os.getenv('ENVIRONMENT', 'development')
+    # Existing settings configuration
+    PROJECT_NAME: str = "SpareFinderAI"
+    API_V1_STR: str = "/api/v1"
     
     # OpenAI Configuration
-    OPENAI_API_KEY: str = os.getenv('OPENAI_API_KEY', '')
-    
-    # S3 Storage Configuration
-    S3_ACCESS_KEY_ID: str = os.getenv('S3_ACCESS_KEY_ID', '')
-    S3_SECRET_ACCESS_KEY: str = os.getenv('S3_SECRET_ACCESS_KEY', '')
-    S3_ENDPOINT: str = os.getenv('S3_ENDPOINT', '')
-    S3_BUCKET_NAME: str = os.getenv('S3_BUCKET_NAME', 'sparefinder')
-    
-    # Supabase Configuration
-    SUPABASE_URL: str = os.getenv('SUPABASE_URL', '')
-    SUPABASE_ANON_KEY: str = os.getenv('SUPABASE_ANON_KEY', '')
-    
-    # Upload Configuration
-    UPLOAD_DIR: str = os.path.join(os.getcwd(), 'uploads')
-    MAX_UPLOAD_SIZE: int = 10 * 1024 * 1024  # 10 MB
+    OPENAI_API_KEY: str = Field(..., env="OPENAI_API_KEY")
     
     # AI Service Configuration
-    CONFIDENCE_THRESHOLD: float = 0.3
-    MAX_PREDICTIONS: int = 3
+    AI_MODEL_PATH: str = Field(default="models/latest_model", env="AI_MODEL_PATH")
+    CONFIDENCE_THRESHOLD: float = Field(default=0.5, env="CONFIDENCE_THRESHOLD")
+    
+    # Storage Configuration
+    UPLOAD_DIRECTORY: str = Field(default="uploads/", env="UPLOAD_DIRECTORY")
+    MAX_UPLOAD_SIZE: int = Field(default=10 * 1024 * 1024, env="MAX_UPLOAD_SIZE")  # 10MB
+    
+    # External API Configuration
+    GOOGLE_VISION_API_KEY: str = Field(..., env="GOOGLE_VISION_API_KEY")
     
     # Logging Configuration
-    LOG_LEVEL: str = os.getenv('LOG_LEVEL', 'INFO')
+    LOG_LEVEL: str = Field(default="INFO", env="LOG_LEVEL")
     
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"
-        extra = 'ignore'
+        extra = "ignore"
 
-# Create a singleton instance
 settings = Settings() 
