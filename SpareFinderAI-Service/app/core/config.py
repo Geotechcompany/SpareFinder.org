@@ -1,24 +1,32 @@
 import os
 from pydantic import BaseModel, Field
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
+    # Use model_config for configuration
+    model_config = SettingsConfigDict(
+        env_file=".env", 
+        env_file_encoding="utf-8", 
+        case_sensitive=False,
+        extra='ignore'
+    )
+
     # Application Settings
     PROJECT_NAME: str = "SpareFinderAI Service"
-    ENVIRONMENT: str = os.getenv('ENVIRONMENT', 'development')
+    ENVIRONMENT: str = "development"
 
     # OpenAI Configuration
-    OPENAI_API_KEY: str = os.getenv('OPENAI_API_KEY', '')
+    OPENAI_API_KEY: str = ""
     
     # S3 Storage Configuration
-    S3_ACCESS_KEY_ID: str = os.getenv('S3_ACCESS_KEY_ID', '')
-    S3_SECRET_ACCESS_KEY: str = os.getenv('S3_SECRET_ACCESS_KEY', '')
-    S3_ENDPOINT: str = os.getenv('S3_ENDPOINT', '')
-    S3_BUCKET_NAME: str = os.getenv('S3_BUCKET_NAME', 'sparefinder')
+    S3_ACCESS_KEY_ID: str = ""
+    S3_SECRET_ACCESS_KEY: str = ""
+    S3_ENDPOINT: str = ""
+    S3_BUCKET_NAME: str = "sparefinder"
     
     # Supabase Configuration
-    SUPABASE_URL: str = os.getenv('SUPABASE_URL', '')
-    SUPABASE_ANON_KEY: str = os.getenv('SUPABASE_ANON_KEY', '')
+    SUPABASE_URL: str = ""
+    SUPABASE_ANON_KEY: str = ""
     
     # Upload Configuration
     UPLOAD_DIR: str = os.path.join(os.getcwd(), 'uploads')
@@ -29,12 +37,7 @@ class Settings(BaseSettings):
     MAX_PREDICTIONS: int = 3
     
     # Logging Configuration
-    LOG_LEVEL: str = os.getenv('LOG_LEVEL', 'INFO')
-    
-    class Config:
-        env_file = ".env"
-        env_file_encoding = "utf-8"
-        extra = 'ignore'
+    LOG_LEVEL: str = "INFO"
 
 # Create a singleton instance
 settings = Settings() 
