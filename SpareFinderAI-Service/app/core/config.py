@@ -1,40 +1,38 @@
 import os
-from pydantic import BaseModel, Field
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import Field
 
 class Settings(BaseSettings):
-    # Application Settings
-    PROJECT_NAME: str = "SpareFinderAI Service"
-    ENVIRONMENT: str = os.getenv('ENVIRONMENT', 'development')
+    # Use model_config instead of Config
+    model_config = SettingsConfigDict(
+        env_file=".env", 
+        env_file_encoding="utf-8", 
+        case_sensitive=False
+    )
+
+    # Use Field for more explicit configuration
+    openai_api_key: str = Field(default="", description="OpenAI API Key")
+    google_vision_credentials: str = Field(default="", description="Google Vision API Credentials")
+    supabase_url: str = Field(default="", description="Supabase Project URL")
+    supabase_key: str = Field(default="", description="Supabase API Key")
     
-    # OpenAI Configuration
-    OPENAI_API_KEY: str = os.getenv('OPENAI_API_KEY', '')
-    
-    # S3 Storage Configuration
-    S3_ACCESS_KEY_ID: str = os.getenv('S3_ACCESS_KEY_ID', '')
-    S3_SECRET_ACCESS_KEY: str = os.getenv('S3_SECRET_ACCESS_KEY', '')
-    S3_ENDPOINT: str = os.getenv('S3_ENDPOINT', '')
-    S3_BUCKET_NAME: str = os.getenv('S3_BUCKET_NAME', 'sparefinder')
-    
-    # Supabase Configuration
-    SUPABASE_URL: str = os.getenv('SUPABASE_URL', '')
-    SUPABASE_ANON_KEY: str = os.getenv('SUPABASE_ANON_KEY', '')
-    
-    # Upload Configuration
-    UPLOAD_DIR: str = os.path.join(os.getcwd(), 'uploads')
-    MAX_UPLOAD_SIZE: int = 10 * 1024 * 1024  # 10 MB
+    # Database settings
+    database_url: str = Field(default="", description="Database Connection URL")
     
     # AI Service Configuration
-    CONFIDENCE_THRESHOLD: float = 0.3
-    MAX_PREDICTIONS: int = 3
+    ai_model_path: str = Field(default="/app/models", description="Path to AI models")
+    upload_directory: str = Field(default="/app/uploads", description="Directory for uploaded files")
     
     # Logging Configuration
-    LOG_LEVEL: str = os.getenv('LOG_LEVEL', 'INFO')
-    
-    class Config:
-        env_file = ".env"
-        env_file_encoding = "utf-8"
-        extra = 'ignore'
+    log_level: str = Field(default="INFO", description="Logging level")
+    log_file: str = Field(default="/app/logs/app.log", description="Log file path")
 
-# Create a singleton instance
+    # Optional settings with defaults
+    max_upload_size: int = Field(default=10 * 1024 * 1024, description="Maximum upload file size (10MB)")
+    allowed_image_types: list[str] = Field(
+        default=["image/jpeg", "image/png", "image/webp"], 
+        description="Allowed image MIME types"
+    )
+
+# Create a singleton settings instance
 settings = Settings() 

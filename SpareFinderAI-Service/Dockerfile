@@ -1,39 +1,33 @@
 # Use an official Python runtime as a parent image
-FROM python:3.11-slim
+FROM python:3.11-slim-bullseye
 
 # Set environment variables
 ENV PYTHONDONTWRITEBYTECODE 1
 ENV PYTHONUNBUFFERED 1
 ENV PIP_NO_CACHE_DIR 1
 
-# Set work directory
+# Set working directory
 WORKDIR /app
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
     build-essential \
-    curl \
-    git \
     libpq-dev \
+    libopencv-dev \
+    tesseract-ocr \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy the entire project
-COPY . /app
-
-# Create a virtual environment
-RUN python -m venv /opt/venv
-ENV PATH="/opt/venv/bin:$PATH"
-
-# Upgrade pip and core tools
+# Upgrade pip and setuptools
 RUN pip install --upgrade pip setuptools wheel
 
-# Install dependencies with more flexible resolution
-RUN pip install --upgrade pip \
-    && pip install --upgrade setuptools \
-    && pip install wheel \
-    && pip install --upgrade numpy \
-    && pip install -r requirements.txt \
-    && pip check || true
+# Copy requirements file first to leverage Docker cache
+COPY requirements.txt .
+
+# Install Python dependencies
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy the rest of the application
+COPY . .
 
 # Create necessary directories
 RUN mkdir -p /app/uploads /app/models /app/logs
@@ -47,9 +41,5 @@ USER nobody
 # Expose the port the app runs on
 EXPOSE 8000
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:8000/health || exit 1
-
-# Run the application
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"] 
+# Use gunicorn for production-grade server
+CMD ["gunicorn", "-w", "4", "-k", "uvicorn.workers.UvicornWorker", "app.main:app", "--bind", "0.0.0.0:8000"] 
