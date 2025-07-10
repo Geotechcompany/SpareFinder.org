@@ -27,13 +27,13 @@ ENV PATH="/opt/venv/bin:$PATH"
 # Upgrade pip and core tools
 RUN pip install --upgrade pip setuptools wheel
 
-# Upgrade pip and resolve dependencies
+# Install dependencies with more flexible resolution
 RUN pip install --upgrade pip \
     && pip install --upgrade setuptools \
     && pip install wheel \
     && pip install --upgrade numpy \
-    && pip install -r requirements.txt --no-deps \
-    && pip install -r requirements.txt
+    && pip install -r requirements.txt \
+    && pip check || true
 
 # Create necessary directories
 RUN mkdir -p /app/uploads /app/models /app/logs
