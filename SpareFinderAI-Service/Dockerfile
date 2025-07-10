@@ -1,51 +1,51 @@
-# Use an official Python runtime as a parent image
-FROM python:3.12-slim
+FROM python:3.11-slim
 
 # Set environment variables
-ENV PYTHONDONTWRITEBYTECODE 1
-ENV PYTHONUNBUFFERED 1
-ENV PIP_NO_CACHE_DIR 1
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PIP_NO_CACHE_DIR=1
 
-# Set work directory
+# Set working directory
 WORKDIR /app
 
-# Install system dependencies
+# Install system dependencies for AI and image processing
 RUN apt-get update && apt-get install -y \
     build-essential \
     curl \
-    git \
+    libgl1-mesa-glx \
+    libglib2.0-0 \
+    libsm6 \
+    libxext6 \
+    libxrender-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy the entire project
-COPY . /app
+# Create non-root user
+RUN useradd -m -u 1000 appuser && \
+    mkdir -p /app/uploads /app/models /app/logs && \
+    chown -R appuser:appuser /app
 
-# Create a virtual environment
-RUN python -m venv /opt/venv
-ENV PATH="/opt/venv/bin:$PATH"
+# Copy requirements first (for better caching)
+COPY requirements.txt ./
 
-# Upgrade pip and core tools
-RUN pip install --upgrade pip setuptools wheel
+# Install Python dependencies
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt
 
-# Copy the dependency installation script
-COPY install_dependencies.py /app/install_dependencies.py
+# Copy application code
+COPY --chown=appuser:appuser . ./
 
-# Make the script executable
-RUN chmod +x /app/install_dependencies.py
+# Switch to non-root user
+USER appuser
 
-# Install dependencies using the custom script
-RUN python /app/install_dependencies.py
-
-# Additional project-specific setup
+# Create uploads directory with correct permissions
 RUN mkdir -p /app/uploads
 
-# Make port 8000 available to the world outside this container
+# Expose the application port
 EXPOSE 8000
 
 # Health check
-HEALTHCHECK CMD curl -f http://localhost:8000/health || exit 1
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:8000/health || exit 1
 
-# Set permissions for startup scripts
-RUN chmod +x start.py start_service.py
-
-# Run the application
-CMD ["python", "start.py"] 
+# Run the application with Uvicorn
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"] 
