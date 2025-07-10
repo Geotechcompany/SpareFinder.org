@@ -35,6 +35,7 @@ import {
 } from '@/lib/api';
 import { dashboardApi } from '@/lib/api';
 import { useToast } from '@/components/ui/use-toast';
+import DashboardSkeleton from '@/components/DashboardSkeleton';
 
 const Dashboard = () => {
   const [isCollapsed, setIsCollapsed] = useState(false);

@@ -183,8 +183,8 @@ apiClient.interceptors.response.use(
 
       try {
         // Attempt to refresh the token
-        const refreshResponse = await apiClient.post('/auth/refresh-token', {
-          token: localStorage.getItem('token')
+        const refreshResponse = await apiClient.post('/api/auth/refresh', {
+          refresh_token: localStorage.getItem('token')
         });
 
         if (refreshResponse.data.token) {
@@ -212,7 +212,7 @@ apiClient.interceptors.response.use(
 export const dashboardApi = {
   getStats: async () => {
     try {
-      const response = await apiClient.get('/dashboard/stats');
+      const response = await apiClient.get('/api/dashboard/stats');
       return response.data;
     } catch (error) {
       console.error('Failed to fetch dashboard stats:', error);
@@ -222,7 +222,7 @@ export const dashboardApi = {
 
   getRecentUploads: async () => {
     try {
-      const response = await apiClient.get('/dashboard/recent-uploads');
+              const response = await apiClient.get('/api/dashboard/recent-uploads');
       return response.data;
     } catch (error) {
       console.error('Failed to fetch recent uploads:', error);
@@ -232,7 +232,7 @@ export const dashboardApi = {
 
   getRecentActivities: async () => {
     try {
-      const response = await apiClient.get('/dashboard/recent-activities');
+              const response = await apiClient.get('/api/dashboard/recent-activities');
       return response.data;
     } catch (error) {
       console.error('Failed to fetch recent activities:', error);
@@ -242,7 +242,7 @@ export const dashboardApi = {
 
   getPerformanceMetrics: async () => {
     try {
-      const response = await apiClient.get('/dashboard/performance-metrics');
+              const response = await apiClient.get('/api/dashboard/performance-metrics');
       return response.data;
     } catch (error) {
       console.error('Failed to fetch performance metrics:', error);
@@ -253,7 +253,7 @@ export const dashboardApi = {
   // Add these methods to the dashboardApi object
   exportHistory: async (format: 'csv' | 'json' = 'csv') => {
     try {
-      const response = await apiClient.get(`/dashboard/export-history?format=${format}`);
+      const response = await apiClient.get(`/api/dashboard/export-history?format=${format}`);
       return response.data;
     } catch (error) {
       console.error('Failed to export history:', error);
@@ -263,7 +263,7 @@ export const dashboardApi = {
 
   deleteUpload: async (uploadId: string) => {
     try {
-      const response = await apiClient.delete(`/dashboard/uploads/${uploadId}`);
+      const response = await apiClient.delete(`/api/dashboard/uploads/${uploadId}`);
       return response.data;
     } catch (error) {
       console.error('Failed to delete upload:', error);
@@ -287,7 +287,7 @@ export const api = {
         }
 
         try {
-          const response = await apiClient.get('/auth/current-user', {
+          const response = await apiClient.get('/api/auth/current-user', {
             headers: {
               'Authorization': `Bearer ${token}`
             }
@@ -389,7 +389,7 @@ export const api = {
     signOut: async () => {
       try {
         const token = localStorage.getItem('token');
-        await apiClient.post('/auth/logout', {}, {
+        await apiClient.post('/api/auth/logout', {}, {
           headers: {
             'Authorization': `Bearer ${token}`
           }
@@ -412,7 +412,7 @@ export const api = {
 
     signUp: async (email: string, password: string, metadata?: Record<string, any>) => {
       try {
-        const response = await apiClient.post('/auth/signup', { 
+        const response = await apiClient.post('/api/auth/register', { 
           email, 
           password, 
           ...metadata 
@@ -438,7 +438,10 @@ export const api = {
 
     signInWithOAuth: async (provider: 'google' | 'github') => {
       try {
-        const response = await apiClient.get(`/auth/${provider}`);
+        const response = await apiClient.post(`/api/auth/google`, {
+          access_token: '', // This will need to be updated based on OAuth flow
+          id_token: '' // This will need to be updated based on OAuth flow
+        });
         
         // Store token if provided
         if (response.data.token) {
@@ -461,7 +464,7 @@ export const api = {
   statistics: {
     refresh: async () => {
       try {
-        const response = await apiClient.post('/statistics/refresh');
+        const response = await apiClient.post('/api/statistics/refresh');
         return response.data;
       } catch (error) {
         console.error('Failed to refresh statistics:', error);
@@ -472,7 +475,7 @@ export const api = {
   profile: {
     getAchievements: async () => {
       try {
-        const response = await apiClient.get('/profile/achievements');
+        const response = await apiClient.get('/api/profile/achievements');
         return response.data;
       } catch (error) {
         console.error('Failed to get achievements:', error);
@@ -490,7 +493,7 @@ export const api = {
     },
     getProfile: async () => {
       try {
-        const response = await apiClient.get('/profile');
+        const response = await apiClient.get('/api/profile');
         return {
           success: true,
           data: {
@@ -593,7 +596,7 @@ export const api = {
   billing: {
     getBillingInfo: async (options: { signal?: AbortSignal } = {}) => {
       try {
-        const response = await apiClient.get('/billing/info', {
+        const response = await apiClient.get('/api/billing/info', {
           signal: options.signal
         });
         return response.data;
@@ -604,7 +607,7 @@ export const api = {
     },
     getInvoices: async (options: { signal?: AbortSignal } = {}) => {
       try {
-        const response = await apiClient.get('/billing/invoices', {
+        const response = await apiClient.get('/api/billing/invoices', {
           signal: options.signal
         });
         return response.data;
@@ -615,7 +618,7 @@ export const api = {
     },
     updateSubscription: async (planId: 'free' | 'pro' | 'enterprise') => {
       try {
-        const response = await apiClient.post('/billing/update-subscription', { planId });
+        const response = await apiClient.post('/api/billing/update-subscription', { planId });
         return response.data;
       } catch (error) {
         console.error('Failed to update subscription:', error);
@@ -624,7 +627,7 @@ export const api = {
     },
     cancelSubscription: async () => {
       try {
-        const response = await apiClient.post('/billing/cancel-subscription');
+        const response = await apiClient.post('/api/billing/cancel-subscription');
         return response.data;
       } catch (error) {
         console.error('Failed to cancel subscription:', error);
@@ -635,7 +638,7 @@ export const api = {
   dashboard: {
     getStats: async () => {
       try {
-        const response = await apiClient.get('/dashboard/stats');
+        const response = await apiClient.get('/api/dashboard/stats');
         return {
           success: true,
           data: response.data
@@ -654,7 +657,7 @@ export const api = {
   admin: {
     getUsers: async (page: number = 1, limit: number = 20) => {
       try {
-        const response = await apiClient.get('/admin/users', { params: { page, limit } });
+        const response = await apiClient.get('/api/admin/users', { params: { page, limit } });
         return {
           success: true,
           data: {
@@ -672,7 +675,7 @@ export const api = {
     },
     updateUserRole: async (userId: string, newRole: 'user' | 'admin' | 'super_admin') => {
       try {
-        const response = await apiClient.patch(`/admin/users/${userId}/role`, { role: newRole });
+        const response = await apiClient.patch(`/api/admin/users/${userId}/role`, { role: newRole });
         return {
           success: true,
           data: response.data
@@ -687,13 +690,200 @@ export const api = {
     },
     deleteUser: async (userId: string) => {
       try {
-        const response = await apiClient.delete(`/admin/users/${userId}`);
+        const response = await apiClient.delete(`/api/admin/users/${userId}`);
         return {
           success: true,
           data: response.data
         };
       } catch (error) {
         console.error('Failed to delete user:', error);
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : 'Unknown error'
+        };
+      }
+    },
+    getAdminStats: async () => {
+      try {
+        const response = await apiClient.get('/api/admin/stats');
+        return {
+          success: true,
+          data: response.data
+        };
+      } catch (error) {
+        console.error('Failed to get admin stats:', error);
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : 'Unknown error'
+        };
+      }
+    },
+    getAdminAnalytics: async (timeRange: string = '30d') => {
+      try {
+        const response = await apiClient.get('/api/admin/analytics', { params: { range: timeRange } });
+        return {
+          success: true,
+          data: response.data
+        };
+      } catch (error) {
+        console.error('Failed to get admin analytics:', error);
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : 'Unknown error'
+        };
+      }
+    },
+    getSystemLogs: async (page: number = 1, limit: number = 100, level?: string) => {
+      try {
+        const params: any = { page, limit };
+        if (level) params.level = level;
+        
+        const response = await apiClient.get('/api/admin/logs', { params });
+        return {
+          success: true,
+          data: response.data
+        };
+      } catch (error) {
+        console.error('Failed to get system logs:', error);
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : 'Unknown error'
+        };
+      }
+    },
+    getAuditLogs: async (page: number = 1, limit: number = 100) => {
+      try {
+        const response = await apiClient.get('/api/admin/audit-logs', { params: { page, limit } });
+        return {
+          success: true,
+          data: response.data
+        };
+      } catch (error) {
+        console.error('Failed to get audit logs:', error);
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : 'Unknown error'
+        };
+      }
+    },
+    // AI Models Management
+    getAIModels: async () => {
+      try {
+        const response = await apiClient.get('/api/admin/ai-models');
+        return {
+          success: true,
+          data: response.data
+        };
+      } catch (error) {
+        console.error('Failed to get AI models:', error);
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : 'Unknown error'
+        };
+      }
+    },
+    createAIModel: async (modelData: { provider: string; model_name: string; api_key: string; description?: string }) => {
+      try {
+        const response = await apiClient.post('/api/admin/ai-models', modelData);
+        return {
+          success: true,
+          data: response.data
+        };
+      } catch (error) {
+        console.error('Failed to create AI model:', error);
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : 'Unknown error'
+        };
+      }
+    },
+    updateAIModel: async (id: string, updateData: any) => {
+      try {
+        const response = await apiClient.patch(`/api/admin/ai-models/${id}`, updateData);
+        return {
+          success: true,
+          data: response.data
+        };
+      } catch (error) {
+        console.error('Failed to update AI model:', error);
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : 'Unknown error'
+        };
+      }
+    },
+    // Payment Methods Management
+    getPaymentMethods: async () => {
+      try {
+        const response = await apiClient.get('/api/admin/payment-methods');
+        return {
+          success: true,
+          data: response.data
+        };
+      } catch (error) {
+        console.error('Failed to get payment methods:', error);
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : 'Unknown error'
+        };
+      }
+    },
+    createPaymentMethod: async (methodData: { name: string; provider: string; api_key: string; secret_key: string; description?: string }) => {
+      try {
+        const response = await apiClient.post('/api/admin/payment-methods', methodData);
+        return {
+          success: true,
+          data: response.data
+        };
+      } catch (error) {
+        console.error('Failed to create payment method:', error);
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : 'Unknown error'
+        };
+      }
+    },
+    // Email Templates Management
+    getEmailTemplates: async () => {
+      try {
+        const response = await apiClient.get('/api/admin/email-templates');
+        return {
+          success: true,
+          data: response.data
+        };
+      } catch (error) {
+        console.error('Failed to get email templates:', error);
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : 'Unknown error'
+        };
+      }
+    },
+    // System Settings Management
+    getSystemSettings: async () => {
+      try {
+        const response = await apiClient.get('/api/admin/system-settings');
+        return {
+          success: true,
+          data: response.data
+        };
+      } catch (error) {
+        console.error('Failed to get system settings:', error);
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : 'Unknown error'
+        };
+      }
+    },
+    updateSystemSettings: async (settings: any) => {
+      try {
+        const response = await apiClient.patch('/api/admin/system-settings', { settings });
+        return {
+          success: true,
+          data: response.data
+        };
+      } catch (error) {
+        console.error('Failed to update system settings:', error);
         return {
           success: false,
           error: error instanceof Error ? error.message : 'Unknown error'

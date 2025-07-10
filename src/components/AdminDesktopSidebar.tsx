@@ -86,7 +86,7 @@ const AdminDesktopSidebar: React.FC<AdminSidebarProps> = ({
       setIsLoading(true);
       
       // Fetch admin stats
-      const statsResponse = await apiClient.getAdminStats();
+      const statsResponse = await api.admin.getAdminStats();
       if (statsResponse.success && statsResponse.data?.statistics) {
         const stats = statsResponse.data.statistics;
         setAdminStats({
@@ -100,7 +100,7 @@ const AdminDesktopSidebar: React.FC<AdminSidebarProps> = ({
       }
 
       // Fetch current admin user info
-      const userResponse = await apiClient.getCurrentUser();
+      const userResponse = await api.auth.getCurrentUser();
       if (userResponse.success && userResponse.data?.user) {
         setAdminUser(userResponse.data.user);
       }
@@ -188,7 +188,7 @@ const AdminDesktopSidebar: React.FC<AdminSidebarProps> = ({
 
   const handleLogout = async () => {
     try {
-      await apiClient.adminLogout();
+      await api.auth.signOut();
       localStorage.removeItem('admin_session');
       toast({
         title: "Logged out successfully",
@@ -223,9 +223,12 @@ const AdminDesktopSidebar: React.FC<AdminSidebarProps> = ({
     }
   };
 
-  const filteredNavItems = navItems.filter(item => 
-    !item.superAdminOnly || adminUser?.role === 'super_admin'
-  );
+  // Remove the filter so all nav items are visible
+  // const filteredNavItems = navItems.filter(item => 
+  //   !item.superAdminOnly || adminUser?.role === 'super_admin'
+  // );
+
+  // Use navItems directly
 
   return (
     <motion.div
@@ -341,7 +344,7 @@ const AdminDesktopSidebar: React.FC<AdminSidebarProps> = ({
 
       {/* Navigation */}
       <div className="flex-1 overflow-y-auto p-4 space-y-2">
-        {filteredNavItems.map((item, index) => (
+        {navItems.map((item, index) => (
           <motion.div
             key={item.href}
             initial={{ opacity: 0, x: -20 }}
