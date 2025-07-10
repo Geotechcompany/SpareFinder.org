@@ -16,7 +16,7 @@ python-dotenv==1.0.0
 boto3==1.26.137
 google-cloud-vision==3.4.1
 supabase==1.0.3
-httpx==0.24.1
+httpx
 aiofiles==23.1.0
 python-jose==3.3.0
 passlib==1.7.4
