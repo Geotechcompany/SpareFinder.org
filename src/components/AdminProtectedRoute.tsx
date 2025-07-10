@@ -31,7 +31,7 @@ const AdminProtectedRoute: React.FC<AdminProtectedRouteProps> = ({
       setError(null);
 
       // Check if we have a token
-      const token = localStorage.getItem('auth_token');
+      const token = localStorage.getItem('token');
       console.log('🛡️ Auth Token Present:', !!token);
       if (!token) {
         console.log('🛡️ No auth token found');
@@ -59,7 +59,7 @@ const AdminProtectedRoute: React.FC<AdminProtectedRouteProps> = ({
 
       // Verify the token is still valid by calling the API
       console.log('🛡️ Verifying user profile');
-      const response = await api.user.getProfile();
+      const response = await api.auth.getCurrentUser();
       
       console.log('🛡️ Profile Response:', {
         success: response.success,
@@ -102,14 +102,14 @@ const AdminProtectedRoute: React.FC<AdminProtectedRouteProps> = ({
         console.log('🛡️ Invalid token or profile');
         // Token is invalid, clear admin session
         localStorage.removeItem('admin_session');
-        localStorage.removeItem('auth_token');
+        localStorage.removeItem('token');
         setIsAuthenticated(false);
       }
     } catch (err) {
       console.error('🛡️ Admin Auth Check Failed:', err);
       // Clear invalid session data
       localStorage.removeItem('admin_session');
-      localStorage.removeItem('auth_token');
+      localStorage.removeItem('token');
       setError('Authentication verification failed');
       setIsAuthenticated(false);
     } finally {

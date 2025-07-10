@@ -27,19 +27,89 @@ const AdminLogin = () => {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [isCheckingSession, setIsCheckingSession] = useState(true);
   const [error, setError] = useState('');
   const navigate = useNavigate();
   const { login } = useAuth();
   const { toast } = useToast();
 
   useEffect(() => {
-    // Check if already logged in as admin
-    const adminSession = localStorage.getItem('admin_session');
-    if (adminSession) {
-      console.log('🔐 Existing admin session found, redirecting');
-      window.location.href = '/admin/dashboard';
-    }
+    checkExistingSession();
   }, []);
+
+  const checkExistingSession = async () => {
+    try {
+      console.log('🔐 Checking existing admin session...');
+      
+      // Check if we have a token
+      const token = localStorage.getItem('token');
+      if (!token) {
+        console.log('🔐 No auth token found');
+        setIsCheckingSession(false);
+        return;
+      }
+
+      // Check if we have admin session info
+      const adminSessionStr = localStorage.getItem('admin_session');
+      const adminSession = adminSessionStr ? JSON.parse(adminSessionStr) : null;
+      
+      console.log('🔐 Admin Session Check:', {
+        exists: !!adminSession,
+        isAdminLogin: adminSession?.isAdminLogin,
+        role: adminSession?.role
+      });
+      
+      if (!adminSession || !adminSession.isAdminLogin) {
+        console.log('🔐 No valid admin session found');
+        setIsCheckingSession(false);
+        return;
+      }
+
+      // Verify the token is still valid by calling the API
+      console.log('🔐 Verifying user profile...');
+      const response = await api.auth.getCurrentUser();
+      
+      console.log('🔐 Profile Response:', {
+        success: response.success,
+        data: response.data
+      });
+      
+      if (response.success && response.data) {
+        const user = response.data;
+        console.log('🔐 User Profile:', {
+          id: user.id,
+          email: user.email,
+          role: user.role
+        });
+        
+        // Check if user has admin role
+        const hasAdminRole = ['admin', 'super_admin'].includes(user.role);
+        
+        if (hasAdminRole) {
+          console.log('🔐 Valid admin session found, redirecting');
+          navigate('/admin/dashboard', { replace: true });
+          return;
+        } else {
+          console.log('🔐 User does not have admin role');
+          // Clear invalid session
+          localStorage.removeItem('admin_session');
+          localStorage.removeItem('token');
+        }
+      } else {
+        console.log('🔐 Invalid token or profile');
+        // Clear invalid session
+        localStorage.removeItem('admin_session');
+        localStorage.removeItem('token');
+      }
+    } catch (err) {
+      console.error('🔐 Session check error:', err);
+      // Clear invalid session
+      localStorage.removeItem('admin_session');
+      localStorage.removeItem('token');
+    } finally {
+      setIsCheckingSession(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -50,11 +120,19 @@ const AdminLogin = () => {
       const response = await api.auth.signIn(email, password);
       
       if ('success' in response && response.success) {
+        // Set admin session after successful login
+        const adminSession = {
+          isAdminLogin: true,
+          role: response.data?.user?.role || 'admin',
+          timestamp: Date.now()
+        };
+        localStorage.setItem('admin_session', JSON.stringify(adminSession));
+        
         toast({
           title: 'Login Successful',
           description: 'Welcome back, Admin!',
         });
-        navigate('/admin/dashboard');
+        navigate('/admin/dashboard', { replace: true });
       } else {
         setError(response.error || 'Login failed');
       }
@@ -65,6 +143,18 @@ const AdminLogin = () => {
       setIsLoading(false);
     }
   };
+
+  // Show loading state while checking session
+  if (isCheckingSession) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-900 via-red-900/20 to-orange-900/20">
+        <div className="text-center">
+          <Loader2 className="w-10 h-10 animate-spin text-red-600 mx-auto mb-4" />
+          <p className="text-gray-400">Checking admin session...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-900 via-red-900/20 to-orange-900/20 relative overflow-hidden">
