@@ -223,9 +223,12 @@ const AdminDesktopSidebar: React.FC<AdminSidebarProps> = ({
     }
   };
 
-  const filteredNavItems = navItems.filter(item => 
-    !item.superAdminOnly || adminUser?.role === 'super_admin'
-  );
+  // Remove the filter so all nav items are visible
+  // const filteredNavItems = navItems.filter(item => 
+  //   !item.superAdminOnly || adminUser?.role === 'super_admin'
+  // );
+
+  // Use navItems directly
 
   return (
     <motion.div
@@ -341,7 +344,7 @@ const AdminDesktopSidebar: React.FC<AdminSidebarProps> = ({
 
       {/* Navigation */}
       <div className="flex-1 overflow-y-auto p-4 space-y-2">
-        {filteredNavItems.map((item, index) => (
+        {navItems.map((item, index) => (
           <motion.div
             key={item.href}
             initial={{ opacity: 0, x: -20 }}
