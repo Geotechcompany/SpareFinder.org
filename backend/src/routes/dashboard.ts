@@ -81,9 +81,10 @@ const validateQueryParams = (req: Request, res: Response, next: () => void) => {
       });
     }
     next();
+    return;
   } catch (error) {
     logger.error('Query parameter validation error', { error });
-    res.status(400).json({ 
+    return res.status(400).json({ 
       success: false, 
       error: 'Invalid query parameters' 
     });
@@ -99,12 +100,12 @@ const handleDashboardError = (
   logger.error(`${context} Error`, { error });
   
   if (error instanceof Error) {
-    res.status(500).json({ 
+    return res.status(500).json({ 
       success: false, 
       error: error.message 
     });
   } else {
-    res.status(500).json({ 
+    return res.status(500).json({ 
       success: false, 
       error: 'Unexpected server error' 
     });
@@ -145,7 +146,7 @@ router.get(
 
       if (error) throw error;
 
-      res.json({
+      return res.json({
         success: true,
         uploads: (data || []).map(upload => ({
           id: upload.id,
@@ -159,7 +160,7 @@ router.get(
         }))
       });
     } catch (error) {
-      handleDashboardError(res, error, 'Recent Uploads');
+      return handleDashboardError(res, error, 'Recent Uploads');
     }
   }
 );
@@ -269,7 +270,7 @@ router.get('/performance-metrics', async (req: AuthenticatedRequest, res: Respon
       match_rate: 0
     };
 
-    res.json({
+    return res.json({
       success: true,
       data: {
         totalSearches: metrics.total_searches || 0,
@@ -285,7 +286,7 @@ router.get('/performance-metrics', async (req: AuthenticatedRequest, res: Respon
     });
   } catch (error) {
     console.error('Performance Metrics Unexpected Error:', error);
-    res.status(500).json({ 
+    return res.status(500).json({ 
       success: false, 
       error: 'Internal server error' 
     });
@@ -339,7 +340,7 @@ router.get('/stats', async (req: AuthenticatedRequest, res: Response) => {
       ? statsData.reduce((sum, item) => sum + (item.processing_time_ms || 0), 0) / statsData.length 
       : 0;
 
-    res.json({
+    return res.json({
       success: true,
       data: {
         totalUploads: totalUploads || 0,
@@ -350,7 +351,7 @@ router.get('/stats', async (req: AuthenticatedRequest, res: Response) => {
     });
   } catch (error) {
     console.error('Dashboard Stats Error:', error);
-    res.status(500).json({ 
+    return res.status(500).json({ 
       success: false, 
       error: 'Internal server error while fetching dashboard stats' 
     });
