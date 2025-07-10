@@ -1,61 +1,75 @@
-# Virtual Environment
-venv/
-.venv/
-env/
-.env/
-
-# Python cache files
-__pycache__/
+# Python
+__pycache__
 *.py[cod]
 *$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
 
-# Jupyter Notebook
-.ipynb_checkpoints
+# Virtual Environment
+venv/
+.env
+.venv
+env/
+ENV/
+
+# IDEs and editors
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
 
 # Logs
 *.log
 logs/
 
-# Local development files
-.git/
-.gitignore
-README.md
-
 # Temporary files
 *.tmp
 *.bak
-*.swp
-.DS_Store
 
-# Upload files (optional, comment out if you want to include sample uploads)
-uploads/*.jpeg
-uploads/*.jpg
-uploads/*.png
+# Git
+.git
+.gitignore
 
-# Development and testing files
-tests/
-test_*.py
-*.test.py
+# Docker
+Dockerfile
+.dockerignore
 
-# Configuration and environment files
-.env
-.env.local
-.env.development
-.env.test
+# Testing
+.pytest_cache/
+htmlcov/
+.coverage
 
-# IDE-specific files
-.vscode/
-.idea/
-*.sublime-project
-*.sublime-workspace
+# Project specific
+uploads/
+*.sqlite3
+*.db
 
-# Build and distribution files
-build/
-dist/
-*.egg-info/
-
-# Dependency directories
-node_modules/
-
-# Render-specific files
-render.yaml 
+# Miscellaneous
+.cache
+.ipynb_checkpoints/ 

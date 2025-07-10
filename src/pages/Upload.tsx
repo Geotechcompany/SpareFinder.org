@@ -314,41 +314,41 @@ const generateAnalysisSections = (analysisResults: AnalysisResponse) => {
 
   // First, add the default Part Identification section
   sections.push({
-    title: "Part Identification",
-    icon: <Target className="w-5 h-5 text-blue-400" />,
-    content: (
-      <motion.div 
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="space-y-4"
-      >
-        {analysisResults.predictions.map((prediction, index) => (
-          <div 
-            key={index} 
-            className="bg-white/5 rounded-xl p-6 border border-white/10 space-y-6"
-          >
-            <div className="flex items-center justify-between">
-              <h3 className="text-2xl font-bold text-white flex items-center space-x-3">
-                <span>{formatTitle(prediction.class_name)}</span>
-                {prediction.part_number && (
-                  <Badge variant="secondary" className="text-xs">
-                    Part No: {prediction.part_number}
-                  </Badge>
-                )}
-              </h3>
-              <Badge 
-                variant={
-                  prediction.confidence > 0.8 ? 'default' : 
-                  prediction.confidence > 0.5 ? 'secondary' : 'destructive'
-                }
-              >
-                {(prediction.confidence * 100).toFixed(2)}% Confidence
-              </Badge>
+      title: "Part Identification",
+      icon: <Target className="w-5 h-5 text-blue-400" />,
+      content: (
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="space-y-4"
+        >
+          {analysisResults.predictions.map((prediction, index) => (
+            <div 
+              key={index} 
+              className="bg-white/5 rounded-xl p-6 border border-white/10 space-y-6"
+            >
+              <div className="flex items-center justify-between">
+                <h3 className="text-2xl font-bold text-white flex items-center space-x-3">
+                  <span>{formatTitle(prediction.class_name)}</span>
+                  {prediction.part_number && (
+                    <Badge variant="secondary" className="text-xs">
+                      Part No: {prediction.part_number}
+                    </Badge>
+                  )}
+                </h3>
+                <Badge 
+                  variant={
+                    prediction.confidence > 0.8 ? 'default' : 
+                    prediction.confidence > 0.5 ? 'secondary' : 'destructive'
+                  }
+                >
+                  {(prediction.confidence * 100).toFixed(2)}% Confidence
+                </Badge>
+              </div>
             </div>
-          </div>
-        ))}
-      </motion.div>
-    )
+          ))}
+        </motion.div>
+      )
   });
 
   // If description exists, parse markdown sections

@@ -2,6 +2,7 @@
 import subprocess
 import sys
 import platform
+import os
 
 def run_command(command):
     """Run a shell command with error handling."""
@@ -20,45 +21,34 @@ def run_command(command):
         sys.exit(1)
 
 def install_system_dependencies():
-    """Install system-level dependencies based on the operating system."""
-    os_name = platform.system().lower()
-    
-    if os_name == 'linux':
-        # Debian/Ubuntu style package management
-        run_command('sudo apt-get update')
-        run_command('sudo apt-get install -y python3-pip python3-venv')
-    elif os_name == 'darwin':  # macOS
-        run_command('brew update')
-        run_command('brew install python')
-    elif os_name == 'windows':
-        # For Windows, we'll assume Python is already installed
-        print("Windows detected. Ensure Python is installed via Python.org or Microsoft Store.")
+    """Install system-level dependencies for Docker environment."""
+    # In Docker, we've already installed system dependencies in the Dockerfile
+    print("Using pre-installed system dependencies")
 
 def create_virtual_environment():
     """Create a virtual environment if it doesn't exist."""
-    run_command('python -m venv venv')
-
-def activate_virtual_environment():
-    """Activate the virtual environment based on the operating system."""
-    os_name = platform.system().lower()
-    
-    if os_name in ['linux', 'darwin']:
-        activate_script = 'source venv/bin/activate'
-    elif os_name == 'windows':
-        activate_script = 'venv\\Scripts\\activate'
-    else:
-        print(f"Unsupported OS: {os_name}")
-        sys.exit(1)
-    
-    return activate_script
+    # In Docker, we've already created a virtual environment
+    print("Using pre-created virtual environment")
 
 def install_python_dependencies():
     """Install Python dependencies from requirements.txt."""
+    # Ensure we're using the virtual environment's pip
     run_command('pip install --upgrade pip setuptools wheel')
-    run_command('pip install -r requirements.txt')
+    
+    # Install project dependencies
+    requirements_path = os.path.join(os.getcwd(), 'requirements.txt')
+    if os.path.exists(requirements_path):
+        run_command(f'pip install -r {requirements_path}')
+    else:
+        print(f"Warning: {requirements_path} not found")
+
+def verify_dependencies():
+    """Verify installed dependencies."""
+    print("\n🔍 Verifying Installed Dependencies:")
+    run_command('pip list')
 
 def main():
-    print("🚀 SpareFinderAI Dependency Installer")
+    print("🚀 SpareFinderAI Dependency Installer (Docker Edition)")
     
     # Check Python version
     python_version = sys.version_info
@@ -67,18 +57,13 @@ def main():
     if python_version.major != 3 or python_version.minor < 8:
         print("⚠️ Warning: This script is tested with Python 3.8+")
     
-    # Install system dependencies
-    install_system_dependencies()
-    
-    # Create virtual environment
-    create_virtual_environment()
-    
-    # Activate virtual environment and install dependencies
-    activate_script = activate_virtual_environment()
-    print(f"Activating virtual environment: {activate_script}")
-    
     # Install dependencies
+    install_system_dependencies()
+    create_virtual_environment()
     install_python_dependencies()
+    
+    # Verify installations
+    verify_dependencies()
     
     print("✅ Dependencies installed successfully!")
 
