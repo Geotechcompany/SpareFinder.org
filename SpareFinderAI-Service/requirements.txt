@@ -1,36 +1,73 @@
-fastapi==0.95.2
-uvicorn==0.22.0
-python-multipart==0.0.6
-openai==0.27.4
-requests==2.30.0
-Pillow==9.5.0
-numpy==1.23.5
-opencv-python-headless==4.7.0.72
-scikit-learn==1.2.2
-tensorflow==2.12.0
-torch==2.0.1
-transformers==4.29.2
-pydantic
-pydantic-settings
+# Core Framework
+fastapi==0.109.0
+uvicorn==0.24.0
+gunicorn==21.2.0
+python-multipart==0.0.9
 python-dotenv==1.0.0
-boto3==1.26.137
-google-cloud-vision==3.4.1
-supabase==1.0.3
-httpx
-aiofiles==23.1.0
-python-jose==3.3.0
-passlib==1.7.4
-bcrypt==4.0.1
-email-validator==2.0.0.post2
-sqlalchemy==2.0.12
-alembic==1.10.3
-psycopg2-binary==2.9.6
-gunicorn==20.1.0
-python-multipart==0.0.6
-python-dateutil==2.8.2
-pytz==2023.3
-Markdown==3.4.3
+
+# Web Scraping Libraries
 beautifulsoup4==4.12.2
-lxml==4.9.2
-selenium==4.9.0
-webdriver-manager==3.8.6 
+selenium==4.15.2
+requests==2.31.0
+fake-useragent==1.4.0
+cloudscraper==1.2.71
+aiohttp==3.9.3
+lxml==4.9.3
+Pillow==10.2.0
+
+# Image Processing - Fix NumPy compatibility
+opencv-python==4.7.0.72
+numpy==1.24.3
+
+# API & Validation
+pydantic==2.6.1
+pydantic-settings==2.0.3
+
+# Database & Storage
+asyncpg==0.29.0
+supabase>=2.3.0
+
+# HTTP Client for external APIs (compatible with supabase)
+httpx==0.24.1
+
+# Utilities
+aiofiles==23.2.1
+python-dateutil==2.8.2
+
+# Monitoring & Logging
+prometheus-client==0.19.0
+structlog==24.1.0
+
+# Security
+python-jose==3.3.0
+passlib[bcrypt]>=1.7.4
+
+# Web Scraping Utilities
+urllib3>=2.0.0
+chardet>=5.2.0
+brotli>=1.0.9
+
+# Development
+pytest==7.4.3
+pytest-asyncio==0.21.1
+black==23.11.0
+isort==5.12.0
+flake8==6.1.0
+
+# Add Supabase and auth dependencies
+gotrue>=2.0.0
+postgrest>=0.13.0
+realtime>=1.0.0
+storage3>=0.7.0
+
+# JWT and auth
+bcrypt>=4.0.0
+
+# Async support for scraping
+asyncio>=3.4.3
+
+# Google Cloud Vision API
+google-cloud-vision==3.7.2
+
+# OpenAI
+openai==1.16.1 
