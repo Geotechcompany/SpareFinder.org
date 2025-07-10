@@ -86,7 +86,7 @@ const AdminDesktopSidebar: React.FC<AdminSidebarProps> = ({
       setIsLoading(true);
       
       // Fetch admin stats
-      const statsResponse = await apiClient.getAdminStats();
+      const statsResponse = await api.admin.getAdminStats();
       if (statsResponse.success && statsResponse.data?.statistics) {
         const stats = statsResponse.data.statistics;
         setAdminStats({
@@ -100,7 +100,7 @@ const AdminDesktopSidebar: React.FC<AdminSidebarProps> = ({
       }
 
       // Fetch current admin user info
-      const userResponse = await apiClient.getCurrentUser();
+      const userResponse = await api.auth.getCurrentUser();
       if (userResponse.success && userResponse.data?.user) {
         setAdminUser(userResponse.data.user);
       }
@@ -188,7 +188,7 @@ const AdminDesktopSidebar: React.FC<AdminSidebarProps> = ({
 
   const handleLogout = async () => {
     try {
-      await apiClient.adminLogout();
+      await api.auth.signOut();
       localStorage.removeItem('admin_session');
       toast({
         title: "Logged out successfully",

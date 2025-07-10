@@ -203,7 +203,7 @@ router.get('/recent-activities', async (req: AuthenticatedRequest, res: Response
       });
     }
 
-    res.json({
+    return res.json({
       success: true,
       activities: (data || []).map(activity => ({
         id: activity.id,
@@ -222,7 +222,7 @@ router.get('/recent-activities', async (req: AuthenticatedRequest, res: Response
     });
   } catch (error) {
     console.error('Recent Activities Unexpected Error:', error);
-    res.status(500).json({ 
+    return res.status(500).json({ 
       success: false, 
       error: 'Internal server error' 
     });
