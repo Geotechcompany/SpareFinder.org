@@ -7,11 +7,11 @@ dotenv.config();
 // Debug logging
 console.log('🔍 Environment check in database-logger:');
 console.log('SUPABASE_URL exists:', !!process.env.SUPABASE_URL);
-console.log('SUPABASE_SERVICE_ROLE_KEY exists:', !!process.env.SUPABASE_SERVICE_ROLE_KEY);
+console.log('SUPABASE_SERVICE_KEY exists:', !!process.env.SUPABASE_SERVICE_KEY);
 console.log('NODE_ENV:', process.env.NODE_ENV);
 
 const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY;
 
 // Create Supabase client with service role key for database operations
 let supabase: ReturnType<typeof createClient> | null = null;
@@ -28,7 +28,7 @@ if (supabaseUrl && supabaseServiceKey) {
   console.warn('⚠️ Supabase environment variables not found. Database logging will be disabled.');
   console.warn('Missing variables:', {
     SUPABASE_URL: !!supabaseUrl,
-    SUPABASE_SERVICE_ROLE_KEY: !!supabaseServiceKey
+    SUPABASE_SERVICE_KEY: !!supabaseServiceKey
   });
 }
 

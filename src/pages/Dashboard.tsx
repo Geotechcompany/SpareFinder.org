@@ -26,13 +26,6 @@ import { useAuth } from '@/contexts/AuthContext';
 import { format } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
-import { 
-  isDashboardStatsResponse, 
-  isRecentUploadResponse, 
-  isRecentActivityResponse, 
-  isPerformanceMetricsResponse,
-  extractData
-} from '@/lib/api';
 import { dashboardApi } from '@/lib/api';
 import { useToast } from '@/components/ui/use-toast';
 import DashboardSkeleton from '@/components/DashboardSkeleton';
@@ -40,7 +33,7 @@ import DashboardSkeleton from '@/components/DashboardSkeleton';
 const Dashboard = () => {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const { user, isLoading: authLoading, logout } = useAuth();
+  const { user, isLoading: authLoading, logout, isAuthenticated } = useAuth();
   const navigate = useNavigate();
   const [isDataLoading, setIsDataLoading] = useState(true);
   
@@ -80,10 +73,50 @@ const Dashboard = () => {
 
   const { toast } = useToast();
 
+  const testTokenManually = async () => {
+    const token = localStorage.getItem('token');
+    console.log('🧪 Manual token test - Token:', !!token);
+    
+    if (!token) {
+      console.log('❌ No token found');
+      return;
+    }
+    
+    try {
+      const response = await fetch('http://localhost:4000/api/auth/current-user', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      console.log('🧪 Manual test response status:', response.status);
+      const data = await response.json();
+      console.log('🧪 Manual test response data:', data);
+      
+      if (response.ok) {
+        console.log('✅ Token is valid!');
+      } else {
+        console.log('❌ Token is invalid:', data);
+      }
+    } catch (error) {
+      console.error('🧪 Manual test error:', error);
+    }
+  };
+
   useEffect(() => {
     const fetchDashboardData = async () => {
+      // Debug logging
+      const token = localStorage.getItem('token');
+      console.log('🔍 Dashboard fetch - User:', user?.id);
+      console.log('🔍 Dashboard fetch - Token:', !!token);
+      console.log('🔍 Dashboard fetch - Token preview:', token ? token.substring(0, 20) + '...' : 'None');
+      console.log('🔍 Dashboard fetch - isAuthenticated:', isAuthenticated);
+      console.log('🔍 Dashboard fetch - User object:', user);
+      
       // Only attempt to fetch if user is authenticated
       if (!user?.id || !localStorage.getItem('token')) {
+        console.log('❌ Dashboard fetch skipped - no user or token');
         setIsDataLoading(false);
         return;
       }
@@ -91,8 +124,11 @@ const Dashboard = () => {
       try {
         setIsDataLoading(true);
         
+        console.log('📊 Fetching dashboard stats...');
         // Fetch dashboard stats with error handling
         const statsResponse = await dashboardApi.getStats();
+        console.log('📊 Stats response:', statsResponse);
+        
         if (statsResponse.success && statsResponse.data) {
           setStats({
             totalUploads: statsResponse.data.totalUploads,
@@ -111,8 +147,11 @@ const Dashboard = () => {
           });
         }
 
+        console.log('📁 Fetching recent uploads...');
         // Fetch recent uploads
         const uploadsResponse = await dashboardApi.getRecentUploads();
+        console.log('📁 Uploads response:', uploadsResponse);
+        
         if (uploadsResponse.success && uploadsResponse.data) {
           setRecentUploads(uploadsResponse.data.uploads.map(upload => ({
             id: upload.id,
@@ -126,8 +165,11 @@ const Dashboard = () => {
           setRecentUploads([]);
         }
 
+        console.log('🔄 Fetching recent activities...');
         // Fetch recent activities
         const activitiesResponse = await dashboardApi.getRecentActivities();
+        console.log('🔄 Activities response:', activitiesResponse);
+        
         if (activitiesResponse.success && activitiesResponse.data) {
           setRecentActivities(activitiesResponse.data.activities.map(activity => ({
             id: activity.id,
@@ -143,8 +185,11 @@ const Dashboard = () => {
           setRecentActivities([]);
         }
 
+        console.log('📈 Fetching performance metrics...');
         // Fetch performance metrics
         const metricsResponse = await dashboardApi.getPerformanceMetrics();
+        console.log('📈 Metrics response:', metricsResponse);
+        
         if (metricsResponse.success && metricsResponse.data) {
           setPerformanceMetrics([
             {
@@ -196,11 +241,20 @@ const Dashboard = () => {
           ]);
         }
 
+        console.log('✅ Dashboard data fetch completed successfully');
+
       } catch (error: any) {
         console.error('Dashboard data fetch error:', error);
+        console.error('Error details:', {
+          status: error.response?.status,
+          statusText: error.response?.statusText,
+          data: error.response?.data,
+          message: error.message
+        });
         
         // Specific handling for authentication errors
         if (error.response?.status === 401 || error.response?.status === 403) {
+          console.log('🔒 Authentication error detected - logging out');
           toast({
             title: 'Session Expired',
             description: 'Your session has expired. Please log in again.',
@@ -258,7 +312,7 @@ const Dashboard = () => {
     };
 
     fetchDashboardData();
-  }, [user?.id, logout, navigate, toast]);
+  }, [user?.id, logout, navigate, toast, isAuthenticated]);
 
   const handleToggleSidebar = () => {
     setIsCollapsed(!isCollapsed);
@@ -541,7 +595,7 @@ const Dashboard = () => {
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: 0.2 }}
                   >
-                    Welcome back, {user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'User'}
+                    Welcome back, {user?.full_name || user?.email?.split('@')[0] || 'User'}
                   </motion.h1>
                   <motion.p 
                     className="text-sm sm:text-base text-gray-400 mt-2"
@@ -558,6 +612,19 @@ const Dashboard = () => {
                   animate={{ opacity: 1, scale: 1 }}
                   transition={{ delay: 0.4 }}
                 >
+                  <motion.div
+                    whileHover={{ scale: 1.05, y: -2 }}
+                    whileTap={{ scale: 0.95 }}
+                    className="w-full sm:w-auto"
+                  >
+                    <Button 
+                      onClick={testTokenManually}
+                      variant="outline"
+                      className="w-full sm:w-auto bg-black/20 border-white/10 text-white hover:bg-white/10 mr-2"
+                    >
+                      Test Token
+                    </Button>
+                  </motion.div>
                   <motion.div
                     whileHover={{ scale: 1.05, y: -2 }}
                     whileTap={{ scale: 0.95 }}

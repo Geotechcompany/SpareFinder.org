@@ -1,177 +1,85 @@
-import axios from 'axios';
-import { config } from './config';
-import { useAuth } from '@/contexts/AuthContext';
+import axios, { AxiosInstance, AxiosResponse } from 'axios';
 
-export interface ApiResponse<T> {
-  success: boolean;
-  data?: T | null;
-  error?: string;
-}
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000';
 
-export interface GitHubAIPartAnalysisResponse {
-  predictions: Array<{
-    class_name: string;
-    confidence: number;
-    category?: string;
-    estimated_price?: string;
-  }>;
-  technical_details?: Record<string, string | string[]>;
-  purchasing_info?: {
-    global_contacts?: string[];
-    recommended_sources?: Array<{
-      name: string;
-      url: string;
-      description?: string;
-    }>;
-  };
-}
-
-export interface DashboardStatsResponse {
-  totalUploads: number;
-  successfulUploads: number;
-  avgConfidence: number;
-  avgProcessTime: number;
-}
-
-export interface RecentUploadResponse {
-  uploads: Array<{
-    id: string;
-    image_name: string;
-    created_at: string;
-    confidence_score: number;
-  }>;
-}
-
-export interface RecentActivityResponse {
-  activities: Array<{
-    id: string;
-    resource_type: string;
-    action: string;
-    details: {
-      description: string;
-      confidence?: number | null;
-      status: string;
-    };
-    created_at: string;
-  }>;
-}
-
-export interface PerformanceMetricsResponse {
-  modelAccuracy: number;
-  accuracyChange: number;
-  totalSearches: number;
-  searchesGrowth: number;
-  avgResponseTime: number;
-  responseTimeChange: number;
-}
-
-export interface AnalysisResponse {
-  description?: string;
-  predictions: Array<{
-    class_name: string;
-    confidence: number;
-    description: string;
-    category: string;
-    manufacturer: string;
-    part_number?: string | null;
-    estimated_price?: string;
-    compatibility?: string[];
-  }>;
-  additional_details?: {
-    full_analysis?: string;
-    technical_specifications?: string;
-    market_information?: string;
-  };
-  image_metadata?: {
-    content_type?: string;
-    size_bytes?: number;
-    base64_image?: string;
-  };
-  processing_time?: number;
-  model_version?: string;
-}
-
-// Type guards
-export function isDashboardStatsResponse(response: any): response is ApiResponse<DashboardStatsResponse> {
-  return response && 
-    response.success === true && 
-    response.data && 
-    typeof response.data.totalUploads === 'number' &&
-    typeof response.data.successfulUploads === 'number' &&
-    typeof response.data.avgConfidence === 'number' &&
-    typeof response.data.avgProcessTime === 'number';
-}
-
-export function isRecentUploadResponse(response: any): response is ApiResponse<RecentUploadResponse> {
-  return response && 
-    response.success === true && 
-    response.data && 
-    Array.isArray(response.data.uploads) && 
-    response.data.uploads.length > 0 &&
-    response.data.uploads.every(upload => 
-      typeof upload.id === 'string' &&
-      typeof upload.image_name === 'string' &&
-      typeof upload.created_at === 'string' &&
-      typeof upload.confidence_score === 'number'
-    );
-}
-
-export function isRecentActivityResponse(response: any): response is ApiResponse<RecentActivityResponse> {
-  return response && 
-    response.success === true && 
-    response.data && 
-    Array.isArray(response.data.activities) && 
-    response.data.activities.length > 0 &&
-    response.data.activities.every(activity => 
-      typeof activity.id === 'string' &&
-      typeof activity.resource_type === 'string' &&
-      typeof activity.action === 'string' &&
-      activity.details && 
-      typeof activity.details.description === 'string' &&
-      typeof activity.details.status === 'string' &&
-      typeof activity.created_at === 'string'
-    );
-}
-
-export function isPerformanceMetricsResponse(response: any): response is ApiResponse<PerformanceMetricsResponse> {
-  return response && 
-    response.success === true && 
-    response.data && 
-    typeof response.data.modelAccuracy === 'number' &&
-    typeof response.data.accuracyChange === 'number' &&
-    typeof response.data.totalSearches === 'number' &&
-    typeof response.data.searchesGrowth === 'number' &&
-    typeof response.data.avgResponseTime === 'number' &&
-    typeof response.data.responseTimeChange === 'number';
-}
-
-// Utility function to safely extract data
-export function extractData<T>(response: ApiResponse<T>): T | null {
-  return response.success && response.data ? response.data : null;
-}
-
-// Create an axios instance with interceptors for token handling
-const apiClient = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL,
-  timeout: 10000,
-  headers: {
-    'Content-Type': 'application/json'
-  }
+console.log('🔧 API Client Config:', {
+  baseURL: API_BASE_URL,
+  environment: import.meta.env.MODE
 });
+
+// Token storage utilities
+const TOKEN_KEY = 'auth_token';
+const REFRESH_TOKEN_KEY = 'auth_refresh_token';
+
+const tokenStorage = {
+  getToken: () => sessionStorage.getItem(TOKEN_KEY),
+  setToken: (token: string) => sessionStorage.setItem(TOKEN_KEY, token),
+  removeToken: () => sessionStorage.removeItem(TOKEN_KEY),
+  
+  getRefreshToken: () => sessionStorage.getItem(REFRESH_TOKEN_KEY),
+  setRefreshToken: (token: string) => sessionStorage.setItem(REFRESH_TOKEN_KEY, token),
+  removeRefreshToken: () => sessionStorage.removeItem(REFRESH_TOKEN_KEY),
+  
+  clearAll: () => {
+    sessionStorage.removeItem(TOKEN_KEY);
+    sessionStorage.removeItem(REFRESH_TOKEN_KEY);
+  }
+};
+
+// Create axios instance
+const apiClient: AxiosInstance = axios.create({
+  baseURL: `${API_BASE_URL}/api`,
+  timeout: 30000,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+});
+
+// Token refresh state
+let isRefreshing = false;
+let refreshPromise: Promise<string> | null = null;
+let failedQueue: Array<{
+  resolve: (value: any) => void;
+  reject: (error: any) => void;
+}> = [];
+
+const processQueue = (error: any, token: string | null = null) => {
+  failedQueue.forEach(({ resolve, reject }) => {
+    if (error) {
+      reject(error);
+    } else {
+      resolve(token);
+    }
+  });
+  
+  failedQueue = [];
+};
 
 // Request interceptor to add token to every request
 apiClient.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('token');
+    const token = tokenStorage.getToken();
+    const hasToken = !!token;
+    
+    console.log('🔍 Request interceptor:', {
+      url: config.url,
+      hasToken,
+      tokenPreview: token ? token.substring(0, 20) + '...' : 'NO TOKEN',
+      timestamp: new Date().toISOString()
+    });
+    
     if (token) {
       config.headers['Authorization'] = `Bearer ${token}`;
+      console.log('✅ Authorization header added');
+    } else {
+      console.log('❌ No token found - request will be unauthorized');
     }
     return config;
   },
   (error) => Promise.reject(error)
 );
 
-// Response interceptor for handling authentication errors
+// Response interceptor for handling authentication errors and token refresh
 apiClient.interceptors.response.use(
   (response) => response,
   async (error) => {
@@ -179,718 +87,262 @@ apiClient.interceptors.response.use(
 
     // If the error is due to an unauthorized request and we haven't already tried to refresh
     if (error.response?.status === 401 && !originalRequest._retry) {
+      // If we're already refreshing, wait for the existing refresh to complete
+      if (isRefreshing && refreshPromise) {
+        return refreshPromise
+          .then(token => {
+            originalRequest.headers['Authorization'] = `Bearer ${token}`;
+            return apiClient(originalRequest);
+          })
+          .catch(err => {
+            return Promise.reject(err);
+          });
+      }
+
+      // If we're refreshing but no promise exists, queue the request
+      if (isRefreshing) {
+        return new Promise((resolve, reject) => {
+          failedQueue.push({ resolve, reject });
+        }).then(token => {
+          originalRequest.headers['Authorization'] = `Bearer ${token}`;
+          return apiClient(originalRequest);
+        }).catch(err => {
+          return Promise.reject(err);
+        });
+      }
+
       originalRequest._retry = true;
+      isRefreshing = true;
+
+      // Check if we have tokens
+      const currentToken = tokenStorage.getToken();
+      const refreshToken = tokenStorage.getRefreshToken();
+      
+      if (!currentToken || !refreshToken) {
+        // No tokens, redirect to login
+        console.warn('🔒 No tokens available - redirecting to login');
+        isRefreshing = false;
+        refreshPromise = null;
+        processQueue(error, null);
+        tokenStorage.clearAll();
+        window.location.href = '/login';
+        return Promise.reject(error);
+      }
+
+      // Create refresh promise
+      refreshPromise = (async () => {
+        try {
+          console.log('🔄 Attempting to refresh token...');
+          
+          // Try to refresh the token with timeout
+          const refreshResponse = await Promise.race([
+            axios.post(`${API_BASE_URL}/api/auth/refresh`, {
+              refresh_token: refreshToken
+            }),
+            new Promise<never>((_, reject) => 
+              setTimeout(() => reject(new Error('Token refresh timeout')), 10000)
+            )
+          ]);
+
+          if (refreshResponse.data.token) {
+            console.log('✅ Token refreshed successfully');
+            
+            // Update stored tokens
+            tokenStorage.setToken(refreshResponse.data.token);
+            if (refreshResponse.data.refresh_token) {
+              tokenStorage.setRefreshToken(refreshResponse.data.refresh_token);
+            }
+
+            // Process the queue with the new token
+            processQueue(null, refreshResponse.data.token);
+            
+            return refreshResponse.data.token;
+          } else {
+            throw new Error('No token in refresh response');
+          }
+        } catch (refreshError) {
+          console.error('🔒 Token refresh failed:', refreshError);
+          
+          // Process queue with error
+          processQueue(refreshError, null);
+          
+          // Clear tokens and redirect to login
+          tokenStorage.clearAll();
+          window.location.href = '/login';
+          throw refreshError;
+        } finally {
+          isRefreshing = false;
+          refreshPromise = null;
+        }
+      })();
 
       try {
-        // Attempt to refresh the token
-        const refreshResponse = await apiClient.post('/api/auth/refresh', {
-          refresh_token: localStorage.getItem('token')
-        });
-
-        if (refreshResponse.data.token) {
-          // Update the token in localStorage
-          localStorage.setItem('token', refreshResponse.data.token);
-
-          // Retry the original request with the new token
-          originalRequest.headers['Authorization'] = `Bearer ${refreshResponse.data.token}`;
-          return apiClient(originalRequest);
-        }
+        const newToken = await refreshPromise;
+        // Update the authorization header for the original request
+        originalRequest.headers['Authorization'] = `Bearer ${newToken}`;
+        // Retry the original request
+        return apiClient(originalRequest);
       } catch (refreshError) {
-        // If token refresh fails, force logout
-        localStorage.removeItem('token');
-        window.location.href = '/login';
         return Promise.reject(refreshError);
       }
     }
 
-    // For other errors, reject the promise
     return Promise.reject(error);
   }
 );
 
-// Dashboard API methods
-export const dashboardApi = {
-  getStats: async () => {
+// API response interface
+interface ApiResponse<T = any> {
+  success: boolean;
+  data?: T;
+  user?: any; // Auth endpoints return user directly
+  token?: string; // Auth endpoints return token
+  refresh_token?: string; // Auth endpoints return refresh token
+  message?: string;
+  error?: string;
+}
+
+// Authentication API
+export const authApi = {
+  register: async (userData: {
+    email: string;
+    password: string;
+    full_name: string;
+    company?: string;
+  }): Promise<ApiResponse> => {
+    const response = await apiClient.post('/auth/register', userData);
+    
+    // Store tokens if registration is successful
+    if (response.data.success && response.data.token) {
+      tokenStorage.setToken(response.data.token);
+      if (response.data.refresh_token) {
+        tokenStorage.setRefreshToken(response.data.refresh_token);
+      }
+    }
+    
+    return response.data;
+  },
+
+  login: async (credentials: { email: string; password: string }): Promise<ApiResponse> => {
+    const response = await apiClient.post('/auth/login', credentials);
+    
+    // Store tokens if login is successful
+    if (response.data.success && response.data.token) {
+      tokenStorage.setToken(response.data.token);
+      if (response.data.refresh_token) {
+        tokenStorage.setRefreshToken(response.data.refresh_token);
+      }
+    }
+    
+    return response.data;
+  },
+
+  logout: async (): Promise<ApiResponse> => {
     try {
-      const response = await apiClient.get('/api/dashboard/stats');
+      const response = await apiClient.post('/auth/logout');
       return response.data;
-    } catch (error) {
-      console.error('Failed to fetch dashboard stats:', error);
-      throw error;
+    } finally {
+      // Always clear tokens on logout, even if the request fails
+      tokenStorage.clearAll();
     }
   },
 
-  getRecentUploads: async () => {
-    try {
-              const response = await apiClient.get('/api/dashboard/recent-uploads');
-      return response.data;
-    } catch (error) {
-      console.error('Failed to fetch recent uploads:', error);
-      throw error;
-    }
+  getCurrentUser: async (): Promise<ApiResponse> => {
+    const response = await apiClient.get('/auth/current-user');
+    return response.data;
   },
 
-  getRecentActivities: async () => {
-    try {
-              const response = await apiClient.get('/api/dashboard/recent-activities');
-      return response.data;
-    } catch (error) {
-      console.error('Failed to fetch recent activities:', error);
-      throw error;
-    }
-  },
-
-  getPerformanceMetrics: async () => {
-    try {
-              const response = await apiClient.get('/api/dashboard/performance-metrics');
-      return response.data;
-    } catch (error) {
-      console.error('Failed to fetch performance metrics:', error);
-      throw error;
-    }
-  },
-
-  // Add these methods to the dashboardApi object
-  exportHistory: async (format: 'csv' | 'json' = 'csv') => {
-    try {
-      const response = await apiClient.get(`/api/dashboard/export-history?format=${format}`);
-      return response.data;
-    } catch (error) {
-      console.error('Failed to export history:', error);
-      throw error;
-    }
-  },
-
-  deleteUpload: async (uploadId: string) => {
-    try {
-      const response = await apiClient.delete(`/api/dashboard/uploads/${uploadId}`);
-      return response.data;
-    } catch (error) {
-      console.error('Failed to delete upload:', error);
-      throw error;
-    }
-  },
-}; 
-
-export const api = {
-  auth: {
-    getCurrentUser: async () => {
-      try {
-        const token = localStorage.getItem('token');
-        if (!token) {
-          console.warn('🚫 No authentication token found');
-          return { 
-            success: false,
-            data: null, 
-            error: 'No authentication token found. Please log in.' 
-          };
-        }
-
-        try {
-          const response = await apiClient.get('/api/auth/current-user', {
-            headers: {
-              'Authorization': `Bearer ${token}`
-            }
-          });
-
-          console.log('✅ Current User Retrieved Successfully');
-          return { 
-            success: true,
-            data: response.data.data, 
-            error: null 
-          };
-        } catch (error: any) {
-          console.error('❌ Failed to get current user:', error);
-          
-          // Detailed error handling
-          if (error.response) {
-            switch (error.response.status) {
-              case 401:
-                console.warn('🔒 Token is invalid or expired');
-                localStorage.removeItem('token');
-                return { 
-                  success: false,
-                  data: null, 
-                  error: 'Session expired. Please log in again.' 
-                };
-              
-              case 404:
-                console.warn('🔍 User profile not found');
-                localStorage.removeItem('token');
-                return { 
-                  success: false,
-                  data: null, 
-                  error: 'User profile not found. Please contact support.' 
-                };
-              
-              case 500:
-                console.error('🚨 Server error during authentication');
-                return { 
-                  success: false,
-                  data: null, 
-                  error: 'Server error. Please try again later.' 
-                };
-              
-              default:
-                console.warn('❓ Unexpected authentication error');
-                return { 
-                  success: false,
-                  data: null, 
-                  error: 'Authentication failed. Please try again.' 
-                };
-            }
-          } else if (error.request) {
-            // Request was made but no response received
-            console.error('🌐 No response from server');
-            return { 
-              success: false,
-              data: null, 
-              error: 'No response from server. Check your network connection.' 
-            };
-          } else {
-            // Something happened in setting up the request
-            console.error('❌ Error setting up authentication request');
-            return { 
-              success: false,
-              data: null, 
-              error: 'An unexpected error occurred. Please try again.' 
-            };
-          }
-        }
-      } catch (unexpectedError) {
-        console.error('🚨 Unexpected error in getCurrentUser:', unexpectedError);
-        return { 
-          success: false,
-          data: null, 
-          error: 'An unexpected error occurred. Please try again.' 
-        };
-      }
-    },
-
-    signIn: async (email: string, password: string) => {
-      try {
-        const response = await apiClient.post('/api/auth/login', { email, password });
-        
-        if (response.data.success && response.data.token) {
-          localStorage.setItem('token', response.data.token);
-          return response.data;
-        } else {
-          throw new Error(response.data.message || 'Login failed');
-        }
-      } catch (error: any) {
-        console.error('Login failed:', error);
-        throw {
-          success: false,
-          error: error.response?.data?.message || error.message || 'Login failed'
-        };
-      }
-    },
-
-    signOut: async () => {
-      try {
-        const token = localStorage.getItem('token');
-        await apiClient.post('/api/auth/logout', {}, {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        });
-        
-        localStorage.removeItem('token');
-        return { 
-          data: null, 
-          error: null 
-        };
-      } catch (error: any) {
-        console.error('Logout failed:', error);
-        localStorage.removeItem('token');
-        return { 
-          data: null, 
-          error: error.response?.data?.message || error.message || 'Logout failed' 
-        };
-      }
-    },
-
-    signUp: async (email: string, password: string, metadata?: Record<string, any>) => {
-      try {
-        const response = await apiClient.post('/api/auth/register', { 
-          email, 
-          password, 
-          ...metadata 
-        });
-        
-        // Store token if provided
-        if (response.data.token) {
-          localStorage.setItem('token', response.data.token);
-        }
-
-        return { 
-          data: response.data, 
-          error: null 
-        };
-      } catch (error: any) {
-        console.error('Signup failed:', error);
-        return { 
-          data: null, 
-          error: error.response?.data?.message || error.message || 'Signup failed' 
-        };
-      }
-    },
-
-    signInWithOAuth: async (provider: 'google' | 'github') => {
-      try {
-        const response = await apiClient.post(`/api/auth/google`, {
-          access_token: '', // This will need to be updated based on OAuth flow
-          id_token: '' // This will need to be updated based on OAuth flow
-        });
-        
-        // Store token if provided
-        if (response.data.token) {
-          localStorage.setItem('token', response.data.token);
-        }
-
-        return { 
-          data: response.data, 
-          error: null 
-        };
-      } catch (error: any) {
-        console.error('OAuth login failed:', error);
-        return { 
-          data: null, 
-          error: error.response?.data?.message || error.message || 'OAuth login failed' 
-        };
-      }
-    }
-  },
-  statistics: {
-    refresh: async () => {
-      try {
-        const response = await apiClient.post('/api/statistics/refresh');
-        return response.data;
-      } catch (error) {
-        console.error('Failed to refresh statistics:', error);
-        throw error;
-      }
-    }
-  },
-  profile: {
-    getAchievements: async () => {
-      try {
-        const response = await apiClient.get('/api/profile/achievements');
-        return response.data;
-      } catch (error) {
-        console.error('Failed to get achievements:', error);
-        throw error;
-      }
-    },
-    getRecentActivities: async (limit = 4) => {
-      try {
-        const response = await apiClient.get(`/profile/activities?limit=${limit}`);
-        return response.data;
-      } catch (error) {
-        console.error('Failed to get recent activities:', error);
-        throw error;
-      }
-    },
-    getProfile: async () => {
-      try {
-        const response = await apiClient.get('/api/profile');
-        return {
-          success: true,
-          data: {
-            profile: response.data
-          }
-        };
-      } catch (error) {
-        console.error('Failed to get profile:', error);
-        return {
-          success: false,
-          error: error instanceof Error ? error.message : 'Unknown error'
-        };
-      }
-    }
-  },
-  upload: {
-    image: async (file: File, keywords?: string[], options?: any) => {
-      try {
-        const formData = new FormData();
-        formData.append('file', file);
-        
-        // Add keywords as a comma-separated string
-        if (keywords && keywords.length > 0) {
-          formData.append('keywords', keywords.join(', '));
-        }
-
-        // Add additional options
-        if (options) {
-          formData.append('confidence_threshold', options.confidenceThreshold || '0.3');
-          formData.append('max_predictions', options.maxPredictions || '3');
-        }
-
-        // Use SpareFinderAI-Service URL from config
-        const response = await axios.post(`${config.ai.serviceUrl}/analyze-part/`, formData, {
-          headers: { 
-            'Content-Type': 'multipart/form-data'
-          },
-          timeout: config.ai.timeout
-        });
-
-        // Transform response to match existing interface
-        return {
-          success: response.data.success,
-          part_info: response.data.predictions.map((pred: any) => ({
-            class_name: pred.class_name,
-            confidence: pred.confidence,
-            description: pred.description,
-            category: pred.category,
-            manufacturer: pred.manufacturer,
-            estimated_price: pred.estimated_price,
-            part_number: pred.part_number,
-            compatibility: pred.compatibility
-          })),
-          full_analysis: response.data.analysis,
-          processing_time: response.data.processing_time,
-          model_version: response.data.model_version,
-          error: response.data.error || null  // Add this line
-        };
-      } catch (error) {
-        console.error('Image upload to AI service failed:', error);
-        throw error;
-      }
-    },
-    storeAnalysis: async (analysisResults: AnalysisResponse) => {
-      try {
-        // Prepare data for backend
-        const storeData = {
-          part_name: analysisResults.predictions[0].class_name,
-          part_number: analysisResults.predictions[0].part_number,
-          manufacturer: analysisResults.predictions[0].manufacturer,
-          category: analysisResults.predictions[0].category,
-          confidence_score: analysisResults.predictions[0].confidence * 100,
-          image_url: analysisResults.image_metadata?.content_type && analysisResults.image_metadata?.base64_image
-            ? `data:${analysisResults.image_metadata.content_type};base64,${analysisResults.image_metadata.base64_image}`
-            : undefined,
-          description: analysisResults.predictions[0].description || 
-                       analysisResults.additional_details?.full_analysis,
-          additional_details: {
-            full_analysis: analysisResults.additional_details?.full_analysis,
-            technical_specifications: analysisResults.additional_details?.technical_specifications,
-            market_information: analysisResults.additional_details?.market_information,
-            processing_time: analysisResults.processing_time,
-            model_version: analysisResults.model_version
-          }
-        };
-
-        const response = await axios.post('/api/upload/store-analysis', storeData, {
-          headers: {
-            'Content-Type': 'application/json'
-          }
-        });
-
-        return response.data;
-      } catch (error) {
-        console.error('Failed to store analysis:', error);
-        throw error;
-      }
-    }
-  },
-  billing: {
-    getBillingInfo: async (options: { signal?: AbortSignal } = {}) => {
-      try {
-        const response = await apiClient.get('/api/billing/info', {
-          signal: options.signal
-        });
-        return response.data;
-      } catch (error) {
-        console.error('Failed to fetch billing info:', error);
-        throw error;
-      }
-    },
-    getInvoices: async (options: { signal?: AbortSignal } = {}) => {
-      try {
-        const response = await apiClient.get('/api/billing/invoices', {
-          signal: options.signal
-        });
-        return response.data;
-      } catch (error) {
-        console.error('Failed to fetch invoices:', error);
-        throw error;
-      }
-    },
-    updateSubscription: async (planId: 'free' | 'pro' | 'enterprise') => {
-      try {
-        const response = await apiClient.post('/api/billing/update-subscription', { planId });
-        return response.data;
-      } catch (error) {
-        console.error('Failed to update subscription:', error);
-        throw error;
-      }
-    },
-    cancelSubscription: async () => {
-      try {
-        const response = await apiClient.post('/api/billing/cancel-subscription');
-        return response.data;
-      } catch (error) {
-        console.error('Failed to cancel subscription:', error);
-        throw error;
-      }
-    }
-  },
-  dashboard: {
-    getStats: async () => {
-      try {
-        const response = await apiClient.get('/api/dashboard/stats');
-        return {
-          success: true,
-          data: response.data
-        };
-      } catch (error) {
-        console.error('Failed to get dashboard stats:', error);
-        return {
-          success: false,
-          error: error instanceof Error ? error.message : 'Unknown error'
-        };
-      }
-    }
-  },
-  // Existing dashboardApi methods can be added here if needed
-  ...dashboardApi,
-  admin: {
-    getUsers: async (page: number = 1, limit: number = 20) => {
-      try {
-        const response = await apiClient.get('/api/admin/users', { params: { page, limit } });
-        return {
-          success: true,
-          data: {
-            users: response.data.users,
-            pagination: response.data.pagination
-          }
-        };
-      } catch (error) {
-        console.error('Failed to get users:', error);
-        return {
-          success: false,
-          error: error instanceof Error ? error.message : 'Unknown error'
-        };
-      }
-    },
-    updateUserRole: async (userId: string, newRole: 'user' | 'admin' | 'super_admin') => {
-      try {
-        const response = await apiClient.patch(`/api/admin/users/${userId}/role`, { role: newRole });
-        return {
-          success: true,
-          data: response.data
-        };
-      } catch (error) {
-        console.error('Failed to update user role:', error);
-        return {
-          success: false,
-          error: error instanceof Error ? error.message : 'Unknown error'
-        };
-      }
-    },
-    deleteUser: async (userId: string) => {
-      try {
-        const response = await apiClient.delete(`/api/admin/users/${userId}`);
-        return {
-          success: true,
-          data: response.data
-        };
-      } catch (error) {
-        console.error('Failed to delete user:', error);
-        return {
-          success: false,
-          error: error instanceof Error ? error.message : 'Unknown error'
-        };
-      }
-    },
-    getAdminStats: async () => {
-      try {
-        const response = await apiClient.get('/api/admin/stats');
-        return {
-          success: true,
-          data: response.data
-        };
-      } catch (error) {
-        console.error('Failed to get admin stats:', error);
-        return {
-          success: false,
-          error: error instanceof Error ? error.message : 'Unknown error'
-        };
-      }
-    },
-    getAdminAnalytics: async (timeRange: string = '30d') => {
-      try {
-        const response = await apiClient.get('/api/admin/analytics', { params: { range: timeRange } });
-        return {
-          success: true,
-          data: response.data
-        };
-      } catch (error) {
-        console.error('Failed to get admin analytics:', error);
-        return {
-          success: false,
-          error: error instanceof Error ? error.message : 'Unknown error'
-        };
-      }
-    },
-    getSystemLogs: async (page: number = 1, limit: number = 100, level?: string) => {
-      try {
-        const params: any = { page, limit };
-        if (level) params.level = level;
-        
-        const response = await apiClient.get('/api/admin/logs', { params });
-        return {
-          success: true,
-          data: response.data
-        };
-      } catch (error) {
-        console.error('Failed to get system logs:', error);
-        return {
-          success: false,
-          error: error instanceof Error ? error.message : 'Unknown error'
-        };
-      }
-    },
-    getAuditLogs: async (page: number = 1, limit: number = 100) => {
-      try {
-        const response = await apiClient.get('/api/admin/audit-logs', { params: { page, limit } });
-        return {
-          success: true,
-          data: response.data
-        };
-      } catch (error) {
-        console.error('Failed to get audit logs:', error);
-        return {
-          success: false,
-          error: error instanceof Error ? error.message : 'Unknown error'
-        };
-      }
-    },
-    // AI Models Management
-    getAIModels: async () => {
-      try {
-        const response = await apiClient.get('/api/admin/ai-models');
-        return {
-          success: true,
-          data: response.data
-        };
-      } catch (error) {
-        console.error('Failed to get AI models:', error);
-        return {
-          success: false,
-          error: error instanceof Error ? error.message : 'Unknown error'
-        };
-      }
-    },
-    createAIModel: async (modelData: { provider: string; model_name: string; api_key: string; description?: string }) => {
-      try {
-        const response = await apiClient.post('/api/admin/ai-models', modelData);
-        return {
-          success: true,
-          data: response.data
-        };
-      } catch (error) {
-        console.error('Failed to create AI model:', error);
-        return {
-          success: false,
-          error: error instanceof Error ? error.message : 'Unknown error'
-        };
-      }
-    },
-    updateAIModel: async (id: string, updateData: any) => {
-      try {
-        const response = await apiClient.patch(`/api/admin/ai-models/${id}`, updateData);
-        return {
-          success: true,
-          data: response.data
-        };
-      } catch (error) {
-        console.error('Failed to update AI model:', error);
-        return {
-          success: false,
-          error: error instanceof Error ? error.message : 'Unknown error'
-        };
-      }
-    },
-    // Payment Methods Management
-    getPaymentMethods: async () => {
-      try {
-        const response = await apiClient.get('/api/admin/payment-methods');
-        return {
-          success: true,
-          data: response.data
-        };
-      } catch (error) {
-        console.error('Failed to get payment methods:', error);
-        return {
-          success: false,
-          error: error instanceof Error ? error.message : 'Unknown error'
-        };
-      }
-    },
-    createPaymentMethod: async (methodData: { name: string; provider: string; api_key: string; secret_key: string; description?: string }) => {
-      try {
-        const response = await apiClient.post('/api/admin/payment-methods', methodData);
-        return {
-          success: true,
-          data: response.data
-        };
-      } catch (error) {
-        console.error('Failed to create payment method:', error);
-        return {
-          success: false,
-          error: error instanceof Error ? error.message : 'Unknown error'
-        };
-      }
-    },
-    // Email Templates Management
-    getEmailTemplates: async () => {
-      try {
-        const response = await apiClient.get('/api/admin/email-templates');
-        return {
-          success: true,
-          data: response.data
-        };
-      } catch (error) {
-        console.error('Failed to get email templates:', error);
-        return {
-          success: false,
-          error: error instanceof Error ? error.message : 'Unknown error'
-        };
-      }
-    },
-    // System Settings Management
-    getSystemSettings: async () => {
-      try {
-        const response = await apiClient.get('/api/admin/system-settings');
-        return {
-          success: true,
-          data: response.data
-        };
-      } catch (error) {
-        console.error('Failed to get system settings:', error);
-        return {
-          success: false,
-          error: error instanceof Error ? error.message : 'Unknown error'
-        };
-      }
-    },
-    updateSystemSettings: async (settings: any) => {
-      try {
-        const response = await apiClient.patch('/api/admin/system-settings', { settings });
-        return {
-          success: true,
-          data: response.data
-        };
-      } catch (error) {
-        console.error('Failed to update system settings:', error);
-        return {
-          success: false,
-          error: error instanceof Error ? error.message : 'Unknown error'
-        };
-      }
-    }
+  signOut: async (): Promise<ApiResponse> => {
+    return authApi.logout();
   }
 };
 
-export type ApiType = typeof api; 
+// Dashboard API
+export const dashboardApi = {
+  getStats: async (): Promise<ApiResponse> => {
+    console.log('📊 Fetching dashboard stats...');
+    try {
+      const response = await apiClient.get('/dashboard/stats');
+      console.log('📊 Stats response:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('📊 Failed to fetch dashboard stats:', error);
+      throw error;
+    }
+  },
+
+  getRecentUploads: async (limit: number = 5): Promise<ApiResponse> => {
+    const response = await apiClient.get(`/dashboard/recent-uploads?limit=${limit}`);
+    return response.data;
+  },
+
+  getRecentActivities: async (limit: number = 5): Promise<ApiResponse> => {
+    const response = await apiClient.get(`/dashboard/recent-activities?limit=${limit}`);
+    return response.data;
+  },
+
+  getPerformanceMetrics: async (): Promise<ApiResponse> => {
+    const response = await apiClient.get('/dashboard/performance-metrics');
+    return response.data;
+  },
+
+  // Add missing methods used by History component
+  exportHistory: async (format: 'csv' | 'json' = 'csv'): Promise<ApiResponse> => {
+    const response = await apiClient.get(`/dashboard/export?format=${format}`);
+    return response.data;
+  },
+
+  deleteUpload: async (uploadId: string): Promise<ApiResponse> => {
+    const response = await apiClient.delete(`/dashboard/uploads/${uploadId}`);
+    return response.data;
+  }
+};
+
+// Admin API
+export const adminApi = {
+  getUsers: async (page: number = 1, limit: number = 50): Promise<ApiResponse> => {
+    const response = await apiClient.get(`/admin/users?page=${page}&limit=${limit}`);
+    return response.data;
+  },
+
+  getAdminStats: async (): Promise<ApiResponse> => {
+    const response = await apiClient.get('/admin/stats');
+    return { success: true, data: { statistics: response.data.statistics } };
+  },
+
+  getAIModels: async (): Promise<ApiResponse> => {
+    const response = await apiClient.get('/admin/ai-models');
+    return { success: true, data: response.data };
+  },
+
+  getPaymentMethods: async (): Promise<ApiResponse> => {
+    const response = await apiClient.get('/admin/payment-methods');
+    return { success: true, data: response.data };
+  },
+
+  getEmailTemplates: async (): Promise<ApiResponse> => {
+    const response = await apiClient.get('/admin/email-templates');
+    return { success: true, data: response.data };
+  },
+
+  getSystemSettings: async (): Promise<ApiResponse> => {
+    const response = await apiClient.get('/admin/system-settings');
+    return { success: true, data: response.data };
+  },
+
+  getAuditLogs: async (page: number = 1, limit: number = 100): Promise<ApiResponse> => {
+    const response = await apiClient.get(`/admin/audit-logs?page=${page}&limit=${limit}`);
+    return { success: true, data: response.data };
+  }
+};
+
+// Export the main API object
+export const api = {
+  auth: authApi,
+  dashboard: dashboardApi,
+  admin: adminApi
+};
+
+// Export individual APIs for backward compatibility
+export { apiClient, tokenStorage };
+export default api; 
