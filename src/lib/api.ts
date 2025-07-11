@@ -61,6 +61,14 @@ apiClient.interceptors.request.use(
     const token = tokenStorage.getToken();
     const hasToken = !!token;
     
+    // Check if this is an auth endpoint that doesn't require a token
+    const isPublicAuthEndpoint = config.url && (
+      config.url.includes('/auth/register') ||
+      config.url.includes('/auth/login') ||
+      config.url.includes('/auth/refresh') ||
+      config.url.includes('/auth/reset-password')
+    );
+    
     console.log('🔍 Request interceptor:', {
       url: config.url,
       hasToken,
@@ -71,8 +79,10 @@ apiClient.interceptors.request.use(
     if (token) {
       config.headers['Authorization'] = `Bearer ${token}`;
       console.log('✅ Authorization header added');
-    } else {
+    } else if (!isPublicAuthEndpoint) {
       console.log('❌ No token found - request will be unauthorized');
+    } else {
+      console.log('ℹ️ Public auth endpoint - no token required');
     }
     return config;
   },
@@ -214,10 +224,17 @@ export const authApi = {
     
     // Store tokens if registration is successful
     if (response.data.success && response.data.token) {
+      console.log('🔐 Storing tokens after successful registration');
       tokenStorage.setToken(response.data.token);
       if (response.data.refresh_token) {
         tokenStorage.setRefreshToken(response.data.refresh_token);
       }
+      
+      // Verify token was stored
+      const storedToken = tokenStorage.getToken();
+      console.log('✅ Token stored successfully:', !!storedToken);
+    } else {
+      console.warn('❌ No token received from registration response');
     }
     
     return response.data;
@@ -272,18 +289,39 @@ export const dashboardApi = {
   },
 
   getRecentUploads: async (limit: number = 5): Promise<ApiResponse> => {
-    const response = await apiClient.get(`/dashboard/recent-uploads?limit=${limit}`);
+    console.log('📋 Fetching recent uploads...');
+    try {
+      const response = await apiClient.get(`/dashboard/recent-uploads?limit=${limit}`);
+      console.log('📋 Recent uploads response:', response.data);
       return response.data;
+    } catch (error) {
+      console.error('📋 Failed to fetch recent uploads:', error);
+      throw error;
+    }
   },
 
   getRecentActivities: async (limit: number = 5): Promise<ApiResponse> => {
-    const response = await apiClient.get(`/dashboard/recent-activities?limit=${limit}`);
-    return response.data;
+    console.log('🔄 Fetching recent activities...');
+    try {
+      const response = await apiClient.get(`/dashboard/recent-activities?limit=${limit}`);
+      console.log('🔄 Recent activities response:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('🔄 Failed to fetch recent activities:', error);
+      throw error;
+    }
   },
 
   getPerformanceMetrics: async (): Promise<ApiResponse> => {
-    const response = await apiClient.get('/dashboard/performance-metrics');
-    return response.data;
+    console.log('📈 Fetching performance metrics...');
+    try {
+      const response = await apiClient.get('/dashboard/performance-metrics');
+      console.log('📈 Performance metrics response:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('📈 Failed to fetch performance metrics:', error);
+      throw error;
+    }
   },
 
   // Add missing methods used by History component
@@ -301,8 +339,15 @@ export const dashboardApi = {
 // Admin API
 export const adminApi = {
   getUsers: async (page: number = 1, limit: number = 50): Promise<ApiResponse> => {
-    const response = await apiClient.get(`/admin/users?page=${page}&limit=${limit}`);
-    return response.data;
+    console.log('📋 Fetching users from API...');
+    try {
+      const response = await apiClient.get(`/admin/users?page=${page}&limit=${limit}`);
+      console.log('📋 Raw API response:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('📋 Failed to fetch users:', error);
+      throw error;
+    }
   },
 
   getAdminStats: async (): Promise<ApiResponse> => {
@@ -333,6 +378,16 @@ export const adminApi = {
   getAuditLogs: async (page: number = 1, limit: number = 100): Promise<ApiResponse> => {
     const response = await apiClient.get(`/admin/audit-logs?page=${page}&limit=${limit}`);
     return { success: true, data: response.data };
+  },
+
+  updateUserRole: async (userId: string, role: 'user' | 'admin' | 'super_admin'): Promise<ApiResponse> => {
+    const response = await apiClient.patch(`/admin/users/${userId}/role`, { role });
+    return response.data;
+  },
+
+  deleteUser: async (userId: string): Promise<ApiResponse> => {
+    const response = await apiClient.delete(`/admin/users/${userId}`);
+    return response.data;
   }
 };
 
