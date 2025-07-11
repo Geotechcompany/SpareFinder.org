@@ -520,13 +520,81 @@ export const profileApi = {
   }
 };
 
+// Upload API
+export const uploadApi = {
+  image: async (
+    file: File, 
+    keywords: string[] = [], 
+    options: {
+      confidenceThreshold?: number;
+      maxPredictions?: number;
+      includeWebScraping?: boolean;
+    } = {}
+  ): Promise<ApiResponse> => {
+    try {
+      const formData = new FormData();
+      formData.append('image', file);
+      
+      // Add keywords if provided
+      if (keywords.length > 0) {
+        formData.append('keywords', keywords.join(', '));
+      }
+      
+      // Add metadata
+      const metadata = {
+        confidenceThreshold: options.confidenceThreshold || 0.3,
+        maxPredictions: options.maxPredictions || 3,
+        includeWebScraping: options.includeWebScraping || false
+      };
+      formData.append('metadata', JSON.stringify(metadata));
+      
+      const response = await apiClient.post('/upload/image', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+        timeout: 60000, // 60 second timeout for image upload
+      });
+      
+      return response.data;
+    } catch (error) {
+      console.error('Upload error:', error);
+      throw error;
+    }
+  }
+};
+
+// Statistics API
+export const statisticsApi = {
+  refresh: async (): Promise<ApiResponse> => {
+    try {
+      const response = await apiClient.post('/statistics/refresh');
+      return response.data;
+    } catch (error) {
+      console.error('Statistics refresh error:', error);
+      throw error;
+    }
+  },
+  
+  getStats: async (): Promise<ApiResponse> => {
+    try {
+      const response = await apiClient.get('/statistics');
+      return response.data;
+    } catch (error) {
+      console.error('Statistics fetch error:', error);
+      throw error;
+    }
+  }
+};
+
 // Export the main API object
 export const api = {
   auth: authApi,
   dashboard: dashboardApi,
   admin: adminApi,
   billing: billingApi,
-  profile: profileApi
+  profile: profileApi,
+  upload: uploadApi,
+  statistics: statisticsApi
 };
 
 // Export individual APIs for backward compatibility
