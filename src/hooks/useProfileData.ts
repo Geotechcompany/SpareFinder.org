@@ -99,7 +99,7 @@ export const useProfileData = () => {
     // Don't fetch if not authenticated or already fetching
     if (!user || !isAuthenticated || isFetchingRef.current) {
       if (!user || !isAuthenticated) {
-        setData(prev => ({ ...prev, loading: false }));
+      setData(prev => ({ ...prev, loading: false }));
       }
       return;
     }

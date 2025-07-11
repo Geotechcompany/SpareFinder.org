@@ -99,10 +99,10 @@ const Login = () => {
       {/* Logo Header */}
       <div className="absolute top-6 right-6 z-10">
         <div className="flex items-center gap-3">
-          <motion.div 
+      <motion.div
             className="relative"
             whileHover={{ scale: 1.05, rotate: 5 }}
-            transition={{ duration: 0.3 }}
+        transition={{ duration: 0.3 }}
           >
             <div className="absolute inset-0 bg-gradient-to-r from-purple-600 to-blue-600 rounded-xl blur opacity-60" />
             <div className="relative w-10 h-10 bg-gradient-to-r from-purple-600 to-blue-600 rounded-xl flex items-center justify-center">
@@ -125,8 +125,8 @@ const Login = () => {
           initial={{ opacity: 0, y: 20, scale: 0.95 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
           transition={{ duration: 0.8, ease: "easeOut" }}
-          className="w-full max-w-md"
-        >
+        className="w-full max-w-md"
+      >
           {/* Glassmorphism Card */}
           <div className="relative">
             <div className="absolute inset-0 bg-gradient-to-br from-white/[0.07] via-white/[0.02] to-transparent backdrop-blur-3xl rounded-3xl border border-white/10" />
@@ -178,31 +178,31 @@ const Login = () => {
                   <Label htmlFor="email" className="text-gray-200 font-medium">Email Address</Label>
                   <div className="relative group">
                     <Mail className="absolute left-4 top-4 h-5 w-5 text-gray-400 group-focus-within:text-purple-400 transition-colors" />
-                    <Input
-                      id="email"
-                      type="email"
-                      placeholder="Enter your email"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="Enter your email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
                       className="pl-12 h-14 bg-white/5 border-white/10 text-white placeholder:text-gray-500 focus:border-purple-500/50 focus:ring-2 focus:ring-purple-500/20 rounded-xl backdrop-blur-xl transition-all duration-300"
-                      required
-                    />
-                  </div>
+                  required
+                />
+              </div>
                 </div>
                 
                 <div className="space-y-2">
                   <Label htmlFor="password" className="text-gray-200 font-medium">Password</Label>
                   <div className="relative group">
                     <Lock className="absolute left-4 top-4 h-5 w-5 text-gray-400 group-focus-within:text-purple-400 transition-colors" />
-                    <Input
-                      id="password"
+                <Input
+                  id="password"
                       type={showPassword ? "text" : "password"}
-                      placeholder="Enter your password"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Enter your password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
                       className="pl-12 pr-12 h-14 bg-white/5 border-white/10 text-white placeholder:text-gray-500 focus:border-purple-500/50 focus:ring-2 focus:ring-purple-500/20 rounded-xl backdrop-blur-xl transition-all duration-300"
-                      required
-                    />
+                  required
+                />
                     <button
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
@@ -211,29 +211,29 @@ const Login = () => {
                       {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                     </button>
                   </div>
-                </div>
+              </div>
 
                 <motion.div
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
                 >
-                  <Button 
-                    type="submit" 
-                    disabled={isSubmitting}
+              <Button 
+                type="submit" 
+                disabled={isSubmitting}
                     className="w-full h-14 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-semibold rounded-xl shadow-lg shadow-purple-500/25 transition-all duration-300"
-                  >
-                    {isSubmitting ? (
+              >
+                {isSubmitting ? (
                       <>
                         <Loader2 className="w-5 h-5 mr-2 animate-spin" />
                         Signing in...
                       </>
-                    ) : (
+                ) : (
                       <>
                         <LogIn className="w-5 h-5 mr-2" />
                         Sign In
                       </>
-                    )}
-                  </Button>
+                )}
+              </Button>
                 </motion.div>
               </motion.form>
 
@@ -254,10 +254,10 @@ const Login = () => {
                   </Link>
                 </p>
               </motion.div>
-            </div>
-          </div>
+                </div>
+              </div>
         </motion.div>
-      </div>
+              </div>
     </div>
   );
 };

@@ -23,7 +23,7 @@ export const authenticateToken = async (req: AuthRequest, res: Response, next: N
     
     // Try to get user with the JWT token
     const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-    
+          
     if (authError || !user) {
       console.warn('❌ Supabase token verification failed:', authError?.message);
       return res.status(401).json({
@@ -33,50 +33,50 @@ export const authenticateToken = async (req: AuthRequest, res: Response, next: N
       });
     }
 
-    console.log('✅ Supabase User Verified:', {
-      id: user.id,
+          console.log('✅ Supabase User Verified:', {
+            id: user.id,
       email: user.email
-    });
+          });
 
     // Get user profile from profiles table
     const { data: profile, error: profileError } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', user.id)
-      .single();
+            .from('profiles')
+            .select('*')
+            .eq('id', user.id)
+            .single();
 
-    if (profileError && profileError.code === 'PGRST116') {
+          if (profileError && profileError.code === 'PGRST116') {
       // Profile doesn't exist, create it
       console.log('🆕 Creating profile for user:', user.email);
-      const { data: newProfile, error: createError } = await supabase
-        .from('profiles')
-        .insert([{
-          id: user.id,
-          email: user.email!,
+            const { data: newProfile, error: createError } = await supabase
+              .from('profiles')
+              .insert([{
+                id: user.id,
+                email: user.email!,
           full_name: user.user_metadata?.full_name || user.user_metadata?.name || user.email?.split('@')[0] || 'User',
           company: user.user_metadata?.company || null,
-          avatar_url: user.user_metadata?.avatar_url || user.user_metadata?.picture || null,
+                avatar_url: user.user_metadata?.avatar_url || user.user_metadata?.picture || null,
           role: 'user', // Default role for new users
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
-        }])
-        .select()
-        .single();
+              }])
+              .select()
+              .single();
 
-      if (createError) {
+            if (createError) {
         console.error('❌ Profile creation error:', createError);
         return res.status(500).json({
           success: false,
           error: 'Profile creation failed',
           message: 'Failed to create user profile'
         });
-      }
+          }
 
       req.user = {
-        userId: user.id,
-        email: user.email || '',
+            userId: user.id,
+            email: user.email || '',
         role: newProfile.role || 'user'
-      };
+          };
     } else if (profileError) {
       console.error('❌ Profile fetch error:', profileError);
       return res.status(500).json({
@@ -90,10 +90,10 @@ export const authenticateToken = async (req: AuthRequest, res: Response, next: N
         email: user.email || '',
         role: profile.role || 'user'
       };
-    }
+        }
 
     console.log('🎉 User Successfully Authenticated:', req.user);
-    return next();
+        return next();
 
   } catch (error) {
     console.error('🚨 Unexpected Authentication Error:', error);

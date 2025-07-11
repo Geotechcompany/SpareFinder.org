@@ -7,7 +7,7 @@ interface User {
   full_name: string;
   company?: string;
   role: string;
-  avatar_url?: string;
+    avatar_url?: string;
   created_at: string;
 }
 
@@ -56,13 +56,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       console.log('🔍 Token found, verifying with backend...');
       
       // Verify token with backend
-      const response = await api.auth.getCurrentUser();
-      
+        const response = await api.auth.getCurrentUser();
+
       if (response.success && response.data?.user) {
         console.log('✅ User authenticated successfully:', response.data.user);
         setUser(response.data.user);
-        setIsAuthenticated(true);
-      } else {
+          setIsAuthenticated(true);
+        } else {
         console.warn('❌ Token verification failed:', response.error);
         // Clear invalid tokens
         tokenStorage.clearAll();
@@ -91,7 +91,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       if (response.success && response.user) {
         console.log('✅ Login successful:', response.user);
         setUser(response.user);
-        setIsAuthenticated(true);
+      setIsAuthenticated(true);
         return { success: true };
       } else {
         console.error('❌ Login failed:', response.error || response.message);
@@ -147,7 +147,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const logout = async (): Promise<void> => {
     try {
       console.log('🚪 Logging out user...');
-      
+        
       // Call backend logout (this will also clear tokens)
       await api.auth.logout();
       

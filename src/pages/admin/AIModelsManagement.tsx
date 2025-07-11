@@ -78,9 +78,27 @@ const AIModelsManagement = () => {
       const response = await api.admin.getAIModels();
       
       if (response.success && response.data?.models) {
-        setModels(response.data.models);
+        // Transform the database models to ensure they have all required fields with defaults
+        const transformedModels: AIModel[] = response.data.models.map((model: any) => ({
+          id: model.id,
+          provider: model.provider || 'Unknown',
+          model_name: model.model_name || 'Unknown Model',
+          api_key: model.api_key || '',
+          status: model.status || 'inactive',
+          usage_count: model.usage_count || 0,
+          cost: model.cost || 0,
+          avg_response_time: model.avg_response_time || 0,
+          success_rate: model.success_rate || 0,
+          last_used_at: model.last_used_at,
+          description: model.description || 'No description available',
+          created_at: model.created_at,
+          updated_at: model.updated_at
+        }));
+        
+        setModels(transformedModels);
       } else {
-        throw new Error('Failed to fetch AI models');
+        console.warn('No AI models found or invalid response structure');
+        setModels([]); // Set empty array instead of throwing error
       }
     } catch (err) {
       console.error('Error fetching AI models:', err);
@@ -135,9 +153,9 @@ const AIModelsManagement = () => {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-900 via-red-900/20 to-gray-900">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-900 via-blue-900/20 to-gray-900">
         <div className="text-center">
-          <Loader2 className="w-10 h-10 animate-spin text-red-600 mx-auto mb-4" />
+          <Loader2 className="w-10 h-10 animate-spin text-blue-600 mx-auto mb-4" />
           <p className="text-gray-400">Loading AI models...</p>
         </div>
       </div>
@@ -146,9 +164,9 @@ const AIModelsManagement = () => {
 
   if (error) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-900 via-red-900/20 to-gray-900">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-900 via-blue-900/20 to-gray-900">
         <div className="text-center">
-          <AlertTriangle className="w-10 h-10 text-red-500 mx-auto mb-4" />
+          <AlertTriangle className="w-10 h-10 text-blue-500 mx-auto mb-4" />
           <p className="text-gray-400 mb-4">{error}</p>
           <Button onClick={fetchAIModels} variant="outline">
             Try Again
@@ -159,11 +177,11 @@ const AIModelsManagement = () => {
   }
 
   return (
-    <div className="min-h-screen flex w-full bg-gradient-to-br from-gray-900 via-red-900/20 to-gray-900 relative overflow-hidden">
+    <div className="min-h-screen flex w-full bg-gradient-to-br from-gray-900 via-blue-900/20 to-gray-900 relative overflow-hidden">
       {/* Animated Background Elements */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <motion.div
-          className="absolute top-1/4 -right-40 w-80 h-80 bg-red-600/15 rounded-full blur-3xl opacity-60"
+          className="absolute top-1/4 -right-40 w-80 h-80 bg-blue-600/15 rounded-full blur-3xl opacity-60"
           animate={{
             scale: [1, 1.3, 1],
             rotate: [0, 180, 360],
@@ -175,7 +193,7 @@ const AIModelsManagement = () => {
           }}
         />
         <motion.div
-          className="absolute -bottom-40 -left-40 w-96 h-96 bg-rose-600/10 rounded-full blur-3xl opacity-40"
+          className="absolute -bottom-40 -left-40 w-96 h-96 bg-purple-600/10 rounded-full blur-3xl opacity-40"
           animate={{
             scale: [1.2, 1, 1.2],
             x: [0, 50, 0],
@@ -205,7 +223,7 @@ const AIModelsManagement = () => {
         >
           {/* Header */}
           <div className="relative">
-            <div className="absolute inset-0 bg-gradient-to-r from-red-600/10 to-rose-600/10 rounded-3xl blur-xl opacity-60" />
+            <div className="absolute inset-0 bg-gradient-to-r from-blue-600/10 to-purple-600/10 rounded-3xl blur-xl opacity-60" />
             <div className="relative bg-black/20 backdrop-blur-xl rounded-3xl p-6 border border-white/10">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div>
@@ -213,19 +231,19 @@ const AIModelsManagement = () => {
                     initial={{ opacity: 0, scale: 0.8 }}
                     animate={{ opacity: 1, scale: 1 }}
                     transition={{ delay: 0.2 }}
-                    className="inline-flex items-center px-4 py-2 bg-gradient-to-r from-red-600/20 to-rose-600/20 rounded-full border border-red-500/30 backdrop-blur-xl mb-4"
+                    className="inline-flex items-center px-4 py-2 bg-gradient-to-r from-blue-600/20 to-purple-600/20 rounded-full border border-blue-500/30 backdrop-blur-xl mb-4"
                   >
                     <motion.div
                       animate={{ rotate: [0, 360] }}
                       transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
                       className="mr-2"
                     >
-                      <BrainCircuit className="w-4 h-4 text-red-400" />
+                      <BrainCircuit className="w-4 h-4 text-blue-400" />
                     </motion.div>
-                    <span className="text-red-300 text-sm font-semibold">AI Models</span>
+                    <span className="text-blue-300 text-sm font-semibold">AI Models</span>
                   </motion.div>
                   <motion.h1 
-                    className="text-3xl lg:text-4xl font-bold bg-gradient-to-r from-white via-red-100 to-rose-100 bg-clip-text text-transparent mb-3"
+                    className="text-3xl lg:text-4xl font-bold bg-gradient-to-r from-white via-blue-100 to-purple-100 bg-clip-text text-transparent mb-3"
                     initial={{ opacity: 0, x: -20 }}
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: 0.3 }}
@@ -250,7 +268,7 @@ const AIModelsManagement = () => {
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
                   >
-                    <Button className="bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-700 hover:to-rose-700 shadow-lg shadow-red-500/25 h-12 px-6">
+                    <Button className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 shadow-lg shadow-blue-500/25 h-12 px-6">
                       <Plus className="w-4 h-4 mr-2" />
                       Add AI Model
                     </Button>

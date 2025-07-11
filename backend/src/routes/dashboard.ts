@@ -143,16 +143,16 @@ router.get(
       return res.json({
         success: true,
         data: {
-          uploads: (data || []).map(upload => ({
-            id: upload.id,
+        uploads: (data || []).map(upload => ({
+          id: upload.id,
             image_name: upload.image_name || upload.part_name || upload.search_term || 'Unknown',
-            created_at: upload.created_at,
+          created_at: upload.created_at,
             confidence_score: upload.confidence_score || 0,
-            part_details: {
+          part_details: {
               part_number: upload.part_number || null,
               manufacturer: upload.manufacturer || null
-            }
-          }))
+          }
+        }))
         }
       });
     } catch (error) {
@@ -206,11 +206,11 @@ router.get('/recent-activities', async (req: AuthRequest, res: Response) => {
     return res.json({
       success: true,
       data: {
-        activities: (data || []).map(activity => ({
-          id: activity.id,
-          resource_type: 'part_search',
+      activities: (data || []).map(activity => ({
+        id: activity.id,
+        resource_type: 'part_search',
           action: activity.is_match ? 'Part Match Found' : 'Search Performed',
-          details: {
+        details: {
             search_term: activity.search_term || 'Unknown',
             search_type: activity.search_type || 'image_upload',
             part_name: activity.part_name || 'Not identified',
@@ -220,9 +220,9 @@ router.get('/recent-activities', async (req: AuthRequest, res: Response) => {
             description: activity.part_name 
               ? `Found ${activity.part_name}${activity.manufacturer ? ` by ${activity.manufacturer}` : ''}`
               : `Searched for ${activity.search_term || 'part'}`
-          },
-          created_at: activity.created_at
-        }))
+        },
+        created_at: activity.created_at
+      }))
       }
     });
   } catch (error) {

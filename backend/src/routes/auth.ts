@@ -749,13 +749,13 @@ router.get('/current-user', authenticateToken, async (req: AuthRequest, res: Res
       success: true,
       data: {
         user: {
-          id: profile.id,
-          email: profile.email,
-          full_name: profile.full_name,
-          company: profile.company,
-          role: profile.role,
-          created_at: profile.created_at,
-          avatar_url: profile.avatar_url
+        id: profile.id,
+        email: profile.email,
+        full_name: profile.full_name,
+        company: profile.company,
+        role: profile.role,
+        created_at: profile.created_at,
+        avatar_url: profile.avatar_url
         }
       }
     });

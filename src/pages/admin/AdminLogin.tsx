@@ -75,7 +75,7 @@ const AdminLogin = () => {
       });
       
       if (response.success && response.data) {
-        const user = response.data;
+        const user = response.data.user;
         console.log('🔐 User Profile:', {
           id: user.id,
           email: user.email,
@@ -179,21 +179,21 @@ const AdminLogin = () => {
         <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: "2s" }} />
         <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-gradient-to-r from-purple-500/5 to-blue-500/5 rounded-full blur-3xl" />
       </div>
-      
+
       {/* Header */}
       <div className="absolute top-6 left-6 z-10">
-        <Link 
-          to="/" 
+      <Link 
+        to="/"
           className="flex items-center gap-3 text-gray-400 hover:text-white transition-all duration-300 group"
         >
           <motion.div
             whileHover={{ x: -2 }}
             className="flex items-center gap-2"
-          >
+      >
             <ArrowLeft className="w-5 h-5" />
             <span>Back to Home</span>
           </motion.div>
-        </Link>
+      </Link>
       </div>
 
       {/* Logo Header */}
@@ -222,9 +222,9 @@ const AdminLogin = () => {
 
       
       <div className="flex items-center justify-center min-h-screen p-6 relative z-10">
-        <motion.div
-          initial={{ opacity: 0, y: 20, scale: 0.95 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
+      <motion.div
+        initial={{ opacity: 0, y: 20, scale: 0.95 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
           transition={{ duration: 0.8, ease: "easeOut" }}
           className="w-full max-w-md"
         >
@@ -241,45 +241,45 @@ const AdminLogin = () => {
                 className="flex justify-center mb-8"
               >
                 <div className="inline-flex items-center px-4 py-2 bg-gradient-to-r from-purple-600/20 to-blue-600/20 rounded-full border border-purple-500/30 backdrop-blur-xl">
-                  <motion.div
+            <motion.div
                     animate={{ rotate: [0, 360] }}
                     transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
                     className="mr-2"
-                  >
+            >
                     <Shield className="w-4 h-4 text-purple-400" />
                   </motion.div>
                   <span className="text-purple-300 text-sm font-semibold">Admin Access</span>
-                </div>
-              </motion.div>
+              </div>
+            </motion.div>
 
               {/* Header */}
-              <motion.div
+            <motion.div
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.6, delay: 0.3 }}
                 className="text-center mb-8"
-              >
+            >
                 <h1 className="text-4xl font-bold text-white mb-3">
                   Admin Console
                 </h1>
                 <p className="text-gray-300 text-lg">
                   Restricted access for administrators only
                 </p>
-              </motion.div>
+            </motion.div>
 
               {/* Error Messages */}
-              {error && (
-                <motion.div
-                  initial={{ opacity: 0, y: -10 }}
-                  animate={{ opacity: 1, y: 0 }}
+            {error && (
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
                   className="mb-6"
-                >
+              >
                   <Alert className="bg-red-500/10 border-red-500/30 text-red-300">
-                    <AlertCircle className="h-4 w-4" />
-                    <AlertDescription>{error}</AlertDescription>
-                  </Alert>
-                </motion.div>
-              )}
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>{error}</AlertDescription>
+                </Alert>
+              </motion.div>
+            )}
 
               {/* Form */}
               <motion.form
@@ -293,99 +293,99 @@ const AdminLogin = () => {
                   <Label htmlFor="email" className="text-gray-200 font-medium">Admin Email</Label>
                   <div className="relative group">
                     <Mail className="absolute left-4 top-4 h-5 w-5 text-gray-400 group-focus-within:text-purple-400 transition-colors" />
-                    <Input
-                      id="email"
-                      type="email"
+                <Input
+                  id="email"
+                  type="email"
                       placeholder="Enter admin email"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
                       className="pl-12 h-14 bg-white/5 border-white/10 text-white placeholder:text-gray-500 focus:border-purple-500/50 focus:ring-2 focus:ring-purple-500/20 rounded-xl backdrop-blur-xl transition-all duration-300"
-                      required
+                  required
                     />
                   </div>
                 </div>
-                
+
                 <div className="space-y-2">
                   <Label htmlFor="password" className="text-gray-200 font-medium">Admin Password</Label>
                   <div className="relative group">
                     <Lock className="absolute left-4 top-4 h-5 w-5 text-gray-400 group-focus-within:text-purple-400 transition-colors" />
-                    <Input
-                      id="password"
+                  <Input
+                    id="password"
                       type={showPassword ? "text" : "password"}
                       placeholder="Enter admin password"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
                       className="pl-12 pr-12 h-14 bg-white/5 border-white/10 text-white placeholder:text-gray-500 focus:border-purple-500/50 focus:ring-2 focus:ring-purple-500/20 rounded-xl backdrop-blur-xl transition-all duration-300"
-                      required
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
                       className="absolute right-4 top-4 text-gray-400 hover:text-purple-400 transition-colors"
-                    >
+                  >
                       {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-                    </button>
+                  </button>
                   </div>
                 </div>
 
-                <motion.div
+              <motion.div
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
-                >
-                  <Button 
-                    type="submit" 
-                    disabled={isLoading}
+              >
+                <Button
+                  type="submit"
+                  disabled={isLoading}
                     className="w-full h-14 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-semibold rounded-xl shadow-lg shadow-purple-500/25 transition-all duration-300"
-                  >
-                    {isLoading ? (
-                      <>
+                >
+                  {isLoading ? (
+                    <>
                         <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                        Authenticating...
-                      </>
-                    ) : (
-                      <>
+                      Authenticating...
+                    </>
+                  ) : (
+                    <>
                         <Shield className="w-5 h-5 mr-2" />
-                        Access Admin Console
-                      </>
-                    )}
-                  </Button>
-                </motion.div>
+                      Access Admin Console
+                    </>
+                  )}
+                </Button>
+              </motion.div>
               </motion.form>
 
-              {/* Security Notice */}
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
+            {/* Security Notice */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
                 transition={{ delay: 0.6, duration: 0.6 }}
                 className="mt-8 p-4 bg-gradient-to-r from-purple-600/10 to-blue-600/10 rounded-xl border border-purple-500/20"
-              >
+            >
                 <div className="flex items-start space-x-3">
                   <Crown className="w-5 h-5 text-purple-400 mt-0.5" />
-                  <div>
+                <div>
                     <p className="text-purple-300 font-medium text-sm">Security Notice</p>
                     <p className="text-gray-400 text-xs mt-1">
-                      This is a restricted admin portal. All access attempts are logged and monitored.
-                    </p>
-                  </div>
+                    This is a restricted admin portal. All access attempts are logged and monitored.
+                  </p>
                 </div>
-              </motion.div>
+              </div>
+            </motion.div>
 
               {/* Footer Link */}
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
                 transition={{ delay: 0.6, duration: 0.6 }}
                 className="mt-8 text-center"
-              >
+        >
                 <p className="text-gray-400">
-                  Need regular user access?{' '}
+            Need regular user access?{' '}
                   <Link 
                     to="/login" 
                     className="text-purple-400 hover:text-purple-300 font-semibold transition-colors duration-300"
                   >
-                    User Login
-                  </Link>
-                </p>
+              User Login
+            </Link>
+          </p>
               </motion.div>
             </div>
           </div>

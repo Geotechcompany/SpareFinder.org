@@ -135,106 +135,106 @@ const Dashboard = () => {
       // Handle stats response
       if (statsResponse.status === 'fulfilled' && statsResponse.value.success) {
         const data = statsResponse.value.data;
-        setStats({
+          setStats({
           totalUploads: data.totalUploads || 0,
           successfulUploads: data.successfulUploads || 0,
           avgConfidence: data.avgConfidence || 0,
           avgProcessTime: data.avgProcessTime || 0
-        });
-      } else {
+          });
+        } else {
         console.warn('❌ Failed to fetch dashboard stats:', statsResponse);
-        setStats({
-          totalUploads: 0,
-          successfulUploads: 0,
-          avgConfidence: 0,
-          avgProcessTime: 0
-        });
-      }
+          setStats({
+            totalUploads: 0,
+            successfulUploads: 0,
+            avgConfidence: 0,
+            avgProcessTime: 0
+          });
+        }
 
       // Handle uploads response
       if (uploadsResponse.status === 'fulfilled' && uploadsResponse.value.success) {
         const uploadsData = uploadsResponse.value.data?.uploads || [];
         setRecentUploads(uploadsData.map(upload => ({
-          id: upload.id,
+            id: upload.id,
           name: upload.image_name || 'Unknown',
-          date: format(new Date(upload.created_at), 'PPp'),
-          status: 'completed',
+            date: format(new Date(upload.created_at), 'PPp'),
+            status: 'completed',
           confidence: Math.round((upload.confidence_score || 0) * 100)
-        })));
-      } else {
+          })));
+        } else {
         console.warn('❌ Failed to fetch recent uploads:', uploadsResponse);
-        setRecentUploads([]);
-      }
+          setRecentUploads([]);
+        }
 
       // Handle activities response
       if (activitiesResponse.status === 'fulfilled' && activitiesResponse.value.success) {
         const activitiesData = activitiesResponse.value.data?.activities || [];
         setRecentActivities(activitiesData.map(activity => ({
-          id: activity.id,
-          type: activity.resource_type,
-          title: activity.action,
-          description: activity.details.description,
-          time: format(new Date(activity.created_at), 'PPp'),
-          confidence: activity.details.confidence ?? null,
-          status: activity.details.status
-        })));
-      } else {
+            id: activity.id,
+            type: activity.resource_type,
+            title: activity.action,
+            description: activity.details.description,
+            time: format(new Date(activity.created_at), 'PPp'),
+            confidence: activity.details.confidence ?? null,
+            status: activity.details.status
+          })));
+        } else {
         console.warn('❌ Failed to fetch recent activities:', activitiesResponse);
-        setRecentActivities([]);
-      }
+          setRecentActivities([]);
+        }
 
       // Handle performance metrics response
       if (metricsResponse.status === 'fulfilled' && metricsResponse.value.success) {
         const data = metricsResponse.value.data;
-        setPerformanceMetrics([
-          {
-            label: 'AI Model Accuracy',
+          setPerformanceMetrics([
+            {
+              label: 'AI Model Accuracy',
             value: `${data.modelAccuracy?.toFixed(1) || 0}%`,
             change: `${data.accuracyChange > 0 ? '+' : ''}${data.accuracyChange?.toFixed(1) || 0}%`,
-            icon: Cpu,
-            color: 'from-green-600 to-emerald-600'
-          },
-          {
-            label: 'Total Searches',
+              icon: Cpu,
+              color: 'from-green-600 to-emerald-600'
+            },
+            {
+              label: 'Total Searches',
             value: `${data.totalSearches || 0}`,
             change: `${data.searchesGrowth > 0 ? '+' : ''}${data.searchesGrowth?.toFixed(1) || 0}%`,
-            icon: Database,
-            color: 'from-blue-600 to-cyan-600'
-          },
-          {
-            label: 'Response Time',
+              icon: Database,
+              color: 'from-blue-600 to-cyan-600'
+            },
+            {
+              label: 'Response Time',
             value: `${data.avgResponseTime || 0}ms`,
             change: `${data.responseTimeChange < 0 ? '' : '+'}${data.responseTimeChange || 0}ms`,
-            icon: Activity,
-            color: 'from-purple-600 to-violet-600'
-          }
-        ]);
-      } else {
+              icon: Activity,
+              color: 'from-purple-600 to-violet-600'
+            }
+          ]);
+        } else {
         console.warn('❌ Failed to fetch performance metrics:', metricsResponse);
-        setPerformanceMetrics([
-          {
-            label: 'AI Model Accuracy',
-            value: '0%',
-            change: '0%',
-            icon: Cpu,
-            color: 'from-green-600 to-emerald-600'
-          },
-          {
-            label: 'Database Coverage',
-            value: '0',
-            change: '0',
-            icon: Database,
-            color: 'from-blue-600 to-cyan-600'
-          },
-          {
-            label: 'Response Time',
-            value: '0ms',
-            change: '0ms',
-            icon: Activity,
-            color: 'from-purple-600 to-violet-600'
-          }
-        ]);
-      }
+          setPerformanceMetrics([
+            {
+              label: 'AI Model Accuracy',
+              value: '0%',
+              change: '0%',
+              icon: Cpu,
+              color: 'from-green-600 to-emerald-600'
+            },
+            {
+              label: 'Database Coverage',
+              value: '0',
+              change: '0',
+              icon: Database,
+              color: 'from-blue-600 to-cyan-600'
+            },
+            {
+              label: 'Response Time',
+              value: '0ms',
+              change: '0ms',
+              icon: Activity,
+              color: 'from-purple-600 to-violet-600'
+            }
+          ]);
+        }
 
       // Check if any request failed with auth error
       const authErrors = [statsResponse, uploadsResponse, activitiesResponse, metricsResponse].filter(
@@ -244,11 +244,11 @@ const Dashboard = () => {
 
       if (authErrors.length > 0) {
         console.log('🔒 Authentication errors detected, logging out...');
-        toast({
-          title: 'Session Expired',
-          description: 'Your session has expired. Please log in again.',
-          variant: 'destructive'
-        });
+          toast({
+            title: 'Session Expired',
+            description: 'Your session has expired. Please log in again.',
+            variant: 'destructive'
+          });
         await logout();
         return;
       }
@@ -258,8 +258,8 @@ const Dashboard = () => {
     } catch (error: any) {
       if (error.message === 'Request aborted') {
         console.log('🔄 Request was aborted');
-        return;
-      }
+          return;
+        }
 
       console.error('❌ Error in fetchDashboardData:', error);
       
@@ -277,11 +277,11 @@ const Dashboard = () => {
 
       // Handle other errors
       setError(error.message || 'Failed to load dashboard data');
-      toast({
-        title: 'Error',
-        description: error.message || 'Failed to load dashboard data',
-        variant: 'destructive'
-      });
+        toast({
+          title: 'Error',
+          description: error.message || 'Failed to load dashboard data',
+          variant: 'destructive'
+        });
     } finally {
       isFetchingRef.current = false;
       setIsDataLoading(false);
@@ -299,14 +299,14 @@ const Dashboard = () => {
     // Reset initialization flag when user changes
     if (!isAuthenticated || !user?.id) {
       isInitializedRef.current = false;
-      setStats({
-        totalUploads: 0,
-        successfulUploads: 0,
-        avgConfidence: 0,
-        avgProcessTime: 0
-      });
-      setRecentUploads([]);
-      setRecentActivities([]);
+        setStats({
+          totalUploads: 0,
+          successfulUploads: 0,
+          avgConfidence: 0,
+          avgProcessTime: 0
+        });
+        setRecentUploads([]);
+        setRecentActivities([]);
       setError(null);
     }
   }, [isAuthenticated, user?.id, authLoading, fetchDashboardData]);
@@ -826,9 +826,9 @@ const Dashboard = () => {
                         <div className="flex items-center justify-between">
                           <p className="text-white text-sm font-medium truncate">{activity.title}</p>
                           {activity.confidence !== null && (
-                            <Badge variant="secondary" className="bg-green-600/20 text-green-400 border-green-500/30 text-xs">
-                              {activity.confidence}%
-                            </Badge>
+                          <Badge variant="secondary" className="bg-green-600/20 text-green-400 border-green-500/30 text-xs">
+                            {activity.confidence}%
+                          </Badge>
                           )}
                         </div>
                         <p className="text-gray-400 text-xs mt-1">{activity.description}</p>

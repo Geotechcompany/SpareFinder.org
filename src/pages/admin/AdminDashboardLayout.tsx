@@ -129,15 +129,15 @@ const AdminDashboardLayout = () => {
 
       const isValid = await checkAuthentication();
       if (isValid) {
-        fetchAdminData();
+        fetchAdminData(true); // Skip auth check since we just validated
       }
     };
 
     initializeAdmin();
   }, [authLoading]);
 
-  const fetchAdminData = async () => {
-    if (!isAuthenticated) {
+  const fetchAdminData = async (skipAuthCheck = false) => {
+    if (!skipAuthCheck && !isAuthenticated) {
       console.log('⏳ Skipping admin data fetch - not authenticated');
       return;
     }
@@ -213,11 +213,15 @@ const AdminDashboardLayout = () => {
       return;
     }
 
-    fetchAdminData();
+    fetchAdminData(false); // Use normal auth check for manual refresh
     toast({
       title: "Data Refreshed",
       description: "Admin dashboard data has been updated.",
     });
+  };
+
+  const handleTryAgain = () => {
+    fetchAdminData(false);
   };
 
   const handleLogout = async () => {
@@ -254,7 +258,7 @@ const AdminDashboardLayout = () => {
           <AlertCircle className="w-10 h-10 text-purple-500 mx-auto mb-4" />
           <p className="text-gray-400 mb-4">{error}</p>
           <div className="space-x-2">
-            <Button onClick={fetchAdminData} variant="outline">
+            <Button onClick={handleTryAgain} variant="outline">
               Try Again
             </Button>
             <Button onClick={handleLogout} variant="ghost">

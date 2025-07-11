@@ -58,11 +58,11 @@ const Register = () => {
     if (formData.password !== formData.confirmPassword) {
       newErrors.push('Passwords do not match');
     }
-    
+
     if (!validatePassword(formData.password)) {
       newErrors.push('Password does not meet security requirements');
     }
-    
+
     if (newErrors.length > 0) {
       setErrors(newErrors);
       return;
@@ -79,18 +79,18 @@ const Register = () => {
       });
       
       if (result.success) {
-        // Clear form data
-        setFormData({
-          name: '',
-          email: '',
-          company: '',
-          password: '',
-          confirmPassword: ''
-        });
-        
+      // Clear form data
+      setFormData({
+        name: '',
+        email: '',
+        company: '',
+        password: '',
+        confirmPassword: ''
+      });
+      
         // Show success message
         toast.success('Registration successful! Welcome to SpareFinder!');
-        
+      
         // Redirect to dashboard
         navigate('/dashboard');
       } else {
