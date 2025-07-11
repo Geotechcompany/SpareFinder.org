@@ -2,7 +2,7 @@ import { Router, Request, Response } from 'express';
 import { createClient } from '@supabase/supabase-js';
 import dotenv from 'dotenv';
 import path from 'path';
-import { z } from 'zod';
+
 import winston from 'winston';
 import { authenticateToken } from '../middleware/auth';  // Import authentication middleware
 import { AuthRequest } from '../types/auth';  // Import the correct auth request type
@@ -20,15 +20,9 @@ const logger = winston.createLogger({
   ]
 });
 
-// Performance Metrics Result Type with Zod
-const PerformanceMetricsSchema = z.object({
-  total_searches: z.number().int().min(0),
-  avg_confidence: z.number().min(0).max(100),
-  avg_process_time: z.number().min(0),
-  match_rate: z.number().min(0).max(1)
-});
 
-type PerformanceMetricsResult = z.infer<typeof PerformanceMetricsSchema>;
+
+
 
 // Environment Variable Validation
 const validateEnvVars = () => {
