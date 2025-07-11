@@ -156,10 +156,10 @@ const Dashboard = () => {
         const uploadsData = uploadsResponse.value.data?.uploads || [];
         setRecentUploads(uploadsData.map(upload => ({
           id: upload.id,
-          name: upload.image_name,
+          name: upload.image_name || 'Unknown',
           date: format(new Date(upload.created_at), 'PPp'),
           status: 'completed',
-          confidence: Math.round(upload.confidence_score * 100)
+          confidence: Math.round((upload.confidence_score || 0) * 100)
         })));
       } else {
         console.warn('❌ Failed to fetch recent uploads:', uploadsResponse);
@@ -670,32 +670,32 @@ const Dashboard = () => {
             {[
               { 
                 title: 'Total Uploads', 
-                value: stats.totalUploads.toString(), 
-                change: '+12%', 
+                value: stats.totalUploads?.toString() || '0', 
+                change: stats.totalUploads > 0 ? '+12%' : '0%', 
                 icon: Upload, 
                 color: 'from-purple-600 to-blue-600',
                 bgColor: 'from-purple-600/20 to-blue-600/20'
               },
               { 
                 title: 'Successful IDs', 
-                value: stats.successfulUploads.toString(), 
-                change: `${((stats.successfulUploads / stats.totalUploads) * 100).toFixed(1)}%`, 
+                value: stats.successfulUploads?.toString() || '0', 
+                change: stats.totalUploads > 0 ? `${((stats.successfulUploads / stats.totalUploads) * 100).toFixed(1)}%` : '0%', 
                 icon: CheckCircle, 
                 color: 'from-green-600 to-emerald-600',
                 bgColor: 'from-green-600/20 to-emerald-600/20'
               },
               { 
                 title: 'Avg Confidence', 
-                value: `${stats.avgConfidence}%`, 
-                change: '+2.1%', 
+                value: `${stats.avgConfidence || 0}%`, 
+                change: stats.avgConfidence > 0 ? '+2.1%' : '0%', 
                 icon: TrendingUp, 
                 color: 'from-blue-600 to-cyan-600',
                 bgColor: 'from-blue-600/20 to-cyan-600/20'
               },
               { 
                 title: 'Processing Time', 
-                value: `${stats.avgProcessTime}s`, 
-                change: '-15%', 
+                value: `${stats.avgProcessTime || 0}ms`, 
+                change: stats.avgProcessTime > 0 ? '-15%' : '0%', 
                 icon: Clock, 
                 color: 'from-orange-600 to-red-600',
                 bgColor: 'from-orange-600/20 to-red-600/20'
@@ -800,7 +800,14 @@ const Dashboard = () => {
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-3 sm:space-y-4 p-4 sm:p-6">
-                  {recentActivities.map((activity, index) => (
+                  {recentActivities.length === 0 ? (
+                    <div className="text-center py-8">
+                      <Activity className="w-12 h-12 text-gray-500 mx-auto mb-4" />
+                      <p className="text-gray-400 text-sm">No recent activities</p>
+                      <p className="text-gray-500 text-xs mt-1">Upload some parts to see activity here</p>
+                    </div>
+                  ) : (
+                    recentActivities.map((activity, index) => (
                     <motion.div
                       key={activity.id}
                       initial={{ opacity: 0, x: -20 }}
@@ -818,15 +825,18 @@ const Dashboard = () => {
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between">
                           <p className="text-white text-sm font-medium truncate">{activity.title}</p>
-                          <Badge variant="secondary" className="bg-green-600/20 text-green-400 border-green-500/30 text-xs">
-                            {activity.confidence}%
-                          </Badge>
+                          {activity.confidence !== null && (
+                            <Badge variant="secondary" className="bg-green-600/20 text-green-400 border-green-500/30 text-xs">
+                              {activity.confidence}%
+                            </Badge>
+                          )}
                         </div>
                         <p className="text-gray-400 text-xs mt-1">{activity.description}</p>
                         <p className="text-gray-500 text-xs mt-1">{activity.time}</p>
                       </div>
                     </motion.div>
-                  ))}
+                    ))
+                  )}
                 </CardContent>
               </Card>
             </motion.div>

@@ -47,15 +47,18 @@ export const authenticateToken = async (req: AuthRequest, res: Response, next: N
 
     if (profileError && profileError.code === 'PGRST116') {
       // Profile doesn't exist, create it
-      console.log('🆕 Creating profile for user');
+      console.log('🆕 Creating profile for user:', user.email);
       const { data: newProfile, error: createError } = await supabase
         .from('profiles')
         .insert([{
           id: user.id,
           email: user.email!,
           full_name: user.user_metadata?.full_name || user.user_metadata?.name || user.email?.split('@')[0] || 'User',
+          company: user.user_metadata?.company || null,
           avatar_url: user.user_metadata?.avatar_url || user.user_metadata?.picture || null,
-          role: 'user'
+          role: 'user', // Default role for new users
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
         }])
         .select()
         .single();

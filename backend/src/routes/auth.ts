@@ -150,7 +150,10 @@ router.post('/register', registerValidation, async (req: Request, res: Response)
         email,
         full_name: userName,
         company: company || null,
-        role: 'user'
+        role: 'user', // Default role for new registrations
+        avatar_url: null,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
       })
       .select()
       .single();
@@ -259,8 +262,12 @@ router.post('/login', loginValidation, async (req: Request, res: Response) => {
         .insert({
           id: authData.user.id,
           email: authData.user.email,
-          full_name: authData.user.user_metadata?.full_name || 'User',
-          role: 'user'
+          full_name: authData.user.user_metadata?.full_name || authData.user.user_metadata?.name || authData.user.email?.split('@')[0] || 'User',
+          company: authData.user.user_metadata?.company || null,
+          avatar_url: authData.user.user_metadata?.avatar_url || authData.user.user_metadata?.picture || null,
+          role: 'user', // Default role for new profiles
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
         })
         .select()
         .single();
