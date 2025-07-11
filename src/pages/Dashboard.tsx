@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -26,23 +26,22 @@ import { useAuth } from '@/contexts/AuthContext';
 import { format } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
-import { 
-  isDashboardStatsResponse, 
-  isRecentUploadResponse, 
-  isRecentActivityResponse, 
-  isPerformanceMetricsResponse,
-  extractData
-} from '@/lib/api';
-import { dashboardApi } from '@/lib/api';
+import { dashboardApi, tokenStorage } from '@/lib/api';
 import { useToast } from '@/components/ui/use-toast';
 import DashboardSkeleton from '@/components/DashboardSkeleton';
 
 const Dashboard = () => {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const { user, isLoading: authLoading, logout } = useAuth();
+  const { user, isLoading: authLoading, logout, isAuthenticated } = useAuth();
   const navigate = useNavigate();
   const [isDataLoading, setIsDataLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  
+  // Use refs to prevent multiple simultaneous requests
+  const isInitializedRef = useRef(false);
+  const isFetchingRef = useRef(false);
+  const abortControllerRef = useRef<AbortController | null>(null);
   
   // State for dashboard data
   const [stats, setStats] = useState({
@@ -80,29 +79,70 @@ const Dashboard = () => {
 
   const { toast } = useToast();
 
-  useEffect(() => {
-    const fetchDashboardData = async () => {
-      // Only attempt to fetch if user is authenticated
-      if (!user?.id || !localStorage.getItem('token')) {
-        setIsDataLoading(false);
+  // Check if user has valid token and is authenticated
+  const hasValidToken = useCallback(() => {
+    const token = tokenStorage.getToken();
+    return !!token && isAuthenticated && !!user?.id;
+  }, [isAuthenticated, user?.id]);
+
+  const fetchDashboardData = useCallback(async () => {
+    // Prevent multiple simultaneous requests
+    if (isFetchingRef.current || !hasValidToken()) {
+      return;
+    }
+
+    // Cancel any existing request
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+
+    // Create new abort controller
+    abortControllerRef.current = new AbortController();
+    const signal = abortControllerRef.current.signal;
+
+    try {
+      isFetchingRef.current = true;
+      setIsDataLoading(true);
+      setError(null);
+
+      console.log('🔄 Starting dashboard data fetch for user:', user?.id);
+
+      // Fetch all data in parallel with proper error handling
+      const [statsResponse, uploadsResponse, activitiesResponse, metricsResponse] = await Promise.allSettled([
+        dashboardApi.getStats().catch(err => {
+          if (signal.aborted) throw new Error('Request aborted');
+          throw err;
+        }),
+        dashboardApi.getRecentUploads().catch(err => {
+          if (signal.aborted) throw new Error('Request aborted');
+          throw err;
+        }),
+        dashboardApi.getRecentActivities().catch(err => {
+          if (signal.aborted) throw new Error('Request aborted');
+          throw err;
+        }),
+        dashboardApi.getPerformanceMetrics().catch(err => {
+          if (signal.aborted) throw new Error('Request aborted');
+          throw err;
+        })
+      ]);
+
+      // Check if request was aborted
+      if (signal.aborted) {
         return;
       }
 
-      try {
-        setIsDataLoading(true);
-        
-        // Fetch dashboard stats with error handling
-        const statsResponse = await dashboardApi.getStats();
-        if (statsResponse.success && statsResponse.data) {
+      // Handle stats response
+      if (statsResponse.status === 'fulfilled' && statsResponse.value.success) {
+        const data = statsResponse.value.data;
           setStats({
-            totalUploads: statsResponse.data.totalUploads,
-            successfulUploads: statsResponse.data.successfulUploads,
-            avgConfidence: statsResponse.data.avgConfidence,
-            avgProcessTime: statsResponse.data.avgProcessTime
+          totalUploads: data.totalUploads || 0,
+          successfulUploads: data.successfulUploads || 0,
+          avgConfidence: data.avgConfidence || 0,
+          avgProcessTime: data.avgProcessTime || 0
           });
         } else {
-          // Log the error and set default/empty stats
-          console.warn('Dashboard stats fetch returned unsuccessful response', statsResponse);
+        console.warn('❌ Failed to fetch dashboard stats:', statsResponse);
           setStats({
             totalUploads: 0,
             successfulUploads: 0,
@@ -111,25 +151,25 @@ const Dashboard = () => {
           });
         }
 
-        // Fetch recent uploads
-        const uploadsResponse = await dashboardApi.getRecentUploads();
-        if (uploadsResponse.success && uploadsResponse.data) {
-          setRecentUploads(uploadsResponse.data.uploads.map(upload => ({
+      // Handle uploads response
+      if (uploadsResponse.status === 'fulfilled' && uploadsResponse.value.success) {
+        const uploadsData = uploadsResponse.value.data?.uploads || [];
+        setRecentUploads(uploadsData.map(upload => ({
             id: upload.id,
-            name: upload.image_name,
+          name: upload.image_name || 'Unknown',
             date: format(new Date(upload.created_at), 'PPp'),
             status: 'completed',
-            confidence: Math.round(upload.confidence_score * 100)
+          confidence: Math.round((upload.confidence_score || 0) * 100)
           })));
         } else {
-          console.warn('Recent uploads fetch returned unsuccessful response', uploadsResponse);
+        console.warn('❌ Failed to fetch recent uploads:', uploadsResponse);
           setRecentUploads([]);
         }
 
-        // Fetch recent activities
-        const activitiesResponse = await dashboardApi.getRecentActivities();
-        if (activitiesResponse.success && activitiesResponse.data) {
-          setRecentActivities(activitiesResponse.data.activities.map(activity => ({
+      // Handle activities response
+      if (activitiesResponse.status === 'fulfilled' && activitiesResponse.value.success) {
+        const activitiesData = activitiesResponse.value.data?.activities || [];
+        setRecentActivities(activitiesData.map(activity => ({
             id: activity.id,
             type: activity.resource_type,
             title: activity.action,
@@ -139,38 +179,38 @@ const Dashboard = () => {
             status: activity.details.status
           })));
         } else {
-          console.warn('Recent activities fetch returned unsuccessful response', activitiesResponse);
+        console.warn('❌ Failed to fetch recent activities:', activitiesResponse);
           setRecentActivities([]);
         }
 
-        // Fetch performance metrics
-        const metricsResponse = await dashboardApi.getPerformanceMetrics();
-        if (metricsResponse.success && metricsResponse.data) {
+      // Handle performance metrics response
+      if (metricsResponse.status === 'fulfilled' && metricsResponse.value.success) {
+        const data = metricsResponse.value.data;
           setPerformanceMetrics([
             {
               label: 'AI Model Accuracy',
-              value: `${metricsResponse.data.modelAccuracy.toFixed(1)}%`,
-              change: `${metricsResponse.data.accuracyChange > 0 ? '+' : ''}${metricsResponse.data.accuracyChange.toFixed(1)}%`,
+            value: `${data.modelAccuracy?.toFixed(1) || 0}%`,
+            change: `${data.accuracyChange > 0 ? '+' : ''}${data.accuracyChange?.toFixed(1) || 0}%`,
               icon: Cpu,
               color: 'from-green-600 to-emerald-600'
             },
             {
               label: 'Total Searches',
-              value: `${metricsResponse.data.totalSearches}`,
-              change: `${metricsResponse.data.searchesGrowth > 0 ? '+' : ''}${metricsResponse.data.searchesGrowth.toFixed(1)}%`,
+            value: `${data.totalSearches || 0}`,
+            change: `${data.searchesGrowth > 0 ? '+' : ''}${data.searchesGrowth?.toFixed(1) || 0}%`,
               icon: Database,
               color: 'from-blue-600 to-cyan-600'
             },
             {
               label: 'Response Time',
-              value: `${metricsResponse.data.avgResponseTime}ms`,
-              change: `${metricsResponse.data.responseTimeChange < 0 ? '' : '+'}${metricsResponse.data.responseTimeChange}ms`,
+            value: `${data.avgResponseTime || 0}ms`,
+            change: `${data.responseTimeChange < 0 ? '' : '+'}${data.responseTimeChange || 0}ms`,
               icon: Activity,
               color: 'from-purple-600 to-violet-600'
             }
           ]);
         } else {
-          console.warn('Performance metrics fetch returned unsuccessful response', metricsResponse);
+        console.warn('❌ Failed to fetch performance metrics:', metricsResponse);
           setPerformanceMetrics([
             {
               label: 'AI Model Accuracy',
@@ -196,31 +236,69 @@ const Dashboard = () => {
           ]);
         }
 
-      } catch (error: any) {
-        console.error('Dashboard data fetch error:', error);
-        
-        // Specific handling for authentication errors
-        if (error.response?.status === 401 || error.response?.status === 403) {
+      // Check if any request failed with auth error
+      const authErrors = [statsResponse, uploadsResponse, activitiesResponse, metricsResponse].filter(
+        response => response.status === 'rejected' && 
+        response.reason?.response?.status === 401
+      );
+
+      if (authErrors.length > 0) {
+        console.log('🔒 Authentication errors detected, logging out...');
           toast({
             title: 'Session Expired',
             description: 'Your session has expired. Please log in again.',
             variant: 'destructive'
           });
-          
-          // Clear authentication state and redirect to login
-          logout();
-          navigate('/login');
+        await logout();
+        return;
+      }
+
+      console.log('✅ Dashboard data fetch completed successfully');
+
+    } catch (error: any) {
+      if (error.message === 'Request aborted') {
+        console.log('🔄 Request was aborted');
           return;
         }
 
-        // Generic error handling
+      console.error('❌ Error in fetchDashboardData:', error);
+      
+      // Handle authentication errors
+      if (error.response?.status === 401) {
+        console.log('🔒 Authentication error, logging out...');
+        toast({
+          title: 'Session Expired',
+          description: 'Your session has expired. Please log in again.',
+          variant: 'destructive'
+        });
+        await logout();
+        return;
+      }
+
+      // Handle other errors
+      setError(error.message || 'Failed to load dashboard data');
         toast({
           title: 'Error',
           description: error.message || 'Failed to load dashboard data',
           variant: 'destructive'
         });
+    } finally {
+      isFetchingRef.current = false;
+      setIsDataLoading(false);
+    }
+  }, [hasValidToken, user?.id, toast, logout]);
 
-        // Set default/empty states in case of error
+  // Initialize data fetch - only run once when component mounts and user is authenticated
+  useEffect(() => {
+    if (!authLoading && isAuthenticated && user?.id && !isInitializedRef.current) {
+      console.log('📊 Initializing Dashboard data fetch for user:', user.id);
+      isInitializedRef.current = true;
+      fetchDashboardData();
+    }
+
+    // Reset initialization flag when user changes
+    if (!isAuthenticated || !user?.id) {
+      isInitializedRef.current = false;
         setStats({
           totalUploads: 0,
           successfulUploads: 0,
@@ -229,36 +307,18 @@ const Dashboard = () => {
         });
         setRecentUploads([]);
         setRecentActivities([]);
-        setPerformanceMetrics([
-          {
-            label: 'AI Model Accuracy',
-            value: '0%',
-            change: '0%',
-            icon: Cpu,
-            color: 'from-green-600 to-emerald-600'
-          },
-          {
-            label: 'Database Coverage',
-            value: '0',
-            change: '0',
-            icon: Database,
-            color: 'from-blue-600 to-cyan-600'
-          },
-          {
-            label: 'Response Time',
-            value: '0ms',
-            change: '0ms',
-            icon: Activity,
-            color: 'from-purple-600 to-violet-600'
-          }
-        ]);
-      } finally {
-        setIsDataLoading(false);
+      setError(null);
+    }
+  }, [isAuthenticated, user?.id, authLoading, fetchDashboardData]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
       }
     };
-
-    fetchDashboardData();
-  }, [user?.id, logout, navigate, toast]);
+  }, []);
 
   const handleToggleSidebar = () => {
     setIsCollapsed(!isCollapsed);
@@ -266,6 +326,24 @@ const Dashboard = () => {
 
   const handleToggleMobileMenu = () => {
     setIsMobileMenuOpen(!isMobileMenuOpen);
+  };
+
+  const handleRefreshData = () => {
+    if (!hasValidToken()) {
+      toast({
+        title: 'Authentication Required',
+        description: 'Please log in to refresh data.',
+        variant: 'destructive'
+      });
+      return;
+    }
+    
+    isInitializedRef.current = false; // Reset initialization flag
+    fetchDashboardData();
+    toast({
+      title: 'Data Refreshed',
+      description: 'Dashboard data has been updated.',
+    });
   };
 
   if (isDataLoading) {
@@ -541,7 +619,7 @@ const Dashboard = () => {
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: 0.2 }}
                   >
-                    Welcome back, {user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'User'}
+                    Welcome back, {user?.full_name || user?.email?.split('@')[0] || 'User'}
                   </motion.h1>
                   <motion.p 
                     className="text-sm sm:text-base text-gray-400 mt-2"
@@ -563,6 +641,20 @@ const Dashboard = () => {
                     whileTap={{ scale: 0.95 }}
                     className="w-full sm:w-auto"
                   >
+                    <Button 
+                      onClick={handleRefreshData}
+                      variant="outline"
+                      className="w-full sm:w-auto bg-black/20 border-white/10 text-white hover:bg-white/10 mr-2"
+                    >
+                      <Loader2 className="w-4 h-4 mr-2" />
+                      Refresh Data
+                    </Button>
+                  </motion.div>
+                  <motion.div
+                    whileHover={{ scale: 1.05, y: -2 }}
+                    whileTap={{ scale: 0.95 }}
+                    className="w-full sm:w-auto"
+                  >
                     <Button className="w-full sm:w-auto bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 shadow-lg shadow-purple-500/25">
                       <Upload className="w-4 h-4 mr-2" />
                       New Upload
@@ -578,32 +670,32 @@ const Dashboard = () => {
             {[
               { 
                 title: 'Total Uploads', 
-                value: stats.totalUploads.toString(), 
-                change: '+12%', 
+                value: stats.totalUploads?.toString() || '0', 
+                change: stats.totalUploads > 0 ? '+12%' : '0%', 
                 icon: Upload, 
                 color: 'from-purple-600 to-blue-600',
                 bgColor: 'from-purple-600/20 to-blue-600/20'
               },
               { 
                 title: 'Successful IDs', 
-                value: stats.successfulUploads.toString(), 
-                change: `${((stats.successfulUploads / stats.totalUploads) * 100).toFixed(1)}%`, 
+                value: stats.successfulUploads?.toString() || '0', 
+                change: stats.totalUploads > 0 ? `${((stats.successfulUploads / stats.totalUploads) * 100).toFixed(1)}%` : '0%', 
                 icon: CheckCircle, 
                 color: 'from-green-600 to-emerald-600',
                 bgColor: 'from-green-600/20 to-emerald-600/20'
               },
               { 
                 title: 'Avg Confidence', 
-                value: `${stats.avgConfidence}%`, 
-                change: '+2.1%', 
+                value: `${stats.avgConfidence || 0}%`, 
+                change: stats.avgConfidence > 0 ? '+2.1%' : '0%', 
                 icon: TrendingUp, 
                 color: 'from-blue-600 to-cyan-600',
                 bgColor: 'from-blue-600/20 to-cyan-600/20'
               },
               { 
                 title: 'Processing Time', 
-                value: `${stats.avgProcessTime}s`, 
-                change: '-15%', 
+                value: `${stats.avgProcessTime || 0}ms`, 
+                change: stats.avgProcessTime > 0 ? '-15%' : '0%', 
                 icon: Clock, 
                 color: 'from-orange-600 to-red-600',
                 bgColor: 'from-orange-600/20 to-red-600/20'
@@ -708,7 +800,14 @@ const Dashboard = () => {
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-3 sm:space-y-4 p-4 sm:p-6">
-                  {recentActivities.map((activity, index) => (
+                  {recentActivities.length === 0 ? (
+                    <div className="text-center py-8">
+                      <Activity className="w-12 h-12 text-gray-500 mx-auto mb-4" />
+                      <p className="text-gray-400 text-sm">No recent activities</p>
+                      <p className="text-gray-500 text-xs mt-1">Upload some parts to see activity here</p>
+                    </div>
+                  ) : (
+                    recentActivities.map((activity, index) => (
                     <motion.div
                       key={activity.id}
                       initial={{ opacity: 0, x: -20 }}
@@ -726,15 +825,18 @@ const Dashboard = () => {
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between">
                           <p className="text-white text-sm font-medium truncate">{activity.title}</p>
+                          {activity.confidence !== null && (
                           <Badge variant="secondary" className="bg-green-600/20 text-green-400 border-green-500/30 text-xs">
                             {activity.confidence}%
                           </Badge>
+                          )}
                         </div>
                         <p className="text-gray-400 text-xs mt-1">{activity.description}</p>
                         <p className="text-gray-500 text-xs mt-1">{activity.time}</p>
                       </div>
                     </motion.div>
-                  ))}
+                    ))
+                  )}
                 </CardContent>
               </Card>
             </motion.div>
@@ -756,10 +858,10 @@ const Dashboard = () => {
                 </CardHeader>
                 <CardContent className="space-y-2 sm:space-y-3 p-4 sm:p-6">
                   {[
-                    { label: 'Upload New Part', icon: Upload, href: '/dashboard/upload', color: 'from-purple-600 to-blue-600' },
-                    { label: 'View History', icon: FileText, href: '/dashboard/history', color: 'from-blue-600 to-cyan-600' },
-                    { label: 'Download Report', icon: Download, href: '#', color: 'from-green-600 to-emerald-600' },
-                    { label: 'View Analytics', icon: Eye, href: '#', color: 'from-orange-600 to-red-600' }
+                    { label: 'Upload New Part', icon: Upload, href: '/upload', color: 'from-purple-600 to-blue-600' },
+                    { label: 'View History', icon: FileText, href: '/history', color: 'from-blue-600 to-cyan-600' },
+                    { label: 'View Profile', icon: Eye, href: '/profile', color: 'from-green-600 to-emerald-600' },
+                    { label: 'Settings', icon: Download, href: '/settings', color: 'from-orange-600 to-red-600' }
                   ].map((action, index) => (
                     <motion.div
                       key={action.label}
@@ -771,6 +873,7 @@ const Dashboard = () => {
                     >
                       <Button
                         variant="ghost"
+                        onClick={() => navigate(action.href)}
                         className="w-full justify-start h-12 text-gray-300 hover:text-white hover:bg-white/5 group"
                       >
                         <div className={`p-2 rounded-lg bg-gradient-to-r ${action.color} mr-3 group-hover:scale-110 transition-transform`}>

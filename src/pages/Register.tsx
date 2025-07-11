@@ -4,17 +4,19 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { Eye, EyeOff, Mail, Lock, User, Chrome, Zap, ArrowLeft, Sparkles, Building, Github, Loader } from 'lucide-react';
+import { Eye, EyeOff, Mail, Lock, User, Zap, ArrowLeft, Sparkles, Building, Loader, AlertCircle, CheckCircle, X } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 
 const Register = () => {
   const navigate = useNavigate();
-  const { signUp, signInWithOAuth } = useAuth();
+  const { signup } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [errors, setErrors] = useState<string[]>([]);
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -23,39 +25,60 @@ const Register = () => {
     confirmPassword: ''
   });
 
+  // Password validation requirements
+  const passwordRequirements = [
+    { test: (pwd: string) => pwd.length >= 8, text: 'At least 8 characters' },
+    { test: (pwd: string) => /[A-Z]/.test(pwd), text: 'One uppercase letter' },
+    { test: (pwd: string) => /[a-z]/.test(pwd), text: 'One lowercase letter' },
+    { test: (pwd: string) => /\d/.test(pwd), text: 'One number' },
+    { test: (pwd: string) => /[!@#$%^&*(),.?":{}|<>]/.test(pwd), text: 'One special character (!@#$%^&*)' }
+  ];
+
+  const validatePassword = (password: string) => {
+    return passwordRequirements.every(req => req.test(password));
+  };
+
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Debug logging
-    console.log('🔍 Form data before submission:', formData);
+    // Clear previous errors
+    setErrors([]);
     
     // Form validation
-    if (formData.password !== formData.confirmPassword) {
-      toast.error('Passwords do not match');
-      return;
-    }
-
-    if (formData.password.length < 6) {
-      toast.error('Password must be at least 6 characters');
-      return;
-    }
-
-    // Additional validation for name
+    const newErrors: string[] = [];
+    
     if (!formData.name || formData.name.trim().length < 2) {
-      toast.error('Please enter your full name (at least 2 characters)');
+      newErrors.push('Please enter your full name (at least 2 characters)');
+    }
+    
+    if (!formData.email || !/\S+@\S+\.\S+/.test(formData.email)) {
+      newErrors.push('Please enter a valid email address');
+    }
+    
+    if (formData.password !== formData.confirmPassword) {
+      newErrors.push('Passwords do not match');
+    }
+
+    if (!validatePassword(formData.password)) {
+      newErrors.push('Password does not meet security requirements');
+    }
+
+    if (newErrors.length > 0) {
+      setErrors(newErrors);
       return;
     }
 
     setIsLoading(true);
     
     try {
-      const result = await signUp(formData.email, formData.password, {
+      const result = await signup({
+        email: formData.email,
+        password: formData.password,
         full_name: formData.name.trim(),
-        company: formData.company.trim(),
+        company: formData.company.trim() || undefined,
       });
       
-      console.log('✅ Registration successful:', result);
-      
+      if (result.success) {
       // Clear form data
       setFormData({
         name: '',
@@ -65,40 +88,18 @@ const Register = () => {
         confirmPassword: ''
       });
       
-      // Show success message and redirect
-      toast.success('Registration successful! Redirecting to login...');
+        // Show success message
+        toast.success('Registration successful! Welcome to SpareFinder!');
       
-      // Small delay before redirect to ensure toast is visible
-      setTimeout(() => {
-        navigate('/login');
-      }, 1500);
-      
-    } catch (error: any) {
-      console.error('❌ Registration error:', error);
-      
-      // Extract error message
-      const errorMessage = error?.message || 'Registration failed. Please try again.';
-      
-      // Show error toast with specific message
-      toast.error(errorMessage);
-      
-      // If it's a network error, show a more specific message
-      if (error.name === 'TypeError' && error.message.includes('Failed to fetch')) {
-        toast.error('Unable to connect to the server. Please check your internet connection.');
+        // Redirect to dashboard
+        navigate('/dashboard');
+      } else {
+        setErrors([result.error || 'Registration failed. Please try again.']);
       }
       
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleGoogleRegister = async () => {
-    try {
-      setIsLoading(true);
-      await signInWithOAuth('google');
     } catch (error: any) {
-      console.error('Google registration error:', error);
-      toast.error(error?.message || 'Google registration failed');
+      console.error('❌ Unexpected registration error:', error);
+      setErrors(['An unexpected error occurred. Please try again.']);
     } finally {
       setIsLoading(false);
     }
@@ -106,6 +107,10 @@ const Register = () => {
 
   const updateFormData = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
+    // Clear errors when user starts typing
+    if (errors.length > 0) {
+      setErrors([]);
+    }
   };
 
   return (
@@ -204,6 +209,26 @@ const Register = () => {
                 </p>
               </motion.div>
 
+              {/* Error Messages */}
+              {errors.length > 0 && (
+                <motion.div
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="mb-6"
+                >
+                  <Alert className="bg-red-500/10 border-red-500/30 text-red-300">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertDescription>
+                      <ul className="list-disc list-inside space-y-1">
+                        {errors.map((error, index) => (
+                          <li key={index}>{error}</li>
+                        ))}
+                      </ul>
+                    </AlertDescription>
+                  </Alert>
+                </motion.div>
+              )}
+
               {/* Form */}
               <motion.form
                 onSubmit={handleRegister}
@@ -282,6 +307,27 @@ const Register = () => {
                       {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                     </motion.button>
                   </div>
+                  
+                  {/* Password Requirements */}
+                  {formData.password && (
+                    <div className="mt-2 p-3 bg-white/5 rounded-lg border border-white/10">
+                      <p className="text-sm text-gray-300 mb-2">Password requirements:</p>
+                      <div className="space-y-1">
+                        {passwordRequirements.map((req, index) => (
+                          <div key={index} className="flex items-center space-x-2">
+                            {req.test(formData.password) ? (
+                              <CheckCircle className="w-4 h-4 text-green-400" />
+                            ) : (
+                              <X className="w-4 h-4 text-red-400" />
+                            )}
+                            <span className={`text-sm ${req.test(formData.password) ? 'text-green-400' : 'text-gray-400'}`}>
+                              {req.text}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
                 
                 <div className="space-y-2">
@@ -307,6 +353,23 @@ const Register = () => {
                       {showConfirmPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                     </motion.button>
                   </div>
+                  
+                  {/* Password Match Indicator */}
+                  {formData.confirmPassword && (
+                    <div className="flex items-center space-x-2 mt-2">
+                      {formData.password === formData.confirmPassword ? (
+                        <>
+                          <CheckCircle className="w-4 h-4 text-green-400" />
+                          <span className="text-sm text-green-400">Passwords match</span>
+                        </>
+                      ) : (
+                        <>
+                          <X className="w-4 h-4 text-red-400" />
+                          <span className="text-sm text-red-400">Passwords do not match</span>
+                        </>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 <div className="text-sm text-gray-400">
@@ -327,11 +390,10 @@ const Register = () => {
                     className="w-full h-14 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-semibold text-lg rounded-xl shadow-lg shadow-purple-500/25 hover:shadow-purple-500/40 transition-all duration-300 relative overflow-hidden"
                   >
                     {isLoading ? (
-                      <motion.div
-                        animate={{ rotate: 360 }}
-                        transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                        className="w-6 h-6 border-2 border-white/30 border-t-white rounded-full"
-                      />
+                      <div className="flex items-center space-x-2">
+                        <Loader className="w-5 h-5 animate-spin" />
+                        <span>Creating Account...</span>
+                      </div>
                     ) : (
                       'Create Account'
                     )}
@@ -344,26 +406,6 @@ const Register = () => {
                   </Button>
                 </motion.div>
               </motion.form>
-              
-              <div className="relative my-8">
-                <div className="absolute inset-0 flex items-center">
-                  <span className="w-full border-t border-white/10" />
-                </div>
-                <div className="relative flex justify-center text-xs uppercase">
-                  <span className="bg-transparent px-4 text-gray-400 font-medium">Or continue with</span>
-                </div>
-              </div>
-              
-              <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-                <Button
-                  onClick={handleGoogleRegister}
-                  variant="outline"
-                  className="w-full h-14 bg-white/5 border-white/10 text-white hover:bg-white/10 hover:border-white/20 rounded-xl backdrop-blur-xl transition-all duration-300"
-                >
-                  <Chrome className="mr-3 h-5 w-5" />
-                  <span className="font-medium">Continue with Google</span>
-                </Button>
-              </motion.div>
               
               <div className="text-center mt-8">
                 <p className="text-gray-300">

@@ -4,7 +4,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/components/ui/use-toast';
-import { api } from '@/lib/api';
+import { api, tokenStorage } from '@/lib/api';
+import { useAuth } from '@/contexts/AuthContext';
+import { useNavigate } from 'react-router-dom';
 import AdminDesktopSidebar from '@/components/AdminDesktopSidebar';
 import MobileSidebar from '@/components/MobileSidebar';
 import DashboardSkeleton from '@/components/DashboardSkeleton';
@@ -63,35 +65,129 @@ const AdminDashboardLayout = () => {
   const [adminUser, setAdminUser] = useState<AdminUser | null>(null);
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  
   const { toast } = useToast();
+  const { user, isLoading: authLoading, logout } = useAuth();
+  const navigate = useNavigate();
+
+  // Check authentication and token validity
+  const checkAuthentication = async () => {
+    try {
+      const token = tokenStorage.getToken();
+      
+      if (!token) {
+        console.log('🔒 No admin token found in session storage');
+        navigate('/admin/login');
+        return false;
+      }
+
+      console.log('🔍 Admin token found, validating...');
+      
+      // Verify token with backend
+      const userResponse = await api.auth.getCurrentUser();
+      
+      if (userResponse.success && userResponse.data?.user) {
+        const userData = userResponse.data.user;
+        
+        // Check if user has admin role
+        if (!userData.role || !['admin', 'super_admin'].includes(userData.role)) {
+          console.log('❌ User does not have admin privileges');
+          toast({
+            variant: "destructive",
+            title: "Access Denied",
+            description: "You don't have admin privileges to access this page.",
+          });
+          navigate('/dashboard');
+          return false;
+        }
+
+        console.log('✅ Admin authentication successful:', userData);
+        setAdminUser(userData);
+        setIsAuthenticated(true);
+        return true;
+      } else {
+        console.warn('❌ Admin token validation failed:', userResponse.error);
+        tokenStorage.clearAll();
+        navigate('/admin/login');
+        return false;
+      }
+    } catch (error) {
+      console.error('❌ Admin authentication check failed:', error);
+      tokenStorage.clearAll();
+      navigate('/admin/login');
+      return false;
+    }
+  };
 
   useEffect(() => {
-    fetchAdminData();
-  }, []);
+    const initializeAdmin = async () => {
+      // Wait for auth context to load
+      if (authLoading) {
+        return;
+      }
 
-  const fetchAdminData = async () => {
+      const isValid = await checkAuthentication();
+      if (isValid) {
+        fetchAdminData(true); // Skip auth check since we just validated
+      }
+    };
+
+    initializeAdmin();
+  }, [authLoading]);
+
+  const fetchAdminData = async (skipAuthCheck = false) => {
+    if (!skipAuthCheck && !isAuthenticated) {
+      console.log('⏳ Skipping admin data fetch - not authenticated');
+      return;
+    }
+
     try {
       setIsLoading(true);
       setError(null);
 
+      console.log('📊 Fetching admin dashboard data...');
+
+      // Check token before making requests
+      const token = tokenStorage.getToken();
+      if (!token) {
+        console.log('❌ No token available for admin data fetch');
+        navigate('/admin/login');
+        return;
+      }
+
       // Fetch admin stats
       const statsResponse = await api.admin.getAdminStats();
       if (statsResponse.success && statsResponse.data?.statistics) {
+        console.log('✅ Admin stats fetched successfully');
         setStats(statsResponse.data.statistics);
+      } else {
+        console.warn('❌ Failed to fetch admin stats:', statsResponse);
+        throw new Error(statsResponse.error || 'Failed to fetch admin statistics');
       }
 
-      // Fetch current admin user
-      const userResponse = await api.auth.getCurrentUser();
-      if (userResponse.success && userResponse.data?.user) {
-        setAdminUser(userResponse.data.user);
+    } catch (err: any) {
+      console.error('❌ Error fetching admin data:', err);
+      
+      // Handle authentication errors
+      if (err.response?.status === 401 || err.response?.status === 403) {
+        console.log('🔒 Admin authentication error, redirecting to login');
+        toast({
+          variant: "destructive",
+          title: "Session Expired",
+          description: "Your admin session has expired. Please log in again.",
+        });
+        tokenStorage.clearAll();
+        navigate('/admin/login');
+        return;
       }
-    } catch (err) {
-      console.error('Error fetching admin data:', err);
-      setError(err instanceof Error ? err.message : 'Failed to load admin data');
+
+      const errorMessage = err instanceof Error ? err.message : 'Failed to load admin data';
+      setError(errorMessage);
       toast({
         variant: "destructive",
         title: "Error",
-        description: "Failed to load admin data. Please try again later.",
+        description: errorMessage,
       });
     } finally {
       setIsLoading(false);
@@ -107,14 +203,51 @@ const AdminDashboardLayout = () => {
   };
 
   const handleRefresh = () => {
-    fetchAdminData();
+    if (!isAuthenticated) {
+      toast({
+        variant: "destructive",
+        title: "Authentication Required",
+        description: "Please log in to refresh admin data.",
+      });
+      navigate('/admin/login');
+      return;
+    }
+
+    fetchAdminData(false); // Use normal auth check for manual refresh
     toast({
       title: "Data Refreshed",
       description: "Admin dashboard data has been updated.",
     });
   };
 
-  if (isLoading) {
+  const handleTryAgain = () => {
+    fetchAdminData(false);
+  };
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+      tokenStorage.clearAll();
+      navigate('/admin/login');
+      toast({
+        title: "Logged Out",
+        description: "You have been successfully logged out.",
+      });
+    } catch (error) {
+      console.error('Logout error:', error);
+      // Force logout even if API call fails
+      tokenStorage.clearAll();
+      navigate('/admin/login');
+    }
+  };
+
+  // Show loading while checking authentication
+  if (authLoading || (isLoading && !isAuthenticated)) {
+    return <DashboardSkeleton variant="admin" />;
+  }
+
+  // Show loading while fetching data
+  if (isLoading && isAuthenticated) {
     return <DashboardSkeleton variant="admin" />;
   }
 
@@ -124,9 +257,14 @@ const AdminDashboardLayout = () => {
         <div className="text-center">
           <AlertCircle className="w-10 h-10 text-purple-500 mx-auto mb-4" />
           <p className="text-gray-400 mb-4">{error}</p>
-          <Button onClick={fetchAdminData} variant="outline">
-            Try Again
-          </Button>
+          <div className="space-x-2">
+            <Button onClick={handleTryAgain} variant="outline">
+              Try Again
+            </Button>
+            <Button onClick={handleLogout} variant="ghost">
+              Logout
+            </Button>
+          </div>
         </div>
       </div>
     );
@@ -277,6 +415,14 @@ const AdminDashboardLayout = () => {
               >
                 <RefreshCw className="w-4 h-4 mr-2" />
                 Refresh
+              </Button>
+              <Button
+                onClick={handleLogout}
+                variant="ghost"
+                size="sm"
+                className="text-gray-400 hover:text-white hover:bg-white/10"
+              >
+                Logout
               </Button>
             </div>
           </div>

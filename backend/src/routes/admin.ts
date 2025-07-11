@@ -22,18 +22,22 @@ router.get('/users', [authenticateToken, requireAdmin], async (req: AuthRequest,
     if (error) {
       console.error('Users fetch error:', error);
       return res.status(500).json({
+        success: false,
         error: 'Users fetch failed',
         message: 'Failed to retrieve users'
       });
     }
 
     return res.json({
-      users,
-      pagination: {
-        page,
-        limit,
-        total: count || 0,
-        pages: Math.ceil((count || 0) / limit)
+      success: true,
+      data: {
+        users,
+        pagination: {
+          page,
+          limit,
+          total: count || 0,
+          pages: Math.ceil((count || 0) / limit)
+        }
       }
     });
 
@@ -75,8 +79,11 @@ router.patch('/users/:userId/role', [authenticateToken, requireAdmin], async (re
     }
 
     return res.json({
+      success: true,
       message: 'User role updated successfully',
-      user: updatedUser
+      data: {
+        user: updatedUser
+      }
     });
 
   } catch (error) {
@@ -113,6 +120,7 @@ router.delete('/users/:userId', [authenticateToken, requireAdmin], async (req: A
     }
 
     return res.json({
+      success: true,
       message: 'User deleted successfully'
     });
 

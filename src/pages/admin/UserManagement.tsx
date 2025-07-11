@@ -89,10 +89,15 @@ const UserManagement = () => {
   const fetchUsers = async () => {
     try {
       setIsLoading(true);
+      console.log('🔍 Fetching users...');
       const response = await api.admin.getUsers(pagination.page, pagination.limit);
+      
+      console.log('📋 User fetch response:', response);
       
       if (response.success && response.data) {
         let filteredUsers = response.data.users || [];
+        
+        console.log('📋 Raw users from API:', filteredUsers);
         
         // Apply search filter
         if (searchTerm) {
@@ -101,12 +106,16 @@ const UserManagement = () => {
             user.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
             (user.company && user.company.toLowerCase().includes(searchTerm.toLowerCase()))
           );
+          console.log('📋 After search filter:', filteredUsers);
         }
         
         // Apply role filter
         if (roleFilter !== 'all') {
           filteredUsers = filteredUsers.filter(user => user.role === roleFilter);
+          console.log('📋 After role filter:', filteredUsers);
         }
+        
+        console.log('📋 Final filtered users:', filteredUsers);
         
         setUsers(filteredUsers);
         setPagination(prev => ({
@@ -114,6 +123,8 @@ const UserManagement = () => {
           total: response.data.pagination?.total || 0,
           pages: response.data.pagination?.pages || 0
         }));
+      } else {
+        console.warn('❌ Invalid response format:', response);
       }
     } catch (error) {
       console.error('Error fetching users:', error);
@@ -338,79 +349,100 @@ const UserManagement = () => {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {users.map((user) => {
-                          const RoleIcon = getRoleIcon(user.role);
-                          return (
-                            <TableRow key={user.id} className="border-white/10 hover:bg-white/5">
-                              <TableCell>
-                                <div>
-                                  <div className="font-medium text-white">{user.full_name}</div>
-                                  <div className="text-sm text-gray-400">{user.email}</div>
-                                </div>
-                              </TableCell>
-                              <TableCell className="text-gray-300">
-                                {user.company || 'N/A'}
-                              </TableCell>
-                              <TableCell>
-                                <Badge variant="secondary" className={getRoleColor(user.role)}>
-                                  <RoleIcon className="w-3 h-3 mr-1" />
-                                  {user.role.replace('_', ' ').toUpperCase()}
-                                </Badge>
-                              </TableCell>
-                              <TableCell className="text-gray-300">
-                                {new Date(user.created_at).toLocaleDateString()}
-                              </TableCell>
-                              <TableCell>
-                                <div className="flex items-center space-x-2">
-                                  <Select
-                                    value={user.role}
-                                    onValueChange={(newRole) => handleRoleUpdate(user.id, newRole as any)}
-                                  >
-                                    <SelectTrigger className="w-32 h-8 bg-white/5 border-white/10 text-white text-xs">
-                                      <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      <SelectItem value="user">User</SelectItem>
-                                      <SelectItem value="admin">Admin</SelectItem>
-                                      <SelectItem value="super_admin">Super Admin</SelectItem>
-                                    </SelectContent>
-                                  </Select>
-                                  
-                                  <AlertDialog>
-                                    <AlertDialogTrigger asChild>
-                                      <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        className="h-8 w-8 p-0 text-red-400 hover:text-red-300 hover:bg-red-900/20"
-                                      >
-                                        <Trash2 className="w-4 h-4" />
-                                      </Button>
-                                    </AlertDialogTrigger>
-                                    <AlertDialogContent className="bg-gray-900 border-white/10">
-                                      <AlertDialogHeader>
-                                        <AlertDialogTitle className="text-white">Delete User</AlertDialogTitle>
-                                        <AlertDialogDescription className="text-gray-400">
-                                          Are you sure you want to delete {user.full_name}? This action cannot be undone.
-                                        </AlertDialogDescription>
-                                      </AlertDialogHeader>
-                                      <AlertDialogFooter>
-                                        <AlertDialogCancel className="bg-white/5 border-white/10 text-white hover:bg-white/10">
-                                          Cancel
-                                        </AlertDialogCancel>
-                                        <AlertDialogAction
-                                          onClick={() => handleDeleteUser(user.id)}
-                                          className="bg-red-600 hover:bg-red-700"
+                        {users.length === 0 ? (
+                          <TableRow>
+                            <TableCell colSpan={5} className="text-center py-8">
+                              <div className="text-gray-400">
+                                {searchTerm || roleFilter !== 'all' ? (
+                                  <div>
+                                    <Users className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                                    <p>No users found matching your criteria.</p>
+                                    <p className="text-sm mt-1">Try adjusting your search or filters.</p>
+                                  </div>
+                                ) : (
+                                  <div>
+                                    <Users className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                                    <p>No users found.</p>
+                                  </div>
+                                )}
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ) : (
+                          users.map((user) => {
+                            const RoleIcon = getRoleIcon(user.role);
+                            return (
+                              <TableRow key={user.id} className="border-white/10 hover:bg-white/5">
+                                <TableCell>
+                                  <div>
+                                    <div className="font-medium text-white">{user.full_name}</div>
+                                    <div className="text-sm text-gray-400">{user.email}</div>
+                                  </div>
+                                </TableCell>
+                                <TableCell className="text-gray-300">
+                                  {user.company || 'N/A'}
+                                </TableCell>
+                                <TableCell>
+                                  <Badge variant="secondary" className={getRoleColor(user.role)}>
+                                    <RoleIcon className="w-3 h-3 mr-1" />
+                                    {user.role.replace('_', ' ').toUpperCase()}
+                                  </Badge>
+                                </TableCell>
+                                <TableCell className="text-gray-300">
+                                  {new Date(user.created_at).toLocaleDateString()}
+                                </TableCell>
+                                <TableCell>
+                                  <div className="flex items-center space-x-2">
+                                    <Select
+                                      value={user.role}
+                                      onValueChange={(newRole) => handleRoleUpdate(user.id, newRole as any)}
+                                    >
+                                      <SelectTrigger className="w-32 h-8 bg-white/5 border-white/10 text-white text-xs">
+                                        <SelectValue />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        <SelectItem value="user">User</SelectItem>
+                                        <SelectItem value="admin">Admin</SelectItem>
+                                        <SelectItem value="super_admin">Super Admin</SelectItem>
+                                      </SelectContent>
+                                    </Select>
+                                    
+                                    <AlertDialog>
+                                      <AlertDialogTrigger asChild>
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          className="h-8 w-8 p-0 text-red-400 hover:text-red-300 hover:bg-red-900/20"
                                         >
-                                          Delete
-                                        </AlertDialogAction>
-                                      </AlertDialogFooter>
-                                    </AlertDialogContent>
-                                  </AlertDialog>
-                                </div>
-                              </TableCell>
-                            </TableRow>
-                          );
-                        })}
+                                          <Trash2 className="w-4 h-4" />
+                                        </Button>
+                                      </AlertDialogTrigger>
+                                      <AlertDialogContent className="bg-gray-900 border-white/10">
+                                        <AlertDialogHeader>
+                                          <AlertDialogTitle className="text-white">Delete User</AlertDialogTitle>
+                                          <AlertDialogDescription className="text-gray-400">
+                                            Are you sure you want to delete {user.full_name}? This action cannot be undone.
+                                          </AlertDialogDescription>
+                                        </AlertDialogHeader>
+                                        <AlertDialogFooter>
+                                          <AlertDialogCancel className="bg-white/5 border-white/10 text-white hover:bg-white/10">
+                                            Cancel
+                                          </AlertDialogCancel>
+                                          <AlertDialogAction
+                                            onClick={() => handleDeleteUser(user.id)}
+                                            className="bg-red-600 hover:bg-red-700"
+                                          >
+                                            Delete
+                                          </AlertDialogAction>
+                                        </AlertDialogFooter>
+                                      </AlertDialogContent>
+                                    </AlertDialog>
+                                  </div>
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })
+                        )}
                       </TableBody>
                     </Table>
                   </div>

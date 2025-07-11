@@ -31,7 +31,7 @@ const AdminProtectedRoute: React.FC<AdminProtectedRouteProps> = ({
       setError(null);
 
       // Check if we have a token
-      const token = localStorage.getItem('token');
+      const token = sessionStorage.getItem('auth_token');
       console.log('🛡️ Auth Token Present:', !!token);
       if (!token) {
         console.log('🛡️ No auth token found');
@@ -66,8 +66,8 @@ const AdminProtectedRoute: React.FC<AdminProtectedRouteProps> = ({
         data: response.data
       });
       
-      // More flexible profile validation
-      const user = response.data;
+      // Extract user from the nested response structure
+      const user = response.data?.user;
       
       console.log('🛡️ Extracted User:', user);
       
@@ -102,14 +102,16 @@ const AdminProtectedRoute: React.FC<AdminProtectedRouteProps> = ({
         console.log('🛡️ Invalid token or profile');
         // Token is invalid, clear admin session
         localStorage.removeItem('admin_session');
-        localStorage.removeItem('token');
+        sessionStorage.removeItem('auth_token');
+        sessionStorage.removeItem('refresh_token');
         setIsAuthenticated(false);
       }
     } catch (err) {
       console.error('🛡️ Admin Auth Check Failed:', err);
       // Clear invalid session data
       localStorage.removeItem('admin_session');
-      localStorage.removeItem('token');
+      sessionStorage.removeItem('auth_token');
+      sessionStorage.removeItem('refresh_token');
       setError('Authentication verification failed');
       setIsAuthenticated(false);
     } finally {

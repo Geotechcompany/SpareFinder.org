@@ -188,20 +188,38 @@ const AdminDesktopSidebar: React.FC<AdminSidebarProps> = ({
 
   const handleLogout = async () => {
     try {
-      await api.auth.signOut();
+      console.log('🚪 Admin logout initiated...');
+      
+      // Use the proper logout function
+      await api.auth.logout();
+      
+      // Clear any admin-specific storage
       localStorage.removeItem('admin_session');
+      
+      console.log('✅ Admin logout successful');
+      
       toast({
         title: "Logged out successfully",
         description: "You have been logged out of the admin console.",
       });
+      
+      // Navigate to admin login page
       navigate('/admin/login');
+      
     } catch (error) {
-      console.error('Admin logout error:', error);
+      console.error('❌ Admin logout error:', error);
+      
+      // Force logout even if API call fails
+      localStorage.removeItem('admin_session');
+      
       toast({
         variant: "destructive",
         title: "Logout failed",
-        description: "There was an error logging out. Please try again.",
+        description: "There was an error logging out, but you've been signed out locally.",
       });
+      
+      // Navigate anyway
+      navigate('/admin/login');
     }
   };
 

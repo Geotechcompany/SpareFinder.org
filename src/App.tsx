@@ -7,6 +7,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import { AuthProvider } from "@/contexts/AuthContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
+import DebugEnv from "@/components/DebugEnv";
 import Index from "./pages/Index";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
@@ -42,6 +43,7 @@ const App = () => (
     <AuthProvider>
       <ThemeProvider>
         <TooltipProvider>
+          <DebugEnv />
           <Toaster />
           <Sonner />
           <BrowserRouter>

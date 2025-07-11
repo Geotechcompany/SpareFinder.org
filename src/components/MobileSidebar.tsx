@@ -24,7 +24,7 @@ interface MobileSidebarProps {
 
 const MobileSidebar: React.FC<MobileSidebarProps> = ({ isOpen, onClose }) => {
   const location = useLocation();
-  const { user, signOut } = useAuth();
+  const { user, logout } = useAuth();
 
   const navItems = [
     { href: '/dashboard', icon: Home, label: 'Dashboard', description: 'Overview & analytics' },
@@ -45,10 +45,14 @@ const MobileSidebar: React.FC<MobileSidebarProps> = ({ isOpen, onClose }) => {
 
   const handleSignOut = async () => {
     try {
-      await signOut();
+      console.log('🚪 Mobile logout initiated...');
+      await logout();
+      console.log('✅ Mobile logout successful');
       onClose();
     } catch (error) {
-      console.error('Sign out failed:', error);
+      console.error('❌ Mobile sign out failed:', error);
+      // Close the sidebar even if logout fails
+      onClose();
     }
   };
 
@@ -59,9 +63,7 @@ const MobileSidebar: React.FC<MobileSidebarProps> = ({ isOpen, onClose }) => {
     : user?.email?.charAt(0).toUpperCase() || 'U';
   
   // Get subscription tier display
-  const subscriptionTier = user?.user_metadata?.subscription_tier || 'free';
-  const tierDisplay = subscriptionTier === 'pro' ? 'Pro Member' : 
-                     subscriptionTier === 'enterprise' ? 'Enterprise' : 'Free Plan';
+  const tierDisplay = user?.company || 'Free Plan';
 
   return (
     <AnimatePresence>

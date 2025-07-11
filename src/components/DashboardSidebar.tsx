@@ -33,7 +33,10 @@ const DashboardSidebar: React.FC<SidebarProps> = ({ isCollapsed = false, onToggl
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
-  const { user, signOut, isAdmin } = useAuth();
+  const { user, logout } = useAuth();
+  
+  // Check if user is admin
+  const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
 
   // Close mobile menu on route change
   useEffect(() => {
@@ -59,10 +62,14 @@ const DashboardSidebar: React.FC<SidebarProps> = ({ isCollapsed = false, onToggl
 
   const handleSignOut = async () => {
     try {
-      await signOut();
+      console.log('🚪 User logout initiated...');
+      await logout();
+      console.log('✅ User logout successful');
       navigate('/login');
     } catch (error) {
-      console.error('Error signing out:', error);
+      console.error('❌ Error signing out:', error);
+      // Force navigation even if logout fails
+      navigate('/login');
     }
   };
 
@@ -92,7 +99,7 @@ const DashboardSidebar: React.FC<SidebarProps> = ({ isCollapsed = false, onToggl
 
   const getUserInitials = () => {
     if (!user) return 'U';
-    const nameParts = [user.user_metadata?.full_name, user.email].filter(Boolean)[0]?.split(' ') || [];
+    const nameParts = [user.full_name, user.email].filter(Boolean)[0]?.split(' ') || [];
     if (nameParts.length === 0) return 'U';
     if (nameParts.length === 1) return nameParts[0][0].toUpperCase();
     return (nameParts[0][0] + nameParts[nameParts.length - 1][0]).toUpperCase();
@@ -102,7 +109,7 @@ const DashboardSidebar: React.FC<SidebarProps> = ({ isCollapsed = false, onToggl
     <div className={`p-4 border-t border-white/10 ${isMobile ? '' : ''}`}>
       <div className="flex items-center space-x-3 p-3 rounded-xl bg-white/5 border border-white/10">
         <Avatar className="w-10 h-10">
-          <AvatarImage src={user?.user_metadata?.avatar_url} />
+          <AvatarImage src={user?.avatar_url} />
           <AvatarFallback className="bg-gradient-to-r from-green-600 to-emerald-600 text-white">
             {getUserInitials()}
           </AvatarFallback>
@@ -110,10 +117,10 @@ const DashboardSidebar: React.FC<SidebarProps> = ({ isCollapsed = false, onToggl
         {!isCollapsed && (
           <div className="flex-1">
             <p className="text-white font-medium">
-              {user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'User'}
+              {user?.full_name || user?.email?.split('@')[0] || 'User'}
             </p>
             <p className="text-gray-400 text-sm">
-              {user?.user_metadata?.subscription_tier || 'Free Plan'}
+              {user?.company || 'Free Plan'}
             </p>
           </div>
         )}
