@@ -5,6 +5,7 @@ import path from 'path';
 import { z } from 'zod';
 import winston from 'winston';
 import { authenticateToken } from '../middleware/auth';  // Import authentication middleware
+import { AuthRequest } from '../types/auth';  // Import the correct auth request type
 
 // Enhanced logging setup
 const logger = winston.createLogger({
@@ -18,17 +19,6 @@ const logger = winston.createLogger({
     new winston.transports.File({ filename: 'error.log', level: 'error' })
   ]
 });
-
-// Extend Request type to include user with zod validation
-const UserSchema = z.object({
-  id: z.string().uuid(),
-  email: z.string().email(),
-  role: z.string()
-});
-
-interface AuthenticatedRequest extends Request {
-  user?: z.infer<typeof UserSchema>;
-}
 
 // Performance Metrics Result Type with Zod
 const PerformanceMetricsSchema = z.object({
@@ -116,12 +106,15 @@ const handleDashboardError = (
 router.get(
   '/recent-uploads', 
   validateQueryParams,
-  async (req: AuthenticatedRequest, res: Response) => {
+  async (req: AuthRequest, res: Response) => {
     try {
       const limit = parseInt(req.query.limit as string) || 5;
-      const userId = req.user?.id;
+      const userId = req.user?.userId;
+
+      console.log('📁 Recent uploads - User ID:', userId);
 
       if (!userId) {
+        console.log('❌ Recent uploads - No user ID found');
         return res.status(401).json({ 
           success: false, 
           error: 'Unauthorized' 
@@ -138,6 +131,7 @@ router.get(
           manufacturer,
           confidence_score,
           image_url,
+          image_name,
           created_at
         `)
         .eq('user_id', userId)
@@ -148,16 +142,18 @@ router.get(
 
       return res.json({
         success: true,
-        uploads: (data || []).map(upload => ({
-          id: upload.id,
-          image_name: upload.part_name || upload.search_term,
-          created_at: upload.created_at,
-          confidence_score: upload.confidence_score,
-          part_details: {
-            part_number: upload.part_number,
-            manufacturer: upload.manufacturer
-          }
-        }))
+        data: {
+          uploads: (data || []).map(upload => ({
+            id: upload.id,
+            image_name: upload.image_name || upload.part_name || upload.search_term || 'Unknown',
+            created_at: upload.created_at,
+            confidence_score: upload.confidence_score || 0,
+            part_details: {
+              part_number: upload.part_number || null,
+              manufacturer: upload.manufacturer || null
+            }
+          }))
+        }
       });
     } catch (error) {
       return handleDashboardError(res, error, 'Recent Uploads');
@@ -166,12 +162,15 @@ router.get(
 );
 
 // Get recent activities
-router.get('/recent-activities', async (req: AuthenticatedRequest, res: Response) => {
+router.get('/recent-activities', async (req: AuthRequest, res: Response) => {
   try {
     const limit = parseInt(req.query.limit as string) || 5;
-    const userId = req.user?.id; // Assuming middleware adds user info
+    const userId = req.user?.userId; // Assuming middleware adds user info
+
+    console.log('🔄 Recent activities - User ID:', userId);
 
     if (!userId) {
+      console.log('❌ Recent activities - No user ID found');
       return res.status(401).json({ 
         success: false, 
         error: 'Unauthorized' 
@@ -206,20 +205,25 @@ router.get('/recent-activities', async (req: AuthenticatedRequest, res: Response
 
     return res.json({
       success: true,
-      activities: (data || []).map(activity => ({
-        id: activity.id,
-        resource_type: 'part_search',
-        action: activity.is_match ? 'match_found' : 'search_performed',
-        details: {
-          search_term: activity.search_term,
-          search_type: activity.search_type,
-          part_name: activity.part_name,
-          manufacturer: activity.manufacturer,
-          confidence: activity.confidence_score,
-          status: activity.analysis_status || (activity.is_match ? 'success' : 'pending')
-        },
-        created_at: activity.created_at
-      }))
+      data: {
+        activities: (data || []).map(activity => ({
+          id: activity.id,
+          resource_type: 'part_search',
+          action: activity.is_match ? 'Part Match Found' : 'Search Performed',
+          details: {
+            search_term: activity.search_term || 'Unknown',
+            search_type: activity.search_type || 'image_upload',
+            part_name: activity.part_name || 'Not identified',
+            manufacturer: activity.manufacturer || 'Unknown',
+            confidence: Math.round((activity.confidence_score || 0) * 100),
+            status: activity.analysis_status || (activity.is_match ? 'success' : 'pending'),
+            description: activity.part_name 
+              ? `Found ${activity.part_name}${activity.manufacturer ? ` by ${activity.manufacturer}` : ''}`
+              : `Searched for ${activity.search_term || 'part'}`
+          },
+          created_at: activity.created_at
+        }))
+      }
     });
   } catch (error) {
     console.error('Recent Activities Unexpected Error:', error);
@@ -231,28 +235,25 @@ router.get('/recent-activities', async (req: AuthenticatedRequest, res: Response
 });
 
 // Get performance metrics
-router.get('/performance-metrics', async (req: AuthenticatedRequest, res: Response) => {
+router.get('/performance-metrics', async (req: AuthRequest, res: Response) => {
   try {
-    const userId = req.user?.id; // Assuming middleware adds user info
+    const userId = req.user?.userId; // Assuming middleware adds user info
+
+    console.log('📈 Performance metrics - User ID:', userId);
 
     if (!userId) {
+      console.log('❌ Performance metrics - No user ID found');
       return res.status(401).json({ 
         success: false, 
         error: 'Unauthorized' 
       });
     }
 
-    // Aggregate performance metrics from part_searches
-    const { data, error } = await supabase
+    // Fetch all user's part searches to calculate metrics
+    const { data: searches, error } = await supabase
       .from('part_searches')
-      .select(`
-        count(*) as total_searches,
-        avg(confidence_score) as avg_confidence,
-        avg(processing_time_ms) as avg_process_time,
-        sum(CASE WHEN is_match THEN 1 ELSE 0 END)::float / count(*) as match_rate
-      `)
-      .eq('user_id', userId)
-      .single() as { data: PerformanceMetricsResult | null, error: any };
+      .select('confidence_score, processing_time_ms, is_match')
+      .eq('user_id', userId);
 
     if (error) {
       console.error('Performance Metrics Error:', error);
@@ -262,25 +263,42 @@ router.get('/performance-metrics', async (req: AuthenticatedRequest, res: Respon
       });
     }
 
-    // Safely handle null data
-    const metrics = data || {
-      total_searches: 0,
-      avg_confidence: 0,
-      avg_process_time: 0,
-      match_rate: 0
-    };
+    // Calculate metrics manually
+    const totalSearches = searches?.length || 0;
+    let avgConfidence = 0;
+    let avgProcessTime = 0;
+    let matchCount = 0;
+
+    if (searches && searches.length > 0) {
+      const confidenceSum = searches.reduce((sum, search) => sum + (search.confidence_score || 0), 0);
+      const processTimeSum = searches.reduce((sum, search) => sum + (search.processing_time_ms || 0), 0);
+      matchCount = searches.filter(search => search.is_match).length;
+
+      avgConfidence = confidenceSum / searches.length;
+      avgProcessTime = processTimeSum / searches.length;
+    }
+
+    const matchRate = totalSearches > 0 ? (matchCount / totalSearches) * 100 : 0;
+
+    console.log('📈 Performance metrics calculated:', {
+      totalSearches,
+      avgConfidence,
+      avgProcessTime,
+      matchRate,
+      rawSearches: searches?.length || 0
+    });
 
     return res.json({
       success: true,
       data: {
-        totalSearches: metrics.total_searches || 0,
-        avgConfidence: metrics.avg_confidence || 0,
-        avgProcessTime: metrics.avg_process_time || 0,
-        matchRate: metrics.match_rate || 0,
-        modelAccuracy: metrics.match_rate || 0,
+        totalSearches,
+        avgConfidence: Math.round(avgConfidence * 100) || 0, // Convert to percentage and round
+        avgProcessTime: Math.round(avgProcessTime) || 0, // Round to whole number
+        matchRate: Math.round(matchRate) || 0, // Round to whole number
+        modelAccuracy: Math.round(matchRate) || 0,
         accuracyChange: 0, // TODO: Implement historical tracking
         searchesGrowth: 0, // TODO: Implement historical tracking
-        avgResponseTime: metrics.avg_process_time || 0,
+        avgResponseTime: Math.round(avgProcessTime) || 0,
         responseTimeChange: 0 // TODO: Implement historical tracking
       }
     });
@@ -294,11 +312,14 @@ router.get('/performance-metrics', async (req: AuthenticatedRequest, res: Respon
 });
 
 // Get dashboard stats
-router.get('/stats', async (req: AuthenticatedRequest, res: Response) => {
+router.get('/stats', async (req: AuthRequest, res: Response) => {
   try {
-    const userId = req.user?.id;
+    const userId = req.user?.userId;
+
+    console.log('📊 Dashboard stats - User ID:', userId);
 
     if (!userId) {
+      console.log('❌ Dashboard stats - No user ID found');
       return res.status(401).json({ 
         success: false, 
         error: 'Unauthorized' 
@@ -340,13 +361,21 @@ router.get('/stats', async (req: AuthenticatedRequest, res: Response) => {
       ? statsData.reduce((sum, item) => sum + (item.processing_time_ms || 0), 0) / statsData.length 
       : 0;
 
+    console.log('📊 Dashboard stats calculated:', {
+      totalUploads: totalUploads || 0,
+      successfulUploads: successfulUploads || 0,
+      avgConfidence: avgConfidence,
+      avgProcessTime: avgProcessTime,
+      rawData: statsData?.length || 0
+    });
+
     return res.json({
       success: true,
       data: {
         totalUploads: totalUploads || 0,
         successfulUploads: successfulUploads || 0,
-        avgConfidence: avgConfidence * 100, // Convert to percentage
-        avgProcessTime: avgProcessTime
+        avgConfidence: Math.round(avgConfidence * 100) || 0, // Convert to percentage and round
+        avgProcessTime: Math.round(avgProcessTime) || 0 // Round to whole number
       }
     });
   } catch (error) {

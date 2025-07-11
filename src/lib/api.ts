@@ -144,7 +144,7 @@ apiClient.interceptors.response.use(
             )
           ]);
 
-          if (refreshResponse.data.token) {
+        if (refreshResponse.data.token) {
             console.log('✅ Token refreshed successfully');
             
             // Update stored tokens
@@ -249,7 +249,7 @@ export const authApi = {
 
   getCurrentUser: async (): Promise<ApiResponse> => {
     const response = await apiClient.get('/auth/current-user');
-    return response.data;
+      return response.data;
   },
 
   signOut: async (): Promise<ApiResponse> => {
@@ -273,7 +273,7 @@ export const dashboardApi = {
 
   getRecentUploads: async (limit: number = 5): Promise<ApiResponse> => {
     const response = await apiClient.get(`/dashboard/recent-uploads?limit=${limit}`);
-    return response.data;
+      return response.data;
   },
 
   getRecentActivities: async (limit: number = 5): Promise<ApiResponse> => {
@@ -294,7 +294,7 @@ export const dashboardApi = {
 
   deleteUpload: async (uploadId: string): Promise<ApiResponse> => {
     const response = await apiClient.delete(`/dashboard/uploads/${uploadId}`);
-    return response.data;
+          return response.data;
   }
 };
 
@@ -336,11 +336,142 @@ export const adminApi = {
   }
 };
 
+// Billing API
+export const billingApi = {
+  getBillingInfo: async (options?: { signal?: AbortSignal }): Promise<ApiResponse> => {
+    const response = await apiClient.get('/billing', {
+      signal: options?.signal
+    });
+    return response.data;
+  },
+
+  updateSubscription: async (tier: 'free' | 'pro' | 'enterprise'): Promise<ApiResponse> => {
+    const response = await apiClient.post('/billing/subscription', { tier });
+        return response.data;
+  },
+
+  cancelSubscription: async (): Promise<ApiResponse> => {
+    const response = await apiClient.post('/billing/subscription/cancel');
+        return response.data;
+  },
+
+  getInvoices: async (options?: { 
+    page?: number; 
+    limit?: number; 
+    signal?: AbortSignal 
+  }): Promise<ApiResponse> => {
+    const params = new URLSearchParams();
+    if (options?.page) params.append('page', options.page.toString());
+    if (options?.limit) params.append('limit', options.limit.toString());
+    
+    const response = await apiClient.get(`/billing/invoices?${params.toString()}`, {
+      signal: options?.signal
+    });
+    return response.data;
+  },
+
+  getUsage: async (): Promise<ApiResponse> => {
+    const response = await apiClient.get('/billing/usage');
+    return response.data;
+  }
+};
+
+// Profile API
+export const profileApi = {
+  getProfile: async (): Promise<ApiResponse> => {
+    const response = await apiClient.get('/profile');
+        return response.data;
+  },
+
+  updateProfile: async (profileData: {
+    full_name?: string;
+    company?: string;
+    phone?: string;
+    bio?: string;
+    location?: string;
+    website?: string;
+  }): Promise<ApiResponse> => {
+    const response = await apiClient.patch('/profile', profileData);
+        return response.data;
+  },
+
+  changePassword: async (currentPassword: string, newPassword: string): Promise<ApiResponse> => {
+    const response = await apiClient.post('/profile/change-password', {
+      currentPassword,
+      newPassword
+        });
+        return response.data;
+  },
+
+  deleteAccount: async (): Promise<ApiResponse> => {
+    const response = await apiClient.delete('/profile/delete-account');
+    return response.data;
+  },
+
+  // Mock achievements since there's no backend endpoint
+  getAchievements: async (): Promise<ApiResponse> => {
+    // Mock achievements data
+    const mockAchievements = [
+      {
+        id: 'first-upload',
+        title: 'First Upload',
+        description: 'Upload your first part image',
+        icon: '🎯',
+        color: 'from-green-600 to-emerald-600',
+        earned: true,
+        earnedAt: new Date().toISOString()
+      },
+      {
+        id: 'accuracy-master',
+        title: 'Accuracy Master',
+        description: 'Achieve 95% accuracy rate',
+        icon: '🎯',
+        color: 'from-blue-600 to-cyan-600',
+        earned: false
+      },
+      {
+        id: 'speed-demon',
+        title: 'Speed Demon',
+        description: 'Complete 50 identifications',
+        icon: '⚡',
+        color: 'from-yellow-600 to-orange-600',
+        earned: false
+      },
+      {
+        id: 'streak-master',
+        title: 'Streak Master',
+        description: 'Use the app for 7 consecutive days',
+        icon: '🔥',
+        color: 'from-red-600 to-pink-600',
+        earned: false
+      }
+    ];
+
+    const earned = mockAchievements.filter(a => a.earned).length;
+    
+        return {
+          success: true,
+      data: {
+        achievements: mockAchievements,
+        totalEarned: earned,
+        totalAvailable: mockAchievements.length
+      }
+    };
+  },
+
+  getRecentActivities: async (limit: number = 5): Promise<ApiResponse> => {
+    const response = await apiClient.get(`/dashboard/recent-activities?limit=${limit}`);
+    return response.data;
+  }
+};
+
 // Export the main API object
 export const api = {
   auth: authApi,
   dashboard: dashboardApi,
-  admin: adminApi
+  admin: adminApi,
+  billing: billingApi,
+  profile: profileApi
 };
 
 // Export individual APIs for backward compatibility
