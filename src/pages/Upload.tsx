@@ -1360,19 +1360,94 @@ const Upload = () => {
     }
   }, [analysisResults, toast]);
 
+  // Save results to database
+  const saveAnalysisResults = useCallback(async () => {
+    if (!analysisResults) {
+      toast({
+        title: "No Results",
+        description: "No analysis results available to save",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      
+      // Prepare data for the save endpoint
+      const saveData = {
+        ...analysisResults,
+        image_url: imagePreview || '',
+        image_name: uploadedFile?.name || 'analysis_result.jpg'
+      };
+
+      console.log('💾 Saving analysis results:', saveData);
+
+      const response = await api.upload.saveResults(saveData);
+
+      if (response.success) {
+        toast({
+          title: "Results Saved",
+          description: `Analysis results saved successfully: ${response.data?.part_name}`,
+          variant: "default"
+        });
+      } else {
+        throw new Error(response.message || 'Failed to save results');
+      }
+    } catch (error) {
+      console.error('Save results error:', error);
+      toast({
+        title: "Save Failed",
+        description: error instanceof Error ? error.message : "Failed to save analysis results",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  }, [analysisResults, imagePreview, uploadedFile, toast]);
+
   // Update existing buttons or add a new button in the results section
-  const renderPDFDownloadButton = () => {
+  const renderActionButtons = () => {
     if (!analysisResults) return null;
 
     return (
-      <Button 
-        onClick={downloadPDFReport}
-        variant="outline"
-        className="w-full flex items-center justify-center space-x-2"
-      >
-        <Download className="w-4 h-4 mr-2" />
-        Download PDF Report
-      </Button>
+      <div className="space-y-3">
+        <Button 
+          onClick={saveAnalysisResults}
+          disabled={isLoading}
+          className="w-full bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white font-medium"
+        >
+          {isLoading ? (
+            <>
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              Saving...
+            </>
+          ) : (
+            <>
+              <FileText className="w-4 h-4 mr-2" />
+              Save Results to Database
+            </>
+          )}
+        </Button>
+        
+        <Button 
+          onClick={downloadPDFReport}
+          variant="outline"
+          className="w-full flex items-center justify-center space-x-2"
+        >
+          <Download className="w-4 h-4 mr-2" />
+          Download PDF Report
+        </Button>
+        
+        <Button 
+          onClick={generateShareableLink}
+          variant="outline"
+          className="w-full flex items-center justify-center space-x-2"
+        >
+          <Share className="w-4 h-4 mr-2" />
+          Share Results
+        </Button>
+      </div>
     );
   };
 
@@ -1903,7 +1978,7 @@ const Upload = () => {
                       </div>
                     )}
                   </div>
-                  {renderPDFDownloadButton()}
+                  {renderActionButtons()}
                 </CardContent>
               </Card>
             </motion.div>

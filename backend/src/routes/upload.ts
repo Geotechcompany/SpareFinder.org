@@ -7,7 +7,6 @@ import { AuthRequest } from '../types/auth';
 import { supabase } from '../server';
 import { DatabaseLogger, PartSearchData, SearchHistoryData } from '../services/database-logger';
 import { z } from 'zod';
-import { Request } from 'express';
 
 const router = Router();
 
