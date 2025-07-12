@@ -983,25 +983,98 @@ router.get('/audit-logs', [authenticateToken, requireAdmin], async (req: AuthReq
     const limit = parseInt(req.query.limit as string) || 100;
     const offset = (page - 1) * limit;
 
-    const { data: logs, error, count } = await supabase
+    console.log('📋 Fetching audit logs from database...');
+
+    // First, try to get audit logs from the audit_logs table
+    const { data: auditLogs, error: auditError, count } = await supabase
       .from('audit_logs')
-      .select(`
-        *,
-        profiles!inner(full_name, email)
-      `, { count: 'exact' })
+      .select('*', { count: 'exact' })
       .order('created_at', { ascending: false })
       .range(offset, offset + limit - 1);
 
-    if (error) {
-      console.error('Audit logs fetch error:', error);
-      return res.status(500).json({
-        error: 'Audit logs fetch failed',
-        message: 'Failed to retrieve audit logs'
+    if (auditError) {
+      console.error('Direct audit logs query failed:', auditError);
+      
+      // Fallback: Use user_activities table as audit logs
+      console.log('📋 Falling back to user_activities table...');
+      const { data: activities, error: activitiesError, count: activitiesCount } = await supabase
+        .from('user_activities')
+        .select(`
+          id,
+          user_id,
+          action,
+          details,
+          created_at,
+          profiles!inner(full_name, email)
+        `, { count: 'exact' })
+        .order('created_at', { ascending: false })
+        .range(offset, offset + limit - 1);
+
+      if (activitiesError) {
+        console.error('User activities fallback failed:', activitiesError);
+        return res.status(500).json({
+          success: false,
+          error: 'Audit logs fetch failed',
+          message: 'Failed to retrieve audit logs from database'
+        });
+      }
+
+      // Transform user activities to audit log format
+      const transformedLogs = activities?.map(activity => ({
+        id: activity.id,
+        user_id: activity.user_id,
+        action: activity.action,
+        resource_type: 'user_activity',
+        resource_id: null,
+        old_values: null,
+        new_values: null,
+        ip_address: null,
+        user_agent: null,
+        created_at: activity.created_at,
+        profiles: activity.profiles
+      })) || [];
+
+      return res.json({
+        success: true,
+        logs: transformedLogs,
+        pagination: {
+          page,
+          limit,
+          total: activitiesCount || 0,
+          pages: Math.ceil((activitiesCount || 0) / limit)
+        }
       });
     }
 
+    // If audit logs exist, we need to manually join with profiles
+    const logsWithProfiles = [];
+    if (auditLogs && auditLogs.length > 0) {
+      for (const log of auditLogs) {
+        let profile = null;
+        
+        if (log.user_id) {
+          // Get profile information for this user
+          const { data: userProfile } = await supabase
+            .from('profiles')
+            .select('full_name, email')
+            .eq('id', log.user_id)
+            .single();
+          
+          profile = userProfile;
+        }
+
+        logsWithProfiles.push({
+          ...log,
+          profiles: profile
+        });
+      }
+    }
+
+    console.log(`✅ Retrieved ${logsWithProfiles.length} audit logs`);
+
     return res.json({
-      logs,
+      success: true,
+      logs: logsWithProfiles,
       pagination: {
         page,
         limit,
@@ -1013,6 +1086,7 @@ router.get('/audit-logs', [authenticateToken, requireAdmin], async (req: AuthReq
   } catch (error) {
     console.error('Get audit logs error:', error);
     return res.status(500).json({
+      success: false,
       error: 'Internal server error',
       message: 'An unexpected error occurred while fetching audit logs'
     });
