@@ -51,6 +51,7 @@ export interface PartSearchData {
   upload_source?: string;
   analysis_status?: 'completed' | 'failed' | 'processing';
   error_message?: string;
+  description?: string;
   metadata?: any;
 }
 
@@ -85,17 +86,25 @@ export class DatabaseLogger {
         similar_images_count: data.similar_images?.length || 0
       });
 
+      // Extract part details from predictions for easier querying
+      const primaryPrediction = data.predictions?.[0];
+      
       const { error } = await supabase
         .from('part_searches')
         .insert({
           id: data.id,
           user_id: data.user_id,
+          search_term: data.search_query || data.image_name || 'Image Upload',
+          part_name: primaryPrediction?.class_name || data.search_query || 'Unknown Part',
+          manufacturer: primaryPrediction?.manufacturer || 'Unknown',
+          category: primaryPrediction?.category || 'Automotive',
+          part_number: primaryPrediction?.part_number || null,
           image_url: data.image_url,
           image_name: data.image_name,
           predictions: data.predictions || [],
           confidence_score: data.confidence_score || 0,
           processing_time: data.processing_time || 0,
-          ai_model_version: data.ai_model_version || 'SpareFinder AI v1',
+          model_version: data.ai_model_version || 'SpareFinder AI v1',
           similar_images: data.similar_images || [],
           web_scraping_used: data.web_scraping_used || false,
           sites_searched: data.sites_searched || 0,
@@ -106,7 +115,13 @@ export class DatabaseLogger {
           upload_source: data.upload_source || 'web',
           analysis_status: data.analysis_status || 'completed',
           error_message: data.error_message,
-          metadata: data.metadata || {}
+          is_match: (data.confidence_score || 0) > 0.5,
+          metadata: {
+            ...data.metadata,
+            description: data.description || primaryPrediction?.description || '',
+            supabase_image_url: data.image_url,
+            full_predictions: data.predictions
+          }
         });
 
       if (error) {

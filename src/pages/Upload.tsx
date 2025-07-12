@@ -1374,9 +1374,24 @@ const Upload = () => {
     try {
       setIsLoading(true);
       
-      // Prepare data for the save endpoint
+      // Transform the data to match the expected schema
       const saveData = {
-        ...analysisResults,
+        success: analysisResults.success,
+        predictions: analysisResults.predictions,
+        similar_images: analysisResults.similar_images || [],
+        model_version: analysisResults.model_version,
+        processing_time: analysisResults.processing_time,
+        image_metadata: {
+          content_type: analysisResults.image_metadata?.content_type || uploadedFile?.type || 'image/jpeg',
+          size_bytes: analysisResults.image_metadata?.size_bytes || uploadedFile?.size || 0,
+          base64_image: analysisResults.image_metadata?.base64_image || null
+        },
+        additional_details: {
+          full_analysis: analysisResults.additional_details?.full_analysis || '',
+          technical_specifications: analysisResults.additional_details?.technical_specifications || '',
+          market_information: analysisResults.additional_details?.market_information || '',
+          confidence_reasoning: analysisResults.additional_details?.confidence_reasoning || ''
+        },
         image_url: imagePreview || '',
         image_name: uploadedFile?.name || 'analysis_result.jpg'
       };
@@ -1425,7 +1440,7 @@ const Upload = () => {
           ) : (
             <>
               <FileText className="w-4 h-4 mr-2" />
-              Save Results to Database
+              Save Results
             </>
           )}
         </Button>

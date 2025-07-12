@@ -7,6 +7,7 @@ import { AuthRequest } from '../types/auth';
 import { supabase } from '../server';
 import { DatabaseLogger, PartSearchData, SearchHistoryData } from '../services/database-logger';
 import { z } from 'zod';
+import { v4 as uuidv4 } from 'uuid';
 
 const router = Router();
 
@@ -171,7 +172,7 @@ router.post('/image', authenticateToken, upload.single('image'), handleMulterErr
         success: false,
         error: 'AI service not configured',
         message: 'The AI analysis service is not properly configured. Please contact support.',
-        id: `upload_${Date.now()}`,
+        id: uuidv4(),
         image_url: urlData.publicUrl
       });
     }
@@ -254,7 +255,7 @@ router.post('/image', authenticateToken, upload.single('image'), handleMulterErr
       
       // If AI service is down, save the upload with a placeholder response
       const fallbackData: PartSearchData = {
-        id: `upload_${Date.now()}`,
+        id: uuidv4(),
         user_id: userId,
         image_url: urlData.publicUrl,
         image_name: originalname,
@@ -334,7 +335,9 @@ router.post('/image', authenticateToken, upload.single('image'), handleMulterErr
 
     // Step 3: Save analysis result to database using enhanced logger
     const analysisData: PartSearchData = {
-      id: aiResponse.data.filename || `upload_${Date.now()}`,
+      id: aiResponse.data.filename && aiResponse.data.filename.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i) 
+        ? aiResponse.data.filename 
+        : uuidv4(),
       user_id: userId,
       image_url: urlData.publicUrl,
       image_name: originalname,
@@ -505,29 +508,29 @@ const AnalysisResultsSchema = z.object({
   predictions: z.array(z.object({
     class_name: z.string(),
     confidence: z.number().min(0).max(1),
-    description: z.string().optional(),
-    category: z.string().optional(),
-    manufacturer: z.string().optional(),
-    estimated_price: z.string().optional(),
-    part_number: z.string().optional(),
-    compatibility: z.array(z.string()).optional()
+    description: z.union([z.string(), z.null()]).optional(),
+    category: z.union([z.string(), z.null()]).optional(),
+    manufacturer: z.union([z.string(), z.null()]).optional(),
+    estimated_price: z.union([z.string(), z.null()]).optional(),
+    part_number: z.union([z.string(), z.null()]).optional(),
+    compatibility: z.union([z.array(z.string()), z.null()]).optional()
   })),
-  similar_images: z.array(z.any()).optional(),
+  similar_images: z.union([z.array(z.any()), z.null()]).optional(),
   model_version: z.string(),
   processing_time: z.number(),
   image_metadata: z.object({
     content_type: z.string(),
     size_bytes: z.number(),
-    base64_image: z.string().optional()
+    base64_image: z.union([z.string(), z.null()]).optional()
   }),
   additional_details: z.object({
-    full_analysis: z.string().optional(),
-    technical_specifications: z.string().optional(),
-    market_information: z.string().optional(),
-    confidence_reasoning: z.string().optional(),
+    full_analysis: z.union([z.string(), z.null()]).optional(),
+    technical_specifications: z.union([z.string(), z.null()]).optional(),
+    market_information: z.union([z.string(), z.null()]).optional(),
+    confidence_reasoning: z.union([z.string(), z.null()]).optional(),
   }).optional(),
-  image_url: z.string().optional(),
-  image_name: z.string().optional()
+  image_url: z.union([z.string(), z.null()]).optional(),
+  image_name: z.union([z.string(), z.null()]).optional()
 });
 
 // Save Analysis Results Endpoint
@@ -555,7 +558,7 @@ router.post('/save-results', authenticateToken, async (req: AuthRequest, res: Re
     }
 
     // Generate unique ID for this analysis
-    const analysisId = `saved_${Date.now()}_${userId.slice(-8)}`;
+    const analysisId = uuidv4();
 
     // Prepare comprehensive analysis data for database
     const analysisData: PartSearchData = {
@@ -575,13 +578,15 @@ router.post('/save-results', authenticateToken, async (req: AuthRequest, res: Re
       sites_searched: 0,
       parts_found: validatedData.predictions.length,
       search_query: primaryPrediction.class_name,
+      description: primaryPrediction.description || validatedData.additional_details?.full_analysis || '',
       similar_images: validatedData.similar_images || [],
       metadata: {
         saved_manually: true,
         save_timestamp: new Date().toISOString(),
         user_agent: req.headers['user-agent'],
         additional_details: validatedData.additional_details,
-        full_analysis_data: validatedData
+        full_analysis_data: validatedData,
+        supabase_image_url: validatedData.image_url
       }
     };
 
@@ -671,7 +676,7 @@ router.post('/store-analysis', authenticateToken, async (req: AuthRequest, res: 
     }
 
     const userId = req.user!.userId;
-    const analysisId = `legacy_${Date.now()}_${userId.slice(-8)}`;
+    const analysisId = uuidv4();
 
     // Convert to new format
     const analysisData: PartSearchData = {
