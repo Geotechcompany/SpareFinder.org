@@ -38,6 +38,7 @@ import MobileSidebar from '@/components/MobileSidebar';
 import { api } from '@/lib/api';
 import { toast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
+import axios from 'axios';
 import { useToast } from '@/components/ui/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -574,9 +575,9 @@ const Upload = () => {
             }
           );
 
-          if (statusResponse.success && statusResponse.part_info && statusResponse.part_info.length > 0) {
+          if (statusResponse.success && statusResponse.data?.predictions && statusResponse.data.predictions.length > 0) {
             // Prepare predictions
-            const predictions = statusResponse.part_info.map(prediction => ({
+            const predictions = statusResponse.data.predictions.map(prediction => ({
               class_name: prediction.class_name || 'Automotive Component',
               confidence: prediction.confidence || 0.75,
               description: prediction.description || '',
@@ -599,7 +600,7 @@ const Upload = () => {
                 size_bytes: file.size
               },
               additional_details: {
-                full_analysis: statusResponse.part_info[0]?.description || '',
+                full_analysis: statusResponse.data?.predictions?.[0]?.description || '',
                 technical_specifications: '',
                 market_information: '',
                 confidence_reasoning: ''
@@ -630,9 +631,9 @@ const Upload = () => {
       }
 
       // If initial response is successful, process immediately
-      if (initialResponse.success && initialResponse.part_info && initialResponse.part_info.length > 0) {
+      if (initialResponse.success && initialResponse.data && initialResponse.data.length > 0) {
         // Prepare predictions
-        const predictions = initialResponse.part_info.map(prediction => ({
+        const predictions = initialResponse.data.map(prediction => ({
           class_name: prediction.class_name || 'Automotive Component',
           confidence: prediction.confidence || 0.75,
           description: prediction.description || '',
@@ -655,7 +656,7 @@ const Upload = () => {
             size_bytes: file.size
           },
           additional_details: {
-            full_analysis: initialResponse.part_info[0]?.description || '',
+            full_analysis: initialResponse.data[0]?.description || '',
             technical_specifications: '',
             market_information: '',
             confidence_reasoning: ''
@@ -684,23 +685,73 @@ const Upload = () => {
     } catch (error) {
       console.error('Image analysis error:', error);
       
-      const errorMessage = error instanceof Error 
-        ? error.message 
-        : 'Unknown error occurred during image analysis';
+      let errorMessage = 'Unknown error occurred during image analysis';
+      let errorTitle = 'Analysis Failed';
+      let retryable = false;
+      
+      // Handle specific error types from the improved backend
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      }
+      
+      // Handle axios errors with better messages
+      if (axios.isAxiosError(error)) {
+        const response = error.response;
+        
+        if (response?.data) {
+          const errorData = response.data;
+          
+          // Use the enhanced error information from backend
+          if (errorData.error && errorData.message) {
+            errorTitle = errorData.error.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase());
+            errorMessage = errorData.message;
+            retryable = errorData.retry_suggested || false;
+            
+            // Add troubleshooting info if available
+            if (errorData.troubleshooting) {
+              console.log('Troubleshooting info:', errorData.troubleshooting);
+            }
+          } else {
+            errorMessage = errorData.message || errorData.error || 'Server error occurred';
+          }
+        } else {
+          // Handle network errors
+          switch (error.code) {
+            case 'ECONNABORTED':
+              errorTitle = 'Request Timeout';
+              errorMessage = 'The request took too long to complete. Please try again.';
+              retryable = true;
+              break;
+            case 'ECONNREFUSED':
+              errorTitle = 'Connection Failed';
+              errorMessage = 'Unable to connect to the analysis service. Please check your connection and try again.';
+              retryable = true;
+              break;
+            case 'ERR_NETWORK':
+              errorTitle = 'Network Error';
+              errorMessage = 'Network connection failed. Please check your internet connection.';
+              retryable = true;
+              break;
+            default:
+              errorMessage = `Network error: ${error.message}`;
+              retryable = true;
+          }
+        }
+      }
 
       onProgress?.({
         status: 'error',
         message: errorMessage,
         progress: 0,
-        currentStep: 'Analysis Failed',
+        currentStep: errorTitle,
         currentStepIndex: 0,
         totalSteps: 6,
-        details: 'Unable to complete image analysis'
+        details: retryable ? 'You can try uploading again' : 'Unable to complete image analysis'
       });
 
       toast({
-        title: 'Analysis Failed',
-        description: errorMessage,
+        title: errorTitle,
+        description: errorMessage + (retryable ? ' (You can try again)' : ''),
         variant: 'destructive'
       });
 
@@ -848,9 +899,9 @@ const Upload = () => {
         throw new Error(result.error || 'No result returned from upload');
       }
       
-      // Prepare predictions, using the service's part_info or fallback parsing
-      const predictions = result.part_info?.length ? 
-        result.part_info.map(prediction => ({
+      // Prepare predictions, using the service's predictions or fallback parsing
+      const predictions = result.data?.predictions?.length ? 
+        result.data.predictions.map(prediction => ({
           class_name: prediction.class_name || 'Automotive Component',
           confidence: prediction.confidence || 0.75,
           description: prediction.description || '',
@@ -864,7 +915,7 @@ const Upload = () => {
         [{
           class_name: 'Automotive Component',
           confidence: 0.75,
-          description: result.part_info?.description || 'No detailed description available',
+          description: result.data?.description || 'No detailed description available',
           category: 'Unspecified',
           manufacturer: 'Unknown',
           estimated_price: 'Price not available'
@@ -873,7 +924,7 @@ const Upload = () => {
       // Prepare additional details dynamically
       const firstPrediction = predictions[0];
       const additionalDetails = {
-        full_analysis: result.part_info?.description || '',
+        full_analysis: result.data?.description || '',
         technical_specifications: `
 - Detailed analysis provided by AI Model
 - Comprehensive part identification service`,
@@ -912,12 +963,12 @@ const Upload = () => {
       });
 
       // If analysis is successful, store the results
-      if (result.success && result.part_info && result.part_info.length > 0) {
+      if (result.success && result.data && result.data.length > 0) {
         try {
           // Prepare analysis results in the expected format
           const analysisResults: AnalysisResponse = {
             success: result.success,
-            predictions: result.part_info.map(prediction => ({
+            predictions: result.data.map(prediction => ({
               class_name: prediction.class_name || 'Automotive Component',
               confidence: prediction.confidence || 0.75,
               description: prediction.description || '',
@@ -936,7 +987,7 @@ const Upload = () => {
               base64_image: await convertImageToBase64(uploadedFile) // Add this helper function
             },
             additional_details: {
-              full_analysis: result.part_info[0]?.description || '',
+              full_analysis: result.data[0]?.description || '',
               technical_specifications: '',
               market_information: '',
               confidence_reasoning: ''
@@ -944,7 +995,7 @@ const Upload = () => {
           };
 
           // Store analysis in database
-          await api.upload.storeAnalysis(analysisResults);
+          console.log('Analysis results prepared:', analysisResults);
         } catch (storageError) {
           console.error('Failed to store analysis:', storageError);
           toast({
@@ -1309,19 +1360,109 @@ const Upload = () => {
     }
   }, [analysisResults, toast]);
 
+  // Save results to database
+  const saveAnalysisResults = useCallback(async () => {
+    if (!analysisResults) {
+      toast({
+        title: "No Results",
+        description: "No analysis results available to save",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      
+      // Transform the data to match the expected schema
+      const saveData = {
+        success: analysisResults.success,
+        predictions: analysisResults.predictions,
+        similar_images: analysisResults.similar_images || [],
+        model_version: analysisResults.model_version,
+        processing_time: analysisResults.processing_time,
+        image_metadata: {
+          content_type: analysisResults.image_metadata?.content_type || uploadedFile?.type || 'image/jpeg',
+          size_bytes: analysisResults.image_metadata?.size_bytes || uploadedFile?.size || 0,
+          base64_image: analysisResults.image_metadata?.base64_image || null
+        },
+        additional_details: {
+          full_analysis: analysisResults.additional_details?.full_analysis || '',
+          technical_specifications: analysisResults.additional_details?.technical_specifications || '',
+          market_information: analysisResults.additional_details?.market_information || '',
+          confidence_reasoning: analysisResults.additional_details?.confidence_reasoning || ''
+        },
+        image_url: imagePreview || '',
+        image_name: uploadedFile?.name || 'analysis_result.jpg'
+      };
+
+      console.log('💾 Saving analysis results:', saveData);
+
+      const response = await api.upload.saveResults(saveData);
+
+      if (response.success) {
+        toast({
+          title: "Results Saved",
+          description: `Analysis results saved successfully: ${response.data?.part_name}`,
+          variant: "default"
+        });
+      } else {
+        throw new Error(response.message || 'Failed to save results');
+      }
+    } catch (error) {
+      console.error('Save results error:', error);
+      toast({
+        title: "Save Failed",
+        description: error instanceof Error ? error.message : "Failed to save analysis results",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  }, [analysisResults, imagePreview, uploadedFile, toast]);
+
   // Update existing buttons or add a new button in the results section
-  const renderPDFDownloadButton = () => {
+  const renderActionButtons = () => {
     if (!analysisResults) return null;
 
     return (
-      <Button 
-        onClick={downloadPDFReport}
-        variant="outline"
-        className="w-full flex items-center justify-center space-x-2"
-      >
-        <Download className="w-4 h-4 mr-2" />
-        Download PDF Report
-      </Button>
+      <div className="space-y-3">
+        <Button 
+          onClick={saveAnalysisResults}
+          disabled={isLoading}
+          className="w-full bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white font-medium"
+        >
+          {isLoading ? (
+            <>
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              Saving...
+            </>
+          ) : (
+            <>
+              <FileText className="w-4 h-4 mr-2" />
+              Save Results
+            </>
+          )}
+        </Button>
+        
+        <Button 
+          onClick={downloadPDFReport}
+          variant="outline"
+          className="w-full flex items-center justify-center space-x-2"
+        >
+          <Download className="w-4 h-4 mr-2" />
+          Download PDF Report
+        </Button>
+        
+        <Button 
+          onClick={generateShareableLink}
+          variant="outline"
+          className="w-full flex items-center justify-center space-x-2"
+        >
+          <Share className="w-4 h-4 mr-2" />
+          Share Results
+        </Button>
+      </div>
     );
   };
 
@@ -1852,7 +1993,7 @@ const Upload = () => {
                       </div>
                     )}
                   </div>
-                  {renderPDFDownloadButton()}
+                  {renderActionButtons()}
                 </CardContent>
               </Card>
             </motion.div>

@@ -338,10 +338,27 @@ export const dashboardApi = {
 
 // Admin API
 export const adminApi = {
-  getUsers: async (page: number = 1, limit: number = 50): Promise<ApiResponse> => {
+  getUsers: async (
+    page: number = 1, 
+    limit: number = 50, 
+    search?: string, 
+    roleFilter?: string
+  ): Promise<ApiResponse> => {
     console.log('📋 Fetching users from API...');
     try {
-      const response = await apiClient.get(`/admin/users?page=${page}&limit=${limit}`);
+      const params = new URLSearchParams();
+      params.append('page', page.toString());
+      params.append('limit', limit.toString());
+      
+      if (search && search.trim()) {
+        params.append('search', search.trim());
+      }
+      
+      if (roleFilter && roleFilter !== 'all') {
+        params.append('role', roleFilter);
+      }
+
+      const response = await apiClient.get(`/admin/users?${params.toString()}`);
       console.log('📋 Raw API response:', response.data);
       return response.data;
     } catch (error) {
@@ -558,6 +575,82 @@ export const uploadApi = {
       return response.data;
     } catch (error) {
       console.error('Upload error:', error);
+      throw error;
+    }
+  },
+
+  saveResults: async (analysisResults: {
+    success: boolean;
+    predictions: Array<{
+      class_name: string;
+      confidence: number;
+      description?: string;
+      category?: string;
+      manufacturer?: string;
+      estimated_price?: string;
+      part_number?: string;
+      compatibility?: string[];
+    }>;
+    similar_images?: any[];
+    model_version: string;
+    processing_time: number;
+    image_metadata: {
+      content_type: string;
+      size_bytes: number;
+      base64_image?: string;
+    };
+    additional_details?: {
+      full_analysis?: string;
+      technical_specifications?: string;
+      market_information?: string;
+      confidence_reasoning?: string;
+    };
+    image_url?: string;
+    image_name?: string;
+  }): Promise<ApiResponse> => {
+    try {
+      const response = await apiClient.post('/upload/save-results', analysisResults, {
+        timeout: 30000, // 30 second timeout
+      });
+      
+      return response.data;
+    } catch (error) {
+      console.error('Save results error:', error);
+      throw error;
+    }
+  },
+
+  getHistory: async (options?: {
+    page?: number;
+    limit?: number;
+    status?: string;
+    web_scraping?: boolean;
+    date_from?: string;
+    date_to?: string;
+  }): Promise<ApiResponse> => {
+    try {
+      const params = new URLSearchParams();
+      if (options?.page) params.append('page', options.page.toString());
+      if (options?.limit) params.append('limit', options.limit.toString());
+      if (options?.status) params.append('status', options.status);
+      if (options?.web_scraping !== undefined) params.append('web_scraping', options.web_scraping.toString());
+      if (options?.date_from) params.append('date_from', options.date_from);
+      if (options?.date_to) params.append('date_to', options.date_to);
+      
+      const response = await apiClient.get(`/upload/history?${params.toString()}`);
+      return response.data;
+    } catch (error) {
+      console.error('Upload history error:', error);
+      throw error;
+    }
+  },
+
+  getStatistics: async (): Promise<ApiResponse> => {
+    try {
+      const response = await apiClient.get('/upload/statistics');
+      return response.data;
+    } catch (error) {
+      console.error('Upload statistics error:', error);
       throw error;
     }
   }

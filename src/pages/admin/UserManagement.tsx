@@ -58,6 +58,14 @@ interface UserData {
   role: 'user' | 'admin' | 'super_admin';
   created_at: string;
   updated_at: string;
+  last_sign_in_at?: string;
+  email_confirmed_at?: string;
+  is_active?: boolean;
+  is_verified?: boolean;
+  search_count?: number;
+  last_search_at?: string;
+  upload_count?: number;
+  last_upload_at?: string;
 }
 
 interface Pagination {
@@ -82,42 +90,44 @@ const UserManagement = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const { toast } = useToast();
 
+  // Debounce search to avoid too many API calls
+  useEffect(() => {
+    const debounceTimer = setTimeout(() => {
+      // Reset to page 1 when search or filter changes
+      if (searchTerm || roleFilter !== 'all') {
+        setPagination(prev => ({ ...prev, page: 1 }));
+      }
+      fetchUsers();
+    }, 500); // 500ms debounce
+
+    return () => clearTimeout(debounceTimer);
+  }, [searchTerm, roleFilter]);
+
+  // Separate effect for pagination changes (no debounce needed)
   useEffect(() => {
     fetchUsers();
-  }, [pagination.page, searchTerm, roleFilter]);
+  }, [pagination.page]);
 
   const fetchUsers = async () => {
     try {
       setIsLoading(true);
-      console.log('🔍 Fetching users...');
-      const response = await api.admin.getUsers(pagination.page, pagination.limit);
+      console.log('🔍 Fetching users with filters:', { searchTerm, roleFilter, page: pagination.page });
+      
+      const response = await api.admin.getUsers(
+        pagination.page, 
+        pagination.limit, 
+        searchTerm, 
+        roleFilter
+      );
       
       console.log('📋 User fetch response:', response);
       
       if (response.success && response.data) {
-        let filteredUsers = response.data.users || [];
+        const fetchedUsers = response.data.users || [];
         
-        console.log('📋 Raw users from API:', filteredUsers);
+        console.log('📋 Fetched users from API:', fetchedUsers);
         
-        // Apply search filter
-        if (searchTerm) {
-          filteredUsers = filteredUsers.filter(user => 
-            user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            user.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            (user.company && user.company.toLowerCase().includes(searchTerm.toLowerCase()))
-          );
-          console.log('📋 After search filter:', filteredUsers);
-        }
-        
-        // Apply role filter
-        if (roleFilter !== 'all') {
-          filteredUsers = filteredUsers.filter(user => user.role === roleFilter);
-          console.log('📋 After role filter:', filteredUsers);
-        }
-        
-        console.log('📋 Final filtered users:', filteredUsers);
-        
-        setUsers(filteredUsers);
+        setUsers(fetchedUsers);
         setPagination(prev => ({
           ...prev,
           total: response.data.pagination?.total || 0,
@@ -125,6 +135,13 @@ const UserManagement = () => {
         }));
       } else {
         console.warn('❌ Invalid response format:', response);
+        // Set empty users array if response is invalid
+        setUsers([]);
+        setPagination(prev => ({
+          ...prev,
+          total: 0,
+          pages: 0
+        }));
       }
     } catch (error) {
       console.error('Error fetching users:', error);
@@ -133,6 +150,13 @@ const UserManagement = () => {
         title: "Error",
         description: "Failed to fetch users. Please try again.",
       });
+      // Set empty users array on error
+      setUsers([]);
+      setPagination(prev => ({
+        ...prev,
+        total: 0,
+        pages: 0
+      }));
     } finally {
       setIsLoading(false);
     }
@@ -344,6 +368,7 @@ const UserManagement = () => {
                           <TableHead className="text-gray-300">User</TableHead>
                           <TableHead className="text-gray-300">Company</TableHead>
                           <TableHead className="text-gray-300">Role</TableHead>
+                          <TableHead className="text-gray-300">Activity</TableHead>
                           <TableHead className="text-gray-300">Joined</TableHead>
                           <TableHead className="text-gray-300">Actions</TableHead>
                         </TableRow>
@@ -351,7 +376,7 @@ const UserManagement = () => {
                       <TableBody>
                         {users.length === 0 ? (
                           <TableRow>
-                            <TableCell colSpan={5} className="text-center py-8">
+                            <TableCell colSpan={6} className="text-center py-8">
                               <div className="text-gray-400">
                                 {searchTerm || roleFilter !== 'all' ? (
                                   <div>
@@ -389,7 +414,25 @@ const UserManagement = () => {
                                   </Badge>
                                 </TableCell>
                                 <TableCell className="text-gray-300">
-                                  {new Date(user.created_at).toLocaleDateString()}
+                                  <div className="text-sm">
+                                    <div className="flex items-center space-x-2">
+                                      <span className="text-blue-400">{user.search_count || 0}</span>
+                                      <span className="text-gray-500">searches</span>
+                                    </div>
+                                    {user.last_sign_in_at && (
+                                      <div className="text-xs text-gray-500 mt-1">
+                                        Last seen: {new Date(user.last_sign_in_at).toLocaleDateString()}
+                                      </div>
+                                    )}
+                                  </div>
+                                </TableCell>
+                                <TableCell className="text-gray-300">
+                                  <div className="text-sm">
+                                    <div>{new Date(user.created_at).toLocaleDateString()}</div>
+                                    {user.is_verified && (
+                                      <div className="text-xs text-green-400 mt-1">✓ Verified</div>
+                                    )}
+                                  </div>
                                 </TableCell>
                                 <TableCell>
                                   <div className="flex items-center space-x-2">

@@ -11,27 +11,84 @@ router.get('/users', [authenticateToken, requireAdmin], async (req: AuthRequest,
   try {
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 50;
+    const search = req.query.search as string;
+    const roleFilter = req.query.role as string;
     const offset = (page - 1) * limit;
 
-    const { data: users, error, count } = await supabase
-      .from('profiles')
+    console.log('📋 Fetching users with filters:', { page, limit, search, roleFilter });
+
+    // Build query for the admin_user_management view
+    let query = supabase
+      .from('admin_user_management')
       .select('*', { count: 'exact' })
-      .order('created_at', { ascending: false })
-      .range(offset, offset + limit - 1);
+      .order('created_at', { ascending: false });
+
+    // Apply search filter if provided
+    if (search && search.trim()) {
+      query = query.or(`email.ilike.%${search}%,full_name.ilike.%${search}%,company.ilike.%${search}%`);
+    }
+
+    // Apply role filter if provided
+    if (roleFilter && roleFilter !== 'all') {
+      query = query.eq('role', roleFilter);
+    }
+
+    // Apply pagination
+    query = query.range(offset, offset + limit - 1);
+
+    const { data: users, error, count } = await query;
 
     if (error) {
       console.error('Users fetch error:', error);
-      return res.status(500).json({
-        success: false,
-        error: 'Users fetch failed',
-        message: 'Failed to retrieve users'
+      
+      // Fallback to basic profiles table if view doesn't exist
+      console.log('📋 Falling back to profiles table...');
+      let fallbackQuery = supabase
+        .from('profiles')
+        .select('*', { count: 'exact' })
+        .order('created_at', { ascending: false });
+
+      if (search && search.trim()) {
+        fallbackQuery = fallbackQuery.or(`email.ilike.%${search}%,full_name.ilike.%${search}%,company.ilike.%${search}%`);
+      }
+
+      if (roleFilter && roleFilter !== 'all') {
+        fallbackQuery = fallbackQuery.eq('role', roleFilter);
+      }
+
+      fallbackQuery = fallbackQuery.range(offset, offset + limit - 1);
+
+      const { data: fallbackUsers, error: fallbackError, count: fallbackCount } = await fallbackQuery;
+
+      if (fallbackError) {
+        console.error('Fallback users fetch error:', fallbackError);
+        return res.status(500).json({
+          success: false,
+          error: 'Users fetch failed',
+          message: 'Failed to retrieve users from database'
+        });
+      }
+
+      return res.json({
+        success: true,
+        data: {
+          users: fallbackUsers || [],
+          pagination: {
+            page,
+            limit,
+            total: fallbackCount || 0,
+            pages: Math.ceil((fallbackCount || 0) / limit)
+          }
+        }
       });
     }
+
+    console.log('📋 Successfully fetched users:', users?.length || 0);
 
     return res.json({
       success: true,
       data: {
-        users,
+        users: users || [],
         pagination: {
           page,
           limit,
@@ -44,6 +101,7 @@ router.get('/users', [authenticateToken, requireAdmin], async (req: AuthRequest,
   } catch (error) {
     console.error('Get users error:', error);
     return res.status(500).json({
+      success: false,
       error: 'Internal server error',
       message: 'An unexpected error occurred while fetching users'
     });
