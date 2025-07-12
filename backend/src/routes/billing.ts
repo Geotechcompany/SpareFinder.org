@@ -417,7 +417,7 @@ router.get('/usage', authenticateToken, async (req: AuthRequest, res: Response) 
 router.post('/checkout-session', authenticateToken, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.user!.userId;
-    const { plan, amount, currency, billing_cycle, success_url, cancel_url } = req.body;
+    const { plan, amount, currency, billing_cycle: _billing_cycle, success_url, cancel_url } = req.body;
 
     // Validate required fields
     if (!plan || !success_url || !cancel_url) {

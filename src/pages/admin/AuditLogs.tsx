@@ -73,66 +73,67 @@ const AuditLogs = () => {
       setIsLoading(true);
       setError(null);
 
+      console.log('🔍 Fetching audit logs from database...');
+
       const response = await api.admin.getAuditLogs(page, 50);
 
       if (response.success && response.data) {
-        // For now, create mock audit logs since the API might not have real data
-        const mockLogs: AuditLog[] = [
-          {
-            id: '1',
-            user_id: 'user1',
-            action: 'User login successful',
-            resource_type: 'authentication',
-            details: { ip: '192.168.1.100', user_agent: 'Chrome/120.0.0.0' },
-            created_at: new Date().toISOString(),
-            profiles: { full_name: 'Geoffrey Audia', email: 'gaudia@bqitech.com' }
-          },
-          {
-            id: '2',
-            user_id: 'user2',
-            action: 'Part upload completed',
-            resource_type: 'upload',
-            details: { filename: 'part_image.jpg', size: '2.3MB' },
-            created_at: new Date(Date.now() - 3600000).toISOString(),
-            profiles: { full_name: 'Test User', email: 'test@example.com' }
-          },
-          {
-            id: '3',
-            user_id: 'admin',
-            action: 'System backup completed',
-            resource_type: 'system',
-            details: { backup_size: '1.2GB', duration: '5 minutes' },
-            created_at: new Date(Date.now() - 7200000).toISOString(),
-            profiles: { full_name: 'System Admin', email: 'admin@bqitech.com' }
-          },
-          {
-            id: '4',
-            user_id: 'user3',
-            action: 'Failed login attempt',
-            resource_type: 'authentication',
-            details: { ip: '192.168.1.200', reason: 'Invalid password' },
-            created_at: new Date(Date.now() - 10800000).toISOString(),
-            profiles: { full_name: 'Unknown User', email: 'unknown@example.com' }
-          },
-          {
-            id: '5',
-            user_id: 'admin',
-            action: 'Admin settings updated',
-            resource_type: 'configuration',
-            details: { settings: 'AI model configuration changed' },
-            created_at: new Date(Date.now() - 14400000).toISOString(),
-            profiles: { full_name: 'Geoffrey Audia', email: 'gaudia@bqitech.com' }
-          }
-        ];
+        console.log('✅ Audit logs response:', response.data);
+        
+        // Handle different possible response structures
+        let auditLogs: AuditLog[] = [];
+        
+        if (Array.isArray(response.data)) {
+          // Direct array response
+          auditLogs = response.data;
+        } else if (response.data.logs && Array.isArray(response.data.logs)) {
+          // Nested logs array
+          auditLogs = response.data.logs;
+        } else if (response.data.data && Array.isArray(response.data.data)) {
+          // Double nested data
+          auditLogs = response.data.data;
+        }
+        
+        // Handle backend response format with success flag
+        if (response.data.success && response.data.logs) {
+          auditLogs = response.data.logs;
+        }
 
-        setLogs(mockLogs);
-        setTotalPages(1);
+        // Transform the data to match our interface
+        const transformedLogs: AuditLog[] = auditLogs.map((log: any) => ({
+          id: log.id || log.audit_id || `log-${Date.now()}-${Math.random()}`,
+          user_id: log.user_id || log.userId || 'unknown',
+          action: log.action || log.event_type || log.activity || 'Unknown action',
+          resource_type: log.resource_type || log.category || log.type || 'general',
+          details: log.details || log.metadata || log.description || {},
+          created_at: log.created_at || log.timestamp || new Date().toISOString(),
+          profiles: log.profiles ? {
+            full_name: log.profiles.full_name || log.profiles.name || 'Unknown User',
+            email: log.profiles.email || 'unknown@example.com'
+          } : undefined
+        }));
+
+        setLogs(transformedLogs);
+        
+        // Set pagination info
+        const pagination = response.data.pagination;
+        if (pagination && pagination.pages) {
+          setTotalPages(pagination.pages);
+        } else {
+          setTotalPages(Math.ceil(transformedLogs.length / 50));
+        }
+
+        console.log(`📊 Loaded ${transformedLogs.length} audit logs`);
       } else {
-        throw new Error('Failed to fetch audit logs');
+        console.warn('❌ No audit logs data received or request failed');
+        // Set empty array instead of throwing error
+        setLogs([]);
+        setTotalPages(1);
       }
     } catch (err) {
-      console.error('Error fetching audit logs:', err);
+      console.error('❌ Error fetching audit logs:', err);
       setError(err instanceof Error ? err.message : 'Failed to fetch audit logs');
+      setLogs([]); // Set empty array on error
       toast({
         variant: "destructive",
         title: "Error",
