@@ -17,7 +17,10 @@ router.get('/users', [authenticateToken, requireAdmin], async (req: AuthRequest,
 
     console.log('📋 Fetching users with filters:', { page, limit, search, roleFilter });
 
-    // Build query for the admin_user_management view
+    // First, ensure all auth.users are synced to profiles
+    await syncAuthUsersToProfiles();
+
+    // Try the admin_user_management view first
     let query = supabase
       .from('admin_user_management')
       .select('*', { count: 'exact' })
@@ -39,51 +42,77 @@ router.get('/users', [authenticateToken, requireAdmin], async (req: AuthRequest,
     const { data: users, error, count } = await query;
 
     if (error) {
-      console.error('Users fetch error:', error);
+      console.error('Admin view error:', error);
+      console.log('📋 Falling back to enhanced profiles query...');
       
-      // Fallback to basic profiles table if view doesn't exist
-      console.log('📋 Falling back to profiles table...');
-      let fallbackQuery = supabase
-        .from('profiles')
-        .select('*', { count: 'exact' })
-        .order('created_at', { ascending: false });
+      // Enhanced fallback query with auth.users data
+      const { data: profilesWithAuth, error: enhancedError, count: enhancedCount } = await supabase
+        .rpc('get_users_with_stats', {
+          search_term: search || '',
+          role_filter: roleFilter === 'all' ? '' : roleFilter || '',
+          offset_val: offset,
+          limit_val: limit
+        });
 
-      if (search && search.trim()) {
-        fallbackQuery = fallbackQuery.or(`email.ilike.%${search}%,full_name.ilike.%${search}%,company.ilike.%${search}%`);
-      }
+      if (enhancedError) {
+        console.error('Enhanced query failed, using basic profiles:', enhancedError);
+        
+        // Basic fallback to profiles table
+        let fallbackQuery = supabase
+          .from('profiles')
+          .select('*', { count: 'exact' })
+          .order('created_at', { ascending: false });
 
-      if (roleFilter && roleFilter !== 'all') {
-        fallbackQuery = fallbackQuery.eq('role', roleFilter);
-      }
+        if (search && search.trim()) {
+          fallbackQuery = fallbackQuery.or(`email.ilike.%${search}%,full_name.ilike.%${search}%,company.ilike.%${search}%`);
+        }
 
-      fallbackQuery = fallbackQuery.range(offset, offset + limit - 1);
+        if (roleFilter && roleFilter !== 'all') {
+          fallbackQuery = fallbackQuery.eq('role', roleFilter);
+        }
 
-      const { data: fallbackUsers, error: fallbackError, count: fallbackCount } = await fallbackQuery;
+        fallbackQuery = fallbackQuery.range(offset, offset + limit - 1);
 
-      if (fallbackError) {
-        console.error('Fallback users fetch error:', fallbackError);
-        return res.status(500).json({
-          success: false,
-          error: 'Users fetch failed',
-          message: 'Failed to retrieve users from database'
+        const { data: fallbackUsers, error: fallbackError, count: fallbackCount } = await fallbackQuery;
+
+        if (fallbackError) {
+          console.error('All fallbacks failed:', fallbackError);
+          return res.status(500).json({
+            success: false,
+            error: 'Users fetch failed',
+            message: 'Failed to retrieve users from database'
+          });
+        }
+
+        return res.json({
+          success: true,
+          data: {
+            users: fallbackUsers || [],
+            pagination: {
+              page,
+              limit,
+              total: fallbackCount || 0,
+              pages: Math.ceil((fallbackCount || 0) / limit)
+            }
+          }
         });
       }
 
       return res.json({
         success: true,
         data: {
-          users: fallbackUsers || [],
+          users: profilesWithAuth || [],
           pagination: {
             page,
             limit,
-            total: fallbackCount || 0,
-            pages: Math.ceil((fallbackCount || 0) / limit)
+            total: enhancedCount || 0,
+            pages: Math.ceil((enhancedCount || 0) / limit)
           }
         }
       });
     }
 
-    console.log('📋 Successfully fetched users:', users?.length || 0);
+    console.log('📋 Successfully fetched users from view:', users?.length || 0);
 
     return res.json({
       success: true,
@@ -107,6 +136,80 @@ router.get('/users', [authenticateToken, requireAdmin], async (req: AuthRequest,
     });
   }
 });
+
+// Helper function to sync auth.users to profiles
+async function syncAuthUsersToProfiles() {
+  try {
+    console.log('🔄 Syncing auth.users to profiles...');
+    
+    // Get all auth users
+    const { data: authUsers, error: authError } = await supabase.auth.admin.listUsers();
+    
+    if (authError) {
+      console.error('Error fetching auth users:', authError);
+      return;
+    }
+
+    // Sync each user to profiles - only create new profiles, don't overwrite existing ones
+    for (const user of authUsers.users) {
+      // Check if profile already exists
+      const { data: existingProfile, error: checkError } = await supabase
+        .from('profiles')
+        .select('id, role')
+        .eq('id', user.id)
+        .single();
+
+      if (checkError && checkError.code !== 'PGRST116') {
+        console.error(`Error checking existing profile for ${user.email}:`, checkError);
+        continue;
+      }
+
+      // If profile doesn't exist, create it with default role
+      if (!existingProfile) {
+        const defaultRole = user.email === 'tps@tpsinternational.org' ? 'super_admin' : 
+                           user.email === 'gaudia@geotech.com' ? 'admin' : 'user';
+
+        const { error: insertError } = await supabase
+          .from('profiles')
+          .insert({
+            id: user.id,
+            email: user.email,
+            full_name: user.user_metadata?.full_name || user.email,
+            created_at: user.created_at,
+            updated_at: user.updated_at,
+            is_verified: user.email_confirmed_at ? true : false,
+            role: defaultRole
+          });
+
+        if (insertError) {
+          console.error(`Error creating profile for ${user.email}:`, insertError);
+        } else {
+          console.log(`✅ Created new profile for ${user.email} with role: ${defaultRole}`);
+        }
+      } else {
+        // Profile exists, only update non-role fields to keep existing role
+        const { error: updateError } = await supabase
+          .from('profiles')
+          .update({
+            email: user.email,
+            full_name: user.user_metadata?.full_name || user.email,
+            updated_at: user.updated_at,
+            is_verified: user.email_confirmed_at ? true : false
+            // Deliberately NOT updating role to preserve existing role
+          })
+          .eq('id', user.id);
+
+        if (updateError) {
+          console.error(`Error updating profile for ${user.email}:`, updateError);
+        }
+      }
+    }
+
+    console.log(`✅ Synced ${authUsers.users.length} users to profiles (preserving existing roles)`);
+  } catch (error) {
+    console.error('Sync error:', error);
+  }
+}
 
 // Update user role (admin only)
 router.patch('/users/:userId/role', [authenticateToken, requireAdmin], async (req: AuthRequest, res: Response) => {
@@ -602,6 +705,67 @@ router.post('/payment-methods', [authenticateToken, requireAdmin], async (req: A
     return res.status(500).json({
       error: 'Internal server error',
       message: 'An unexpected error occurred while creating payment method'
+    });
+  }
+});
+
+// Delete payment method (admin only)
+router.delete('/payment-methods/:id', [authenticateToken, requireAdmin], async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    if (!id) {
+      return res.status(400).json({
+        error: 'Missing payment method ID',
+        message: 'Payment method ID is required'
+      });
+    }
+
+    // Check if payment method exists
+    const { data: existingMethod, error: checkError } = await supabase
+      .from('payment_methods')
+      .select('id, name, status')
+      .eq('id', id)
+      .single();
+
+    if (checkError || !existingMethod) {
+      return res.status(404).json({
+        error: 'Payment method not found',
+        message: 'The specified payment method does not exist'
+      });
+    }
+
+    // Prevent deletion of active payment methods
+    if (existingMethod.status === 'active') {
+      return res.status(400).json({
+        error: 'Cannot delete active payment method',
+        message: 'Please disable the payment method before deleting it'
+      });
+    }
+
+    // Delete the payment method
+    const { error: deleteError } = await supabase
+      .from('payment_methods')
+      .delete()
+      .eq('id', id);
+
+    if (deleteError) {
+      console.error('Payment method deletion error:', deleteError);
+      return res.status(500).json({
+        error: 'Payment method deletion failed',
+        message: 'Failed to delete payment method'
+      });
+    }
+
+    return res.json({
+      success: true,
+      message: `Payment method "${existingMethod.name}" deleted successfully`
+    });
+  } catch (error) {
+    console.error('Delete payment method error:', error);
+    return res.status(500).json({
+      error: 'Internal server error',
+      message: 'An unexpected error occurred while deleting payment method'
     });
   }
 });

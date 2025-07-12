@@ -1,11 +1,43 @@
 import { motion, AnimatePresence, useScroll, useTransform } from 'framer-motion';
 import { Button } from '@/components/ui/button';
-import { Rocket, ShieldCheck, BarChart, Globe, Zap, Cloud, Factory, Cpu, Database, Server, TestTube2, Upload, Check, X, Target, Shield, Sparkles, Clock, Award, Users, Scale, Lock, Menu } from 'lucide-react';
+import { 
+  Rocket, 
+  ShieldCheck, 
+  BarChart, 
+  Globe, 
+  Zap, 
+  Cloud, 
+  Factory, 
+  Cpu, 
+  Database, 
+  Server, 
+  TestTube2, 
+  Upload, 
+  Check, 
+  X, 
+  Target, 
+  Shield, 
+  Sparkles, 
+  Clock, 
+  Award, 
+  Users, 
+  Scale, 
+  Lock, 
+  Menu,
+  CreditCard,
+  ExternalLink,
+  Loader2,
+  CheckCircle,
+  AlertCircle
+} from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useState, useEffect, useRef } from 'react';
 import { useInView } from 'framer-motion';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { useToast } from '@/components/ui/use-toast';
+import { api } from '@/lib/api';
 
 // Cookie consent component
 const CookieConsent = () => {
@@ -64,6 +96,90 @@ const Landing = () => {
   const y2 = useTransform(scrollY, [0, 300], [0, -50]);
   const opacity = useTransform(scrollY, [0, 300], [1, 0]);
   const scaleX = useTransform(scrollYProgress, [0, 1], [0, 1]);
+
+  // Payment modal state
+  const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+  const [selectedPlan, setSelectedPlan] = useState<any>(null);
+  const [isProcessing, setIsProcessing] = useState(false);
+  
+  const { toast } = useToast();
+
+  // Stripe Checkout function
+  const processStripePayment = async (plan: any) => {
+    try {
+      setIsProcessing(true);
+      
+      // Create Stripe checkout session
+      const checkoutData = {
+        plan: plan.name,
+        amount: parseFloat(plan.price[isAnnual ? 'annual' : 'monthly']),
+        currency: 'GBP',
+        billing_cycle: isAnnual ? 'annual' : 'monthly',
+        success_url: `${window.location.origin}/dashboard?payment=success`,
+        cancel_url: `${window.location.origin}/?payment=cancelled`
+      };
+
+      const response = await api.billing.createCheckoutSession(checkoutData);
+
+      if (response.success && response.data?.checkout_url) {
+        // Redirect to Stripe Checkout
+        window.location.href = response.data.checkout_url;
+      } else {
+        throw new Error(response.error || 'Failed to create checkout session');
+      }
+
+    } catch (error) {
+      console.error('Stripe checkout error:', error);
+      toast({
+        title: "Checkout Error",
+        description: error instanceof Error ? error.message : 'Failed to start checkout process',
+        variant: "destructive",
+      });
+      setIsProcessing(false);
+    }
+  };
+
+  // Handle plan selection with Stripe integration
+  const handlePlanSelect = async (plan: any) => {
+    if (plan.name === 'Starter') {
+      // Free plan - direct signup
+      toast({
+        title: "Free Plan Selected",
+        description: "Please create an account to get started with your free plan.",
+        variant: "default",
+      });
+      return;
+    }
+    
+    if (plan.name === 'Enterprise') {
+      // Enterprise plan - contact sales
+      toast({
+        title: "Enterprise Plan",
+        description: "Our sales team will contact you to discuss custom enterprise solutions.",
+        variant: "default",
+      });
+      return;
+    }
+    
+    // Pro plan - show Stripe checkout confirmation
+    setSelectedPlan(plan);
+    setIsPaymentModalOpen(true);
+  };
+
+  // Handle Stripe checkout
+  const handleStripeCheckout = async () => {
+    if (!selectedPlan) return;
+    
+    setIsPaymentModalOpen(false);
+    await processStripePayment(selectedPlan);
+  };
+
+  // Reset modal state
+  const resetPaymentModal = () => {
+    setIsPaymentModalOpen(false);
+    setSelectedPlan(null);
+    setIsProcessing(false);
+  };
 
   const features = [
     { 
@@ -988,6 +1104,7 @@ const Landing = () => {
                   </ul>
                   
                   <Button
+                    onClick={() => handlePlanSelect(plan)}
                     className={`w-full group relative overflow-hidden ${
                       plan.featured
                         ? 'bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700'
@@ -1011,6 +1128,149 @@ const Landing = () => {
           </div>
         </div>
       </section>
+
+             {/* Payment Modal */}
+       <AnimatePresence>
+         {isPaymentModalOpen && (
+           <Dialog open={isPaymentModalOpen} onOpenChange={resetPaymentModal}>
+             <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 border border-gray-700 text-white">
+               <DialogHeader>
+                 <DialogTitle className="text-2xl font-bold bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent">
+                   {selectedPlan ? `Complete Your Payment for ${selectedPlan.name}` : 'Payment Required'}
+                 </DialogTitle>
+                 <DialogDescription className="text-gray-300">
+                   {selectedPlan ? `Subscribe to ${selectedPlan.name} plan for £${selectedPlan.price[isAnnual ? 'annual' : 'monthly']}/${isAnnual ? 'year' : 'month'}` : 'Please select a plan to proceed with payment.'}
+                 </DialogDescription>
+               </DialogHeader>
+
+               <AnimatePresence mode="wait">
+                 {selectedPlan && (
+                   <motion.div
+                     key="payment"
+                     initial={{ opacity: 0, x: 20 }}
+                     animate={{ opacity: 1, x: 0 }}
+                     exit={{ opacity: 0, x: -20 }}
+                     transition={{ duration: 0.3 }}
+                     className="space-y-6 py-4"
+                   >
+                     {/* Plan Summary */}
+                     <div className="bg-gradient-to-r from-purple-900/20 to-blue-900/20 rounded-xl p-4 border border-purple-500/30">
+                       <h3 className="text-lg font-semibold text-purple-300 mb-2">Plan Summary</h3>
+                       <div className="flex justify-between items-center text-gray-300">
+                         <span>{selectedPlan?.name} Plan ({isAnnual ? 'Annual' : 'Monthly'})</span>
+                         <span className="text-xl font-bold text-white">
+                           £{selectedPlan?.price[isAnnual ? 'annual' : 'monthly']}/{isAnnual ? 'year' : 'month'}
+                         </span>
+                       </div>
+                       {isAnnual && (
+                         <div className="text-sm text-green-400 mt-1">
+                           💰 Save 20% with annual billing
+                         </div>
+                       )}
+                     </div>
+
+                                           {/* Stripe Checkout Information */}
+                      <div className="space-y-6">
+                        <h3 className="text-lg font-semibold text-green-300 flex items-center">
+                          <CreditCard className="w-5 h-5 mr-2" />
+                          Secure Payment via Stripe
+                        </h3>
+                        
+                        {/* Stripe Benefits */}
+                        <div className="bg-gradient-to-r from-green-900/20 to-emerald-900/20 rounded-xl p-4 border border-green-500/30">
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                            <div className="flex items-center text-green-300">
+                              <Shield className="w-4 h-4 mr-2" />
+                              Bank-level security
+                            </div>
+                            <div className="flex items-center text-green-300">
+                              <Lock className="w-4 h-4 mr-2" />
+                              PCI DSS compliant
+                            </div>
+                            <div className="flex items-center text-green-300">
+                              <CreditCard className="w-4 h-4 mr-2" />
+                              Multiple payment methods
+                            </div>
+                            <div className="flex items-center text-green-300">
+                              <Globe className="w-4 h-4 mr-2" />
+                              Global payment processing
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="space-y-3">
+                          <p className="text-gray-300">
+                            🔒 You will be redirected to Stripe's secure payment page to complete your payment.
+                          </p>
+                          <p className="text-gray-400 text-sm">
+                            ✓ Your subscription will be activated instantly upon successful payment<br/>
+                            ✓ You'll receive a confirmation email with your subscription details<br/>
+                            ✓ Cancel anytime from your dashboard
+                          </p>
+                        </div>
+
+                        {/* Action Buttons */}
+                        <div className="space-y-4">
+                          <Button
+                            onClick={handleStripeCheckout}
+                            disabled={isProcessing}
+                            className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white w-full h-12 text-lg font-semibold shadow-lg shadow-purple-500/25"
+                          >
+                            {isProcessing ? (
+                              <>
+                                <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                                Redirecting to Stripe...
+                              </>
+                            ) : (
+                              <>
+                                <CreditCard className="w-5 h-5 mr-2" />
+                                Proceed to Secure Payment
+                                <ExternalLink className="w-4 h-4 ml-2" />
+                              </>
+                            )}
+                          </Button>
+                          
+                          <Button
+                            variant="outline"
+                            onClick={resetPaymentModal}
+                            disabled={isProcessing}
+                            className="border-gray-600 text-gray-300 hover:bg-gray-800 w-full"
+                          >
+                            Cancel
+                          </Button>
+                        </div>
+
+                        <p className="text-xs text-gray-500 text-center">
+                          By proceeding, you agree to our <Link to="/terms" className="underline hover:text-purple-400">Terms of Service</Link> and acknowledge our <Link to="/privacy" className="underline hover:text-purple-400">Privacy Policy</Link>.
+                        </p>
+                      </div>
+                   </motion.div>
+                 )}
+
+                 {!selectedPlan && (
+                   <motion.div
+                     key="no-plan"
+                     initial={{ opacity: 0, scale: 0.9 }}
+                     animate={{ opacity: 1, scale: 1 }}
+                     exit={{ opacity: 0, scale: 0.9 }}
+                     transition={{ duration: 0.3 }}
+                     className="text-center py-12"
+                   >
+                     <h3 className="text-xl font-semibold text-white mb-2">No Plan Selected</h3>
+                     <p className="text-gray-400 mb-6">Please select a plan to proceed with payment.</p>
+                     <Button 
+                       onClick={() => setIsPaymentModalOpen(false)}
+                       className="bg-gray-700 hover:bg-gray-600 text-white"
+                     >
+                       Cancel
+                     </Button>
+                   </motion.div>
+                 )}
+               </AnimatePresence>
+             </DialogContent>
+           </Dialog>
+         )}
+       </AnimatePresence>
 
       <Footer />
 

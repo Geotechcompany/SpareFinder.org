@@ -382,6 +382,22 @@ export const adminApi = {
     return { success: true, data: response.data };
   },
 
+  createPaymentMethod: async (paymentMethodData: {
+    name: string;
+    provider: string;
+    api_key: string;
+    secret_key: string;
+    description?: string;
+  }): Promise<ApiResponse> => {
+    const response = await apiClient.post('/admin/payment-methods', paymentMethodData);
+    return { success: true, data: response.data };
+  },
+
+  deletePaymentMethod: async (paymentMethodId: string): Promise<ApiResponse> => {
+    const response = await apiClient.delete(`/admin/payment-methods/${paymentMethodId}`);
+    return { success: true, data: response.data };
+  },
+
   getEmailTemplates: async (): Promise<ApiResponse> => {
     const response = await apiClient.get('/admin/email-templates');
     return { success: true, data: response.data };
@@ -444,6 +460,58 @@ export const billingApi = {
 
   getUsage: async (): Promise<ApiResponse> => {
     const response = await apiClient.get('/billing/usage');
+    return response.data;
+  },
+
+  processPayment: async (paymentData: {
+    plan: string;
+    amount: number;
+    currency: string;
+    billing_cycle: string;
+    customer: {
+      email: string;
+      name: string;
+      company?: string;
+    };
+    payment_method: {
+      card_number: string;
+      expiry_date: string;
+      cvv: string;
+    };
+  }): Promise<ApiResponse> => {
+    const response = await apiClient.post('/billing/process-payment', paymentData);
+    return response.data;
+  },
+
+  createSubscription: async (subscriptionData: {
+    plan: string;
+    amount: number;
+    currency: string;
+    billing_cycle: string;
+    customer: {
+      email: string;
+      name: string;
+      company?: string;
+    };
+    payment_method: {
+      card_number: string;
+      expiry_date: string;
+      cvv: string;
+    };
+  }): Promise<ApiResponse> => {
+    const response = await apiClient.post('/billing/subscribe', subscriptionData);
+    return response.data;
+  },
+
+  createCheckoutSession: async (checkoutData: {
+    plan: string;
+    amount: number;
+    currency: string;
+    billing_cycle: string;
+    success_url: string;
+    cancel_url: string;
+  }): Promise<ApiResponse> => {
+    const response = await apiClient.post('/billing/checkout-session', checkoutData);
     return response.data;
   }
 };

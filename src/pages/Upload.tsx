@@ -416,6 +416,7 @@ const Upload = () => {
   const [selectedPrediction, setSelectedPrediction] = useState<PartPrediction | null>(null);
   const [partInfo, setPartInfo] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [originalAiResponse, setOriginalAiResponse] = useState<any>(null);
   
   // New state for keywords
   const [keywords, setKeywords] = useState<string>('');
@@ -786,6 +787,7 @@ const Upload = () => {
       setSelectedPrediction(null);
       setAnalysisProgress(null);
       setPartInfo(null);
+      setOriginalAiResponse(null);
     }
   };
 
@@ -795,6 +797,7 @@ const Upload = () => {
     setSelectedPrediction(null);
     setAnalysisProgress(null);
     setPartInfo(null);
+    setOriginalAiResponse(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -886,6 +889,9 @@ const Upload = () => {
           maxPredictions: 3
         }
       );
+      
+      // Store the original AI response for complete data saving
+      setOriginalAiResponse(result);
       
       updateProgress('part_matching', 'Matching part details across multiple databases...', 70, 'Cross-referencing automotive part catalogs');
       await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate matching process
@@ -1063,6 +1069,7 @@ const Upload = () => {
     setIsAnalyzing(true);
     setAnalysisResults(null);
     setSelectedPrediction(null);
+    setOriginalAiResponse(null);
 
     try {
       const result = await analyzeImage(
@@ -1102,6 +1109,7 @@ const Upload = () => {
     setSelectedPrediction(null);
     setAnalysisProgress(null);
     setPartInfo(null);
+    setOriginalAiResponse(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -1374,7 +1382,7 @@ const Upload = () => {
     try {
       setIsLoading(true);
       
-      // Transform the data to match the expected schema
+      // Transform the data to match the expected schema - include full AI response
       const saveData = {
         success: analysisResults.success,
         predictions: analysisResults.predictions,
@@ -1393,7 +1401,16 @@ const Upload = () => {
           confidence_reasoning: analysisResults.additional_details?.confidence_reasoning || ''
         },
         image_url: imagePreview || '',
-        image_name: uploadedFile?.name || 'analysis_result.jpg'
+        image_name: uploadedFile?.name || 'analysis_result.jpg',
+        // Include complete AI response data
+        analysis: originalAiResponse?.analysis || analysisResults.additional_details?.full_analysis || '',
+        confidence: originalAiResponse?.confidence || analysisResults.predictions?.[0]?.confidence || 0,
+        metadata: {
+          ...originalAiResponse?.metadata,
+          ai_service_id: originalAiResponse?.id,
+          upload_timestamp: new Date().toISOString(),
+          frontend_version: '2.0.0'
+        }
       };
 
       console.log('💾 Saving analysis results:', saveData);
@@ -1419,7 +1436,7 @@ const Upload = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [analysisResults, imagePreview, uploadedFile, toast]);
+  }, [analysisResults, originalAiResponse, imagePreview, uploadedFile, toast]);
 
   // Update existing buttons or add a new button in the results section
   const renderActionButtons = () => {

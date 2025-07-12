@@ -21,18 +21,40 @@ import {
   Users,
   TrendingUp,
   Menu,
-  X
+  X,
+  CreditCard,
+  Loader2,
+  CheckCircle
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Link } from "react-router-dom";
 import ThemeToggle from "@/components/ThemeToggle";
 import { Calendar } from "@/components/ui/calendar";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { useToast } from "@/components/ui/use-toast";
+import { api } from "@/lib/api";
 
 const Index = () => {
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
   const [hoveredPlan, setHoveredPlan] = useState<string | null>(null);
   const [activeTestimonial, setActiveTestimonial] = useState(0);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+  const [selectedPlan, setSelectedPlan] = useState<any>(null);
+  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+  const [paymentStep, setPaymentStep] = useState<'details' | 'processing' | 'success' | 'error'>('details');
+  const [paymentForm, setPaymentForm] = useState({
+    email: '',
+    cardNumber: '',
+    expiryDate: '',
+    cvv: '',
+    name: '',
+    company: ''
+  });
+
+  const { toast } = useToast();
 
   const features = [
     {
@@ -97,6 +119,7 @@ const Index = () => {
       id: "starter",
       name: "Starter",
       price: "£24",
+      priceValue: 24,
       period: "/month",
       description: "Perfect for small workshops and hobbyists",
       features: [
@@ -107,12 +130,14 @@ const Index = () => {
         "Mobile app access"
       ],
       popular: false,
-      color: "from-gray-600 to-gray-700"
+      color: "from-gray-600 to-gray-700",
+      billingCycle: "monthly"
     },
     {
       id: "professional",
       name: "Professional",
       price: "£74",
+      priceValue: 74,
       period: "/month",
       description: "Ideal for growing businesses and service centers",
       features: [
@@ -125,12 +150,14 @@ const Index = () => {
         "Custom reports & analytics"
       ],
       popular: true,
-      color: "from-purple-600 to-blue-600"
+      color: "from-purple-600 to-blue-600",
+      billingCycle: "monthly"
     },
     {
       id: "enterprise",
       name: "Enterprise",
       price: "£249",
+      priceValue: 249,
       period: "/month",
       description: "For large organizations and dealerships",
       features: [
@@ -144,9 +171,167 @@ const Index = () => {
         "On-premise deployment option"
       ],
       popular: false,
-      color: "from-amber-500 to-orange-600"
+      color: "from-amber-500 to-orange-600",
+      billingCycle: "monthly"
     }
   ];
+
+  // Payment processing functions
+  const handlePlanSelect = (plan: any) => {
+    setSelectedPlan(plan);
+    setPaymentStep('details');
+    setIsPaymentModalOpen(true);
+  };
+
+  const handlePaymentFormChange = (field: string, value: string) => {
+    setPaymentForm(prev => ({
+      ...prev,
+      [field]: value
+    }));
+  };
+
+  const validatePaymentForm = () => {
+    const { email, cardNumber, expiryDate, cvv, name } = paymentForm;
+    
+    if (!email || !email.includes('@')) {
+      toast({
+        variant: "destructive",
+        title: "Invalid Email",
+        description: "Please enter a valid email address"
+      });
+      return false;
+    }
+    
+    if (!cardNumber || cardNumber.replace(/\s/g, '').length < 16) {
+      toast({
+        variant: "destructive",
+        title: "Invalid Card Number",
+        description: "Please enter a valid card number"
+      });
+      return false;
+    }
+    
+    if (!expiryDate || !/^\d{2}\/\d{2}$/.test(expiryDate)) {
+      toast({
+        variant: "destructive",
+        title: "Invalid Expiry Date",
+        description: "Please enter expiry date in MM/YY format"
+      });
+      return false;
+    }
+    
+    if (!cvv || cvv.length < 3) {
+      toast({
+        variant: "destructive",
+        title: "Invalid CVV",
+        description: "Please enter a valid CVV"
+      });
+      return false;
+    }
+    
+    if (!name.trim()) {
+      toast({
+        variant: "destructive",
+        title: "Name Required",
+        description: "Please enter the cardholder name"
+      });
+      return false;
+    }
+    
+    return true;
+  };
+
+  const processPayment = async () => {
+    if (!validatePaymentForm() || !selectedPlan) return;
+    
+    try {
+      setIsProcessingPayment(true);
+      setPaymentStep('processing');
+
+      // Simulate payment processing (replace with actual payment gateway integration)
+      const paymentData = {
+        plan: selectedPlan.id,
+        amount: selectedPlan.priceValue,
+        currency: 'GBP',
+        billing_cycle: selectedPlan.billingCycle,
+        customer: {
+          email: paymentForm.email,
+          name: paymentForm.name,
+          company: paymentForm.company
+        },
+        payment_method: {
+          card_number: paymentForm.cardNumber.replace(/\s/g, ''),
+          expiry_date: paymentForm.expiryDate,
+          cvv: paymentForm.cvv
+        }
+      };
+
+      // Process payment using configured payment methods
+      try {
+        const response = await api.billing.processPayment(paymentData);
+        
+        if (response.success) {
+          setPaymentStep('success');
+          toast({
+            title: "Payment Successful!",
+            description: `Welcome to SpareFinder ${selectedPlan.name}. Check your email for confirmation.`
+          });
+          
+          // Clear form
+          setPaymentForm({
+            email: '',
+            cardNumber: '',
+            expiryDate: '',
+            cvv: '',
+            name: '',
+            company: ''
+          });
+        } else {
+          throw new Error(response.message || 'Payment failed. Please try again.');
+        }
+      } catch (apiError) {
+        console.error('API Error:', apiError);
+        throw apiError; // Re-throw to be caught by outer catch
+      }
+    } catch (error) {
+      console.error('Payment error:', error);
+      setPaymentStep('error');
+      toast({
+        variant: "destructive",
+        title: "Payment Failed",
+        description: error instanceof Error ? error.message : "An unexpected error occurred"
+      });
+    } finally {
+      setIsProcessingPayment(false);
+    }
+  };
+
+  const formatCardNumber = (value: string) => {
+    // Remove all non-digit characters
+    const v = value.replace(/\s+/g, '').replace(/[^0-9]/gi, '');
+    // Add spaces every 4 digits
+    const matches = v.match(/\d{4,16}/g);
+    const match = matches && matches[0] || '';
+    const parts = [];
+    for (let i = 0, len = match.length; i < len; i += 4) {
+      parts.push(match.substring(i, i + 4));
+    }
+    if (parts.length) {
+      return parts.join(' ');
+    } else {
+      return v;
+    }
+  };
+
+  const formatExpiryDate = (value: string) => {
+    // Remove all non-digit characters
+    const v = value.replace(/\D/g, '');
+    // Add slash after 2 digits
+    if (v.length >= 2) {
+      return v.substring(0, 2) + '/' + v.substring(2, 4);
+    }
+    return v;
+  };
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -579,6 +764,7 @@ const Index = () => {
                         : 'bg-white/10 hover:bg-white/20 text-white border border-white/20'
                       }`}
                       variant={plan.popular ? "default" : "outline"}
+                      onClick={() => plan.id === "enterprise" ? null : handlePlanSelect(plan)}
                     >
                       {plan.id === "enterprise" ? "Contact Sales" : "Get Started"}
                       <ChevronRight className="ml-2 w-5 h-5" />
@@ -694,6 +880,185 @@ const Index = () => {
           </div>
         </div>
       </footer>
+
+      {/* Payment Modal */}
+      <Dialog open={isPaymentModalOpen} onOpenChange={setIsPaymentModalOpen}>
+        <DialogContent className="bg-black/95 backdrop-blur-xl border-white/20 max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-white text-2xl font-bold">
+              {paymentStep === 'success' ? 'Payment Successful!' : 
+               paymentStep === 'error' ? 'Payment Failed' :
+               paymentStep === 'processing' ? 'Processing Payment...' : 
+               `Subscribe to ${selectedPlan?.name}`}
+            </DialogTitle>
+            <DialogDescription className="text-gray-400">
+              {paymentStep === 'success' ? 'Welcome to SpareFinder! Check your email for confirmation.' :
+               paymentStep === 'error' ? 'There was an issue processing your payment. Please try again.' :
+               paymentStep === 'processing' ? 'Please wait while we process your payment...' :
+               `${selectedPlan?.price}${selectedPlan?.period} - ${selectedPlan?.description}`}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-6 pt-4">
+            {paymentStep === 'details' && (
+              <div className="space-y-4">
+                {/* Customer Information */}
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="name" className="text-gray-200">Full Name</Label>
+                      <Input
+                        id="name"
+                        value={paymentForm.name}
+                        onChange={(e) => handlePaymentFormChange('name', e.target.value)}
+                        placeholder="John Doe"
+                        className="bg-white/10 border-white/20 text-white mt-1"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="company" className="text-gray-200">Company (Optional)</Label>
+                      <Input
+                        id="company"
+                        value={paymentForm.company}
+                        onChange={(e) => handlePaymentFormChange('company', e.target.value)}
+                        placeholder="Company Ltd"
+                        className="bg-white/10 border-white/20 text-white mt-1"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <Label htmlFor="email" className="text-gray-200">Email Address</Label>
+                    <Input
+                      id="email"
+                      type="email"
+                      value={paymentForm.email}
+                      onChange={(e) => handlePaymentFormChange('email', e.target.value)}
+                      placeholder="john@example.com"
+                      className="bg-white/10 border-white/20 text-white mt-1"
+                    />
+                  </div>
+                </div>
+
+                {/* Payment Information */}
+                <div className="border-t border-white/20 pt-4">
+                  <h3 className="text-white font-semibold mb-4 flex items-center">
+                    <CreditCard className="w-5 h-5 mr-2" />
+                    Payment Information
+                  </h3>
+                  <div className="space-y-4">
+                    <div>
+                      <Label htmlFor="cardNumber" className="text-gray-200">Card Number</Label>
+                      <Input
+                        id="cardNumber"
+                        value={paymentForm.cardNumber}
+                        onChange={(e) => handlePaymentFormChange('cardNumber', formatCardNumber(e.target.value))}
+                        placeholder="1234 5678 9012 3456"
+                        maxLength={19}
+                        className="bg-white/10 border-white/20 text-white mt-1 font-mono"
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label htmlFor="expiryDate" className="text-gray-200">Expiry Date</Label>
+                        <Input
+                          id="expiryDate"
+                          value={paymentForm.expiryDate}
+                          onChange={(e) => handlePaymentFormChange('expiryDate', formatExpiryDate(e.target.value))}
+                          placeholder="MM/YY"
+                          maxLength={5}
+                          className="bg-white/10 border-white/20 text-white mt-1 font-mono"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="cvv" className="text-gray-200">CVV</Label>
+                        <Input
+                          id="cvv"
+                          value={paymentForm.cvv}
+                          onChange={(e) => handlePaymentFormChange('cvv', e.target.value.replace(/\D/g, '').slice(0, 4))}
+                          placeholder="123"
+                          maxLength={4}
+                          className="bg-white/10 border-white/20 text-white mt-1 font-mono"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Total */}
+                <div className="border-t border-white/20 pt-4">
+                  <div className="flex justify-between items-center text-lg">
+                    <span className="text-gray-300">Total:</span>
+                    <span className="text-white font-bold">
+                      {selectedPlan?.price}{selectedPlan?.period}
+                    </span>
+                  </div>
+                  <p className="text-sm text-gray-400 mt-2">
+                    You can cancel anytime. No hidden fees.
+                  </p>
+                </div>
+
+                <Button 
+                  onClick={processPayment}
+                  disabled={isProcessingPayment}
+                  className="w-full h-12 bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 text-white font-semibold"
+                >
+                  <CreditCard className="w-5 h-5 mr-2" />
+                  Subscribe Now
+                </Button>
+              </div>
+            )}
+
+            {paymentStep === 'processing' && (
+              <div className="text-center py-8">
+                <Loader2 className="w-12 h-12 animate-spin text-purple-500 mx-auto mb-4" />
+                <p className="text-white font-semibold">Processing your payment...</p>
+                <p className="text-gray-400 text-sm mt-2">This may take a few moments</p>
+              </div>
+            )}
+
+            {paymentStep === 'success' && (
+              <div className="text-center py-8">
+                <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
+                <p className="text-white font-semibold mb-2">Payment Successful!</p>
+                <p className="text-gray-300 mb-6">
+                  Welcome to SpareFinder {selectedPlan?.name}. You'll receive a confirmation email shortly.
+                </p>
+                <Button 
+                  onClick={() => setIsPaymentModalOpen(false)}
+                  className="w-full bg-green-600 hover:bg-green-700 text-white"
+                >
+                  Get Started
+                </Button>
+              </div>
+            )}
+
+            {paymentStep === 'error' && (
+              <div className="text-center py-8">
+                <X className="w-16 h-16 text-red-500 mx-auto mb-4" />
+                <p className="text-white font-semibold mb-2">Payment Failed</p>
+                <p className="text-gray-300 mb-6">
+                  There was an issue processing your payment. Please check your card details and try again.
+                </p>
+                <div className="space-y-3">
+                  <Button 
+                    onClick={() => setPaymentStep('details')}
+                    className="w-full bg-purple-600 hover:bg-purple-700 text-white"
+                  >
+                    Try Again
+                  </Button>
+                  <Button 
+                    onClick={() => setIsPaymentModalOpen(false)}
+                    variant="outline"
+                    className="w-full border-white/20 text-white hover:bg-white/10"
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
