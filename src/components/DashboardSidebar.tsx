@@ -34,9 +34,6 @@ const DashboardSidebar: React.FC<SidebarProps> = ({ isCollapsed = false, onToggl
   const location = useLocation();
   const navigate = useNavigate();
   const { user, logout } = useAuth();
-  
-  // Check if user is admin
-  const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
 
   // Close mobile menu on route change
   useEffect(() => {
@@ -83,12 +80,7 @@ const DashboardSidebar: React.FC<SidebarProps> = ({ isCollapsed = false, onToggl
     { href: '/dashboard/settings', icon: Settings, label: 'Settings', description: 'Preferences' }
   ];
 
-  // Admin navigation items (only shown to admins)
-  const adminNavItems = [
-    { href: '/admin/dashboard', icon: Shield, label: 'Admin Panel', description: 'System management' },
-    { href: '/admin/user-management', icon: Users, label: 'Users', description: 'Manage users' },
-    { href: '/admin/system-analytics', icon: BarChart3, label: 'Analytics', description: 'System stats' }
-  ];
+
 
   const isActiveRoute = (href: string) => {
     if (href === '/dashboard') {
@@ -214,40 +206,7 @@ const DashboardSidebar: React.FC<SidebarProps> = ({ isCollapsed = false, onToggl
             </motion.div>
           ))}
 
-          {/* Admin Navigation (Mobile) */}
-          {isAdmin && (
-            <>
-              <div className="border-t border-white/10 my-4 pt-4">
-                <div className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 px-4">
-                  Administration
-                </div>
-              </div>
-              {adminNavItems.map((item, index) => (
-                <motion.div
-                  key={item.href}
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: (navItems.length + index) * 0.1 }}
-                >
-                  <Link
-                    to={item.href}
-                    onClick={toggleMobileMenu}
-                    className={`relative flex items-center space-x-3 p-4 rounded-xl transition-all duration-300 group ${
-                      isActiveRoute(item.href)
-                        ? 'bg-gradient-to-r from-red-600/20 to-orange-600/20 border border-red-500/30 text-white'
-                        : 'text-gray-400 hover:text-white hover:bg-white/5'
-                    }`}
-                  >
-                    <item.icon className="w-5 h-5 flex-shrink-0" />
-                    <div className="flex-1">
-                      <div className="font-medium">{item.label}</div>
-                      <div className="text-xs opacity-75">{item.description}</div>
-                    </div>
-                  </Link>
-                </motion.div>
-              ))}
-            </>
-          )}
+
         </div>
 
         {/* Mobile User Section */}
@@ -384,69 +343,7 @@ const DashboardSidebar: React.FC<SidebarProps> = ({ isCollapsed = false, onToggl
             </motion.div>
           ))}
 
-          {/* Admin Navigation (Desktop) */}
-          {isAdmin && (
-            <>
-              <AnimatePresence>
-                {!isCollapsed && (
-                  <motion.div
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: 'auto' }}
-                    exit={{ opacity: 0, height: 0 }}
-                    className="border-t border-white/10 my-4 pt-4"
-                  >
-                    <div className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 px-3">
-                      Administration
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-              {adminNavItems.map((item, index) => (
-                <motion.div
-                  key={item.href}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: (navItems.length + index) * 0.05 }}
-                  whileHover={{ x: isCollapsed ? 0 : 5 }}
-                >
-                  <Link
-                    to={item.href}
-                    className={`relative flex items-center space-x-3 p-3 rounded-xl transition-all duration-300 group ${
-                      isActiveRoute(item.href)
-                        ? 'bg-gradient-to-r from-red-600/20 to-orange-600/20 border border-red-500/30 text-white'
-                        : 'text-gray-400 hover:text-white hover:bg-white/5'
-                    }`}
-                  >
-                    {isActiveRoute(item.href) && (
-                      <motion.div
-                        layoutId="activeAdminTab"
-                        className="absolute inset-0 bg-gradient-to-r from-red-600/10 to-orange-600/10 rounded-xl border border-red-500/20"
-                        initial={false}
-                        transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
-                      />
-                    )}
-                    <div className="relative z-10 flex items-center space-x-3 w-full">
-                      <item.icon className="w-5 h-5 flex-shrink-0" />
-                      <AnimatePresence>
-                        {!isCollapsed && (
-                          <motion.div
-                            initial={{ opacity: 0, x: -10 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            exit={{ opacity: 0, x: -10 }}
-                            transition={{ duration: 0.2 }}
-                            className="flex-1"
-                          >
-                            <div className="font-medium">{item.label}</div>
-                            <div className="text-xs opacity-75">{item.description}</div>
-                          </motion.div>
-                        )}
-                      </AnimatePresence>
-                    </div>
-                  </Link>
-                </motion.div>
-              ))}
-            </>
-          )}
+
         </div>
 
         {/* Desktop User Section */}

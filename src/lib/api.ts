@@ -338,10 +338,27 @@ export const dashboardApi = {
 
 // Admin API
 export const adminApi = {
-  getUsers: async (page: number = 1, limit: number = 50): Promise<ApiResponse> => {
+  getUsers: async (
+    page: number = 1, 
+    limit: number = 50, 
+    search?: string, 
+    roleFilter?: string
+  ): Promise<ApiResponse> => {
     console.log('📋 Fetching users from API...');
     try {
-      const response = await apiClient.get(`/admin/users?page=${page}&limit=${limit}`);
+      const params = new URLSearchParams();
+      params.append('page', page.toString());
+      params.append('limit', limit.toString());
+      
+      if (search && search.trim()) {
+        params.append('search', search.trim());
+      }
+      
+      if (roleFilter && roleFilter !== 'all') {
+        params.append('role', roleFilter);
+      }
+
+      const response = await apiClient.get(`/admin/users?${params.toString()}`);
       console.log('📋 Raw API response:', response.data);
       return response.data;
     } catch (error) {
