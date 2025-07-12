@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/components/ui/use-toast';
 import { api } from '@/lib/api';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { 
   CreditCard, 
   Download, 
@@ -24,7 +25,10 @@ import {
   CheckCircle,
   AlertTriangle,
   Menu,
-  Loader2
+  Loader2,
+  ArrowLeft,
+  ExternalLink,
+  X
 } from 'lucide-react';
 import DashboardSidebar from '@/components/DashboardSidebar';
 import MobileSidebar from '@/components/MobileSidebar';
@@ -33,10 +37,12 @@ const Billing = () => {
   const [currentPlan, setCurrentPlan] = useState('free');
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [billingData, setBillingData] = useState(null);
-  const [invoices, setInvoices] = useState([]);
+  const [billingData, setBillingData] = useState<any>(null);
+  const [invoices, setInvoices] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   const { toast } = useToast();
 
   const handleToggleSidebar = () => {
@@ -46,6 +52,45 @@ const Billing = () => {
   const handleToggleMobileMenu = () => {
     setIsMobileMenuOpen(!isMobileMenuOpen);
   };
+
+  // Handle post-payment redirect
+  useEffect(() => {
+    const paymentSuccess = searchParams.get('payment_success');
+    const paymentCancelled = searchParams.get('payment_cancelled');
+    const sessionId = searchParams.get('session_id');
+    
+    if (paymentSuccess === 'true') {
+      toast({
+        title: "Payment Successful!",
+        description: "Your subscription has been activated successfully.",
+        variant: "default"
+      });
+      
+      // Clear the URL parameters
+      navigate('/billing', { replace: true });
+    } else if (paymentCancelled === 'true') {
+      toast({
+        title: "Payment Cancelled",
+        description: "Your payment was cancelled. You can try again at any time.",
+        variant: "destructive"
+      });
+      
+      // Clear the URL parameters
+      navigate('/billing', { replace: true });
+    } else if (sessionId) {
+      // Handle Stripe checkout session success
+      toast({
+        title: "Processing Payment",
+        description: "Please wait while we confirm your payment...",
+        variant: "default"
+      });
+      
+      // You could verify the session here
+      setTimeout(() => {
+        navigate('/billing', { replace: true });
+      }, 3000);
+    }
+  }, [searchParams, navigate, toast]);
 
   useEffect(() => {
     let isMounted = true;
@@ -63,9 +108,9 @@ const Billing = () => {
           signal: controller.signal
         });
         
-        if (isMounted && billingResponse) {
-          setBillingData(billingResponse);
-          setCurrentPlan(billingResponse.subscription?.tier || 'free');
+        if (isMounted && billingResponse && billingResponse.data) {
+          setBillingData(billingResponse.data);
+          setCurrentPlan(billingResponse.data.subscription?.tier || 'free');
         }
 
         // Fetch invoices
@@ -73,8 +118,8 @@ const Billing = () => {
           signal: controller.signal
         });
         
-        if (isMounted && invoicesResponse) {
-          setInvoices(invoicesResponse.invoices || []);
+        if (isMounted && invoicesResponse && invoicesResponse.data) {
+          setInvoices(invoicesResponse.data.invoices || []);
         }
       } catch (error) {
         if (isMounted) {
@@ -108,15 +153,40 @@ const Billing = () => {
 
   const handlePlanChange = async (planId: string) => {
     try {
-      const response = await api.billing.updateSubscription(planId as 'free' | 'pro' | 'enterprise');
-      
-      // Assuming the response contains updated subscription info
-      if (response) {
-        setCurrentPlan(planId);
-        toast({
-          title: "Subscription Updated",
-          description: `Successfully upgraded to ${planId} plan`
+      // For paid plans, use Stripe checkout
+      if (planId !== 'free') {
+        const selectedPlan = plans.find(p => p.id === planId);
+        if (!selectedPlan) {
+          throw new Error('Invalid plan selected');
+        }
+
+        // Create Stripe checkout session
+        const checkoutResponse = await api.billing.createCheckoutSession({
+          plan: selectedPlan.name,
+          amount: selectedPlan.price,
+          currency: 'GBP',
+          billing_cycle: 'monthly',
+          success_url: `${window.location.origin}/billing?payment_success=true&session_id={CHECKOUT_SESSION_ID}`,
+          cancel_url: `${window.location.origin}/billing?payment_cancelled=true`
         });
+
+        if (checkoutResponse.data?.checkout_url) {
+          // Redirect to Stripe checkout
+          window.location.href = checkoutResponse.data.checkout_url;
+        } else {
+          throw new Error('Failed to create checkout session');
+        }
+      } else {
+        // For free plan, update directly
+        const response = await api.billing.updateSubscription(planId as 'free' | 'pro' | 'enterprise');
+        
+        if (response) {
+          setCurrentPlan(planId);
+          toast({
+            title: "Subscription Updated",
+            description: "Successfully downgraded to free plan"
+          });
+        }
       }
     } catch (error) {
       console.error('Error updating subscription:', error);
@@ -343,6 +413,41 @@ const Billing = () => {
             transition={{ duration: 0.5 }}
             className="space-y-4 sm:space-y-6 lg:space-y-8 max-w-6xl mx-auto"
           >
+          {/* Payment Success Banner */}
+          <AnimatePresence>
+            {(searchParams.get('payment_success') === 'true' || searchParams.get('session_id')) && (
+              <motion.div
+                initial={{ opacity: 0, y: -20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -20 }}
+                className="relative"
+              >
+                <div className="absolute inset-0 bg-gradient-to-r from-green-600/20 to-emerald-600/20 rounded-3xl blur-xl opacity-60" />
+                <div className="relative bg-gradient-to-r from-green-600/10 to-emerald-600/10 backdrop-blur-xl rounded-3xl p-6 border border-green-500/30 mb-6">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-4">
+                      <div className="w-12 h-12 bg-gradient-to-r from-green-600 to-emerald-600 rounded-full flex items-center justify-center">
+                        <CheckCircle className="w-6 h-6 text-white" />
+                      </div>
+                      <div>
+                        <h3 className="text-xl font-bold text-white">Payment Successful!</h3>
+                        <p className="text-green-200">Your subscription has been activated and is now processing.</p>
+                      </div>
+                    </div>
+                    <Button 
+                      variant="ghost" 
+                      size="sm"
+                      onClick={() => navigate('/billing', { replace: true })}
+                      className="text-green-200 hover:text-white"
+                    >
+                      <X className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
           {/* Header */}
           <div className="relative">
             <div className="absolute inset-0 bg-gradient-to-r from-purple-600/10 to-blue-600/10 rounded-3xl blur-xl opacity-60" />
@@ -568,7 +673,22 @@ const Billing = () => {
                               }`}
                               disabled={currentPlan === plan.id}
                             >
-                              {currentPlan === plan.id ? 'Current Plan' : plan.price === 0 ? 'Downgrade' : 'Upgrade'}
+                              {currentPlan === plan.id ? (
+                                <>
+                                  <CheckCircle className="w-4 h-4 mr-2" />
+                                  Current Plan
+                                </>
+                              ) : plan.price === 0 ? (
+                                <>
+                                  <ArrowLeft className="w-4 h-4 mr-2" />
+                                  Downgrade
+                                </>
+                              ) : (
+                                <>
+                                  <ExternalLink className="w-4 h-4 mr-2" />
+                                  Upgrade via Stripe
+                                </>
+                              )}
                             </Button>
                           </motion.div>
                         </motion.div>

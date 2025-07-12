@@ -89,6 +89,15 @@ export class DatabaseLogger {
       // Extract part details from predictions for easier querying
       const primaryPrediction = data.predictions?.[0];
       
+      // Extract full analysis from metadata (AI service returns it in metadata.analysis)
+      const fullAnalysis = data.metadata?.analysis || data.description || primaryPrediction?.description || '';
+      
+      // Extract estimated price range from the analysis
+      const extractPriceRange = (text: string): string => {
+        const priceMatch = text.match(/\*\*New price range:\*\*\s*([^*\n]+)/);
+        return priceMatch ? priceMatch[1].trim() : primaryPrediction?.estimated_price || 'Price not available';
+      };
+      
       const { error } = await supabase
         .from('part_searches')
         .insert({
@@ -103,6 +112,7 @@ export class DatabaseLogger {
           image_name: data.image_name,
           predictions: data.predictions || [],
           confidence_score: data.confidence_score || 0,
+          ai_confidence: data.confidence_score || 0,
           processing_time: data.processing_time || 0,
           model_version: data.ai_model_version || 'SpareFinder AI v1',
           similar_images: data.similar_images || [],
@@ -116,11 +126,20 @@ export class DatabaseLogger {
           analysis_status: data.analysis_status || 'completed',
           error_message: data.error_message,
           is_match: (data.confidence_score || 0) > 0.5,
+          full_analysis: fullAnalysis,
+          estimated_price_range: extractPriceRange(fullAnalysis),
           metadata: {
             ...data.metadata,
-            description: data.description || primaryPrediction?.description || '',
+            ai_service_response: {
+              id: data.metadata?.filename,
+              confidence: data.metadata?.confidence || data.confidence_score,
+              model_version: data.ai_model_version,
+              processing_time: data.processing_time,
+              timestamp: data.metadata?.upload_timestamp
+            },
             supabase_image_url: data.image_url,
-            full_predictions: data.predictions
+            full_predictions: data.predictions,
+            original_analysis: fullAnalysis
           }
         });
 

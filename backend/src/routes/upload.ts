@@ -530,7 +530,11 @@ const AnalysisResultsSchema = z.object({
     confidence_reasoning: z.union([z.string(), z.null()]).optional(),
   }).optional(),
   image_url: z.union([z.string(), z.null()]).optional(),
-  image_name: z.union([z.string(), z.null()]).optional()
+  image_name: z.union([z.string(), z.null()]).optional(),
+  // Additional fields from AI service response
+  analysis: z.union([z.string(), z.null()]).optional(),
+  confidence: z.union([z.number(), z.null()]).optional(),
+  metadata: z.union([z.any(), z.null()]).optional()
 });
 
 // Save Analysis Results Endpoint
@@ -560,6 +564,11 @@ router.post('/save-results', authenticateToken, async (req: AuthRequest, res: Re
     // Generate unique ID for this analysis
     const analysisId = uuidv4();
 
+    // Extract the full analysis from the request body (it comes from the AI service)
+    const fullAnalysis = (req.body as any).analysis || 
+                        validatedData.additional_details?.full_analysis || 
+                        primaryPrediction.description || '';
+
     // Prepare comprehensive analysis data for database
     const analysisData: PartSearchData = {
       id: analysisId,
@@ -578,7 +587,7 @@ router.post('/save-results', authenticateToken, async (req: AuthRequest, res: Re
       sites_searched: 0,
       parts_found: validatedData.predictions.length,
       search_query: primaryPrediction.class_name,
-      description: primaryPrediction.description || validatedData.additional_details?.full_analysis || '',
+      description: fullAnalysis,
       similar_images: validatedData.similar_images || [],
       metadata: {
         saved_manually: true,
@@ -586,6 +595,9 @@ router.post('/save-results', authenticateToken, async (req: AuthRequest, res: Re
         user_agent: req.headers['user-agent'],
         additional_details: validatedData.additional_details,
         full_analysis_data: validatedData,
+        analysis: fullAnalysis,
+        confidence: (req.body as any).confidence || primaryPrediction.confidence,
+        ai_metadata: (req.body as any).metadata || {},
         supabase_image_url: validatedData.image_url
       }
     };

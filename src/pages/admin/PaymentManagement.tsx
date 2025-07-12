@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/components/ui/use-toast';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { api } from '@/lib/api';
 import { 
   CreditCard, 
@@ -31,7 +32,8 @@ import {
   Zap,
   Users,
   ShoppingCart,
-  Receipt
+  Receipt,
+  Trash2
 } from 'lucide-react';
 
 interface PaymentMethod {
@@ -55,6 +57,17 @@ const PaymentManagement = () => {
   const [methods, setMethods] = useState<PaymentMethod[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isDeleting, setIsDeleting] = useState<string | null>(null);
+  
+  // Form state
+  const [formData, setFormData] = useState({
+    name: '',
+    provider: '',
+    api_key: '',
+    secret_key: '',
+    description: ''
+  });
   
   const { toast } = useToast();
   
@@ -92,6 +105,128 @@ const PaymentManagement = () => {
       });
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleInputChange = (field: string, value: string) => {
+    setFormData(prev => ({
+      ...prev,
+      [field]: value
+    }));
+  };
+
+  const validateForm = () => {
+    if (!formData.name.trim()) {
+      toast({
+        variant: "destructive",
+        title: "Validation Error",
+        description: "Payment method name is required",
+      });
+      return false;
+    }
+    
+    if (!formData.provider) {
+      toast({
+        variant: "destructive",
+        title: "Validation Error",
+        description: "Provider is required",
+      });
+      return false;
+    }
+    
+    if (!formData.api_key.trim()) {
+      toast({
+        variant: "destructive",
+        title: "Validation Error",
+        description: "API key is required",
+      });
+      return false;
+    }
+    
+    if (!formData.secret_key.trim()) {
+      toast({
+        variant: "destructive",
+        title: "Validation Error",
+        description: "Secret key is required",
+      });
+      return false;
+    }
+    
+    return true;
+  };
+
+  const handleSubmit = async () => {
+    if (!validateForm()) return;
+    
+    try {
+      setIsSubmitting(true);
+      
+      const response = await api.admin.createPaymentMethod({
+        name: formData.name.trim(),
+        provider: formData.provider,
+        api_key: formData.api_key.trim(),
+        secret_key: formData.secret_key.trim(),
+        description: formData.description.trim() || undefined
+      });
+      
+      if (response.success) {
+        toast({
+          title: "Success",
+          description: "Payment method created successfully!",
+        });
+        
+        // Reset form
+        setFormData({
+          name: '',
+          provider: '',
+          api_key: '',
+          secret_key: '',
+          description: ''
+        });
+        
+        // Refresh payment methods list
+        await fetchPaymentMethods();
+      } else {
+        throw new Error(response.message || 'Failed to create payment method');
+      }
+    } catch (err) {
+      console.error('Error creating payment method:', err);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: err instanceof Error ? err.message : "Failed to create payment method",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleDelete = async (paymentMethodId: string) => {
+    try {
+      setIsDeleting(paymentMethodId);
+      
+      const response = await api.admin.deletePaymentMethod(paymentMethodId);
+      
+      if (response.success) {
+        toast({
+          title: "Success",
+          description: "Payment method deleted successfully!",
+        });
+        
+        // Refresh payment methods list
+        await fetchPaymentMethods();
+      } else {
+        throw new Error(response.message || 'Failed to delete payment method');
+      }
+    } catch (err) {
+      console.error('Error deleting payment method:', err);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: err instanceof Error ? err.message : "Failed to delete payment method",
+      });
+    } finally {
+      setIsDeleting(null);
     }
   };
 
@@ -471,6 +606,41 @@ const PaymentManagement = () => {
                         >
                           <Activity className="w-4 h-4 text-purple-400" />
                         </motion.button>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <motion.button
+                              whileHover={{ scale: 1.1 }}
+                              whileTap={{ scale: 0.9 }}
+                              className="p-2 hover:bg-red-500/20 rounded-lg transition-colors"
+                              disabled={isDeleting === method.id}
+                            >
+                              {isDeleting === method.id ? (
+                                <Loader2 className="w-4 h-4 text-red-400 animate-spin" />
+                              ) : (
+                                <Trash2 className="w-4 h-4 text-red-400" />
+                              )}
+                            </motion.button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent className="bg-black/80 backdrop-blur-xl border-white/10">
+                            <AlertDialogHeader>
+                              <AlertDialogTitle className="text-white">Delete Payment Method</AlertDialogTitle>
+                              <AlertDialogDescription className="text-gray-400">
+                                Are you sure you want to delete "{method.name}"? This action cannot be undone and will permanently remove this payment method from the system.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel className="bg-white/10 text-white border-white/20 hover:bg-white/20">
+                                Cancel
+                              </AlertDialogCancel>
+                              <AlertDialogAction 
+                                onClick={() => handleDelete(method.id)}
+                                className="bg-red-600 hover:bg-red-700 text-white"
+                              >
+                                Delete
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
                       </div>
                       
                       <motion.div
@@ -515,18 +685,20 @@ const PaymentManagement = () => {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
                   <div className="space-y-2">
                     <Label htmlFor="name" className="text-gray-200 font-medium">Name</Label>
                     <Input
                       id="name"
+                      value={formData.name}
+                      onChange={(e) => handleInputChange('name', e.target.value)}
                       placeholder="Payment method name"
                       className="h-12 bg-white/5 border-white/10 text-white rounded-xl"
                     />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="provider" className="text-gray-200 font-medium">Provider</Label>
-                    <Select>
+                    <Select value={formData.provider} onValueChange={(value) => handleInputChange('provider', value)}>
                       <SelectTrigger className="h-12 bg-white/5 border-white/10 text-white rounded-xl">
                         <SelectValue placeholder="Select provider" />
                       </SelectTrigger>
@@ -542,7 +714,20 @@ const PaymentManagement = () => {
                     <Input
                       id="apikey"
                       type="password"
+                      value={formData.api_key}
+                      onChange={(e) => handleInputChange('api_key', e.target.value)}
                       placeholder="Enter API key"
+                      className="h-12 bg-white/5 border-white/10 text-white rounded-xl"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="secretkey" className="text-gray-200 font-medium">Secret Key</Label>
+                    <Input
+                      id="secretkey"
+                      type="password"
+                      value={formData.secret_key}
+                      onChange={(e) => handleInputChange('secret_key', e.target.value)}
+                      placeholder="Enter secret key"
                       className="h-12 bg-white/5 border-white/10 text-white rounded-xl"
                     />
                   </div>
@@ -552,12 +737,37 @@ const PaymentManagement = () => {
                       whileTap={{ scale: 0.95 }}
                       className="w-full"
                     >
-                      <Button className="w-full h-12 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 shadow-lg shadow-green-500/25 rounded-xl">
-                        <Shield className="w-4 h-4 mr-2" />
-                        Add Method
+                      <Button 
+                        onClick={handleSubmit}
+                        disabled={isSubmitting}
+                        className="w-full h-12 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 shadow-lg shadow-green-500/25 rounded-xl"
+                      >
+                        {isSubmitting ? (
+                          <>
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                            Adding...
+                          </>
+                        ) : (
+                          <>
+                            <Shield className="w-4 h-4 mr-2" />
+                            Add Method
+                          </>
+                        )}
                       </Button>
                     </motion.div>
                   </div>
+                </div>
+                
+                {/* Description field (optional) */}
+                <div className="mt-6 space-y-2">
+                  <Label htmlFor="description" className="text-gray-200 font-medium">Description (Optional)</Label>
+                  <Input
+                    id="description"
+                    value={formData.description}
+                    onChange={(e) => handleInputChange('description', e.target.value)}
+                    placeholder="Brief description of this payment method"
+                    className="h-12 bg-white/5 border-white/10 text-white rounded-xl"
+                  />
                 </div>
               </CardContent>
             </Card>
