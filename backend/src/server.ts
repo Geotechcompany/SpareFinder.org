@@ -23,6 +23,7 @@ import settingsRoutes from './routes/settings';
 import notificationsRoutes from './routes/notifications';
 import billingRoutes from './routes/billing';
 import statisticsRoutes from './routes/statistics';
+import healthRoutes from './routes/health';
 
 // Initialize Supabase client
 export const supabase = createClient(
@@ -81,15 +82,8 @@ app.use(compression());
 // Logging middleware
 app.use(morgan('combined'));
 
-// Health check endpoint
-app.get('/health', (_req, res) => {
-  res.json({
-    status: 'healthy',
-    timestamp: new Date().toISOString(),
-    version: process.env.npm_package_version || '1.0.0',
-    environment: process.env.NODE_ENV || 'development'
-  });
-});
+// Health check routes
+app.use('/health', healthRoutes);
 
 // Removed rate limiter usage
 
@@ -131,6 +125,11 @@ app.use((error: any, _req: express.Request, res: express.Response, _next: expres
 app.listen(PORT, () => {
   console.log(`🚀 SpareFinder Backend running on port ${PORT}`);
   console.log(`📊 Health check: http://localhost:${PORT}/health`);
+  console.log(`  ├─ Comprehensive: http://localhost:${PORT}/health`);
+  console.log(`  ├─ Simple: http://localhost:${PORT}/health/simple`);
+  console.log(`  ├─ Database: http://localhost:${PORT}/health/database`);
+  console.log(`  ├─ AI Service: http://localhost:${PORT}/health/ai-service`);
+  console.log(`  └─ Storage: http://localhost:${PORT}/health/storage`);
   console.log(`🔐 Auth endpoints: http://localhost:${PORT}/api/auth`);
   console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
 });
