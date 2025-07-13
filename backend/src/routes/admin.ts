@@ -297,6 +297,19 @@ router.delete('/users/:userId', [authenticateToken, requireAdmin], async (req: A
 // Get system statistics (admin only)
 router.get('/stats', [authenticateToken, requireAdmin], async (_req: AuthRequest, res: Response) => {
   try {
+    console.log('📊 Fetching admin statistics...');
+    
+    // First, ensure all auth.users are synced to profiles
+    await syncAuthUsersToProfiles();
+    
+    // Get auth users count as a fallback
+    const { data: authUsers, error: authError } = await supabase.auth.admin.listUsers();
+    if (authError) {
+      console.error('Error fetching auth users for stats:', authError);
+    }
+    const authUserCount = authUsers?.users?.length || 0;
+    console.log(`📊 Auth users count: ${authUserCount}`);
+    
     // Get comprehensive statistics
     const [
       { count: userCount },
@@ -312,7 +325,7 @@ router.get('/stats', [authenticateToken, requireAdmin], async (_req: AuthRequest
       // Total searches
       supabase.from('part_searches').select('*', { count: 'exact', head: true }),
       
-      // Active users (last 30 days)
+      // Active users (last 30 days) - users who have updated their profile or logged in recently
       supabase.from('profiles')
         .select('*', { count: 'exact', head: true })
         .gte('updated_at', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()),
@@ -383,9 +396,14 @@ router.get('/stats', [authenticateToken, requireAdmin], async (_req: AuthRequest
     const pendingTasks = 0; // This could be enhanced with actual task queue
     const recentAlerts = 0; // This could be enhanced with actual alert system
 
+    // Use the higher count between profiles and auth users
+    const finalUserCount = Math.max(userCount || 0, authUserCount);
+    console.log(`📊 Final user count: ${finalUserCount} (profiles: ${userCount}, auth: ${authUserCount})`);
+    console.log(`📊 Active users: ${activeUsers}, Total searches: ${searchCount}`);
+
     return res.json({
       statistics: {
-        total_users: userCount || 0,
+        total_users: finalUserCount,
         total_searches: searchCount || 0,
         active_users: activeUsers || 0,
         success_rate: Math.round(successRate * 100) / 100,

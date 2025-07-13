@@ -15,7 +15,6 @@ import {
   Cpu,
   Users,
   Upload,
-  Download,
   Zap,
   HardDrive,
   Wifi,
@@ -23,13 +22,10 @@ import {
   TrendingDown,
   Clock,
   Globe,
-  Shield,
   AlertTriangle,
   CheckCircle,
   MemoryStick,
   RefreshCw,
-  Calendar,
-  Target,
   Loader2
 } from 'lucide-react';
 
@@ -78,8 +74,14 @@ const SystemAnalytics = () => {
       setIsLoading(true);
       setError(null);
 
-      // Fetch system metrics 
-      const metricsResponse = await api.admin.getAdminStats();
+      // Fetch system metrics and analytics in parallel
+      const [metricsResponse, analyticsResponse] = await Promise.all([
+        api.admin.getAdminStats(),
+        api.admin.getAnalytics(timeRange)
+      ]);
+
+      console.log('📊 System metrics response:', metricsResponse);
+      console.log('📈 Analytics response:', analyticsResponse);
 
       if (metricsResponse.success && metricsResponse.data?.statistics) {
         const stats = metricsResponse.data.statistics;
@@ -89,27 +91,22 @@ const SystemAnalytics = () => {
         });
       }
 
-      // For now, create mock analytics data since the API endpoint doesn't exist yet
-      const mockAnalytics: AnalyticsData = {
-        searches_by_day: {},
-        registrations_by_day: {},
-        time_range: timeRange
-      };
-      
-      // Generate mock data for the selected time range
-      const days = timeRange === '7d' ? 7 : timeRange === '30d' ? 30 : 90;
-      const now = new Date();
-      
-      for (let i = 0; i < days; i++) {
-        const date = new Date(now);
-        date.setDate(date.getDate() - i);
-        const dateStr = date.toISOString().split('T')[0];
-        
-        mockAnalytics.searches_by_day[dateStr] = Math.floor(Math.random() * 100) + 20;
-        mockAnalytics.registrations_by_day[dateStr] = Math.floor(Math.random() * 20) + 1;
+      // Use real analytics data from API
+      if (analyticsResponse.success && analyticsResponse.data?.analytics) {
+        const analyticsData = analyticsResponse.data.analytics;
+        setAnalytics({
+          searches_by_day: analyticsData.searches_by_day || {},
+          registrations_by_day: analyticsData.registrations_by_day || {},
+          time_range: analyticsData.time_range || timeRange
+        });
+      } else {
+        // Fallback to empty analytics if API fails
+        setAnalytics({
+          searches_by_day: {},
+          registrations_by_day: {},
+          time_range: timeRange
+        });
       }
-      
-      setAnalytics(mockAnalytics);
 
       setLastUpdated(new Date());
     } catch (err) {
@@ -125,78 +122,138 @@ const SystemAnalytics = () => {
     }
   };
 
-  const getHealthColor = (health: string) => {
-    switch (health) {
-      case 'healthy': return 'text-green-400';
-      case 'warning': return 'text-yellow-400';
-      case 'critical': return 'text-red-400';
-      default: return 'text-gray-400';
-    }
-  };
-
-  const getHealthIcon = (health: string) => {
-    switch (health) {
-      case 'healthy': return CheckCircle;
-      case 'warning': return AlertTriangle;
-      case 'critical': return AlertTriangle;
-      default: return Clock;
-    }
-  };
-
-  const getUsageColor = (usage: number) => {
-    if (usage >= 90) return 'from-red-600 to-rose-600';
-    if (usage >= 70) return 'from-yellow-600 to-orange-600';
-    return 'from-green-600 to-emerald-600';
-  };
-
   const formatLastUpdated = () => {
     return lastUpdated.toLocaleTimeString();
   };
 
-  const calculateGrowth = (current: number, previous: number) => {
-    if (previous === 0) return current > 0 ? 100 : 0;
-    return ((current - previous) / previous) * 100;
-  };
-
-  // Calculate chart data from analytics
-  const chartData = analytics ? Object.entries(analytics.searches_by_day).map(([date, searches]) => ({
-    date,
-    searches,
-    registrations: analytics.registrations_by_day[date] || 0
-  })).slice(-30) : [];
-
   const systemMetrics = {
     uptime: '47d 12h 34m',
-    totalUsers: 12847,
-    activeUsers: 2341,
-    totalUploads: 847293,
-    avgResponseTime: '0.32s',
-    successRate: 99.7,
-    errorRate: 0.3,
+    totalUsers: metrics?.total_users || 0,
+    activeUsers: metrics?.active_users || 0,
+    totalUploads: metrics?.total_searches || 0,
+    avgResponseTime: metrics?.avg_response_time ? `${metrics.avg_response_time}ms` : '0ms',
+    successRate: metrics?.success_rate || 0,
+    errorRate: metrics?.success_rate ? (100 - metrics.success_rate) : 0,
     dataProcessed: '2.4TB'
   };
 
   const performanceData = [
-    { label: 'CPU Usage', value: 68, unit: '%', status: 'good', icon: Cpu, color: 'from-blue-600 to-cyan-600' },
-    { label: 'Memory Usage', value: 74, unit: '%', status: 'warning', icon: MemoryStick, color: 'from-yellow-600 to-orange-600' },
-    { label: 'Disk Usage', value: 45, unit: '%', status: 'good', icon: HardDrive, color: 'from-green-600 to-emerald-600' },
-    { label: 'Network I/O', value: 23, unit: 'MB/s', status: 'good', icon: Wifi, color: 'from-purple-600 to-violet-600' }
-  ];
-
-  const recentActivity = [
-    { time: '14:32', action: 'System backup completed', status: 'success', icon: CheckCircle },
-    { time: '14:28', action: 'High CPU usage detected', status: 'warning', icon: AlertTriangle },
-    { time: '14:15', action: 'New user registration spike', status: 'info', icon: Users },
-    { time: '14:02', action: 'Database optimization completed', status: 'success', icon: Database },
-    { time: '13:45', action: 'API response time improved', status: 'success', icon: Zap }
+    { 
+      label: 'CPU Usage', 
+      value: metrics?.cpu_usage || 0, 
+      unit: '%', 
+      status: (metrics?.cpu_usage || 0) > 80 ? 'critical' : (metrics?.cpu_usage || 0) > 60 ? 'warning' : 'good', 
+      icon: Cpu, 
+      color: 'from-blue-600 to-cyan-600' 
+    },
+    { 
+      label: 'Memory Usage', 
+      value: metrics?.memory_usage || 0, 
+      unit: '%', 
+      status: (metrics?.memory_usage || 0) > 80 ? 'critical' : (metrics?.memory_usage || 0) > 60 ? 'warning' : 'good', 
+      icon: MemoryStick, 
+      color: 'from-yellow-600 to-orange-600' 
+    },
+    { 
+      label: 'Disk Usage', 
+      value: metrics?.disk_usage || 0, 
+      unit: '%', 
+      status: (metrics?.disk_usage || 0) > 80 ? 'critical' : (metrics?.disk_usage || 0) > 60 ? 'warning' : 'good', 
+      icon: HardDrive, 
+      color: 'from-green-600 to-emerald-600' 
+    },
+    { 
+      label: 'Avg Response Time', 
+      value: metrics?.avg_response_time || 0, 
+      unit: 'ms', 
+      status: (metrics?.avg_response_time || 0) > 1000 ? 'critical' : (metrics?.avg_response_time || 0) > 500 ? 'warning' : 'good', 
+      icon: Wifi, 
+      color: 'from-purple-600 to-violet-600' 
+    }
   ];
 
   const trafficStats = [
-    { label: 'Total Requests', value: '1.2M', change: '+12.3%', trend: 'up' },
-    { label: 'API Calls', value: '847K', change: '+8.7%', trend: 'up' },
-    { label: 'Upload Requests', value: '234K', change: '-2.1%', trend: 'down' },
-    { label: 'Error Responses', value: '1.2K', change: '-15.4%', trend: 'down' }
+    { 
+      label: 'Total Searches', 
+      value: metrics?.total_searches ? metrics.total_searches.toLocaleString() : '0', 
+      change: metrics?.searches_this_week && metrics?.searches_today ? 
+        `+${Math.round(((metrics.searches_today / Math.max(metrics.searches_this_week, 1)) * 100))}%` : '+0%', 
+      trend: metrics?.searches_today && metrics?.searches_this_week && metrics.searches_today > 0 ? 'up' : 'down' 
+    },
+    { 
+      label: 'Active Users', 
+      value: metrics?.active_users ? metrics.active_users.toLocaleString() : '0', 
+      change: metrics?.new_users_today ? `+${metrics.new_users_today}%` : '+0%', 
+      trend: metrics?.new_users_today && metrics.new_users_today > 0 ? 'up' : 'down' 
+    },
+    { 
+      label: 'Success Rate', 
+      value: metrics?.success_rate ? `${metrics.success_rate.toFixed(1)}%` : '0%', 
+      change: metrics?.success_rate ? `+${(metrics.success_rate - 90).toFixed(1)}%` : '+0%', 
+      trend: metrics?.success_rate && metrics.success_rate > 90 ? 'up' : 'down' 
+    },
+    { 
+      label: 'New Users Today', 
+      value: metrics?.new_users_today ? metrics.new_users_today.toLocaleString() : '0', 
+      change: metrics?.new_users_today ? `+${metrics.new_users_today}` : '+0', 
+      trend: metrics?.new_users_today && metrics.new_users_today > 0 ? 'up' : 'down' 
+    }
   ];
+
+  const generateRecentActivity = () => {
+    const activity = [];
+    const now = new Date();
+    
+    if (metrics?.system_health) {
+      activity.push({
+        time: now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+        action: `System health check: ${metrics.system_health}`,
+        status: metrics.system_health === 'healthy' ? 'success' : 
+               metrics.system_health === 'warning' ? 'warning' : 'error',
+        icon: metrics.system_health === 'healthy' ? CheckCircle : AlertTriangle
+      });
+    }
+    
+    if (metrics?.cpu_usage && metrics.cpu_usage > 80) {
+      activity.push({
+        time: new Date(now.getTime() - 5 * 60 * 1000).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+        action: `High CPU usage detected: ${metrics.cpu_usage}%`,
+        status: 'warning',
+        icon: AlertTriangle
+      });
+    }
+    
+    if (metrics?.new_users_today && metrics.new_users_today > 0) {
+      activity.push({
+        time: new Date(now.getTime() - 15 * 60 * 1000).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+        action: `${metrics.new_users_today} new users registered today`,
+        status: 'info',
+        icon: Users
+      });
+    }
+    
+    if (metrics?.searches_today && metrics.searches_today > 0) {
+      activity.push({
+        time: new Date(now.getTime() - 30 * 60 * 1000).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+        action: `${metrics.searches_today} searches completed today`,
+        status: 'success',
+        icon: Database
+      });
+    }
+    
+    if (metrics?.avg_response_time && metrics.avg_response_time < 500) {
+      activity.push({
+        time: new Date(now.getTime() - 45 * 60 * 1000).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+        action: `API response time optimized: ${metrics.avg_response_time}ms`,
+        status: 'success',
+        icon: Zap
+      });
+    }
+    
+    return activity.slice(0, 5);
+  };
+
+  const recentActivity = generateRecentActivity();
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -306,6 +363,14 @@ const SystemAnalytics = () => {
                   >
                     Real-time system performance monitoring
                   </motion.p>
+                  <motion.p 
+                    className="text-gray-500 text-sm"
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: 0.5 }}
+                  >
+                    Last updated: {formatLastUpdated()}
+                  </motion.p>
                 </div>
                 <motion.div
                   initial={{ opacity: 0, scale: 0.8 }}
@@ -321,10 +386,57 @@ const SystemAnalytics = () => {
                     <Clock className="w-4 h-4 mr-2" />
                     {systemMetrics.uptime}
                   </Badge>
+                  <Button
+                    onClick={fetchSystemData}
+                    disabled={isLoading}
+                    variant="outline"
+                    size="sm"
+                    className="border-white/20 hover:border-white/40 text-white hover:bg-white/10"
+                  >
+                    {isLoading ? (
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    ) : (
+                      <RefreshCw className="w-4 h-4 mr-2" />
+                    )}
+                    Refresh Data
+                  </Button>
+                  <Select value={timeRange} onValueChange={setTimeRange}>
+                    <SelectTrigger className="w-32 border-white/20 hover:border-white/40 text-white bg-white/10">
+                      <SelectValue placeholder="Time Range" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="7d">Last 7 Days</SelectItem>
+                      <SelectItem value="30d">Last 30 Days</SelectItem>
+                      <SelectItem value="90d">Last 90 Days</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </motion.div>
               </div>
             </div>
           </div>
+
+          {/* Error State */}
+          {error && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.6 }}
+              className="relative"
+            >
+              <div className="absolute inset-0 bg-gradient-to-r from-red-600/10 to-orange-600/10 rounded-3xl blur-xl opacity-60" />
+              <Card className="relative bg-black/20 backdrop-blur-xl border-red-500/30">
+                <CardContent className="p-6">
+                  <div className="flex items-center space-x-3 text-red-400">
+                    <AlertTriangle className="w-6 h-6" />
+                    <div>
+                      <h3 className="text-lg font-semibold">Error Loading System Data</h3>
+                      <p className="text-sm text-red-300">{error}</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </motion.div>
+          )}
 
           {/* Key Metrics */}
           <motion.div
@@ -333,36 +445,60 @@ const SystemAnalytics = () => {
             transition={{ delay: 0.6 }}
             className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6"
           >
-            {[
-              { label: 'Total Users', value: systemMetrics.totalUsers.toLocaleString(), icon: Users, color: 'from-blue-600 to-cyan-600' },
-              { label: 'Active Users', value: systemMetrics.activeUsers.toLocaleString(), icon: Activity, color: 'from-green-600 to-emerald-600' },
-              { label: 'Total Uploads', value: systemMetrics.totalUploads.toLocaleString(), icon: Upload, color: 'from-purple-600 to-violet-600' },
-              { label: 'Success Rate', value: `${systemMetrics.successRate}%`, icon: CheckCircle, color: 'from-emerald-600 to-teal-600' }
-            ].map((metric, index) => (
-              <motion.div
-                key={metric.label}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.7 + index * 0.1 }}
-                whileHover={{ scale: 1.02, y: -2 }}
-                className="relative"
-              >
-                <div className={`absolute inset-0 bg-gradient-to-r ${metric.color} opacity-10 rounded-2xl blur-xl`} />
-                <Card className="relative bg-black/20 backdrop-blur-xl border-white/10 hover:border-white/20 transition-all duration-300">
-                  <CardContent className="p-6">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-gray-400 text-sm">{metric.label}</p>
-                        <p className="text-2xl font-bold text-white">{metric.value}</p>
+            {isLoading ? (
+              Array.from({ length: 4 }, (_, index) => (
+                <motion.div
+                  key={`loading-${index}`}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.7 + index * 0.1 }}
+                  className="relative"
+                >
+                  <Card className="relative bg-black/20 backdrop-blur-xl border-white/10">
+                    <CardContent className="p-6">
+                      <div className="flex items-center justify-between">
+                        <div className="space-y-2">
+                          <div className="h-4 bg-gray-700 rounded animate-pulse"></div>
+                          <div className="h-8 bg-gray-700 rounded animate-pulse"></div>
+                        </div>
+                        <div className="w-12 h-12 bg-gray-700 rounded-xl animate-pulse"></div>
                       </div>
-                      <div className={`w-12 h-12 rounded-xl bg-gradient-to-r ${metric.color} flex items-center justify-center`}>
-                        <metric.icon className="w-6 h-6 text-white" />
+                    </CardContent>
+                  </Card>
+                </motion.div>
+              ))
+            ) : (
+              [
+                { label: 'Total Users', value: systemMetrics.totalUsers.toLocaleString(), icon: Users, color: 'from-blue-600 to-cyan-600' },
+                { label: 'Active Users', value: systemMetrics.activeUsers.toLocaleString(), icon: Activity, color: 'from-green-600 to-emerald-600' },
+                { label: 'Total Uploads', value: systemMetrics.totalUploads.toLocaleString(), icon: Upload, color: 'from-purple-600 to-violet-600' },
+                { label: 'Success Rate', value: `${systemMetrics.successRate}%`, icon: CheckCircle, color: 'from-emerald-600 to-teal-600' }
+              ].map((metric, index) => (
+                <motion.div
+                  key={metric.label}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.7 + index * 0.1 }}
+                  whileHover={{ scale: 1.02, y: -2 }}
+                  className="relative"
+                >
+                  <div className={`absolute inset-0 bg-gradient-to-r ${metric.color} opacity-10 rounded-2xl blur-xl`} />
+                  <Card className="relative bg-black/20 backdrop-blur-xl border-white/10 hover:border-white/20 transition-all duration-300">
+                    <CardContent className="p-6">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-gray-400 text-sm">{metric.label}</p>
+                          <p className="text-2xl font-bold text-white">{metric.value}</p>
+                        </div>
+                        <div className={`w-12 h-12 rounded-xl bg-gradient-to-r ${metric.color} flex items-center justify-center`}>
+                          <metric.icon className="w-6 h-6 text-white" />
+                        </div>
                       </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </motion.div>
-            ))}
+                    </CardContent>
+                  </Card>
+                </motion.div>
+              ))
+            )}
           </motion.div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
