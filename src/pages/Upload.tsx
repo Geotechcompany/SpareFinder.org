@@ -421,7 +421,6 @@ const Upload = () => {
   // New state for keywords
   const [keywords, setKeywords] = useState<string>('');
   const [savedKeywords, setSavedKeywords] = useState<string[]>([]);
-  const [newKeyword, setNewKeyword] = useState('');
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   const keywordsInputRef = useRef<HTMLInputElement>(null);
@@ -496,10 +495,10 @@ const Upload = () => {
 
   // Add keyword functionality
   const handleAddKeyword = () => {
-    const trimmedKeyword = newKeyword.trim();
+    const trimmedKeyword = keywords.trim();
     if (trimmedKeyword && !savedKeywords.includes(trimmedKeyword)) {
       setSavedKeywords(prev => [...prev, trimmedKeyword]);
-      setNewKeyword(''); // Clear input after adding
+      setKeywords(''); // Clear input after adding
       keywordsInputRef.current?.focus();
     }
   };
