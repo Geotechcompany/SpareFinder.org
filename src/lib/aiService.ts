@@ -73,7 +73,7 @@ export interface AnalysisProgress {
 
 // Configuration
 const AI_SERVICE_CONFIG = {
-  baseUrl: import.meta.env.VITE_AI_SERVICE_URL || 'https://api-sparefinder-org.onrender.com',
+  baseUrl: import.meta.env.VITE_AI_SERVICE_URL || 'https://ai-sparefinder-org.onrender.com',
   apiKey: import.meta.env.VITE_AI_API_KEY,
   maxFileSize: 10 * 1024 * 1024, // 10MB
   supportedFormats: ['image/jpeg', 'image/png', 'image/webp'],

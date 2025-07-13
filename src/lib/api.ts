@@ -413,6 +413,11 @@ export const adminApi = {
     return { success: true, data: response.data };
   },
 
+  getAnalytics: async (timeRange: string = '30d'): Promise<ApiResponse> => {
+    const response = await apiClient.get(`/admin/analytics?range=${timeRange}`);
+    return { success: true, data: response.data };
+  },
+
   updateUserRole: async (userId: string, role: 'user' | 'admin' | 'super_admin'): Promise<ApiResponse> => {
     const response = await apiClient.patch(`/admin/users/${userId}/role`, { role });
     return response.data;
