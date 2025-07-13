@@ -1,0 +1,22 @@
+name: Keep AI Service Alive
+
+on:
+  schedule:
+    # Run every 5 minutes
+    - cron: '*/5 * * * *'
+  workflow_dispatch: # Allow manual triggering
+
+jobs:
+  keep-alive:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Ping AI Service
+      run: |
+        echo "Pinging AI Service to keep it alive..."
+        curl -f https://ai-sparefinder-com.onrender.com/health || echo "Service ping failed"
+        
+    - name: Ping Backend Service
+      run: |
+        echo "Pinging Backend Service to keep it alive..."
+        curl -f https://api-sparefinder-org.onrender.com/health || echo "Backend ping failed" 
