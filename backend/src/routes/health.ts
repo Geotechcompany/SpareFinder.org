@@ -40,7 +40,7 @@ async function checkDatabase(): Promise<HealthCheckResult> {
     const startTime = Date.now();
     
     // Simple query to check database connectivity
-    const { data, error } = await supabase
+    const { error } = await supabase
       .from('profiles')
       .select('id')
       .limit(1);
