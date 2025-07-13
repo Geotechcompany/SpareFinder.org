@@ -9,6 +9,7 @@
         "build": "tsc",
         "lint": "eslint src/**/*.ts",
         "test": "jest",
+        "test:health": "node test-health.js",
         "migrate": "node scripts/migrate-to-supabase.js",
         "migrate:manual": "node scripts/migrate-to-supabase.js --manual",
         "test:migration": "node scripts/test-migration.js"

@@ -190,15 +190,57 @@ CMD ["npm", "start"]
 
 ## 📊 Monitoring
 
-### Health Check
-GET `/health` returns:
+### Health Check Endpoints
+
+The backend provides comprehensive health monitoring with multiple endpoints:
+
+#### Comprehensive Health Check
+`GET /health` - Complete system health status:
 ```json
 {
   "status": "healthy",
   "timestamp": "2024-01-01T00:00:00.000Z",
   "version": "1.0.0",
-  "environment": "development"
+  "environment": "production",
+  "uptime": 3600,
+  "services": {
+    "database": {
+      "status": "healthy",
+      "responseTime": 45,
+      "details": { "connection": "active", "query": "successful" }
+    },
+    "ai_service": {
+      "status": "healthy", 
+      "responseTime": 123,
+      "details": { "url": "https://ai-service.com", "service": "SpareFinderAI" }
+    },
+    "storage": {
+      "status": "healthy",
+      "responseTime": 67,
+      "details": { "bucket": "sparefinder", "bucket_exists": true }
+    }
+  },
+  "system": {
+    "memory": { "used": 128, "total": 512, "percentage": 25 },
+    "cpu": { "usage": "N/A" }
+  }
 }
+```
+
+#### Individual Service Health Checks
+- `GET /health/simple` - Basic status (fast, minimal overhead)
+- `GET /health/database` - Supabase database connectivity
+- `GET /health/ai-service` - AI service availability  
+- `GET /health/storage` - Supabase storage bucket access
+
+#### Testing Health Endpoints
+```bash
+# Test all health endpoints
+npm run test:health
+
+# Or test manually
+curl http://localhost:4000/health
+curl http://localhost:4000/health/database
 ```
 
 ### Logging
