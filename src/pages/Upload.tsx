@@ -350,7 +350,7 @@ const generateAnalysisSections = (analysisResults: AnalysisResponse) => {
           ))}
         </motion.div>
       )
-  });
+    });
 
   // If description exists, parse markdown sections
   analysisResults.predictions.forEach((prediction) => {
@@ -383,10 +383,10 @@ const generateAnalysisSections = (analysisResults: AnalysisResponse) => {
     }
   });
 
-  // Add additional details sections
+  // Add additional details sections (excluding full_analysis)
   if (analysisResults.additional_details) {
     Object.entries(analysisResults.additional_details).forEach(([key, value]) => {
-      if (typeof value === 'string' && value.trim()) {
+      if (typeof value === 'string' && value.trim() && key !== 'full_analysis') {
         sections.push({
           title: formatTitle(key),
           icon: <Info className="w-5 h-5 text-yellow-400" />,
@@ -421,7 +421,6 @@ const Upload = () => {
   // New state for keywords
   const [keywords, setKeywords] = useState<string>('');
   const [savedKeywords, setSavedKeywords] = useState<string[]>([]);
-  const [newKeyword, setNewKeyword] = useState('');
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   const keywordsInputRef = useRef<HTMLInputElement>(null);
@@ -496,10 +495,10 @@ const Upload = () => {
 
   // Add keyword functionality
   const handleAddKeyword = () => {
-    const trimmedKeyword = newKeyword.trim();
+    const trimmedKeyword = keywords.trim();
     if (trimmedKeyword && !savedKeywords.includes(trimmedKeyword)) {
       setSavedKeywords(prev => [...prev, trimmedKeyword]);
-      setNewKeyword(''); // Clear input after adding
+      setKeywords(''); // Clear input after adding
       keywordsInputRef.current?.focus();
     }
   };
