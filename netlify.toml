@@ -1,0 +1,32 @@
+[build]
+  command = "npm install && npm run build"
+  publish = "dist"
+  functions = "netlify/functions"
+  
+[build.environment]
+  NODE_VERSION = "18.18.0"
+  NPM_VERSION = "9"
+  NPM_CONFIG_PRODUCTION = "false"
+  # Backend API URL for production
+  VITE_API_URL = "https://api-sparefinder-org.onrender.com"
+  # AI Service URL
+  VITE_AI_SERVICE_URL = "https://ai-sparefinder-com.onrender.com"
+  VITE_AI_SERVICE_API_KEY = "geotech-dev-key-2024"
+  # Supabase
+  VITE_SUPABASE_URL = "https://bharlmgxoqdafjeeknmk.supabase.co"
+  VITE_SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJoYXJsbWd4b3FkYWZqZWVrbm1rIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTIwODM4NjUsImV4cCI6MjA2NzY1OTg2NX0.9zvRKIEEVNbcamjQ8hQJfMMsQJ2WX9S_BaAxbyOmj4w"
+ # App settings
+  VITE_APP_NAME = "SpareFinder"
+  VITE_APP_URL = "https://sparefinder.org"
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+[context.production.environment]
+  NODE_ENV = "production"
+  NPM_CONFIG_PRODUCTION = "false"
+
+[context.deploy-preview.environment]
+  NODE_ENV = "production" 
