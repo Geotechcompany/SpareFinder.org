@@ -33,7 +33,7 @@ export interface AppConfig {
 // Default configuration
 const defaultConfig: AppConfig = {
   ai: {
-    serviceUrl: 'http://localhost:8000',
+    serviceUrl: 'https://ai-sparefinder-org.onrender.com',
     apiKey: '',
     timeout: 60000,
     maxFileSize: 10 * 1024 * 1024, // 10MB
