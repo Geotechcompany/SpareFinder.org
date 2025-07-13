@@ -12,18 +12,18 @@ async function getStripeInstance(): Promise<Stripe | null> {
     // Fetch active Stripe payment method from database
     const { data: stripeMethod, error } = await supabase
       .from('payment_methods')
-      .select('api_key, secret_key, is_active')
+      .select('api_key, secret_key, status')
       .eq('provider', 'stripe')
-      .eq('is_active', true)
+      .eq('status', 'active')
       .single();
 
-    if (error || !stripeMethod || !stripeMethod.secret_key) {
+    if (error || !stripeMethod || !stripeMethod.api_key) {
       console.error('No active Stripe API key found:', error);
       return null;
     }
 
-    // Initialize Stripe with the secret key from database
-    const stripe = new Stripe(stripeMethod.secret_key, {
+    // Initialize Stripe with the secret key from database (stored in api_key field)
+    const stripe = new Stripe(stripeMethod.api_key, {
       apiVersion: '2025-06-30.basil', // Use latest API version
     });
 
