@@ -278,21 +278,26 @@ const History = () => {
   if (authLoading || isLoading) {
     return (
       <div className="min-h-screen flex w-full bg-gradient-to-br from-gray-900 via-purple-900/20 to-blue-900/20 relative overflow-hidden">
-        <DashboardSidebar isCollapsed={isCollapsed} onToggle={handleToggleSidebar} />
+        {/* Desktop Sidebar */}
+        <div className="hidden md:block">
+          <DashboardSidebar isCollapsed={isCollapsed} onToggle={handleToggleSidebar} />
+        </div>
+        
+        {/* Mobile Sidebar */}
         <MobileSidebar isOpen={isMobileMenuOpen} onClose={() => setIsMobileMenuOpen(false)} />
         
         <motion.div
           initial={false}
-          animate={{ marginLeft: isCollapsed ? 80 : 320 }}
+          animate={{ marginLeft: window.innerWidth >= 768 ? (isCollapsed ? 80 : 320) : 0 }}
           transition={{ duration: 0.3, ease: "easeInOut" }}
-          className="flex-1 p-4 lg:p-8 relative z-10"
+          className="flex-1 p-3 md:p-4 lg:p-8 relative z-10"
         >
-          <div className="space-y-6">
+          <div className="space-y-4 md:space-y-6">
             <Card className="bg-black/20 backdrop-blur-xl border-white/10">
-              <CardContent className="p-6">
+              <CardContent className="p-4 md:p-6">
                 <div className="flex items-center justify-center">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
-                  <span className="ml-3 text-white">Loading history...</span>
+                  <div className="animate-spin rounded-full h-6 w-6 md:h-8 md:w-8 border-b-2 border-purple-600"></div>
+                  <span className="ml-3 text-white text-sm md:text-base">Loading history...</span>
                 </div>
               </CardContent>
             </Card>
@@ -306,23 +311,28 @@ const History = () => {
   if (error && !isLoading) {
     return (
       <div className="min-h-screen flex w-full bg-gradient-to-br from-gray-900 via-purple-900/20 to-blue-900/20 relative overflow-hidden">
-        <DashboardSidebar isCollapsed={isCollapsed} onToggle={handleToggleSidebar} />
+        {/* Desktop Sidebar */}
+        <div className="hidden md:block">
+          <DashboardSidebar isCollapsed={isCollapsed} onToggle={handleToggleSidebar} />
+        </div>
+        
+        {/* Mobile Sidebar */}
         <MobileSidebar isOpen={isMobileMenuOpen} onClose={() => setIsMobileMenuOpen(false)} />
         
         <motion.div
           initial={false}
-          animate={{ marginLeft: isCollapsed ? 80 : 320 }}
+          animate={{ marginLeft: window.innerWidth >= 768 ? (isCollapsed ? 80 : 320) : 0 }}
           transition={{ duration: 0.3, ease: "easeInOut" }}
-          className="flex-1 p-4 lg:p-8 relative z-10"
+          className="flex-1 p-3 md:p-4 lg:p-8 relative z-10"
         >
-          <div className="space-y-6">
+          <div className="space-y-4 md:space-y-6">
             <Card className="bg-black/20 backdrop-blur-xl border-white/10">
-              <CardContent className="p-6">
+              <CardContent className="p-4 md:p-6">
                 <div className="text-center">
-                  <AlertTriangle className="w-12 h-12 text-red-500 mx-auto mb-4" />
-                  <h3 className="text-white text-lg font-semibold mb-2">Error Loading History</h3>
-                  <p className="text-gray-400 mb-4">{error}</p>
-                  <Button onClick={fetchAllData} variant="outline">
+                  <AlertTriangle className="w-8 h-8 md:w-12 md:h-12 text-red-500 mx-auto mb-3 md:mb-4" />
+                  <h3 className="text-white text-base md:text-lg font-semibold mb-2">Error Loading History</h3>
+                  <p className="text-gray-400 text-sm md:text-base mb-3 md:mb-4">{error}</p>
+                  <Button onClick={fetchAllData} variant="outline" size="sm">
                     Try Again
                   </Button>
                 </div>
@@ -340,7 +350,7 @@ const History = () => {
       {/* Animated Background Elements */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <motion.div
-          className="absolute -top-40 -left-40 w-80 h-80 bg-purple-600/30 rounded-full blur-3xl opacity-70"
+          className="absolute -top-20 md:-top-40 -left-20 md:-left-40 w-40 h-40 md:w-80 md:h-80 bg-purple-600/30 rounded-full blur-3xl opacity-70"
           animate={{
             scale: [1, 1.2, 1],
             rotate: [0, 180, 360],
@@ -352,7 +362,7 @@ const History = () => {
           }}
         />
         <motion.div
-          className="absolute top-1/2 -right-40 w-96 h-96 bg-blue-600/20 rounded-full blur-3xl opacity-60"
+          className="absolute top-1/2 -right-20 md:-right-40 w-48 h-48 md:w-96 md:h-96 bg-blue-600/20 rounded-full blur-3xl opacity-60"
           animate={{
             scale: [1.2, 1, 1.2],
             rotate: [360, 180, 0],
@@ -365,72 +375,81 @@ const History = () => {
         />
       </div>
 
-      <DashboardSidebar isCollapsed={isCollapsed} onToggle={handleToggleSidebar} />
+      {/* Desktop Sidebar */}
+      <div className="hidden md:block">
+        <DashboardSidebar isCollapsed={isCollapsed} onToggle={handleToggleSidebar} />
+      </div>
+      
+      {/* Mobile Sidebar */}
       <MobileSidebar isOpen={isMobileMenuOpen} onClose={() => setIsMobileMenuOpen(false)} />
 
       {/* Mobile Menu Button */}
       <button 
         onClick={handleToggleMobileMenu}
-        className="fixed top-4 right-4 z-50 p-2 rounded-lg bg-black/20 backdrop-blur-xl border border-white/10 md:hidden"
+        className="fixed top-3 right-3 z-50 p-2 md:p-3 rounded-lg bg-black/20 backdrop-blur-xl border border-white/10 md:hidden"
       >
-        <Menu className="w-5 h-5 text-white" />
+        <Menu className="w-4 h-4 md:w-5 md:h-5 text-white" />
       </button>
 
       {/* Main Content */}
       <motion.div
         initial={false}
-        animate={{ marginLeft: isCollapsed ? 80 : 320 }}
+        animate={{ marginLeft: window.innerWidth >= 768 ? (isCollapsed ? 80 : 320) : 0 }}
         transition={{ duration: 0.3, ease: "easeInOut" }}
-        className="flex-1 p-4 lg:p-8 relative z-10"
+        className="flex-1 p-3 md:p-4 lg:p-8 relative z-10"
       >
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
-          className="space-y-6 lg:space-y-8"
+          className="space-y-4 md:space-y-6 lg:space-y-8"
         >
           {/* Header */}
           <div className="relative">
-            <div className="absolute inset-0 bg-gradient-to-r from-purple-600/10 to-blue-600/10 rounded-3xl blur-xl opacity-60" />
-            <div className="relative bg-black/20 backdrop-blur-xl rounded-3xl p-6 border border-white/10">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                <div>
-                  <motion.h1 
-                    className="text-3xl lg:text-4xl font-bold bg-gradient-to-r from-white via-purple-200 to-blue-200 bg-clip-text text-transparent mb-3"
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: 0.2 }}
+            <div className="absolute inset-0 bg-gradient-to-r from-purple-600/10 to-blue-600/10 rounded-2xl md:rounded-3xl blur-xl opacity-60" />
+            <div className="relative bg-black/20 backdrop-blur-xl rounded-2xl md:rounded-3xl p-4 md:p-6 border border-white/10">
+              <div className="flex flex-col gap-3 md:gap-4">
+                <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 md:gap-4">
+                  <div className="flex-1 min-w-0">
+                    <motion.h1 
+                      className="text-2xl md:text-3xl lg:text-4xl font-bold bg-gradient-to-r from-white via-purple-200 to-blue-200 bg-clip-text text-transparent mb-2 md:mb-3"
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: 0.2 }}
+                    >
+                      Upload History
+                    </motion.h1>
+                    <motion.p 
+                      className="text-gray-400 text-sm md:text-base lg:text-lg"
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: 0.3 }}
+                    >
+                      Track your part identification results and performance
+                    </motion.p>
+                  </div>
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.8 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ delay: 0.4 }}
+                    className="flex-shrink-0"
                   >
-                    Upload History
-                  </motion.h1>
-                  <motion.p 
-                    className="text-gray-400 text-lg"
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: 0.3 }}
-                  >
-                    Track your part identification results and performance
-                  </motion.p>
+                    <Button 
+                      onClick={handleExportHistory}
+                      className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 shadow-lg shadow-purple-500/25 text-sm md:text-base"
+                      size="sm"
+                    >
+                      <Download className="w-3 h-3 md:w-4 md:h-4 mr-1 md:mr-2" />
+                      Export History
+                    </Button>
+                  </motion.div>
                 </div>
-                <motion.div
-                  initial={{ opacity: 0, scale: 0.8 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={{ delay: 0.4 }}
-                >
-                  <Button 
-                    onClick={handleExportHistory}
-                    className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 shadow-lg shadow-purple-500/25"
-                  >
-                    <Download className="w-4 h-4 mr-2" />
-                    Export History
-                  </Button>
-                </motion.div>
               </div>
             </div>
           </div>
 
           {/* Stats Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 lg:gap-6">
             {[
               { 
                 title: 'Total Uploads', 
@@ -466,19 +485,19 @@ const History = () => {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.1 * index, duration: 0.5 }}
-                whileHover={{ y: -5, scale: 1.02 }}
+                whileHover={{ y: -2, scale: 1.02 }}
                 className="relative group"
               >
-                <div className={`absolute inset-0 bg-gradient-to-r ${stat.bgColor} rounded-2xl blur-xl opacity-60 group-hover:opacity-80 transition-opacity`} />
+                <div className={`absolute inset-0 bg-gradient-to-r ${stat.bgColor} rounded-xl md:rounded-2xl blur-xl opacity-60 group-hover:opacity-80 transition-opacity`} />
                 <Card className="relative bg-black/40 backdrop-blur-xl border-white/10 hover:border-white/20 transition-all duration-300">
-                  <CardContent className="p-6">
+                  <CardContent className="p-3 md:p-4 lg:p-6">
                     <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-gray-400 text-sm font-medium">{stat.title}</p>
-                        <p className="text-2xl font-bold text-white mt-1">{stat.value}</p>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-gray-400 text-xs md:text-sm font-medium truncate">{stat.title}</p>
+                        <p className="text-lg md:text-xl lg:text-2xl font-bold text-white mt-1 truncate">{stat.value}</p>
                       </div>
-                      <div className={`p-3 rounded-xl bg-gradient-to-r ${stat.color} shadow-lg`}>
-                        <stat.icon className="w-6 h-6 text-white" />
+                      <div className={`p-2 md:p-3 rounded-lg md:rounded-xl bg-gradient-to-r ${stat.color} shadow-lg flex-shrink-0`}>
+                        <stat.icon className="w-4 h-4 md:w-5 md:h-5 lg:w-6 lg:h-6 text-white" />
                       </div>
                     </div>
                   </CardContent>
@@ -494,62 +513,62 @@ const History = () => {
             transition={{ delay: 0.6 }}
             className="relative"
           >
-            <div className="absolute inset-0 bg-gradient-to-r from-indigo-600/10 to-purple-600/10 rounded-3xl blur-xl opacity-60" />
+            <div className="absolute inset-0 bg-gradient-to-r from-indigo-600/10 to-purple-600/10 rounded-2xl md:rounded-3xl blur-xl opacity-60" />
             <Card className="relative bg-black/20 backdrop-blur-xl border-white/10">
-              <CardHeader>
-                <CardTitle className="text-white flex items-center space-x-2">
-                  <Activity className="w-5 h-5 text-blue-400" />
+              <CardHeader className="p-4 md:p-6">
+                <CardTitle className="text-white flex items-center space-x-2 text-base md:text-lg">
+                  <Activity className="w-4 h-4 md:w-5 md:h-5 text-blue-400" />
                   <span>Recent Uploads</span>
                 </CardTitle>
-                <CardDescription className="text-gray-400">
+                <CardDescription className="text-gray-400 text-xs md:text-sm">
                   Your latest part identification results
                 </CardDescription>
               </CardHeader>
-              <CardContent>
+              <CardContent className="p-4 md:p-6 pt-0">
                 {uploads.length === 0 ? (
-                  <div className="text-center py-8">
-                    <FileText className="w-12 h-12 text-gray-600 mx-auto mb-4" />
-                    <p className="text-gray-400">No uploads found</p>
-                    <p className="text-gray-500 text-sm mt-2">Start by uploading your first part image</p>
+                  <div className="text-center py-6 md:py-8">
+                    <FileText className="w-8 h-8 md:w-12 md:h-12 text-gray-600 mx-auto mb-3 md:mb-4" />
+                    <p className="text-gray-400 text-sm md:text-base">No uploads found</p>
+                    <p className="text-gray-500 text-xs md:text-sm mt-2">Start by uploading your first part image</p>
                   </div>
                 ) : (
-                  <div className="space-y-4">
+                  <div className="space-y-3 md:space-y-4">
                     {uploads.map((upload, index) => (
                       <motion.div
                         key={upload.id}
                         initial={{ opacity: 0, x: -20 }}
                         animate={{ opacity: 1, x: 0 }}
                         transition={{ delay: 0.7 + index * 0.1 }}
-                        className="flex items-center justify-between p-4 rounded-xl bg-white/5 hover:bg-white/10 transition-colors group"
+                        className="flex items-center justify-between p-3 md:p-4 rounded-lg md:rounded-xl bg-white/5 hover:bg-white/10 transition-colors group"
                       >
-                        <div className="flex items-center space-x-4">
-                          <div className="p-2 bg-gradient-to-r from-purple-600/20 to-blue-600/20 rounded-lg">
-                            <FileText className="w-5 h-5 text-purple-400" />
+                        <div className="flex items-center space-x-3 md:space-x-4 flex-1 min-w-0">
+                          <div className="p-2 bg-gradient-to-r from-purple-600/20 to-blue-600/20 rounded-lg flex-shrink-0">
+                            <FileText className="w-4 h-4 md:w-5 md:h-5 text-purple-400" />
                           </div>
-                          <div>
-                            <p className="text-white font-medium">{upload.name}</p>
-                            <p className="text-gray-400 text-sm">{upload.date}</p>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-white font-medium text-sm md:text-base truncate">{upload.name}</p>
+                            <p className="text-gray-400 text-xs md:text-sm truncate">{upload.date}</p>
                           </div>
                         </div>
-                        <div className="flex items-center space-x-3">
-                          <Badge variant="secondary" className="bg-green-600/20 text-green-400 border-green-500/30">
+                        <div className="flex items-center space-x-2 md:space-x-3 flex-shrink-0">
+                          <Badge variant="secondary" className="bg-green-600/20 text-green-400 border-green-500/30 text-xs md:text-sm">
                             {upload.confidence}%
                           </Badge>
-                          <div className="flex space-x-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <div className="flex space-x-1 md:space-x-2 opacity-0 group-hover:opacity-100 transition-opacity">
                             <Button
                               variant="ghost"
                               size="sm"
-                              className="text-blue-400 hover:text-blue-300"
+                              className="text-blue-400 hover:text-blue-300 p-1 md:p-2"
                             >
-                              <Eye className="w-4 h-4" />
+                              <Eye className="w-3 h-3 md:w-4 md:h-4" />
                             </Button>
                             <Button
                               variant="ghost"
                               size="sm"
                               onClick={() => handleDeleteUpload(upload.id)}
-                              className="text-red-400 hover:text-red-300"
+                              className="text-red-400 hover:text-red-300 p-1 md:p-2"
                             >
-                              <Trash2 className="w-4 h-4" />
+                              <Trash2 className="w-3 h-3 md:w-4 md:h-4" />
                             </Button>
                           </div>
                         </div>
