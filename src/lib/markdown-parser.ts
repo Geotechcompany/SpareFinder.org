@@ -3,8 +3,14 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
 export const parseAIResponse = (markdown: string): string => {
-  // Utility to convert URLs and emails to clickable links
+  // Utility to convert URLs, emails, and markdown formatting to HTML
   const convertLinksToHtml = (text: string): string => {
+    // Convert markdown bold **text** to HTML bold
+    text = text.replace(/\*\*([^*]+)\*\*/g, '<strong class="font-bold text-gray-900 dark:text-gray-100">$1</strong>');
+    
+    // Convert markdown italic *text* to HTML italic (but avoid conflicting with bold)
+    text = text.replace(/(?<!\*)\*([^*]+)\*(?!\*)/g, '<em class="italic text-gray-800 dark:text-gray-200">$1</em>');
+    
     // Convert markdown links [text](url) to HTML links
     text = text.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer" class="text-blue-500 hover:text-blue-400 underline">$1</a>');
     
@@ -17,21 +23,24 @@ export const parseAIResponse = (markdown: string): string => {
     // Convert email addresses to clickable mailto links
     text = text.replace(/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/g, '<a href="mailto:$1" class="text-blue-500 hover:text-blue-400 underline">$1</a>');
     
+    // Convert markdown inline code `code` to HTML code
+    text = text.replace(/`([^`]+)`/g, '<code class="bg-gray-100 dark:bg-gray-800 px-1 py-0.5 rounded text-sm font-mono">$1</code>');
+    
     return text;
   };
 
-  // Utility to escape HTML while preserving our converted links
+  // Utility to escape HTML while preserving our converted links and formatting
   const escapeHtmlButPreserveLinks = (unsafe: string): string => {
-    // First convert links
+    // First convert links and formatting
     let safe = convertLinksToHtml(unsafe);
     
-    // Then escape other HTML characters, but preserve our link tags
-    const linkPlaceholders: string[] = [];
+    // Then escape other HTML characters, but preserve our generated HTML tags
+    const htmlPlaceholders: string[] = [];
     
-    // Replace link tags with placeholders
-    safe = safe.replace(/<a [^>]*>.*?<\/a>/g, (match) => {
-      const placeholder = `__LINK_PLACEHOLDER_${linkPlaceholders.length}__`;
-      linkPlaceholders.push(match);
+    // Replace HTML tags with placeholders
+    safe = safe.replace(/<(a [^>]*>.*?<\/a|strong [^>]*>.*?<\/strong|em [^>]*>.*?<\/em|code [^>]*>.*?<\/code)>/g, (match) => {
+      const placeholder = `__HTML_PLACEHOLDER_${htmlPlaceholders.length}__`;
+      htmlPlaceholders.push(match);
       return placeholder;
     });
     
@@ -43,9 +52,9 @@ export const parseAIResponse = (markdown: string): string => {
       .replace(/"/g, "&quot;")
       .replace(/'/g, "&#039;");
     
-    // Restore link tags
-    linkPlaceholders.forEach((link, index) => {
-      safe = safe.replace(`__LINK_PLACEHOLDER_${index}__`, link);
+    // Restore HTML tags
+    htmlPlaceholders.forEach((html, index) => {
+      safe = safe.replace(`__HTML_PLACEHOLDER_${index}__`, html);
     });
     
     return safe;

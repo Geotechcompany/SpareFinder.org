@@ -189,7 +189,7 @@
 .analysis-markdown .analysis-content h2,
 .analysis-markdown .analysis-content h3,
 .analysis-markdown .analysis-content h4 {
-    @apply text-blue-600 dark: text-blue-400 font-bold mt-4 mb-2 border-b border-gray-200 dark: border-gray-700 pb-1;
+    @apply text-blue-600 dark:text-blue-400 font-bold mt-4 mb-2 border-b border-gray-200 dark:border-gray-700 pb-1;
 }
 
 .analysis-markdown .analysis-content h1 {
@@ -218,7 +218,7 @@
 }
 
 .analysis-markdown .analysis-content strong {
-    @apply font-semibold text-gray-900 dark: text-gray-100;
+    @apply font-semibold text-gray-900 dark:text-gray-100;
 }
 
 .analysis-markdown .analysis-content p {
@@ -226,19 +226,19 @@
 }
 
 .analysis-markdown .analysis-content em {
-    @apply italic text-gray-600 dark: text-gray-400;
+    @apply italic text-gray-600 dark:text-gray-400;
 }
 
 .analysis-markdown .analysis-content code {
-    @apply bg-gray-100 dark: bg-gray-800 px-1 py-0.5 rounded text-sm font-mono;
+    @apply bg-gray-100 dark:bg-gray-800 px-1 py-0.5 rounded text-sm font-mono;
 }
 
 .analysis-markdown .analysis-content pre {
-    @apply bg-gray-100 dark: bg-gray-800 p-3 rounded-lg overflow-x-auto my-3;
+    @apply bg-gray-100 dark:bg-gray-800 p-3 rounded-lg overflow-x-auto my-3;
 }
 
 .analysis-markdown .analysis-content blockquote {
-    @apply border-l-4 border-blue-500 pl-4 py-2 bg-gray-50 dark: bg-gray-800 rounded-r-lg my-3 italic;
+    @apply border-l-4 border-blue-500 pl-4 py-2 bg-gray-50 dark:bg-gray-800 rounded-r-lg my-3 italic;
 }
 
 
@@ -250,15 +250,15 @@
 
 .analysis-markdown .technical-data-table th,
 .analysis-markdown .technical-data-table td {
-    @apply border border-gray-300 dark: border-gray-600 px-3 py-2 text-left;
+    @apply border border-gray-300 dark:border-gray-600 px-3 py-2 text-left;
 }
 
 .analysis-markdown .technical-data-table th {
-    @apply bg-gray-100 dark: bg-gray-700 font-semibold text-gray-800 dark: text-gray-200;
+    @apply bg-gray-100 dark:bg-gray-700 font-semibold text-gray-800 dark:text-gray-200;
 }
 
 .analysis-markdown .technical-data-table td {
-    @apply bg-white dark: bg-gray-800;
+    @apply bg-white dark:bg-gray-800;
 }
 
 
@@ -272,11 +272,11 @@
 /* Supplier and Where to Buy section styling */
 
 .analysis-markdown .where-to-buy {
-    @apply my-6 p-4 bg-gray-50 dark: bg-gray-800 rounded-lg border border-gray-200 dark: border-gray-700;
+    @apply my-6 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700;
 }
 
 .analysis-markdown .where-to-buy h2 {
-    @apply text-lg font-bold text-green-700 dark: text-green-400 mb-3 border-b border-green-200 dark: border-green-600 pb-2;
+    @apply text-lg font-bold text-green-700 dark:text-green-400 mb-3 border-b border-green-200 dark:border-green-600 pb-2;
 }
 
 .analysis-markdown .supplier-content {
@@ -284,26 +284,26 @@
 }
 
 .analysis-markdown .supplier-line {
-    @apply py-2 px-3 bg-white dark: bg-gray-700 rounded border-l-4 border-blue-400 shadow-sm;
+    @apply py-2 px-3 bg-white dark:bg-gray-700 rounded border-l-4 border-blue-400 shadow-sm;
 }
 
 .analysis-markdown .supplier-content a {
-    @apply text-blue-600 dark: text-blue-400 hover: text-blue-800 dark: hover: text-blue-300 underline font-medium transition-colors;
+    @apply text-blue-600 dark:text-blue-400 hover: text-blue-800 dark:hover: text-blue-300 underline font-medium transition-colors;
 }
 
 .analysis-markdown .supplier-content a:hover {
-    @apply bg-blue-50 dark: bg-blue-900 px-1 rounded;
+    @apply bg-blue-50 dark:bg-blue-900 px-1 rounded;
 }
 
 
 /* Part identification section styling */
 
 .analysis-markdown .part-id {
-    @apply my-6 p-4 bg-blue-50 dark: bg-blue-900 rounded-lg border border-blue-200 dark: border-blue-700;
+    @apply my-6 p-4 bg-blue-50 dark:bg-blue-900 rounded-lg border border-blue-200 dark:border-blue-700;
 }
 
 .analysis-markdown .part-id h2 {
-    @apply text-lg font-bold text-blue-800 dark: text-blue-200 mb-3;
+    @apply text-lg font-bold text-blue-800 dark:text-blue-200 mb-3;
 }
 
 .analysis-markdown .part-id-item {
@@ -311,22 +311,22 @@
 }
 
 .analysis-markdown .part-id-item strong {
-    @apply text-blue-900 dark: text-blue-100;
+    @apply text-blue-900 dark:text-blue-100;
 }
 
 
 /* Technical description section styling */
 
 .analysis-markdown .tech-desc {
-    @apply my-6 p-4 bg-purple-50 dark: bg-purple-900 rounded-lg border border-purple-200 dark: border-purple-700;
+    @apply my-6 p-4 bg-purple-50 dark:bg-purple-900 rounded-lg border border-purple-200 dark:border-purple-700;
 }
 
 .analysis-markdown .tech-desc h2 {
-    @apply text-lg font-bold text-purple-800 dark: text-purple-200 mb-3;
+    @apply text-lg font-bold text-purple-800 dark:text-purple-200 mb-3;
 }
 
 .analysis-markdown .tech-desc h3 {
-    @apply text-base font-semibold text-purple-700 dark: text-purple-300 mt-4 mb-2;
+    @apply text-base font-semibold text-purple-700 dark:text-purple-300 mt-4 mb-2;
 }
 
 .analysis-markdown .use-cases,
@@ -336,7 +336,7 @@
 
 .analysis-markdown .use-cases li,
 .analysis-markdown .part-differences li {
-    @apply text-sm text-gray-700 dark: text-gray-300;
+    @apply text-sm text-gray-700 dark:text-gray-300;
 }
 
 
@@ -347,22 +347,22 @@
 }
 
 .analysis-markdown .data-sheet h2 {
-    @apply text-lg font-bold text-gray-800 dark: text-gray-200 mb-3;
+    @apply text-lg font-bold text-gray-800 dark:text-gray-200 mb-3;
 }
 
 
 /* Generic section styling */
 
 .analysis-markdown .generic-section {
-    @apply my-6 p-4 bg-gray-50 dark: bg-gray-800 rounded-lg border border-gray-200 dark: border-gray-700;
+    @apply my-6 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700;
 }
 
 .analysis-markdown .generic-section h2 {
-    @apply text-lg font-bold text-gray-800 dark: text-gray-200 mb-3;
+    @apply text-lg font-bold text-gray-800 dark:text-gray-200 mb-3;
 }
 
 .analysis-markdown .section-content {
-    @apply text-sm text-gray-700 dark: text-gray-300 leading-relaxed;
+    @apply text-sm text-gray-700 dark:text-gray-300 leading-relaxed;
 }
 
 .analysis-markdown .section-content li {
