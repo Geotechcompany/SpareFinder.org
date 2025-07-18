@@ -122,11 +122,20 @@ class OpenAIImageAnalyzer:
    - Include fitment tips like diameter, bolt pattern, offset, etc.
 
 6. **🌍 Where to Buy**
-   List international online vendors that supply this part, including:
-   - Website URL
-   - Contact phone/email
-   - Shipping region (global, USA, EU, etc.)
-   - Any special services (fitment tool, support, chat, etc.)
+   List specific vendors and their product pages for this exact part:
+   - Supplier Name: [Company Name]
+   - Product Page: [Direct URL to this specific part]
+   - Price Range: [If available]
+   - Shipping Region: (global, USA, EU, etc.)
+   - Contact: [Phone/email if available]
+   - Special Services: [Fitment tools, technical support, etc.]
+   
+   Include major automotive suppliers like:
+   - RockAuto, AutoZone, O'Reilly Auto Parts (USA)
+   - Euro Car Parts, GSF Car Parts (UK/EU)  
+   - Repco, Supercheap Auto (Australia)
+   - Canadian Tire (Canada)
+   - Local/regional suppliers by part type
 
 7. **📈 Confidence Score**
    - Return confidence score of part identification
@@ -188,23 +197,23 @@ MANDATORY OUTPUT FORMAT:
             # Extract full analysis text
             full_analysis = response.choices[0].message.content
             
-            # Parse analysis into structured predictions
-            predictions = self._parse_analysis(full_analysis, max_predictions, confidence_threshold)
+            # Parse analysis into flat structure
+            parsed_data = self._parse_analysis(full_analysis, max_predictions, confidence_threshold)
             
             # Calculate processing time
             end_time = asyncio.get_event_loop().time()
             processing_time = end_time - start_time
             
-            # Prepare result
+            # Prepare flat result structure
             result = {
                 "success": True,
-                "predictions": predictions,
-                "full_analysis": full_analysis,
-                "processing_time": processing_time,
-                "model_version": "Advanced Vision Analysis"
+                "status": "completed",
+                **parsed_data,  # Merge all flat fields
+                "processing_time_seconds": round(processing_time, 2),
+                "model_version": "SpareFinderAI Part Analysis v1.0"
             }
             
-            self.logger.info(f"Image analysis completed: {len(predictions)} predictions")
+            self.logger.info(f"Image analysis completed: {parsed_data.get('class_name', 'Unknown part')}")
             
             return result
         
@@ -212,10 +221,39 @@ MANDATORY OUTPUT FORMAT:
             self.logger.error(f"Image analysis error: {e}")
             return {
                 "success": False,
+                "status": "failed",
                 "error": str(e),
-                "predictions": [],
+                "class_name": "Analysis Failed",
+                "category": "Error",
+                "precise_part_name": "Analysis Failed",
+                "material_composition": "Unknown",
+                "manufacturer": "Unknown",
+                "confidence_score": 0,
+                "confidence_explanation": f"Analysis failed: {str(e)}",
+                "estimated_price": {
+                    "new": "Not available",
+                    "used": "Not available",
+                    "refurbished": "Not available"
+                },
+                "description": "Image analysis could not be completed",
+                "technical_data_sheet": {
+                    "part_type": "Unknown",
+                    "material": "Unknown",
+                    "common_specs": "Not available",
+                    "load_rating": "Unknown",
+                    "weight": "Unknown",
+                    "reusability": "Unknown",
+                    "finish": "Unknown",
+                    "temperature_tolerance": "Unknown"
+                },
+                "compatible_vehicles": [],
+                "engine_types": [],
+                "buy_links": {},
+                "suppliers": [],
+                "fitment_tips": "Retry with a clearer image",
+                "additional_instructions": "Please upload a high-quality image and try again",
                 "full_analysis": "",
-                "processing_time": 0
+                "processing_time_seconds": 0
             }
 
     def _parse_analysis(
@@ -223,108 +261,352 @@ MANDATORY OUTPUT FORMAT:
         analysis_text: str, 
         max_predictions: int = 3, 
         confidence_threshold: float = 0.3
-    ) -> List[Dict[str, Any]]:
+    ) -> Dict[str, Any]:
         """
-        Parse the analysis text into structured predictions with enhanced purchasing information
+        Parse the analysis text into a flat, UI-friendly structure
         
         :param analysis_text: Full text analysis from OpenAI
-        :param max_predictions: Maximum number of predictions to return
+        :param max_predictions: Maximum number of predictions to return (unused in flat format)
         :param confidence_threshold: Minimum confidence for predictions
-        :return: List of prediction dictionaries with purchasing details
+        :return: Flat dictionary with all part analysis data
         """
         try:
-            # Enhanced parsing with new structured output
-            predictions = []
-            
-            # Extract part identification details
-            part_name_match = re.search(r'\*\*🛞 Part Identification\*\*\n(.*?)(?=\n\*\*)', analysis_text, re.DOTALL | re.IGNORECASE)
+            # Extract part identification details with updated pattern
+            part_name_match = re.search(r'# 🛞 Part Identification\n(.*?)(?=\n#|$)', analysis_text, re.DOTALL | re.IGNORECASE)
             part_name_text = part_name_match.group(1) if part_name_match else ""
             
-            # Extract specific details
-            part_name = re.search(r'- Precise part name:\s*(.+)', part_name_text, re.IGNORECASE)
-            part_name = part_name.group(1).strip() if part_name else "Automotive Component"
+            # Extract specific details with flexible patterns
+            def extract_field(text, patterns, default="Not specified"):
+                for pattern in patterns:
+                    match = re.search(pattern, text, re.IGNORECASE | re.MULTILINE)
+                    if match:
+                        return match.group(1).strip()
+                return default
             
-            category_match = re.search(r'- Category or type of system:\s*(.+)', part_name_text, re.IGNORECASE)
-            category = category_match.group(1).strip() if category_match else "Automotive Parts"
+            # Part identification fields with updated patterns to match AI response format
+            precise_part_name = extract_field(part_name_text, [
+                r'- \*\*Precise Part Name\*\*:\s*(.+)',
+                r'- Precise part name:\s*(.+)',
+                r'- Part name:\s*(.+)',
+                r'Precise part name:\s*(.+)',
+                r'\*\*Precise Part Name\*\*:\s*(.+)'
+            ], "Automotive Component")
             
-            material_match = re.search(r'- Material composition:\s*(.+)', part_name_text, re.IGNORECASE)
-            material = material_match.group(1).strip() if material_match else "Unknown"
+            category = extract_field(part_name_text, [
+                r'- \*\*\*Category\*\*:\s*(.+)',
+                r'- \*\*Category\*\*:\s*(.+)',
+                r'- Category or type of system.*?:\s*(.+)',
+                r'- Category:\s*(.+)',
+                r'Category.*?:\s*(.+)',
+                r'\*\*Category\*\*:\s*(.+)'
+            ], "Automotive Parts")
             
-            # Extract pricing information
-            pricing_match = re.search(r'\*\*💰 Pricing & Availability\*\*\n(.*?)(?=\n\*\*)', analysis_text, re.DOTALL | re.IGNORECASE)
+            material_composition = extract_field(part_name_text, [
+                r'- \*\*Material Composition\*\*:\s*(.+)',
+                r'- Material composition:\s*(.+)',
+                r'- Material:\s*(.+)',
+                r'Material.*?:\s*(.+)',
+                r'\*\*Material Composition\*\*:\s*(.+)'
+            ], "Unknown")
+            
+            # Extract technical description with updated patterns
+            tech_desc_match = re.search(r'# 📘 Technical Description\n(.*?)(?=\n#|$)', analysis_text, re.DOTALL | re.IGNORECASE)
+            if tech_desc_match:
+                tech_desc_text = tech_desc_match.group(1).strip()
+                # Extract the main function/description
+                function_match = re.search(r'- \*\*Function\*\*:\s*(.+?)(?=\n-|\n#|$)', tech_desc_text, re.DOTALL)
+                if function_match:
+                    description = function_match.group(1).strip()
+                else:
+                    # Fallback to first meaningful line
+                    lines = [line.strip() for line in tech_desc_text.split('\n') if line.strip() and not line.strip().startswith('-')]
+                    description = lines[0] if lines else tech_desc_text[:200] + "..."
+            else:
+                description = "Technical description not available"
+            
+            # Extract pricing information with updated pattern
+            pricing_match = re.search(r'# 💰 Pricing & Availability\n(.*?)(?=\n#|$)', analysis_text, re.DOTALL | re.IGNORECASE)
             pricing_text = pricing_match.group(1) if pricing_match else ""
             
-            price_range_match = re.search(r'- Average price ranges:\s*(.+)', pricing_text, re.IGNORECASE)
-            estimated_price = price_range_match.group(1).strip() if price_range_match else "Price not available"
+            # Parse pricing ranges with updated patterns
+            new_price = extract_field(pricing_text, [
+                r'- \*\*Average New Price\*\*:\s*(.+)',
+                r'- New:\s*(.+)',
+                r'New.*?:\s*(\$[^,\n]+)',
+                r'New price.*?:\s*(.+)',
+                r'\*\*Average New Price\*\*:\s*(.+)'
+            ], "Price not available")
             
-            # Extract vendor information
-            vendors_match = re.search(r'\*\*🌍 Where to Buy\*\*\n(.*?)(?=\n\*\*)', analysis_text, re.DOTALL | re.IGNORECASE)
-            vendors_text = vendors_match.group(1) if vendors_match else ""
+            used_price = extract_field(pricing_text, [
+                r'- \*\*Used/Refurbished Price\*\*:\s*(.+)',
+                r'- Used:\s*(.+)',
+                r'Used.*?:\s*(\$[^,\n]+)',
+                r'Used price.*?:\s*(.+)',
+                r'\*\*Used.*?Price\*\*:\s*(.+)'
+            ], "Price not available")
             
-            # Extract vendor details
-            vendor_urls = re.findall(r'- Website URL:\s*(.+)', vendors_text, re.IGNORECASE)
+            refurbished_price = extract_field(pricing_text, [
+                r'- \*\*Used/Refurbished Price\*\*:\s*(.+)',
+                r'- Refurbished:\s*(.+)',
+                r'Refurbished.*?:\s*(\$[^,\n]+)',
+                r'Refurb.*?:\s*(.+)',
+                r'\*\*.*?Refurbished.*?Price\*\*:\s*(.+)'
+            ], "Price not available")
             
-            # Extract confidence score
-            confidence_match = re.search(r'\*\*📈 Confidence Score\*\*\n(.*?)(?=\n\*\*)', analysis_text, re.DOTALL | re.IGNORECASE)
+            # Extract technical data sheet with updated pattern
+            tech_spec_match = re.search(r'# 📊 Technical Data Sheet\n(.*?)(?=\n#|$)', analysis_text, re.DOTALL | re.IGNORECASE)
+            tech_spec_text = tech_spec_match.group(1) if tech_spec_match else ""
+            
+            # Extract compatible vehicles with updated pattern
+            vehicles_match = re.search(r'# 🚗 Compatible Vehicles\n(.*?)(?=\n#|$)', analysis_text, re.DOTALL | re.IGNORECASE)
+            vehicles_text = vehicles_match.group(1) if vehicles_match else ""
+            
+            # Parse compatible vehicles list with updated patterns
+            compatible_vehicles = []
+            if vehicles_text:
+                # Extract vehicle makes/models from bullet points or lists
+                vehicle_patterns = [
+                    r'- \*\*Example Makes and Models\*\*:\s*\n\s*-\s*([^-]+)',
+                    r'- (.+such as[^,\n]+(?:,[^,\n]+)*)',
+                    r'Performance vehicles such as (.+)',
+                    r'- (.+)',
+                    r'• (.+)',
+                    r'\* (.+)'
+                ]
+                for pattern in vehicle_patterns:
+                    matches = re.findall(pattern, vehicles_text, re.MULTILINE | re.IGNORECASE)
+                    if matches:
+                        for match in matches[:1]:  # Take first match
+                            # If it contains "such as", extract the vehicle list
+                            if "such as" in match.lower():
+                                vehicle_list = match.split("such as")[-1]
+                                vehicles = [v.strip().rstrip(",") for v in vehicle_list.split(",")]
+                                compatible_vehicles.extend([v for v in vehicles if v and not v.lower().endswith("etc.")])
+                            else:
+                                compatible_vehicles.append(match.strip())
+                        break
+                
+                # Limit to 5 vehicles and clean up
+                compatible_vehicles = [v.strip() for v in compatible_vehicles[:5] if v.strip()]
+            
+            # Extract where to buy information with updated pattern
+            buy_links_match = re.search(r'# 🌍 Where to Buy\n(.*?)(?=\n#|$)', analysis_text, re.DOTALL | re.IGNORECASE)
+            buy_links_text = buy_links_match.group(1) if buy_links_match else ""
+            
+            # Parse buy links with enhanced supplier extraction
+            buy_links = {}
+            suppliers_info = []
+            
+            if buy_links_text:
+                # Enhanced patterns to extract supplier name and product page with markdown support
+                supplier_patterns = [
+                    # Pattern: - **Supplier Name**: [Company Name]
+                    r'- \*\*Supplier Name\*\*:\s*\[([^\]]+)\]',
+                    # Pattern: - Supplier Name: Company Name
+                    r'- Supplier Name:\s*([^\n]+)',
+                    # Pattern: - Company Name: URL
+                    r'- ([^:]+):\s*(https?://[^\s]+)',
+                    # Pattern: Company Name (URL)
+                    r'([A-Za-z\s&]+)\s*\((https?://[^\)]+)\)',
+                    # Pattern: [Company Name](URL)
+                    r'\[([^\]]+)\]\((https?://[^\)]+)\)'
+                ]
+                
+                product_page_pattern = r'- \*\*Product Page\*\*:\s*(?:\[[^\]]+\]\()?([^\s\)]+)(?:\))?'
+                price_range_pattern = r'- \*\*Price Range\*\*:\s*([^\n]+)'
+                shipping_pattern = r'- \*\*Shipping Region\*\*:\s*([^\n]+)'
+                contact_pattern = r'- \*\*Contact\*\*:\s*([^\n]+)'
+                
+                # Extract supplier names
+                supplier_names = []
+                for pattern in supplier_patterns:
+                    matches = re.findall(pattern, buy_links_text, re.MULTILINE | re.IGNORECASE)
+                    if matches:
+                        for match in matches:
+                            if isinstance(match, tuple):
+                                supplier_names.append((match[0].strip(), match[1] if len(match) > 1 else None))
+                            else:
+                                supplier_names.append((match.strip(), None))
+                
+                # Extract product pages
+                product_pages = re.findall(product_page_pattern, buy_links_text, re.MULTILINE | re.IGNORECASE)
+                
+                # Extract additional info
+                price_ranges = re.findall(price_range_pattern, buy_links_text, re.MULTILINE | re.IGNORECASE)
+                shipping_regions = re.findall(shipping_pattern, buy_links_text, re.MULTILINE | re.IGNORECASE)
+                contacts = re.findall(contact_pattern, buy_links_text, re.MULTILINE | re.IGNORECASE)
+                
+                # Build structured supplier information
+                for i, (supplier_name, url) in enumerate(supplier_names[:5]):  # Limit to 5 suppliers
+                    supplier_info = {
+                        "name": supplier_name,
+                        "url": url or (product_pages[i] if i < len(product_pages) else ""),
+                        "price_range": price_ranges[i] if i < len(price_ranges) else "",
+                        "shipping_region": shipping_regions[i] if i < len(shipping_regions) else "",
+                        "contact": contacts[i] if i < len(contacts) else ""
+                    }
+                    suppliers_info.append(supplier_info)
+                    
+                    # Also add to flat buy_links for backward compatibility
+                    clean_name = re.sub(r'[^a-zA-Z0-9]', '_', supplier_name.lower())
+                    buy_links[clean_name] = url or (product_pages[i] if i < len(product_pages) else "")
+                
+                # If no structured suppliers found, try to extract any URLs
+                if not suppliers_info:
+                    all_urls = re.findall(r'https?://[^\s]+', buy_links_text)
+                    for i, url in enumerate(all_urls[:3]):
+                        # Try to extract domain name as supplier
+                        domain_match = re.search(r'https?://(?:www\.)?([^/]+)', url)
+                        supplier_name = domain_match.group(1) if domain_match else f"Supplier {i+1}"
+                        
+                        suppliers_info.append({
+                            "name": supplier_name,
+                            "url": url,
+                            "price_range": "",
+                            "shipping_region": "",
+                            "contact": ""
+                        })
+                        buy_links[supplier_name.lower().replace('.', '_')] = url
+                
+                # Add fallback suppliers if none found
+                if not buy_links:
+                    fallback_suppliers = [
+                        ("RockAuto", "https://www.rockauto.com"),
+                        ("AutoZone", "https://www.autozone.com"),
+                        ("O'Reilly Auto Parts", "https://www.oreillyauto.com"),
+                        ("Euro Car Parts", "https://www.eurocarparts.com"),
+                        ("Amazon", "https://www.amazon.com")
+                    ]
+                    for name, url in fallback_suppliers:
+                        suppliers_info.append({
+                            "name": name,
+                            "url": url,
+                            "price_range": "Varies",
+                            "shipping_region": "Multiple regions",
+                            "contact": "See website"
+                        })
+                        buy_links[name.lower().replace(' ', '_').replace("'", "")] = url
+            
+            # Extract confidence score with updated patterns
+            confidence_match = re.search(r'# 📈 Confidence Score\n(.*?)(?=\n#|\n\*\*|$)', analysis_text, re.DOTALL | re.IGNORECASE)
             confidence_text = confidence_match.group(1) if confidence_match else ""
             
-            confidence_score_match = re.search(r'- Confidence score:\s*(\d+(?:\.\d+)?)', confidence_text, re.IGNORECASE)
-            confidence = float(confidence_score_match.group(1)) if confidence_score_match else 0.7
+            # Try multiple patterns to extract confidence score
+            confidence_score_patterns = [
+                r'- \*\*Score\*\*:\s*(\d+(?:\.\d+)?)%?',
+                r'- Confidence score:\s*(\d+(?:\.\d+)?)%?',
+                r'(\d+(?:\.\d+)?)%?\s*confidence',
+                r'(\d+(?:\.\d+)?)%?'
+            ]
+            confidence_score = 70.0  # Default
+            for pattern in confidence_score_patterns:
+                match = re.search(pattern, confidence_text, re.IGNORECASE)
+                if match:
+                    confidence_score = float(match.group(1))
+                    break
             
-            # Create primary prediction
-            primary_prediction = {
-                "class_name": part_name,
-                "confidence": confidence,
-                "description": analysis_text[:1000],  # First 1000 chars as description
+            # Extract confidence explanation with updated patterns
+            confidence_explanation = extract_field(confidence_text, [
+                r'- \*\*Explanation\*\*:\s*(.+)',
+                r'- Explain.*?:\s*(.+)',
+                r'- (.+uncertainty.+)',
+                r'Explain.*?:\s*(.+)',
+                r'\*\*Explanation\*\*:\s*(.+)'
+            ], "Analysis based on visible features and patterns")
+            
+            # Extract additional instructions with updated pattern
+            instructions_match = re.search(r'# 📤 Additional Instructions\n(.*?)(?=\n#|$)', analysis_text, re.DOTALL | re.IGNORECASE)
+            if instructions_match:
+                instructions_text = instructions_match.group(1).strip()
+                # Extract the improvement suggestions
+                improvement_match = re.search(r'- \*\*Improvement Suggestions\*\*:\s*(.+)', instructions_text, re.DOTALL)
+                if improvement_match:
+                    additional_instructions = improvement_match.group(1).strip()
+                else:
+                    additional_instructions = instructions_text
+            else:
+                additional_instructions = "Upload clearer images with visible part numbers for better accuracy"
+            
+            # Extract fitment tips from pricing section with updated patterns
+            fitment_tips = extract_field(pricing_text, [
+                r'- \*\*Fitment Tips\*\*:\s*(.+)',
+                r'- Include fitment tips.*?:\s*(.+)',
+                r'- Fitment.*?:\s*(.+)',
+                r'fitment.*?:\s*(.+)',
+                r'\*\*Fitment Tips\*\*:\s*(.+)'
+            ], "Verify compatibility with your specific vehicle before purchase")
+            
+            # Build flat response structure
+            flat_response = {
+                "class_name": precise_part_name,
                 "category": category,
-                "manufacturer": "Not Specified",
-                "estimated_price": estimated_price,
-                "part_number": None,
-                "compatibility": [],
-                "purchasing_info": {
-                    "global_contacts": vendor_urls,
-                    "recommended_sources": [
-                        {
-                            "name": vendor_url,
-                            "url": vendor_url,
-                            "description": "Global parts supplier"
-                        } for vendor_url in vendor_urls[:3]  # Limit to top 3 vendors
-                    ]
+                "precise_part_name": precise_part_name,
+                "material_composition": material_composition,
+                "manufacturer": "Not Specified",  # Can be enhanced later
+                "confidence_score": int(confidence_score),
+                "confidence_explanation": confidence_explanation,
+                "estimated_price": {
+                    "new": new_price,
+                    "used": used_price,
+                    "refurbished": refurbished_price
                 },
-                "technical_details": {
-                    "material": material,
-                    "additional_info": part_name_text
-                }
+                "description": description,
+                "technical_data_sheet": {
+                    "part_type": extract_field(tech_spec_text, [r'Part type:\s*(.+)', r'Type:\s*(.+)'], precise_part_name),
+                    "material": material_composition,
+                    "common_specs": extract_field(tech_spec_text, [r'Common sizes.*?:\s*(.+)', r'Specs:\s*(.+)'], "Varies by application"),
+                    "load_rating": extract_field(tech_spec_text, [r'Load rating:\s*(.+)'], "Standard"),
+                    "weight": extract_field(tech_spec_text, [r'Weight:\s*(.+)'], "Varies"),
+                    "reusability": extract_field(tech_spec_text, [r'Reusability:\s*(.+)'], "Depends on condition"),
+                    "finish": extract_field(tech_spec_text, [r'Finish.*?:\s*(.+)'], "Standard finish"),
+                    "temperature_tolerance": extract_field(tech_spec_text, [r'Temperature tolerance:\s*(.+)'], "Standard operating range")
+                },
+                "compatible_vehicles": compatible_vehicles,
+                "engine_types": ["Inline", "V-type", "Flat"],  # Generic for now, can be enhanced
+                "buy_links": buy_links,
+                "suppliers": suppliers_info,  # Structured supplier information with names and details
+                "fitment_tips": fitment_tips,
+                "additional_instructions": additional_instructions,
+                "full_analysis": analysis_text  # Keep full analysis for debug purposes
             }
             
-            predictions.append(primary_prediction)
-            
-            return predictions[:max_predictions]
+            return flat_response
         
         except Exception as e:
-            self.logger.error(f"Prediction parsing error: {e}")
-            return [{
+            self.logger.error(f"Flat parsing error: {e}")
+            return {
                 "class_name": "Automotive Component",
-                "confidence": 0.5,
-                "description": "Unable to parse detailed analysis",
                 "category": "Unknown",
+                "precise_part_name": "Automotive Component", 
+                "material_composition": "Unknown",
                 "manufacturer": "Unknown",
-                "estimated_price": "Not available",
-                "purchasing_info": {
-                    "global_contacts": [],
-                    "recommended_sources": [
-                        {
-                            "name": "Global Auto Parts Finder",
-                            "url": "https://www.globalautopartsfinder.com",
-                            "description": "Fallback international parts search platform"
-                        }
-                    ]
+                "confidence_score": 50,
+                "confidence_explanation": "Unable to parse detailed analysis",
+                "estimated_price": {
+                    "new": "Price not available",
+                    "used": "Price not available", 
+                    "refurbished": "Price not available"
                 },
-                "technical_details": {
-                    "error": "Failed to parse technical details",
-                    "details": str(e)
-                }
-            }]
+                "description": "Analysis parsing failed",
+                "technical_data_sheet": {
+                    "part_type": "Unknown",
+                    "material": "Unknown",
+                    "common_specs": "Not available",
+                    "load_rating": "Unknown",
+                    "weight": "Unknown", 
+                    "reusability": "Unknown",
+                    "finish": "Unknown",
+                    "temperature_tolerance": "Unknown"
+                },
+                "compatible_vehicles": [],
+                "engine_types": [],
+                "buy_links": {},
+                "suppliers": [],
+                "fitment_tips": "Contact a specialist for proper identification",
+                "additional_instructions": "Provide clearer images for better analysis",
+                "full_analysis": "",
+                "error": str(e)
+            }
 
     def generate_technical_datasheet(
         self, 
@@ -439,15 +721,43 @@ async def analyze_part_image(
             )
         )
         
-        # Ensure the result always has a consistent structure
+        # Ensure the result always has a consistent flat structure
         if not result or not result.get('success'):
             return {
                 "success": False,
                 "status": "failed",
                 "error": "Analysis could not be completed",
-                "predictions": [],
+                "class_name": "Analysis Failed",
+                "category": "Error",
+                "precise_part_name": "Analysis Failed", 
+                "material_composition": "Unknown",
+                "manufacturer": "Unknown",
+                "confidence_score": 0,
+                "confidence_explanation": "Analysis could not be completed",
+                "estimated_price": {
+                    "new": "Not available",
+                    "used": "Not available",
+                    "refurbished": "Not available"
+                },
+                "description": "Analysis could not be completed",
+                "technical_data_sheet": {
+                    "part_type": "Unknown",
+                    "material": "Unknown", 
+                    "common_specs": "Not available",
+                    "load_rating": "Unknown",
+                    "weight": "Unknown",
+                    "reusability": "Unknown",
+                    "finish": "Unknown",
+                    "temperature_tolerance": "Unknown"
+                },
+                "compatible_vehicles": [],
+                "engine_types": [],
+                "buy_links": {},
+                "suppliers": [],
+                "fitment_tips": "Retry with a clearer image",
+                "additional_instructions": "Please upload a high-quality image and try again",
                 "full_analysis": "",
-                "processing_time": 0
+                "processing_time_seconds": 0
             }
         
         return result
@@ -527,11 +837,20 @@ def analyze_image(
    - Include fitment tips like diameter, bolt pattern, offset, etc.
 
 6. **🌍 Where to Buy**
-   List international online vendors that supply this part, including:
-   - Website URL
-   - Contact phone/email
-   - Shipping region (global, USA, EU, etc.)
-   - Any special services (fitment tool, support, chat, etc.)
+   List specific vendors and their product pages for this exact part:
+   - Supplier Name: [Company Name]
+   - Product Page: [Direct URL to this specific part]
+   - Price Range: [If available]
+   - Shipping Region: (global, USA, EU, etc.)
+   - Contact: [Phone/email if available]
+   - Special Services: [Fitment tools, technical support, etc.]
+   
+   Include major automotive suppliers like:
+   - RockAuto, AutoZone, O'Reilly Auto Parts (USA)
+   - Euro Car Parts, GSF Car Parts (UK/EU)  
+   - Repco, Supercheap Auto (Australia)
+   - Canadian Tire (Canada)
+   - Local/regional suppliers by part type
 
 7. **📈 Confidence Score**
    - Return confidence score of part identification
@@ -593,23 +912,23 @@ MANDATORY OUTPUT FORMAT:
         # Extract full analysis text
         full_analysis = response.choices[0].message.content
         
-        # Parse analysis into structured predictions
-        predictions = self._parse_analysis(full_analysis, max_predictions, confidence_threshold)
+        # Parse analysis into flat structure
+        parsed_data = self._parse_analysis(full_analysis, max_predictions, confidence_threshold)
         
         # Calculate processing time
         end_time = time.time()
         processing_time = end_time - start_time
         
-        # Prepare result
+        # Prepare flat result structure
         result = {
             "success": True,
-            "predictions": predictions,
-            "full_analysis": full_analysis,
-            "processing_time": processing_time,
-            "model_version": "Advanced Vision Analysis"
+            "status": "completed",
+            **parsed_data,  # Merge all flat fields
+            "processing_time_seconds": round(processing_time, 2),
+            "model_version": "SpareFinderAI Part Analysis v1.0"
         }
         
-        self.logger.info(f"Image analysis completed: {len(predictions)} predictions")
+        self.logger.info(f"Image analysis completed: {parsed_data.get('class_name', 'Unknown part')}")
         
         return result
     
@@ -617,10 +936,39 @@ MANDATORY OUTPUT FORMAT:
         self.logger.error(f"Image analysis error: {e}")
         return {
             "success": False,
+            "status": "failed",
             "error": str(e),
-            "predictions": [],
+            "class_name": "Analysis Failed",
+            "category": "Error",
+            "precise_part_name": "Analysis Failed",
+            "material_composition": "Unknown",
+            "manufacturer": "Unknown",
+            "confidence_score": 0,
+            "confidence_explanation": f"Analysis failed: {str(e)}",
+            "estimated_price": {
+                "new": "Not available",
+                "used": "Not available",
+                "refurbished": "Not available"
+            },
+            "description": "Image analysis could not be completed",
+            "technical_data_sheet": {
+                "part_type": "Unknown",
+                "material": "Unknown",
+                "common_specs": "Not available",
+                "load_rating": "Unknown",
+                "weight": "Unknown",
+                "reusability": "Unknown",
+                "finish": "Unknown",
+                "temperature_tolerance": "Unknown"
+            },
+            "compatible_vehicles": [],
+            "engine_types": [],
+            "buy_links": {},
+            "suppliers": [],
+            "fitment_tips": "Retry with a clearer image",
+            "additional_instructions": "Please upload a high-quality image and try again",
             "full_analysis": "",
-            "processing_time": 0
+            "processing_time_seconds": 0
         }
 
 # Update the class method to use the new synchronous method

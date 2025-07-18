@@ -122,27 +122,56 @@ async def validation_exception_handler(request, exc):
         }
     )
 
-# Prediction Model
-class PartPrediction(BaseModel):
-    class_name: str
-    confidence: float
-    description: str
-    category: Optional[str] = None
-    manufacturer: Optional[str] = None
-    estimated_price: Optional[str] = None
-    part_number: Optional[str] = None
-    compatibility: Optional[List[str]] = None
+# Estimated Price Model
+class EstimatedPrice(BaseModel):
+    new: str
+    used: str
+    refurbished: str
 
-# Analysis Response Model
+# Technical Data Sheet Model  
+class TechnicalDataSheet(BaseModel):
+    part_type: str
+    material: str
+    common_specs: str
+    load_rating: str
+    weight: str
+    reusability: str
+    finish: str
+    temperature_tolerance: str
+
+# Supplier Information Model
+class SupplierInfo(BaseModel):
+    name: str
+    url: str
+    price_range: Optional[str] = ""
+    shipping_region: Optional[str] = ""
+    contact: Optional[str] = ""
+
+# Flat Analysis Response Model
 class AnalysisResponse(BaseModel):
     success: bool
     status: str
     filename: Optional[str] = None
-    predictions: Optional[List[PartPrediction]] = None
-    analysis: Optional[str] = None
-    error: Optional[str] = None
-    processing_time: Optional[float] = None
+    class_name: Optional[str] = None
+    category: Optional[str] = None
+    precise_part_name: Optional[str] = None
+    material_composition: Optional[str] = None
+    manufacturer: Optional[str] = None
+    confidence_score: Optional[int] = None
+    confidence_explanation: Optional[str] = None
+    estimated_price: Optional[EstimatedPrice] = None
+    description: Optional[str] = None
+    technical_data_sheet: Optional[TechnicalDataSheet] = None
+    compatible_vehicles: Optional[List[str]] = None
+    engine_types: Optional[List[str]] = None
+    buy_links: Optional[Dict[str, str]] = None
+    suppliers: Optional[List[SupplierInfo]] = None
+    fitment_tips: Optional[str] = None
+    additional_instructions: Optional[str] = None
+    full_analysis: Optional[str] = None
+    processing_time_seconds: Optional[float] = None
     model_version: Optional[str] = None
+    error: Optional[str] = None
 
 # Graceful shutdown handler
 def graceful_shutdown(signum, frame):
@@ -246,38 +275,19 @@ async def analyze_part(
                 }
             )
         
-        # If analysis failed, return error response
+        # If analysis failed, return error response (now already in flat format)
         if not analysis_result.get('success'):
+            # Add filename to the flat error response
+            analysis_result["filename"] = filename
             return JSONResponse(
                 status_code=500,
-                content={
-                    "success": False,
-                    "status": "failed",
-                    "error": analysis_result.get('error', 'Unknown error'),
-                    "filename": filename
-                }
+                content=analysis_result
             )
         
-        # Prepare response
+        # Analysis successful - add filename to the flat response
         response_data = {
-            "success": True,
-            "status": "completed",
             "filename": filename,
-            "predictions": [
-                {
-                    "class_name": pred.get("class_name", "Unknown Part"),
-                    "confidence": pred.get("confidence", 0.0),
-                    "description": pred.get("description", ""),
-                    "category": pred.get("category"),
-                    "manufacturer": pred.get("manufacturer"),
-                    "estimated_price": pred.get("estimated_price"),
-                    "part_number": pred.get("part_number"),
-                    "compatibility": pred.get("compatibility", [])
-                } for pred in analysis_result.get("predictions", [])
-            ],
-            "analysis": analysis_result.get("full_analysis", ""),
-            "processing_time": analysis_result.get("processing_time"),
-            "model_version": "SpareFinderAI Part Analysis v1.0"
+            **analysis_result  # Merge all flat analysis fields
         }
         
         # Store result for potential later retrieval
@@ -321,10 +331,10 @@ async def get_analysis_status(
                 }
             )
         
-        # Retrieve stored result
+        # Retrieve stored result (now in flat format)
         result = analysis_results[filename]
         
-        # Return the stored result
+        # Return the stored flat result
         return JSONResponse(
             status_code=200,
             content=result

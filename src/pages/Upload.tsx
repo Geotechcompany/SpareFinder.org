@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useContext, useEffect } from 'react';
 import { 
   CheckCircle, 
   Brain, 
@@ -46,6 +46,7 @@ import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious
 import { useFileUpload } from '@/hooks/useFileUpload';
 import { cn } from '@/lib/utils';
 import { PartDetailsAnalysis } from '@/components/PartDetailsAnalysis';
+import { FlatPartAnalysisDisplay } from '@/components/PartAnalysisDisplay';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/components/ui/collapsible';
 import { v4 as uuidv4 } from 'uuid';
@@ -53,6 +54,138 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { parseMarkdownSections, MarkdownCard } from '@/lib/markdown-parser';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
+
+
+
+// Enhanced CSS styles for technical data visibility
+const technicalDataStyles = `
+  .technical-data-enhanced {
+    position: relative;
+    z-index: 10;
+  }
+  
+  .technical-specifications-section {
+    position: relative;
+    z-index: 10;
+  }
+  
+  .technical-section-highlight {
+    position: relative;
+    z-index: 10;
+  }
+  
+  /* Technical Data Container Styling */
+  .technical-container {
+    background: linear-gradient(135deg, rgba(5, 150, 105, 0.1), rgba(16, 185, 129, 0.05));
+    border: 1px solid rgba(5, 150, 105, 0.3);
+    box-shadow: 0 8px 32px rgba(5, 150, 105, 0.15);
+  }
+  
+  .general-container {
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(147, 51, 234, 0.05));
+    border: 1px solid rgba(59, 130, 246, 0.3);
+    box-shadow: 0 8px 32px rgba(59, 130, 246, 0.15);
+  }
+  
+  /* Enhanced table styles for technical data */
+  .technical-data-enhanced table,
+  .technical-specifications-section table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+    margin: 1rem 0 !important;
+    background: rgba(17, 24, 39, 0.8) !important;
+    border-radius: 8px !important;
+    overflow: hidden !important;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1) !important;
+  }
+  
+  .technical-data-enhanced th,
+  .technical-specifications-section th {
+    background: linear-gradient(90deg, rgba(34, 197, 94, 0.2), rgba(16, 185, 129, 0.2)) !important;
+    color: #d1fae5 !important;
+    padding: 12px !important;
+    text-align: left !important;
+    font-weight: 600 !important;
+    border: 1px solid rgba(34, 197, 94, 0.3) !important;
+  }
+  
+  .technical-data-enhanced td,
+  .technical-specifications-section td {
+    padding: 10px 12px !important;
+    border: 1px solid rgba(75, 85, 99, 0.3) !important;
+    color: #f3f4f6 !important;
+    background: rgba(31, 41, 55, 0.5) !important;
+  }
+  
+  .technical-data-enhanced tr:nth-child(even) td,
+  .technical-specifications-section tr:nth-child(even) td {
+    background: rgba(17, 24, 39, 0.7) !important;
+  }
+  
+  .technical-data-enhanced tr:hover td,
+  .technical-specifications-section tr:hover td {
+    background: rgba(34, 197, 94, 0.1) !important;
+  }
+  
+  /* Enhanced content visibility */
+  .technical-data-enhanced .prose,
+  .technical-specifications-section .prose {
+    max-width: none !important;
+    color: #f3f4f6 !important;
+  }
+  
+  .technical-data-enhanced ul,
+  .technical-specifications-section ul {
+    list-style-type: disc !important;
+    margin-left: 1.5rem !important;
+    color: #d1fae5 !important;
+  }
+  
+  .technical-data-enhanced li,
+  .technical-specifications-section li {
+    margin-bottom: 0.5rem !important;
+    line-height: 1.6 !important;
+  }
+  
+  .technical-data-enhanced pre,
+  .technical-specifications-section pre {
+    background: rgba(17, 24, 39, 0.8) !important;
+    border: 1px solid rgba(34, 197, 94, 0.3) !important;
+    border-radius: 6px !important;
+    padding: 1rem !important;
+    overflow-x: auto !important;
+    color: #d1fae5 !important;
+  }
+  
+  .technical-data-enhanced code,
+  .technical-specifications-section code {
+    background: rgba(34, 197, 94, 0.2) !important;
+    color: #d1fae5 !important;
+    padding: 2px 4px !important;
+    border-radius: 4px !important;
+  }
+  
+  /* Container-specific animations */
+  .technical-container:hover {
+    box-shadow: 0 12px 40px rgba(5, 150, 105, 0.25);
+    transform: translateY(-2px);
+    transition: all 0.3s ease-out;
+  }
+  
+  .general-container:hover {
+    box-shadow: 0 12px 40px rgba(59, 130, 246, 0.25);
+    transform: translateY(-2px);
+    transition: all 0.3s ease-out;
+  }
+`;
+
+// Add the styles to the document head
+if (typeof document !== 'undefined') {
+  const styleSheet = document.createElement('style');
+  styleSheet.type = 'text/css';
+  styleSheet.innerText = technicalDataStyles;
+  document.head.appendChild(styleSheet);
+}
 
 // Add this helper function before the Upload component
 const convertImageToBase64 = (file: File): Promise<string> => {
@@ -184,6 +317,7 @@ interface AnalysisResponse {
     [key: string]: any;
   };
   error?: string | null;
+  flatData?: any; // Store the raw flat response data
 }
 
 // Add new animation variants
@@ -305,18 +439,30 @@ const parseDescriptionSections = (description: string) => {
   return sections;
 };
 
-// Update generateAnalysisSections to use parsed description sections
+// Update generateAnalysisSections to return separate containers for different section types
 const generateAnalysisSections = (analysisResults: AnalysisResponse) => {
-  const sections: { 
+  const technicalSections: { 
     title: string; 
     icon: React.ReactNode; 
-    content: React.ReactNode 
+    content: React.ReactNode;
+    priority?: number;
+    emoji?: string;
+  }[] = [];
+  
+  const generalSections: { 
+    title: string; 
+    icon: React.ReactNode; 
+    content: React.ReactNode;
+    priority?: number;
+    emoji?: string;
   }[] = [];
 
-  // First, add the default Part Identification section
-  sections.push({
+  // First, add the default Part Identification section to general sections
+  generalSections.push({
       title: "Part Identification",
       icon: <Target className="w-5 h-5 text-blue-400" />,
+      priority: 1,
+      emoji: "🛞",
       content: (
         <motion.div 
           initial={{ opacity: 0, y: 20 }}
@@ -352,56 +498,245 @@ const generateAnalysisSections = (analysisResults: AnalysisResponse) => {
       )
     });
 
-  // If description exists, parse markdown sections
+  // If description exists, parse markdown sections and categorize them
   analysisResults.predictions.forEach((prediction) => {
     if (prediction.description) {
       const markdownSections = parseMarkdownSections(prediction.description);
       
       markdownSections.forEach((section) => {
-        sections.push({
+        const lowercaseTitle = section.title.toLowerCase();
+        const isTechnicalData = lowercaseTitle.includes('specification') || 
+                              lowercaseTitle.includes('technical') || 
+                              lowercaseTitle.includes('data sheet') ||
+                              lowercaseTitle.includes('dimensions') ||
+                              lowercaseTitle.includes('material') ||
+                              section.emoji === '🔧' ||
+                              section.emoji === '📊';
+        
+        const sectionData = {
           title: section.title,
+          priority: isTechnicalData ? 2 : 3,
+          emoji: section.emoji,
           icon: (() => {
-            const lowercaseTitle = section.title.toLowerCase();
-            
             if (lowercaseTitle.includes('identification')) 
               return <Target className="w-5 h-5 text-blue-400" />;
             if (lowercaseTitle.includes('specification') || lowercaseTitle.includes('technical')) 
               return <FileText className="w-5 h-5 text-green-400" />;
             if (lowercaseTitle.includes('compatibility') || lowercaseTitle.includes('vehicle')) 
               return <Target className="w-5 h-5 text-purple-400" />;
+            if (lowercaseTitle.includes('pricing') || lowercaseTitle.includes('cost')) 
+              return <span className="text-yellow-400">💰</span>;
+            if (lowercaseTitle.includes('where') || lowercaseTitle.includes('buy')) 
+              return <span className="text-purple-400">🌍</span>;
+            if (lowercaseTitle.includes('confidence') || lowercaseTitle.includes('score')) 
+              return <span className="text-green-400">📈</span>;
             return <Info className="w-5 h-5 text-yellow-400" />;
           })(),
           content: (
-            <MarkdownCard 
-              title={section.title} 
-              content={section.content} 
-              emoji={section.emoji} 
-            />
+            <div className={`${isTechnicalData ? 'technical-data-enhanced' : ''}`}>
+              <MarkdownCard 
+                title={section.title} 
+                content={section.content} 
+                emoji={section.emoji}
+                level={section.level || 2}
+                className={isTechnicalData ? 'bg-gradient-to-br from-green-900/20 to-blue-900/20 border-green-500/30' : ''}
+              />
+            </div>
           )
-        });
+        };
+
+        // Add to appropriate container
+        if (isTechnicalData) {
+          technicalSections.push(sectionData);
+        } else {
+          generalSections.push(sectionData);
+        }
       });
     }
   });
 
-  // Add additional details sections (excluding full_analysis)
+  // Add additional details sections and categorize them
   if (analysisResults.additional_details) {
     Object.entries(analysisResults.additional_details).forEach(([key, value]) => {
       if (typeof value === 'string' && value.trim() && key !== 'full_analysis') {
-        sections.push({
+        const isTechnicalSpecs = key === 'technical_specifications' || 
+                                key.includes('specification') ||
+                                key.includes('technical') ||
+                                key.includes('material') ||
+                                key.includes('dimension');
+        
+        const sectionData = {
           title: formatTitle(key),
-          icon: <Info className="w-5 h-5 text-yellow-400" />,
+          priority: isTechnicalSpecs ? 2 : 4,
+          emoji: isTechnicalSpecs ? "🔧" : "📋",
+          icon: isTechnicalSpecs ? 
+            <FileText className="w-5 h-5 text-green-400" /> : 
+            <Info className="w-5 h-5 text-yellow-400" />,
           content: (
-            <MarkdownCard 
-              title={formatTitle(key)} 
-              content={value} 
-            />
+            <div className={`${isTechnicalSpecs ? 'technical-specifications-section' : ''}`}>
+              <MarkdownCard 
+                title={formatTitle(key)} 
+                content={value}
+                level={2}
+                className={isTechnicalSpecs ? 
+                  'bg-gradient-to-br from-green-900/20 to-emerald-900/20 border-green-500/30 shadow-lg shadow-green-500/10' : 
+                  ''
+                }
+              />
+            </div>
           )
-        });
+        };
+
+        // Add to appropriate container
+        if (isTechnicalSpecs) {
+          technicalSections.push(sectionData);
+        } else {
+          generalSections.push(sectionData);
+        }
       }
     });
   }
 
-  return sections;
+  // If we have very few sections, try to parse any remaining content as fallback
+  if (generalSections.length === 1 && technicalSections.length === 0 && analysisResults.additional_details?.full_analysis) {
+    const fallbackSections = parseMarkdownSections(analysisResults.additional_details.full_analysis);
+    
+    fallbackSections.forEach((section, index) => {
+      if (section.title && section.content) {
+        const lowercaseTitle = section.title.toLowerCase();
+        const isTechnicalData = lowercaseTitle.includes('specification') || 
+                              lowercaseTitle.includes('technical') || 
+                              lowercaseTitle.includes('data sheet') ||
+                              lowercaseTitle.includes('dimensions') ||
+                              lowercaseTitle.includes('material');
+        
+        const sectionData = {
+          title: section.title,
+          priority: isTechnicalData ? 2 : 5,
+          emoji: section.emoji,
+          icon: (() => {
+            if (lowercaseTitle.includes('specification') || lowercaseTitle.includes('technical')) 
+              return <FileText className="w-5 h-5 text-green-400" />;
+            if (lowercaseTitle.includes('compatibility') || lowercaseTitle.includes('vehicle')) 
+              return <span className="text-blue-400">🚗</span>;
+            if (lowercaseTitle.includes('pricing') || lowercaseTitle.includes('cost')) 
+              return <span className="text-yellow-400">💰</span>;
+            if (lowercaseTitle.includes('where') || lowercaseTitle.includes('buy')) 
+              return <span className="text-purple-400">🌍</span>;
+            if (lowercaseTitle.includes('confidence') || lowercaseTitle.includes('score')) 
+              return <span className="text-green-400">📈</span>;
+            return <Info className="w-5 h-5 text-gray-400" />;
+          })(),
+          content: (
+            <div className={`${isTechnicalData ? 'technical-data-enhanced' : ''}`}>
+              <MarkdownCard 
+                title={section.title} 
+                content={section.content} 
+                emoji={section.emoji}
+                level={section.level || 2}
+                className={isTechnicalData ? 'bg-gradient-to-br from-green-900/20 to-blue-900/20 border-green-500/30' : ''}
+              />
+            </div>
+          )
+        };
+
+        // Add to appropriate container
+        if (isTechnicalData) {
+          technicalSections.push(sectionData);
+        } else {
+          generalSections.push(sectionData);
+        }
+      }
+    });
+  }
+
+  // Sort sections by priority within each container
+  const sortedTechnicalSections = technicalSections.sort((a, b) => (a.priority || 5) - (b.priority || 5));
+  const sortedGeneralSections = generalSections.sort((a, b) => (a.priority || 5) - (b.priority || 5));
+  
+  // Debug logging for development
+  if (import.meta.env.DEV) {
+    console.log('🔍 Analysis Results Debug:', {
+      technicalSections: sortedTechnicalSections.length,
+      generalSections: sortedGeneralSections.length,
+      technicalTitles: sortedTechnicalSections.map(s => ({ title: s.title, emoji: s.emoji })),
+      generalTitles: sortedGeneralSections.map(s => ({ title: s.title, emoji: s.emoji })),
+      originalPredictions: analysisResults.predictions.length,
+      additionalDetails: Object.keys(analysisResults.additional_details || {}),
+    });
+  }
+  
+  return {
+    technical: sortedTechnicalSections,
+    general: sortedGeneralSections
+  };
+};
+
+// Debug component for development
+const AnalysisDebugInfo = ({ analysisResults }: { analysisResults: AnalysisResponse }) => {
+  if (!import.meta.env.DEV) return null;
+  
+  const sections = generateAnalysisSections(analysisResults);
+  
+  return (
+    <Collapsible>
+      <CollapsibleTrigger asChild>
+        <Button variant="outline" size="sm" className="mb-4 text-xs">
+          <Info className="w-3 h-3 mr-1" />
+          Debug Info (Technical: {sections.technical.length}, General: {sections.general.length})
+        </Button>
+      </CollapsibleTrigger>
+      <CollapsibleContent>
+        <div className="bg-gray-900/50 p-4 rounded-lg border border-gray-700 mb-4 text-xs">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <h4 className="text-green-300 font-semibold mb-2 flex items-center">
+                <FileText className="w-3 h-3 mr-1" />
+                Technical Sections ({sections.technical.length})
+              </h4>
+              <ul className="text-gray-400 space-y-1">
+                {sections.technical.map((section, i) => (
+                  <li key={i} className="flex items-center space-x-2">
+                    <span>{section.emoji || '🔧'}</span>
+                    <span className="text-green-400">{section.title}</span>
+                    <Badge variant="outline" className="text-xs ml-auto bg-green-900/30 border-green-500">
+                      P{section.priority}
+                    </Badge>
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <div>
+              <h4 className="text-blue-300 font-semibold mb-2 flex items-center">
+                <Brain className="w-3 h-3 mr-1" />
+                General Sections ({sections.general.length})
+              </h4>
+              <ul className="text-gray-400 space-y-1">
+                {sections.general.map((section, i) => (
+                  <li key={i} className="flex items-center space-x-2">
+                    <span>{section.emoji || '📋'}</span>
+                    <span className="text-blue-400">{section.title}</span>
+                    <Badge variant="outline" className="text-xs ml-auto bg-blue-900/30 border-blue-500">
+                      P{section.priority}
+                    </Badge>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+          <div className="mt-4 pt-4 border-t border-gray-700">
+            <h4 className="text-white font-semibold mb-2">Raw Data</h4>
+            <div className="grid grid-cols-4 gap-4 text-gray-400">
+              <div>Predictions: {analysisResults.predictions.length}</div>
+              <div>Additional Details: {Object.keys(analysisResults.additional_details || {}).length}</div>
+              <div>Model: {analysisResults.model_version}</div>
+              <div>Processing: {analysisResults.processing_time}s</div>
+            </div>
+          </div>
+        </div>
+      </CollapsibleContent>
+    </Collapsible>
+  );
 };
 
 const Upload = () => {
@@ -417,6 +752,7 @@ const Upload = () => {
   const [partInfo, setPartInfo] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [originalAiResponse, setOriginalAiResponse] = useState<any>(null);
+  const [isResultsExpanded, setIsResultsExpanded] = useState(false);
   
   // New state for keywords
   const [keywords, setKeywords] = useState<string>('');
@@ -575,36 +911,45 @@ const Upload = () => {
             }
           );
 
-          if (statusResponse.success && statusResponse.data?.predictions && statusResponse.data.predictions.length > 0) {
-            // Prepare predictions
-            const predictions = statusResponse.data.predictions.map(prediction => ({
-              class_name: prediction.class_name || 'Automotive Component',
-              confidence: prediction.confidence || 0.75,
-              description: prediction.description || '',
-              category: prediction.category || 'Unspecified',
-              manufacturer: prediction.manufacturer || 'Unknown',
-              estimated_price: prediction.estimated_price || 'Price not available',
-              part_number: prediction.part_number,
-              compatibility: prediction.compatibility
-            }));
+          if (statusResponse.success && statusResponse.data) {
+            // Transform the flat response to match existing interface
+            const flatData = statusResponse.data;
+            
+            // Create a single prediction from flat data for backward compatibility
+            const prediction = {
+              class_name: flatData.class_name || flatData.precise_part_name || 'Automotive Component',
+              confidence: (flatData.confidence_score || 0) / 100, // Convert percentage to decimal
+              description: flatData.description || flatData.full_analysis || '',
+              category: flatData.category || 'Unspecified',
+              manufacturer: flatData.manufacturer || 'Unknown',
+              estimated_price: flatData.estimated_price || 'Price not available',
+              part_number: flatData.part_number || null,
+              compatibility: flatData.compatible_vehicles || []
+            };
 
             // Transform response to match existing interface
             const analysisResults: AnalysisResponse = {
               success: true,
-              predictions: predictions,
+              predictions: [prediction], // Wrap in array for backward compatibility
               similar_images: [], 
-              model_version: 'AI Part Analysis',
-              processing_time: 0, // Not provided by this service
+              model_version: flatData.model_version || 'SpareFinderAI Part Analysis v1.0',
+              processing_time: flatData.processing_time_seconds || 0,
               image_metadata: {
                 content_type: file.type,
                 size_bytes: file.size
               },
               additional_details: {
-                full_analysis: statusResponse.data?.predictions?.[0]?.description || '',
-                technical_specifications: '',
-                market_information: '',
-                confidence_reasoning: ''
-              }
+                full_analysis: flatData.full_analysis || flatData.description || '',
+                technical_specifications: JSON.stringify(flatData.technical_data_sheet || {}),
+                market_information: JSON.stringify({
+                  pricing: flatData.estimated_price,
+                  suppliers: flatData.suppliers,
+                  buy_links: flatData.buy_links
+                }),
+                confidence_reasoning: flatData.confidence_explanation || ''
+              },
+              // Store flat data for direct access
+              flatData: flatData
             };
 
             // Final progress update
@@ -631,49 +976,58 @@ const Upload = () => {
       }
 
       // If initial response is successful, process immediately
-      if (initialResponse.success && initialResponse.data && initialResponse.data.length > 0) {
-        // Prepare predictions
-        const predictions = initialResponse.data.map(prediction => ({
-          class_name: prediction.class_name || 'Automotive Component',
-          confidence: prediction.confidence || 0.75,
-          description: prediction.description || '',
-          category: prediction.category || 'Unspecified',
-          manufacturer: prediction.manufacturer || 'Unknown',
-          estimated_price: prediction.estimated_price || 'Price not available',
-          part_number: prediction.part_number,
-          compatibility: prediction.compatibility
-        }));
+      if (initialResponse.success && initialResponse.data) {
+        // Transform the flat response to match existing interface
+        const flatData = initialResponse.data;
+        
+        // Create a single prediction from flat data for backward compatibility
+        const prediction = {
+          class_name: flatData.class_name || flatData.precise_part_name || 'Automotive Component',
+          confidence: (flatData.confidence_score || 0) / 100, // Convert percentage to decimal
+          description: flatData.description || flatData.full_analysis || '',
+          category: flatData.category || 'Unspecified',
+          manufacturer: flatData.manufacturer || 'Unknown',
+          estimated_price: flatData.estimated_price || 'Price not available',
+          part_number: flatData.part_number || null,
+          compatibility: flatData.compatible_vehicles || []
+        };
 
         // Transform response to match existing interface
         const analysisResults: AnalysisResponse = {
           success: true,
-          predictions: predictions,
+          predictions: [prediction], // Wrap in array for backward compatibility
           similar_images: [], 
-          model_version: 'AI Part Analysis',
-          processing_time: 0, // Not provided by this service
+          model_version: flatData.model_version || 'SpareFinderAI Part Analysis v1.0',
+          processing_time: flatData.processing_time_seconds || 0,
           image_metadata: {
             content_type: file.type,
             size_bytes: file.size
           },
           additional_details: {
-            full_analysis: initialResponse.data[0]?.description || '',
-            technical_specifications: '',
-            market_information: '',
-            confidence_reasoning: ''
-          }
+            full_analysis: flatData.full_analysis || flatData.description || '',
+            technical_specifications: JSON.stringify(flatData.technical_data_sheet || {}),
+            market_information: JSON.stringify({
+              pricing: flatData.estimated_price,
+              suppliers: flatData.suppliers,
+              buy_links: flatData.buy_links
+            }),
+            confidence_reasoning: flatData.confidence_explanation || ''
+          },
+          // Store flat data for direct access
+          flatData: flatData
         };
 
         // Final progress update
         onProgress?.({
           status: 'complete',
-          message: `Found ${analysisResults.predictions.length} potential matches`,
+          message: 'Part analysis completed successfully',
           progress: 100,
           currentStep: 'Analysis Complete',
           currentStepIndex: 6,
           totalSteps: 6,
           details: 'Comprehensive part analysis finished',
-          identifiedPart: analysisResults.predictions[0]?.class_name,
-          confidence: analysisResults.predictions[0]?.confidence * 100
+          identifiedPart: flatData.class_name || flatData.precise_part_name,
+          confidence: flatData.confidence_score || 0
         });
 
         return analysisResults;
@@ -900,6 +1254,19 @@ const Upload = () => {
 
       console.log('Upload result:', result);
       
+      // Debug logging for AI response content
+      if (import.meta.env.DEV) {
+        console.log('🔍 AI Response Debug:', {
+          success: result.success,
+          dataStructure: result.data ? Object.keys(result.data) : 'No data',
+          predictionCount: result.data?.predictions?.length || 0,
+          hasAnalysisField: result.data?.predictions?.[0]?.analysis ? 'Yes' : 'No',
+          hasDescriptionField: result.data?.predictions?.[0]?.description ? 'Yes' : 'No',
+          analysisLength: result.data?.predictions?.[0]?.analysis?.length || 0,
+          analysisPreview: result.data?.predictions?.[0]?.analysis?.substring(0, 200) + '...' || 'No analysis'
+        });
+      }
+      
       if (!result.success) {
         throw new Error(result.error || 'No result returned from upload');
       }
@@ -909,7 +1276,7 @@ const Upload = () => {
         result.data.predictions.map(prediction => ({
           class_name: prediction.class_name || 'Automotive Component',
           confidence: prediction.confidence || 0.75,
-          description: prediction.description || '',
+          description: prediction.analysis || prediction.description || '', // Use analysis field first
           category: prediction.category || 'Unspecified',
           manufacturer: prediction.manufacturer || 'Unknown',
           estimated_price: prediction.estimated_price || 'Price not available',
@@ -920,16 +1287,16 @@ const Upload = () => {
         [{
           class_name: 'Automotive Component',
           confidence: 0.75,
-          description: result.data?.description || 'No detailed description available',
+          description: result.data?.analysis || result.data?.description || 'No detailed description available',
           category: 'Unspecified',
           manufacturer: 'Unknown',
           estimated_price: 'Price not available'
         }];
 
-      // Prepare additional details dynamically
+      // Prepare additional details dynamically using analysis field
       const firstPrediction = predictions[0];
       const additionalDetails = {
-        full_analysis: result.data?.description || '',
+        full_analysis: result.data?.predictions?.[0]?.analysis || result.data?.analysis || result.data?.description || '',
         technical_specifications: `
 - Detailed analysis provided by AI Model
 - Comprehensive part identification service`,
@@ -949,8 +1316,8 @@ const Upload = () => {
         success: result.success,
         predictions: predictions,
         similar_images: [], // No similar images from this service
-        model_version: 'AI Part Analysis',
-        processing_time: 0, // Not provided
+        model_version: result.data?.model_version || 'AI Part Analysis',
+        processing_time: result.data?.processing_time || 0,
         image_metadata: {
           content_type: uploadedFile.type,
           size_bytes: uploadedFile.size,
@@ -961,6 +1328,9 @@ const Upload = () => {
 
       // Set the first prediction as selected
       setSelectedPrediction(firstPrediction);
+      
+      // Set analysis results for display
+      setAnalysisResults(analysisResults);
 
       toast({
         title: "Success",
@@ -1488,6 +1858,223 @@ const Upload = () => {
     return 'destructive';
   };
 
+  // Enhanced Part Analysis Display Component
+  const PartAnalysisDisplay = ({ analysisResults }: { analysisResults: AnalysisResponse }) => {
+    const prediction = analysisResults.predictions?.[0];
+    const analysisContent = prediction?.description || analysisResults.additional_details?.full_analysis || '';
+    
+    if (!prediction) return null;
+
+    return (
+      <div className="space-y-6">
+        {/* Header Section */}
+        <div className="bg-gradient-to-r from-blue-900/20 to-purple-900/20 border border-blue-500/30 rounded-2xl p-6 backdrop-blur-sm">
+          <div className="flex items-center justify-between mb-4">
+            <h1 className="text-3xl font-bold text-white flex items-center space-x-3">
+              <span className="text-2xl">🔍</span>
+              <span>AI Part Analysis</span>
+            </h1>
+            <Badge className="bg-blue-600/20 text-blue-300 border-blue-500/30 px-4 py-2">
+              {analysisResults.model_version}
+            </Badge>
+          </div>
+
+          {/* Metadata Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 text-gray-300">
+            {/* Left Column - Part Info */}
+            <div className="space-y-3">
+              <h3 className="text-lg font-semibold text-blue-300 border-b border-blue-500/30 pb-1">
+                📋 Part Information
+              </h3>
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-gray-400">🧾 Part Name:</span>
+                  <span className="font-semibold text-white">{prediction.class_name}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-400">🏷 Category:</span>
+                  <span>{prediction.category}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-400">🏢 Manufacturer:</span>
+                  <span>{prediction.manufacturer || 'Not Specified'}</span>
+                </div>
+                {prediction.part_number && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-400">🔢 Part Number:</span>
+                    <span className="font-mono text-green-300">{prediction.part_number}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Middle Column - Analysis Stats */}
+            <div className="space-y-3">
+              <h3 className="text-lg font-semibold text-green-300 border-b border-green-500/30 pb-1">
+                📊 Analysis Stats
+              </h3>
+              <div className="space-y-3 text-sm">
+                <div>
+                  <div className="flex justify-between items-center mb-1">
+                    <span className="text-gray-400">🧮 Confidence:</span>
+                    <span className="font-bold text-white">{(prediction.confidence * 100).toFixed(1)}%</span>
+                  </div>
+                  <div className="w-full bg-gray-700 rounded-full h-2">
+                    <motion.div
+                      className={`h-2 rounded-full ${
+                        prediction.confidence > 0.8 ? 'bg-green-500' :
+                        prediction.confidence > 0.6 ? 'bg-yellow-500' : 'bg-red-500'
+                      }`}
+                      initial={{ width: 0 }}
+                      animate={{ width: `${prediction.confidence * 100}%` }}
+                      transition={{ duration: 1, ease: "easeOut" }}
+                    />
+                  </div>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-400">⏱ Processing:</span>
+                  <span>{analysisResults.processing_time?.toFixed(2) || 0}s</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-400">💰 Price:</span>
+                  <span className="text-green-300 font-semibold">{prediction.estimated_price}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Right Column - Image Info */}
+            <div className="space-y-3">
+              <h3 className="text-lg font-semibold text-purple-300 border-b border-purple-500/30 pb-1">
+                🖼 Image Details
+              </h3>
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-gray-400">📁 Format:</span>
+                  <span>{analysisResults.image_metadata?.content_type?.split('/')[1]?.toUpperCase()}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-400">📏 Size:</span>
+                  <span>{(analysisResults.image_metadata?.size_bytes / 1024 / 1024)?.toFixed(2)} MB</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-400">✅ Status:</span>
+                  <span className="text-green-300 font-semibold">Analysis Complete</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Structured Analysis Content */}
+        {analysisContent && (
+          <div className="space-y-6">
+            {(() => {
+              const sections = generateAnalysisSections(analysisResults);
+              
+              return (
+                <>
+                  {/* Technical Data Sheets */}
+                  {sections.technical.length > 0 && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="bg-gradient-to-br from-green-900/10 to-emerald-900/10 border border-green-500/30 rounded-2xl p-6 backdrop-blur-sm technical-container"
+                    >
+                      <div className="flex items-center space-x-3 mb-6 pb-3 border-b border-green-500/30">
+                        <motion.div
+                          animate={{ scale: [1, 1.1, 1], rotate: [0, 5, -5, 0] }}
+                          transition={{ duration: 2, repeat: Infinity, repeatType: "reverse" }}
+                        >
+                          <FileText className="w-6 h-6 text-green-400" />
+                        </motion.div>
+                        <div className="flex-1">
+                          <h2 className="text-2xl font-bold text-green-300">🔧 Technical Data Sheets</h2>
+                          <p className="text-green-400 text-sm">Detailed specifications and technical information</p>
+                        </div>
+                        <Badge className="bg-green-600/20 text-green-300 border-green-500/30">
+                          {sections.technical.length} section{sections.technical.length !== 1 ? 's' : ''}
+                        </Badge>
+                      </div>
+                      
+                      <div className="space-y-6">
+                        {sections.technical.map((section, index) => (
+                          <motion.div 
+                            key={index}
+                            initial={{ opacity: 0, x: -20 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            transition={{ delay: index * 0.1 }}
+                            className="technical-data-enhanced"
+                          >
+                            <div className="flex items-center space-x-3 mb-4 pb-2 border-b border-green-500/20">
+                              {section.icon}
+                              <h3 className="text-xl font-bold text-green-200">{section.title}</h3>
+                              <Badge className="bg-green-600/20 text-green-300 border-green-500/30 ml-auto text-xs">
+                                Technical Spec
+                              </Badge>
+                            </div>
+                            {section.content}
+                          </motion.div>
+                        ))}
+                      </div>
+                    </motion.div>
+                  )}
+
+                  {/* General Analysis */}
+                  {sections.general.length > 0 && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.2 }}
+                      className="bg-gradient-to-br from-blue-900/10 to-purple-900/10 border border-blue-500/30 rounded-2xl p-6 backdrop-blur-sm general-container"
+                    >
+                      <div className="flex items-center space-x-3 mb-6 pb-3 border-b border-blue-500/30">
+                        <motion.div
+                          animate={{ rotate: [0, 360] }}
+                          transition={{ duration: 8, repeat: Infinity, ease: "linear" }}
+                        >
+                          <Brain className="w-6 h-6 text-blue-400" />
+                        </motion.div>
+                        <div className="flex-1">
+                          <h2 className="text-2xl font-bold text-blue-300">📋 Analysis Results</h2>
+                          <p className="text-blue-400 text-sm">Part identification, compatibility, and market information</p>
+                        </div>
+                        <Badge className="bg-blue-600/20 text-blue-300 border-blue-500/30">
+                          {sections.general.length} section{sections.general.length !== 1 ? 's' : ''}
+                        </Badge>
+                      </div>
+                      
+                      <div className="space-y-6">
+                        {sections.general.map((section, index) => (
+                          <motion.div 
+                            key={index}
+                            initial={{ opacity: 0, x: -20 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            transition={{ delay: index * 0.1 + 0.2 }}
+                          >
+                            <div className="flex items-center space-x-3 mb-4 pb-2 border-b border-blue-500/20">
+                              {section.icon}
+                              <h3 className="text-xl font-bold text-blue-200">{section.title}</h3>
+                              {section.title === "Part Identification" && (
+                                <Badge className="bg-blue-600/20 text-blue-300 border-blue-500/30 ml-auto text-xs">
+                                  Primary Analysis
+                                </Badge>
+                              )}
+                            </div>
+                            {section.content}
+                          </motion.div>
+                        ))}
+                      </div>
+                    </motion.div>
+                  )}
+                </>
+              );
+            })()}
+          </div>
+        )}
+      </div>
+    );
+  };
+
   return (
     <div className="min-h-screen flex w-full bg-gradient-to-br from-gray-900 via-purple-900/20 to-blue-900/20 relative overflow-hidden">
       {/* Animated Background Elements */}
@@ -1800,133 +2387,240 @@ const Upload = () => {
                     )}
                   </div>
 
-                  {/* Modern Progress Bar */}
+                  {/* Enhanced Progress Bar with Detailed Information */}
                   <AnimatePresence>
-                    {isAnalyzing && analysisProgress && (
+                    {(isAnalyzing || isLoading) && analysisProgress && (
                       <motion.div
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: -10 }}
-                        className="space-y-4"
+                        className="space-y-6 bg-gray-900/50 rounded-2xl p-6 border border-gray-700/50 backdrop-blur-sm"
                       >
-                        {/* Progress Header */}
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center space-x-3">
-                            <motion.div
-                              animate={{ rotate: analysisProgress.status === 'complete' ? 0 : 360 }}
-                              transition={{ 
-                                duration: analysisProgress.status === 'complete' ? 0 : 2, 
-                                repeat: analysisProgress.status === 'complete' ? 0 : Infinity, 
-                                ease: "linear" 
-                              }}
-                              className={`p-2 rounded-full bg-gradient-to-r ${getProgressStageColor(analysisProgress.status)} shadow-lg`}
-                            >
-                              {getProgressStageIcon(analysisProgress.status)}
-                            </motion.div>
-                            <div>
-                              <div className="text-white font-medium text-lg">
-                                {analysisProgress.currentStep || analysisProgress.message}
+                        {/* Enhanced Progress Header */}
+                        <div className="space-y-4">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center space-x-4">
+                              <motion.div
+                                animate={{ rotate: analysisProgress.status === 'complete' ? 0 : 360 }}
+                                transition={{ 
+                                  duration: analysisProgress.status === 'complete' ? 0 : 2, 
+                                  repeat: analysisProgress.status === 'complete' ? 0 : Infinity, 
+                                  ease: "linear" 
+                                }}
+                                className={`p-3 rounded-full bg-gradient-to-r ${getProgressStageColor(analysisProgress.status)} shadow-lg`}
+                              >
+                                {getProgressStageIcon(analysisProgress.status)}
+                              </motion.div>
+                              <div className="flex-1">
+                                <div className="text-white font-bold text-xl">
+                                  {analysisProgress.currentStep || analysisProgress.message}
+                                </div>
+                                <div className="text-gray-300 text-base mt-1">
+                                  {analysisProgress.details || 'Processing your automotive part analysis...'}
+                                </div>
+                                {analysisProgress.currentStepIndex && analysisProgress.totalSteps && (
+                                  <div className="text-gray-400 text-sm mt-2 flex items-center space-x-2">
+                                    <span>Step {analysisProgress.currentStepIndex} of {analysisProgress.totalSteps}</span>
+                                    <span className="w-1 h-1 bg-gray-500 rounded-full"></span>
+                                    <span>AI Engine Processing</span>
+                                  </div>
+                                )}
                               </div>
-                              <div className="text-gray-400 text-sm">
-                                {analysisProgress.details || 'Processing your request...'}
+                            </div>
+                            <div className="text-right">
+                              <div className="text-white text-2xl font-bold">
+                                {analysisProgress.progress}%
                               </div>
+                              <div className="text-gray-400 text-sm">Complete</div>
                             </div>
                           </div>
-                          <div className="text-right">
-                            <div className="text-white text-lg font-bold">
-                              {analysisProgress.progress}%
-                            </div>
-                            {analysisProgress.currentStepIndex && analysisProgress.totalSteps && (
-                              <div className="text-gray-400 text-xs">
-                                Step {analysisProgress.currentStepIndex} of {analysisProgress.totalSteps}
+
+                          {/* Detailed Status Information */}
+                          <div className="bg-gray-800/50 rounded-lg p-4 border border-gray-700/30">
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                              <div className="flex items-center space-x-2">
+                                <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse"></div>
+                                <span className="text-gray-300">Status:</span>
+                                <span className="text-white font-semibold capitalize">
+                                  {analysisProgress.status.replace('_', ' ')}
+                                </span>
                               </div>
-                            )}
+                              <div className="flex items-center space-x-2">
+                                <div className="w-2 h-2 bg-green-400 rounded-full"></div>
+                                <span className="text-gray-300">Engine:</span>
+                                <span className="text-white font-semibold">AI Vision</span>
+                              </div>
+                              <div className="flex items-center space-x-2">
+                                <div className="w-2 h-2 bg-purple-400 rounded-full"></div>
+                                <span className="text-gray-300">Mode:</span>
+                                <span className="text-white font-semibold">Advanced Analysis</span>
+                              </div>
+                            </div>
                           </div>
                         </div>
 
-                        {/* Modern Progress Bar */}
-                        <div className="relative">
-                          <div className="w-full bg-gray-800/50 rounded-full h-3 overflow-hidden backdrop-blur-sm border border-gray-700/50">
-                            <motion.div
-                              className={`h-full bg-gradient-to-r ${getProgressStageColor(analysisProgress.status)} rounded-full relative overflow-hidden`}
-                              initial={{ width: 0 }}
-                              animate={{ width: `${analysisProgress.progress}%` }}
-                              transition={{ duration: 0.8, ease: "easeOut" }}
-                            >
-                              {/* Animated shine effect */}
+                        {/* Enhanced Progress Bar */}
+                        <div className="space-y-4">
+                          <div className="relative">
+                            <div className="w-full bg-gray-800 rounded-full h-4 overflow-hidden backdrop-blur-sm border border-gray-600">
                               <motion.div
-                                className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent"
-                                animate={{ x: ['-100%', '100%'] }}
-                                transition={{ 
-                                  duration: 2, 
-                                  repeat: analysisProgress.status !== 'complete' ? Infinity : 0,
-                                  ease: "easeInOut" 
-                                }}
-                              />
-                            </motion.div>
-                          </div>
-                          {/* Progress markers */}
-                          {analysisProgress.totalSteps && (
-                            <div className="flex justify-between mt-2">
-                              {Array.from({ length: analysisProgress.totalSteps }, (_, i) => (
-                                <div
-                                  key={i}
-                                  className={`w-2 h-2 rounded-full transition-colors duration-300 ${
-                                    (analysisProgress.currentStepIndex || 0) > i
-                                      ? 'bg-green-400'
-                                      : (analysisProgress.currentStepIndex || 0) === i + 1
-                                      ? `bg-gradient-to-r ${getProgressStageColor(analysisProgress.status)}`
-                                      : 'bg-gray-600'
-                                  }`}
+                                className={`h-full bg-gradient-to-r ${getProgressStageColor(analysisProgress.status)} rounded-full relative overflow-hidden`}
+                                initial={{ width: 0 }}
+                                animate={{ width: `${analysisProgress.progress}%` }}
+                                transition={{ duration: 0.8, ease: "easeOut" }}
+                              >
+                                {/* Enhanced animated shine effect */}
+                                <motion.div
+                                  className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent"
+                                  animate={{ x: ['-100%', '100%'] }}
+                                  transition={{ 
+                                    duration: 1.5, 
+                                    repeat: analysisProgress.status !== 'complete' ? Infinity : 0,
+                                    ease: "easeInOut" 
+                                  }}
                                 />
-                              ))}
+                                {/* Progress text overlay */}
+                                <div className="absolute inset-0 flex items-center justify-center">
+                                  <span className="text-white text-xs font-semibold mix-blend-difference">
+                                    {analysisProgress.progress}%
+                                  </span>
+                                </div>
+                              </motion.div>
+                            </div>
+                          </div>
+                          
+                          {/* Enhanced Progress markers */}
+                          {analysisProgress.totalSteps && (
+                            <div className="space-y-2">
+                              <div className="flex justify-between">
+                                {Array.from({ length: analysisProgress.totalSteps }, (_, i) => (
+                                  <div key={i} className="flex flex-col items-center space-y-1">
+                                    <div
+                                      className={`w-3 h-3 rounded-full transition-all duration-300 ${
+                                        (analysisProgress.currentStepIndex || 0) > i
+                                          ? 'bg-green-400 scale-110'
+                                          : (analysisProgress.currentStepIndex || 0) === i + 1
+                                          ? `bg-gradient-to-r ${getProgressStageColor(analysisProgress.status)} scale-125 animate-pulse`
+                                          : 'bg-gray-600'
+                                      }`}
+                                    />
+                                    <div className="text-xs text-gray-400 text-center max-w-16">
+                                      {i === 0 && 'Upload'}
+                                      {i === 1 && 'Validate'}
+                                      {i === 2 && 'AI Scan'}
+                                      {i === 3 && 'Match'}
+                                      {i === 4 && 'Finalize'}
+                                      {i === 5 && 'Complete'}
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
                             </div>
                           )}
                         </div>
 
-                        {/* Identified Part Display */}
+                        {/* Real-time Activity Log */}
+                        <Collapsible>
+                          <CollapsibleTrigger asChild>
+                            <Button variant="ghost" size="sm" className="w-full justify-between text-gray-300 hover:text-white">
+                              <span className="flex items-center space-x-2">
+                                <Info className="w-4 h-4" />
+                                <span>View Detailed Progress</span>
+                              </span>
+                              <ChevronDown className="w-4 h-4" />
+                            </Button>
+                          </CollapsibleTrigger>
+                          <CollapsibleContent>
+                            <div className="mt-4 space-y-2 bg-gray-900/70 rounded-lg p-4 border border-gray-700/50 max-h-40 overflow-y-auto">
+                              <div className="text-xs font-mono text-gray-300 space-y-1">
+                                <div className="flex justify-between">
+                                  <span>🔄 Analysis started</span>
+                                  <span className="text-gray-500">{new Date().toLocaleTimeString()}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span>📤 Image uploaded successfully</span>
+                                  <span className="text-gray-500">{new Date().toLocaleTimeString()}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span>🔍 {analysisProgress.message}</span>
+                                  <span className="text-gray-500">{new Date().toLocaleTimeString()}</span>
+                                </div>
+                                {analysisProgress.status === 'ai_analysis' && (
+                                  <div className="flex justify-between text-blue-300">
+                                    <span>🧠 Deep learning model processing...</span>
+                                    <span className="text-gray-500">{new Date().toLocaleTimeString()}</span>
+                                  </div>
+                                )}
+                                {analysisProgress.status === 'part_matching' && (
+                                  <div className="flex justify-between text-purple-300">
+                                    <span>🔗 Matching against automotive database...</span>
+                                    <span className="text-gray-500">{new Date().toLocaleTimeString()}</span>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </CollapsibleContent>
+                        </Collapsible>
+
+                        {/* Identified Part Display - Enhanced */}
                         {analysisProgress.identifiedPart && (
                           <motion.div
                             initial={{ opacity: 0, scale: 0.9 }}
                             animate={{ opacity: 1, scale: 1 }}
-                            className="p-4 rounded-lg bg-gradient-to-r from-green-600/20 to-emerald-600/20 border border-green-500/30 backdrop-blur-sm"
+                            className="p-6 rounded-xl bg-gradient-to-r from-green-600/20 to-emerald-600/20 border border-green-500/30 backdrop-blur-sm"
                           >
                             <div className="flex items-center justify-between">
-                              <div className="flex items-center space-x-3">
-                                <div className="p-2 bg-green-600/30 rounded-full">
-                                  <CheckCircle className="w-5 h-5 text-green-400" />
-                                </div>
+                              <div className="flex items-center space-x-4">
+                                <motion.div 
+                                  className="p-3 bg-green-600/30 rounded-full"
+                                  animate={{ scale: [1, 1.1, 1] }}
+                                  transition={{ duration: 2, repeat: Infinity }}
+                                >
+                                  <CheckCircle className="w-6 h-6 text-green-400" />
+                                </motion.div>
                                 <div>
                                   <div className="text-green-300 font-medium text-lg">
-                                    Part Identified!
+                                    🎯 Part Successfully Identified!
                                   </div>
-                                  <div className="text-green-200 font-semibold">
+                                  <div className="text-green-200 font-bold text-xl">
                                     {analysisProgress.identifiedPart}
+                                  </div>
+                                  <div className="text-green-300 text-sm mt-1">
+                                    Advanced AI pattern recognition complete
                                   </div>
                                 </div>
                               </div>
                               {analysisProgress.confidence && (
                                 <div className="text-right">
-                                  <div className="text-green-400 text-xl font-bold">
+                                  <div className="text-green-400 text-3xl font-bold">
                                     {analysisProgress.confidence}%
                                   </div>
-                                  <div className="text-green-300 text-xs">Confidence</div>
+                                  <div className="text-green-300 text-sm">Confidence Score</div>
+                                  <div className="text-green-400 text-xs mt-1">
+                                    {analysisProgress.confidence > 90 ? 'Excellent Match' : 
+                                     analysisProgress.confidence > 75 ? 'Good Match' : 'Fair Match'}
+                                  </div>
                                 </div>
                               )}
                             </div>
                           </motion.div>
                         )}
 
-                        {/* Real-time Status Messages */}
+                        {/* Additional Status Messages */}
                         <motion.div
                           key={analysisProgress.status}
                           initial={{ opacity: 0, x: -20 }}
                           animate={{ opacity: 1, x: 0 }}
-                          className="text-center"
+                          className="text-center bg-gray-800/30 rounded-lg p-3"
                         >
-                          <p className="text-gray-300 text-sm">
+                          <p className="text-gray-200 text-base font-medium">
                             {analysisProgress.message}
                           </p>
+                          {analysisProgress.details && (
+                            <p className="text-gray-400 text-sm mt-1">
+                              {analysisProgress.details}
+                            </p>
+                          )}
                         </motion.div>
                       </motion.div>
                     )}
@@ -1959,19 +2653,41 @@ const Upload = () => {
               <div className="absolute inset-0 bg-gradient-to-r from-blue-600/10 to-green-600/10 rounded-3xl blur-xl opacity-60" />
               <Card className="relative bg-black/20 backdrop-blur-xl border-white/10 h-full">
                 <CardHeader>
-                  <CardTitle className="text-white flex items-center space-x-2">
-                    <Brain className="w-5 h-5 text-blue-400" />
-                    <span>Analysis Results</span>
+                  <CardTitle className="text-white flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <Brain className="w-5 h-5 text-blue-400" />
+                      <span>Analysis Results</span>
+                      {analysisResults && (
+                        <motion.div
+                          initial={{ scale: 0 }}
+                          animate={{ scale: 1 }}
+                          transition={{ type: "spring", stiffness: 200, damping: 15 }}
+                        >
+                          <Badge className="bg-green-600/20 text-green-300 border-green-500/30">
+                            {analysisResults.predictions.length} match{analysisResults.predictions.length !== 1 ? 'es' : ''}
+                          </Badge>
+                        </motion.div>
+                      )}
+                    </div>
                     {analysisResults && (
-                      <motion.div
-                        initial={{ scale: 0 }}
-                        animate={{ scale: 1 }}
-                        transition={{ type: "spring", stiffness: 200, damping: 15 }}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setIsResultsExpanded(!isResultsExpanded)}
+                        className="text-xs"
                       >
-                        <Badge className="bg-green-600/20 text-green-300 border-green-500/30 ml-auto">
-                          {analysisResults.predictions.length} match{analysisResults.predictions.length !== 1 ? 'es' : ''}
-                        </Badge>
-                      </motion.div>
+                        {isResultsExpanded ? (
+                          <>
+                            <ChevronDown className="w-4 h-4 mr-1" />
+                            Collapse Results
+                          </>
+                        ) : (
+                          <>
+                            <Plus className="w-4 h-4 mr-1" />
+                            View All Results
+                          </>
+                        )}
+                      </Button>
                     )}
                   </CardTitle>
                   <CardDescription className="text-gray-400">
@@ -1980,27 +2696,33 @@ const Upload = () => {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-6">
-                    {analysisResults && analysisResults.predictions && analysisResults.predictions.length > 0 ? (
-                      <motion.div 
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ duration: 0.3 }}
-                        className="bg-black/20 backdrop-blur-xl border border-white/10 rounded-2xl p-6 space-y-6"
-                      >
-                        <div className="space-y-6">
-                          {generateAnalysisSections(analysisResults).map((section, index) => (
-                            <div key={index} className="space-y-4">
-                              <div className="flex items-center space-x-3 border-b border-white/10 pb-3">
-                                {section.icon}
-                                <h2 className="text-2xl font-bold text-white">
-                                  {section.title}
-                                </h2>
-                              </div>
-                              {section.content}
-                            </div>
-                          ))}
+                    {analysisResults && analysisResults.flatData ? (
+                      <ScrollArea className="h-[calc(100vh-400px)] min-h-[600px] max-h-none w-full pr-4">
+                        <div className="space-y-6 pb-8">
+                          {/* Debug component for development */}
+                          <AnalysisDebugInfo analysisResults={analysisResults} />
+                          
+                          {/* Enhanced Flat Part Analysis Display */}
+                          <FlatPartAnalysisDisplay 
+                            analysisData={analysisResults.flatData} 
+                            imagePreview={imagePreview}
+                          />
                         </div>
-                      </motion.div>
+                      </ScrollArea>
+                    ) : analysisResults && analysisResults.predictions && analysisResults.predictions.length > 0 ? (
+                      <ScrollArea className="h-[calc(100vh-400px)] min-h-[600px] max-h-none w-full pr-4">
+                        <div className="space-y-6 pb-8">
+                          {/* Debug component for development */}
+                          <AnalysisDebugInfo analysisResults={analysisResults} />
+                          
+                          {/* Legacy Part Analysis Display */}
+                          <PartDetailsAnalysis analysisResult={{
+                            predictions: analysisResults.predictions,
+                            technical_details: {},
+                            purchasing_info: {}
+                          }} />
+                        </div>
+                      </ScrollArea>
                     ) : (
                       <div className="text-center text-gray-400 p-8 bg-black/20 rounded-2xl border border-white/10">
                         <Info className="w-16 h-16 mx-auto mb-4 text-blue-400 opacity-50" />

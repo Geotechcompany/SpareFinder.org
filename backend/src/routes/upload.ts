@@ -334,6 +334,18 @@ router.post('/image', authenticateToken, upload.single('image'), handleMulterErr
     console.log('Full AI service response:', JSON.stringify(aiResponse.data, null, 2));
 
     // Step 3: Save analysis result to database using enhanced logger
+    // Handle both flat format (new) and predictions array (legacy)
+    const isFlat = aiResponse.data.class_name || aiResponse.data.precise_part_name;
+    const partName = isFlat ? 
+      (aiResponse.data.precise_part_name || aiResponse.data.class_name) :
+      aiResponse.data.predictions?.[0]?.class_name;
+    const confidence = isFlat ? 
+      (aiResponse.data.confidence_score || 0) / 100 : // Convert percentage to decimal
+      (aiResponse.data.predictions?.[0]?.confidence || 0);
+    const processingTime = isFlat ?
+      (aiResponse.data.processing_time_seconds || 0) :
+      (aiResponse.data.processing_time || 0);
+
     const analysisData: PartSearchData = {
       id: aiResponse.data.filename && aiResponse.data.filename.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i) 
         ? aiResponse.data.filename 
@@ -341,9 +353,15 @@ router.post('/image', authenticateToken, upload.single('image'), handleMulterErr
       user_id: userId,
       image_url: urlData.publicUrl,
       image_name: originalname,
-      predictions: aiResponse.data.predictions || [],
-      confidence_score: aiResponse.data.predictions?.[0]?.confidence || 0,
-      processing_time: aiResponse.data.processing_time || 0,
+      predictions: isFlat ? [{
+        class_name: partName,
+        confidence: confidence,
+        description: aiResponse.data.description || aiResponse.data.full_analysis || '',
+        category: aiResponse.data.category || 'Unknown',
+        manufacturer: aiResponse.data.manufacturer || 'Unknown'
+      }] : (aiResponse.data.predictions || []),
+      confidence_score: confidence,
+      processing_time: processingTime,
       ai_model_version: aiResponse.data.model_version || 'SpareFinderAI v1.0',
       analysis_status: aiResponse.data.success ? 'completed' : 'failed',
       image_size_bytes: size,
@@ -351,12 +369,13 @@ router.post('/image', authenticateToken, upload.single('image'), handleMulterErr
       upload_source: 'web',
       web_scraping_used: false,
       sites_searched: 0,
-      parts_found: aiResponse.data.predictions?.length || 0,
+      parts_found: isFlat ? (partName ? 1 : 0) : (aiResponse.data.predictions?.length || 0),
       similar_images: [],
-      search_query: aiResponse.data.predictions?.[0]?.class_name,
+      search_query: partName,
       metadata: {
         filename: aiResponse.data.filename,
-        analysis: aiResponse.data.analysis,
+        analysis: aiResponse.data.full_analysis || aiResponse.data.description || aiResponse.data.analysis,
+        flat_data: isFlat ? aiResponse.data : undefined, // Store full flat response
         ...req.body.metadata && JSON.parse(req.body.metadata)
       }
     };
@@ -373,7 +392,7 @@ router.post('/image', authenticateToken, upload.single('image'), handleMulterErr
       part_search_id: analysisData.id,
       search_type: 'image_upload',
       search_query: originalname,
-      results_count: (aiResponse.data.predictions?.length || 0) + (aiResponse.data.similar_images?.length || 0),
+      results_count: isFlat ? (partName ? 1 : 0) : ((aiResponse.data.predictions?.length || 0) + (aiResponse.data.similar_images?.length || 0)),
       session_id: req.headers['x-session-id'] as string,
       ip_address: req.ip,
       user_agent: req.headers['user-agent']
@@ -381,23 +400,45 @@ router.post('/image', authenticateToken, upload.single('image'), handleMulterErr
     await DatabaseLogger.logSearchHistory(searchHistoryData);
 
     // Step 4: Return results to frontend
-    return res.json({
-      success: aiResponse.data.success || true,
-      data: aiResponse.data.predictions || [],
-      id: aiResponse.data.filename,
-      image_url: urlData.publicUrl,
-      predictions: aiResponse.data.predictions || [],
-      processing_time: aiResponse.data.processing_time || 0,
-      model_version: aiResponse.data.model_version,
-      confidence: aiResponse.data.predictions?.[0]?.confidence || 0,
-      analysis: aiResponse.data.analysis,
-      metadata: {
-        file_size: size,
-        file_type: mimetype,
-        upload_timestamp: new Date().toISOString(),
-        filename: aiResponse.data.filename
-      }
-    });
+    // Return flat format directly if available, otherwise legacy format
+    if (isFlat) {
+      return res.json({
+        success: aiResponse.data.success || true,
+        data: aiResponse.data, // Return the flat data structure
+        id: aiResponse.data.filename,
+        image_url: urlData.publicUrl,
+        predictions: analysisData.predictions, // Backward compatibility
+        processing_time: processingTime,
+        model_version: aiResponse.data.model_version,
+        confidence: (aiResponse.data.confidence_score || 0),
+        analysis: aiResponse.data.full_analysis || aiResponse.data.description,
+        metadata: {
+          file_size: size,
+          file_type: mimetype,
+          upload_timestamp: new Date().toISOString(),
+          filename: aiResponse.data.filename
+        }
+      });
+    } else {
+      // Legacy format response
+      return res.json({
+        success: aiResponse.data.success || true,
+        data: aiResponse.data.predictions || [],
+        id: aiResponse.data.filename,
+        image_url: urlData.publicUrl,
+        predictions: aiResponse.data.predictions || [],
+        processing_time: aiResponse.data.processing_time || 0,
+        model_version: aiResponse.data.model_version,
+        confidence: aiResponse.data.predictions?.[0]?.confidence || 0,
+        analysis: aiResponse.data.analysis,
+        metadata: {
+          file_size: size,
+          file_type: mimetype,
+          upload_timestamp: new Date().toISOString(),
+          filename: aiResponse.data.filename
+        }
+      });
+    }
 
   } catch (error) {
     console.error('Image upload/analysis error:', error);
