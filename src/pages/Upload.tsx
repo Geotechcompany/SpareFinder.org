@@ -54,6 +54,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { parseMarkdownSections, MarkdownCard } from '@/lib/markdown-parser';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
+import { parseAIResponse } from '@/lib/markdown-parser';
 
 
 
@@ -1639,6 +1640,14 @@ const Upload = () => {
     }
 
     try {
+      // Get the full analysis content - prioritize flatData
+      const fullAnalysis = analysisResults.flatData?.full_analysis || 
+                          analysisResults.additional_details?.full_analysis || 
+                          '';
+      
+      // Format the full analysis using our markdown parser
+      const formattedAnalysis = fullAnalysis ? parseAIResponse(fullAnalysis) : '';
+
       // Create a container for PDF content
       const input = document.createElement('div');
       input.style.width = '800px';
@@ -1646,66 +1655,173 @@ const Upload = () => {
       input.style.fontFamily = 'Arial, sans-serif';
       input.style.backgroundColor = 'white';
       input.style.color = 'black';
+      input.style.lineHeight = '1.6';
 
-      // Generate PDF content
+      // Generate comprehensive PDF content
       input.innerHTML = `
-        <h1 style="color: #333; border-bottom: 2px solid #333; padding-bottom: 10px;">
-          SpareFinderAI Vision Analysis Report
-        </h1>
+        <div style="text-align: center; margin-bottom: 30px; border-bottom: 3px solid #2c3e50; padding-bottom: 20px;">
+          <h1 style="color: #2c3e50; margin: 0; font-size: 28px; font-weight: bold;">
+            🔍 SpareFinderAI Vision Analysis Report
+          </h1>
+          <p style="color: #7f8c8d; margin: 10px 0 0 0; font-size: 14px;">
+            Generated on ${new Date().toLocaleString()} | Model: ${analysisResults.model_version}
+          </p>
+        </div>
         
         ${analysisResults.predictions.map((prediction, index) => `
-          <div style="margin-bottom: 20px; border: 1px solid #ddd; padding: 15px; border-radius: 5px;">
-            <h2 style="color: #2c3e50; margin-bottom: 10px;">
-              Part ${index + 1}: ${prediction.class_name}
+          <div style="margin-bottom: 25px; border: 2px solid #ecf0f1; padding: 20px; border-radius: 8px; background-color: #fafafa;">
+            <h2 style="color: #2c3e50; margin-bottom: 15px; font-size: 22px; border-bottom: 1px solid #bdc3c7; padding-bottom: 8px;">
+              🛞 Part ${index + 1}: ${prediction.class_name || 'Unknown Part'}
             </h2>
-            <p><strong>Confidence:</strong> ${(prediction.confidence * 100).toFixed(2)}%</p>
-            <p><strong>Category:</strong> ${prediction.category}</p>
-            <p><strong>Manufacturer:</strong> ${prediction.manufacturer}</p>
-            ${prediction.part_number ? `<p><strong>Part Number:</strong> ${prediction.part_number}</p>` : ''}
-            <p><strong>Estimated Price:</strong> ${prediction.estimated_price}</p>
+            
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
+              <div>
+                <p style="margin: 5px 0;"><strong>🎯 Confidence:</strong> ${(prediction.confidence * 100).toFixed(2)}%</p>
+                <p style="margin: 5px 0;"><strong>📂 Category:</strong> ${prediction.category || 'Unspecified'}</p>
+                <p style="margin: 5px 0;"><strong>🏢 Manufacturer:</strong> ${prediction.manufacturer || 'Unknown'}</p>
+              </div>
+              <div>
+                ${prediction.part_number ? `<p style="margin: 5px 0;"><strong>🔢 Part Number:</strong> <code style="background-color: #ecf0f1; padding: 2px 6px; border-radius: 3px;">${prediction.part_number}</code></p>` : ''}
+                <p style="margin: 5px 0;"><strong>💰 Estimated Price:</strong> ${prediction.estimated_price || 'Not Available'}</p>
+                <p style="margin: 5px 0;"><strong>⏱️ Processing Time:</strong> ${analysisResults.processing_time || 0}s</p>
+              </div>
+            </div>
             
             ${prediction.description ? `
-              <div style="background-color: #f4f4f4; padding: 10px; border-radius: 5px; margin-top: 10px;">
-                <h3 style="color: #34495e;">Description</h3>
-                <p>${prediction.description}</p>
+              <div style="background-color: #e8f6f3; padding: 15px; border-radius: 5px; margin-top: 15px; border-left: 4px solid #1abc9c;">
+                <h3 style="color: #16a085; margin: 0 0 10px 0; font-size: 16px;">📝 Basic Description</h3>
+                <p style="margin: 0; color: #2c3e50;">${prediction.description}</p>
               </div>
             ` : ''}
           </div>
         `).join('')}
 
-        ${analysisResults.additional_details ? `
-          <div style="margin-top: 20px; border-top: 2px solid #333; padding-top: 15px;">
-            <h2 style="color: #2c3e50;">Additional Details</h2>
-            ${Object.entries(analysisResults.additional_details).map(([key, value]) => 
-              typeof value === 'string' && value.trim() ? `
-                <div style="margin-bottom: 10px;">
-                  <h3 style="color: #34495e;">${key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}</h3>
-                  <p>${value}</p>
-                </div>
-              ` : ''
-            ).join('')}
+        ${fullAnalysis ? `
+          <div style="margin-top: 30px; border-top: 3px solid #3498db; padding-top: 20px;">
+            <h2 style="color: #2c3e50; margin-bottom: 20px; font-size: 24px; text-align: center;">
+              🧠 Complete AI Analysis
+            </h2>
+            <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; border: 1px solid #dee2e6; line-height: 1.8;">
+              ${formattedAnalysis}
+            </div>
           </div>
         ` : ''}
 
-        <div style="margin-top: 20px; font-size: 10px; color: #777; text-align: center;">
-          Generated by SpareFinderAI Vision on ${new Date().toLocaleString()}
+        ${analysisResults.flatData ? `
+          <div style="margin-top: 25px; border-top: 2px solid #95a5a6; padding-top: 20px;">
+            <h2 style="color: #2c3e50; margin-bottom: 15px; font-size: 20px;">📊 Technical Specifications</h2>
+            <div style="background-color: #ecf0f1; padding: 15px; border-radius: 5px;">
+              ${analysisResults.flatData.technical_data_sheet ? `
+                <div style="margin-bottom: 15px;">
+                  <h3 style="color: #34495e; margin-bottom: 8px;">🔧 Technical Data</h3>
+                  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 14px;">
+                    ${Object.entries(analysisResults.flatData.technical_data_sheet).map(([key, value]) => `
+                      <div style="padding: 5px 0; border-bottom: 1px dotted #bdc3c7;">
+                        <strong>${key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}:</strong> ${value}
+                      </div>
+                    `).join('')}
+                  </div>
+                </div>
+              ` : ''}
+              
+              ${analysisResults.flatData.compatible_vehicles?.length ? `
+                <div style="margin-bottom: 15px;">
+                  <h3 style="color: #34495e; margin-bottom: 8px;">🚗 Compatible Vehicles</h3>
+                  <p style="font-size: 14px; color: #2c3e50;">${analysisResults.flatData.compatible_vehicles.join(', ')}</p>
+                </div>
+              ` : ''}
+              
+              ${analysisResults.flatData.suppliers?.length ? `
+                <div>
+                  <h3 style="color: #34495e; margin-bottom: 8px;">🛒 Supplier Information</h3>
+                  ${analysisResults.flatData.suppliers.map(supplier => `
+                    <div style="background-color: white; padding: 10px; margin: 5px 0; border-radius: 4px; border-left: 3px solid #3498db;">
+                      <strong>${supplier.name}</strong>
+                      ${supplier.price_range ? `<br><span style="color: #27ae60;">Price: ${supplier.price_range}</span>` : ''}
+                      ${supplier.shipping_region ? `<br><span style="color: #8e44ad;">Ships to: ${supplier.shipping_region}</span>` : ''}
+                      ${supplier.url ? `<br><span style="color: #3498db;">URL: ${supplier.url}</span>` : ''}
+                    </div>
+                  `).join('')}
+                </div>
+              ` : ''}
+            </div>
+          </div>
+        ` : ''}
+
+        ${analysisResults.image_metadata ? `
+          <div style="margin-top: 25px; border-top: 2px solid #95a5a6; padding-top: 20px;">
+            <h2 style="color: #2c3e50; margin-bottom: 15px; font-size: 20px;">📸 Image Analysis Details</h2>
+            <div style="background-color: #fdf2e9; padding: 15px; border-radius: 5px; border-left: 4px solid #f39c12;">
+              <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px; font-size: 14px;">
+                <div>
+                  <strong>📁 Format:</strong><br>
+                  ${analysisResults.image_metadata.content_type?.split('/')[1]?.toUpperCase() || 'Unknown'}
+                </div>
+                <div>
+                  <strong>📏 File Size:</strong><br>
+                  ${analysisResults.image_metadata.size_bytes ? 
+                    (analysisResults.image_metadata.size_bytes / 1024 / 1024).toFixed(2) + ' MB' : 
+                    'Unknown'}
+                </div>
+                <div>
+                  <strong>✅ Status:</strong><br>
+                  <span style="color: #27ae60; font-weight: bold;">Analysis Complete</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        ` : ''}
+
+        <div style="margin-top: 40px; padding-top: 20px; border-top: 2px solid #bdc3c7; text-align: center;">
+          <p style="font-size: 12px; color: #7f8c8d; margin: 0;">
+            This comprehensive analysis report was generated by SpareFinderAI Vision.<br>
+            For technical support or questions, visit our support center.<br>
+            <strong>Report ID:</strong> ${Date.now().toString(36).toUpperCase()}
+          </p>
         </div>
       `;
+
+      // Apply CSS styles for better PDF rendering
+      const style = document.createElement('style');
+      style.textContent = `
+        .analysis-content a {
+          color: #3498db !important;
+          text-decoration: underline !important;
+        }
+        .analysis-content strong {
+          font-weight: bold !important;
+          color: #2c3e50 !important;
+        }
+        .analysis-content em {
+          font-style: italic !important;
+          color: #34495e !important;
+        }
+        .analysis-content code {
+          background-color: #f8f9fa !important;
+          padding: 2px 4px !important;
+          border-radius: 3px !important;
+          font-family: 'Courier New', monospace !important;
+        }
+      `;
+      document.head.appendChild(style);
 
       // Append to body to render
       document.body.appendChild(input);
 
-      // Convert to canvas
+      // Convert to canvas with higher quality
       const canvas = await html2canvas(input, { 
         scale: 2,
         useCORS: true,
-        logging: false 
+        logging: false,
+        allowTaint: true,
+        backgroundColor: '#ffffff'
       });
 
-      // Remove temporary input
+      // Remove temporary elements
       document.body.removeChild(input);
+      document.head.removeChild(style);
 
-      // Create PDF
+      // Create PDF with better formatting
       const imgData = canvas.toDataURL('image/png');
       const pdf = new jsPDF({
         orientation: 'portrait',
@@ -1717,14 +1833,29 @@ const Upload = () => {
       const pdfWidth = pdf.internal.pageSize.getWidth();
       const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
 
-      pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+      // Handle multi-page PDFs if content is too long
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      let heightLeft = pdfHeight;
+      let position = 0;
 
-      // Save PDF
-      pdf.save(`sparefinder_part_analysis_${new Date().toISOString().replace(/:/g, '-')}.pdf`);
+      pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, pdfHeight);
+      heightLeft -= pageHeight;
+
+      while (heightLeft >= 0) {
+        position = heightLeft - pdfHeight;
+        pdf.addPage();
+        pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, pdfHeight);
+        heightLeft -= pageHeight;
+      }
+
+      // Save PDF with descriptive filename
+      const partName = analysisResults.predictions[0]?.class_name || 'automotive-part';
+      const timestamp = new Date().toISOString().replace(/:/g, '-').split('.')[0];
+      pdf.save(`SpareFinderAI_${partName.replace(/\s+/g, '_')}_${timestamp}.pdf`);
 
       toast({
-        title: "PDF Generated",
-        description: "Comprehensive part analysis report saved successfully",
+        title: "PDF Generated Successfully",
+        description: "Complete analysis report with all details saved to your downloads",
         variant: "default"
       });
     } catch (error) {
@@ -1751,7 +1882,12 @@ const Upload = () => {
     try {
       setIsLoading(true);
       
-      // Transform the data to match the expected schema - include full AI response
+      // Get the complete AI analysis content - prioritize flatData
+      const fullAnalysis = analysisResults.flatData?.full_analysis || 
+                          analysisResults.additional_details?.full_analysis || 
+                          '';
+      
+      // Transform the data to match the expected schema - include complete AI response
       const saveData = {
         success: analysisResults.success,
         predictions: analysisResults.predictions,
@@ -1764,32 +1900,82 @@ const Upload = () => {
           base64_image: analysisResults.image_metadata?.base64_image || null
         },
         additional_details: {
-          full_analysis: analysisResults.additional_details?.full_analysis || '',
-          technical_specifications: analysisResults.additional_details?.technical_specifications || '',
-          market_information: analysisResults.additional_details?.market_information || '',
-          confidence_reasoning: analysisResults.additional_details?.confidence_reasoning || ''
+          full_analysis: fullAnalysis,
+          technical_specifications: analysisResults.additional_details?.technical_specifications || 
+            (analysisResults.flatData?.technical_data_sheet ? JSON.stringify(analysisResults.flatData.technical_data_sheet, null, 2) : ''),
+          market_information: analysisResults.additional_details?.market_information || 
+            JSON.stringify({
+              pricing: analysisResults.flatData?.estimated_price,
+              suppliers: analysisResults.flatData?.suppliers,
+              buy_links: analysisResults.flatData?.buy_links
+            }, null, 2),
+          confidence_reasoning: analysisResults.additional_details?.confidence_reasoning || 
+            analysisResults.flatData?.confidence_explanation || ''
         },
         image_url: imagePreview || '',
         image_name: uploadedFile?.name || 'analysis_result.jpg',
-        // Include complete AI response data
-        analysis: originalAiResponse?.analysis || analysisResults.additional_details?.full_analysis || '',
-        confidence: originalAiResponse?.confidence || analysisResults.predictions?.[0]?.confidence || 0,
+        // Include complete AI response data with enhanced metadata
+        analysis: fullAnalysis, // Store the full AI analysis
+        confidence: analysisResults.flatData?.confidence_score || 
+                   analysisResults.predictions?.[0]?.confidence || 0,
         metadata: {
-          ...originalAiResponse?.metadata,
           ai_service_id: originalAiResponse?.id,
           upload_timestamp: new Date().toISOString(),
-          frontend_version: '2.0.0'
+          frontend_version: '2.0.0',
+          model_version: analysisResults.model_version,
+          processing_time: analysisResults.processing_time,
+          // Include flat data structure for comprehensive storage
+          flat_data: analysisResults.flatData ? {
+            class_name: analysisResults.flatData.class_name,
+            category: analysisResults.flatData.category,
+            precise_part_name: analysisResults.flatData.precise_part_name,
+            material_composition: analysisResults.flatData.material_composition,
+            manufacturer: analysisResults.flatData.manufacturer,
+            confidence_score: analysisResults.flatData.confidence_score,
+            estimated_price: analysisResults.flatData.estimated_price,
+            technical_data_sheet: analysisResults.flatData.technical_data_sheet,
+            compatible_vehicles: analysisResults.flatData.compatible_vehicles,
+            engine_types: analysisResults.flatData.engine_types,
+            suppliers: analysisResults.flatData.suppliers,
+            buy_links: analysisResults.flatData.buy_links,
+            fitment_tips: analysisResults.flatData.fitment_tips,
+            additional_instructions: analysisResults.flatData.additional_instructions
+          } : null,
+          // Store enhanced analysis sections
+          enhanced_sections: {
+            part_identification: {
+              name: analysisResults.flatData?.precise_part_name || analysisResults.predictions?.[0]?.class_name,
+              category: analysisResults.flatData?.category || analysisResults.predictions?.[0]?.category,
+              manufacturer: analysisResults.flatData?.manufacturer || analysisResults.predictions?.[0]?.manufacturer,
+              part_number: analysisResults.flatData?.part_number || analysisResults.predictions?.[0]?.part_number
+            },
+            technical_analysis: {
+              material: analysisResults.flatData?.material_composition,
+              specifications: analysisResults.flatData?.technical_data_sheet,
+              compatibility: analysisResults.flatData?.compatible_vehicles
+            },
+            market_analysis: {
+              price_estimate: analysisResults.flatData?.estimated_price,
+              suppliers: analysisResults.flatData?.suppliers,
+              purchase_links: analysisResults.flatData?.buy_links
+            },
+            ai_insights: {
+              confidence_score: analysisResults.flatData?.confidence_score,
+              confidence_explanation: analysisResults.flatData?.confidence_explanation,
+              full_analysis: fullAnalysis
+            }
+          }
         }
       };
 
-      console.log('💾 Saving analysis results:', saveData);
+      console.log('💾 Saving comprehensive analysis results:', saveData);
 
       const response = await api.upload.saveResults(saveData);
 
       if (response.success) {
         toast({
-          title: "Results Saved",
-          description: `Analysis results saved successfully: ${response.data?.part_name}`,
+          title: "Complete Analysis Saved",
+          description: `Full analysis with AI insights saved successfully: ${response.data?.part_name || analysisResults.flatData?.precise_part_name || 'Analysis Result'}`,
           variant: "default"
         });
       } else {
