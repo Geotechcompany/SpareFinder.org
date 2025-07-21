@@ -114,6 +114,7 @@ export class DatabaseLogger {
           confidence_score: data.confidence_score || 0,
           ai_confidence: data.confidence_score || 0,
           processing_time: data.processing_time || 0,
+          processing_time_ms: data.processing_time || 0, // Add both for compatibility
           model_version: data.ai_model_version || 'SpareFinder AI v1',
           similar_images: data.similar_images || [],
           web_scraping_used: data.web_scraping_used || false,

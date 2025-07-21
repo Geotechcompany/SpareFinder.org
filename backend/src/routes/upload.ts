@@ -334,6 +334,18 @@ router.post('/image', authenticateToken, upload.single('image'), handleMulterErr
     console.log('Full AI service response:', JSON.stringify(aiResponse.data, null, 2));
 
     // Step 3: Save analysis result to database using enhanced logger
+    // Handle both flat format (new) and predictions array (legacy)
+    const isFlat = aiResponse.data.class_name || aiResponse.data.precise_part_name;
+    const partName = isFlat ? 
+      (aiResponse.data.precise_part_name || aiResponse.data.class_name) :
+      aiResponse.data.predictions?.[0]?.class_name;
+    const confidence = isFlat ? 
+      (aiResponse.data.confidence_score || 0) / 100 : // Convert percentage to decimal
+      (aiResponse.data.predictions?.[0]?.confidence || 0);
+    const processingTime = isFlat ?
+      (aiResponse.data.processing_time_seconds || 0) :
+      (aiResponse.data.processing_time || 0);
+
     const analysisData: PartSearchData = {
       id: aiResponse.data.filename && aiResponse.data.filename.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i) 
         ? aiResponse.data.filename 
@@ -341,9 +353,15 @@ router.post('/image', authenticateToken, upload.single('image'), handleMulterErr
       user_id: userId,
       image_url: urlData.publicUrl,
       image_name: originalname,
-      predictions: aiResponse.data.predictions || [],
-      confidence_score: aiResponse.data.predictions?.[0]?.confidence || 0,
-      processing_time: aiResponse.data.processing_time || 0,
+      predictions: isFlat ? [{
+        class_name: partName,
+        confidence: confidence,
+        description: aiResponse.data.description || aiResponse.data.full_analysis || '',
+        category: aiResponse.data.category || 'Unknown',
+        manufacturer: aiResponse.data.manufacturer || 'Unknown'
+      }] : (aiResponse.data.predictions || []),
+      confidence_score: confidence,
+      processing_time: processingTime,
       ai_model_version: aiResponse.data.model_version || 'SpareFinderAI v1.0',
       analysis_status: aiResponse.data.success ? 'completed' : 'failed',
       image_size_bytes: size,
@@ -351,12 +369,13 @@ router.post('/image', authenticateToken, upload.single('image'), handleMulterErr
       upload_source: 'web',
       web_scraping_used: false,
       sites_searched: 0,
-      parts_found: aiResponse.data.predictions?.length || 0,
+      parts_found: isFlat ? (partName ? 1 : 0) : (aiResponse.data.predictions?.length || 0),
       similar_images: [],
-      search_query: aiResponse.data.predictions?.[0]?.class_name,
+      search_query: partName,
       metadata: {
         filename: aiResponse.data.filename,
-        analysis: aiResponse.data.analysis,
+        analysis: aiResponse.data.full_analysis || aiResponse.data.description || aiResponse.data.analysis,
+        flat_data: isFlat ? aiResponse.data : undefined, // Store full flat response
         ...req.body.metadata && JSON.parse(req.body.metadata)
       }
     };
@@ -373,7 +392,7 @@ router.post('/image', authenticateToken, upload.single('image'), handleMulterErr
       part_search_id: analysisData.id,
       search_type: 'image_upload',
       search_query: originalname,
-      results_count: (aiResponse.data.predictions?.length || 0) + (aiResponse.data.similar_images?.length || 0),
+      results_count: isFlat ? (partName ? 1 : 0) : ((aiResponse.data.predictions?.length || 0) + (aiResponse.data.similar_images?.length || 0)),
       session_id: req.headers['x-session-id'] as string,
       ip_address: req.ip,
       user_agent: req.headers['user-agent']
@@ -381,23 +400,45 @@ router.post('/image', authenticateToken, upload.single('image'), handleMulterErr
     await DatabaseLogger.logSearchHistory(searchHistoryData);
 
     // Step 4: Return results to frontend
-    return res.json({
-      success: aiResponse.data.success || true,
-      data: aiResponse.data.predictions || [],
-      id: aiResponse.data.filename,
-      image_url: urlData.publicUrl,
-      predictions: aiResponse.data.predictions || [],
-      processing_time: aiResponse.data.processing_time || 0,
-      model_version: aiResponse.data.model_version,
-      confidence: aiResponse.data.predictions?.[0]?.confidence || 0,
-      analysis: aiResponse.data.analysis,
-      metadata: {
-        file_size: size,
-        file_type: mimetype,
-        upload_timestamp: new Date().toISOString(),
-        filename: aiResponse.data.filename
-      }
-    });
+    // Return flat format directly if available, otherwise legacy format
+    if (isFlat) {
+      return res.json({
+        success: aiResponse.data.success || true,
+        data: aiResponse.data, // Return the flat data structure
+        id: aiResponse.data.filename,
+        image_url: urlData.publicUrl,
+        predictions: analysisData.predictions, // Backward compatibility
+        processing_time: processingTime,
+        model_version: aiResponse.data.model_version,
+        confidence: (aiResponse.data.confidence_score || 0),
+        analysis: aiResponse.data.full_analysis || aiResponse.data.description,
+        metadata: {
+          file_size: size,
+          file_type: mimetype,
+          upload_timestamp: new Date().toISOString(),
+          filename: aiResponse.data.filename
+        }
+      });
+    } else {
+      // Legacy format response
+      return res.json({
+        success: aiResponse.data.success || true,
+        data: aiResponse.data.predictions || [],
+        id: aiResponse.data.filename,
+        image_url: urlData.publicUrl,
+        predictions: aiResponse.data.predictions || [],
+        processing_time: aiResponse.data.processing_time || 0,
+        model_version: aiResponse.data.model_version,
+        confidence: aiResponse.data.predictions?.[0]?.confidence || 0,
+        analysis: aiResponse.data.analysis,
+        metadata: {
+          file_size: size,
+          file_type: mimetype,
+          upload_timestamp: new Date().toISOString(),
+          filename: aiResponse.data.filename
+        }
+      });
+    }
 
   } catch (error) {
     console.error('Image upload/analysis error:', error);
@@ -502,7 +543,7 @@ router.get('/statistics', authenticateToken, async (req: AuthRequest, res: Respo
   }
 });
 
-// Validation Schema for Analysis Results from Frontend
+// Validation Schema for Analysis Results from Frontend - Enhanced for comprehensive data
 const AnalysisResultsSchema = z.object({
   success: z.boolean(),
   predictions: z.array(z.object({
@@ -511,7 +552,15 @@ const AnalysisResultsSchema = z.object({
     description: z.union([z.string(), z.null()]).optional(),
     category: z.union([z.string(), z.null()]).optional(),
     manufacturer: z.union([z.string(), z.null()]).optional(),
-    estimated_price: z.union([z.string(), z.null()]).optional(),
+    estimated_price: z.union([
+      z.string(), 
+      z.object({
+        new: z.string().optional(),
+        used: z.string().optional(),
+        refurbished: z.string().optional()
+      }),
+      z.null()
+    ]).optional(),
     part_number: z.union([z.string(), z.null()]).optional(),
     compatibility: z.union([z.array(z.string()), z.null()]).optional()
   })),
@@ -534,7 +583,70 @@ const AnalysisResultsSchema = z.object({
   // Additional fields from AI service response
   analysis: z.union([z.string(), z.null()]).optional(),
   confidence: z.union([z.number(), z.null()]).optional(),
-  metadata: z.union([z.any(), z.null()]).optional()
+  metadata: z.object({
+    ai_service_id: z.union([z.string(), z.null()]).optional(),
+    upload_timestamp: z.string().optional(),
+    frontend_version: z.string().optional(),
+    model_version: z.string().optional(),
+    processing_time: z.number().optional(),
+    // Enhanced flat data structure
+    flat_data: z.object({
+      class_name: z.union([z.string(), z.null()]).optional(),
+      category: z.union([z.string(), z.null()]).optional(),
+      precise_part_name: z.union([z.string(), z.null()]).optional(),
+      material_composition: z.union([z.string(), z.null()]).optional(),
+      manufacturer: z.union([z.string(), z.null()]).optional(),
+      confidence_score: z.union([z.number(), z.null()]).optional(),
+      estimated_price: z.union([
+        z.string(), 
+        z.object({
+          new: z.string().optional(),
+          used: z.string().optional(),
+          refurbished: z.string().optional()
+        }),
+        z.null()
+      ]).optional(),
+      technical_data_sheet: z.union([z.any(), z.null()]).optional(),
+      compatible_vehicles: z.union([z.array(z.string()), z.null()]).optional(),
+      engine_types: z.union([z.array(z.string()), z.null()]).optional(),
+      suppliers: z.union([z.array(z.any()), z.null()]).optional(),
+      buy_links: z.union([z.any(), z.null()]).optional(),
+      fitment_tips: z.union([z.string(), z.null()]).optional(),
+      additional_instructions: z.union([z.string(), z.null()]).optional()
+    }).optional(),
+    // Enhanced analysis sections
+    enhanced_sections: z.object({
+      part_identification: z.object({
+        name: z.union([z.string(), z.null()]).optional(),
+        category: z.union([z.string(), z.null()]).optional(),
+        manufacturer: z.union([z.string(), z.null()]).optional(),
+        part_number: z.union([z.string(), z.null()]).optional()
+      }).optional(),
+      technical_analysis: z.object({
+        material: z.union([z.string(), z.null()]).optional(),
+        specifications: z.union([z.any(), z.null()]).optional(),
+        compatibility: z.union([z.array(z.string()), z.null()]).optional()
+      }).optional(),
+      market_analysis: z.object({
+        price_estimate: z.union([
+          z.string(), 
+          z.object({
+            new: z.string().optional(),
+            used: z.string().optional(),
+            refurbished: z.string().optional()
+          }),
+          z.null()
+        ]).optional(),
+        suppliers: z.union([z.array(z.any()), z.null()]).optional(),
+        purchase_links: z.union([z.any(), z.null()]).optional()
+      }).optional(),
+      ai_insights: z.object({
+        confidence_score: z.union([z.number(), z.null()]).optional(),
+        confidence_explanation: z.union([z.string(), z.null()]).optional(),
+        full_analysis: z.union([z.string(), z.null()]).optional()
+      }).optional()
+    }).optional()
+  }).optional()
 });
 
 // Save Analysis Results Endpoint
@@ -564,10 +676,26 @@ router.post('/save-results', authenticateToken, async (req: AuthRequest, res: Re
     // Generate unique ID for this analysis
     const analysisId = uuidv4();
 
-    // Extract the full analysis from the request body (it comes from the AI service)
-    const fullAnalysis = (req.body as any).analysis || 
+    // Extract the full analysis from multiple sources - prioritize the most comprehensive
+    const fullAnalysis = validatedData.metadata?.enhanced_sections?.ai_insights?.full_analysis ||
+                        (req.body as any).analysis || 
                         validatedData.additional_details?.full_analysis || 
                         primaryPrediction.description || '';
+
+    // Extract enhanced part information
+    const partInfo = {
+      name: validatedData.metadata?.enhanced_sections?.part_identification?.name || 
+            validatedData.metadata?.flat_data?.precise_part_name ||
+            primaryPrediction.class_name,
+      category: validatedData.metadata?.enhanced_sections?.part_identification?.category ||
+               validatedData.metadata?.flat_data?.category ||
+               primaryPrediction.category,
+      manufacturer: validatedData.metadata?.enhanced_sections?.part_identification?.manufacturer ||
+                   validatedData.metadata?.flat_data?.manufacturer ||
+                   primaryPrediction.manufacturer,
+      part_number: validatedData.metadata?.enhanced_sections?.part_identification?.part_number ||
+                  primaryPrediction.part_number
+    };
 
     // Prepare comprehensive analysis data for database
     const analysisData: PartSearchData = {
@@ -586,19 +714,54 @@ router.post('/save-results', authenticateToken, async (req: AuthRequest, res: Re
       web_scraping_used: false,
       sites_searched: 0,
       parts_found: validatedData.predictions.length,
-      search_query: primaryPrediction.class_name,
+      search_query: partInfo.name,
       description: fullAnalysis,
       similar_images: validatedData.similar_images || [],
       metadata: {
         saved_manually: true,
         save_timestamp: new Date().toISOString(),
         user_agent: req.headers['user-agent'],
+        
+        // Store comprehensive analysis details
         additional_details: validatedData.additional_details,
         full_analysis_data: validatedData,
+        full_analysis: fullAnalysis,
+        
+        // Enhanced part information
+        enhanced_part_info: partInfo,
+        
+        // Technical specifications
+        technical_data_sheet: validatedData.metadata?.flat_data?.technical_data_sheet,
+        material_composition: validatedData.metadata?.flat_data?.material_composition,
+        compatible_vehicles: validatedData.metadata?.flat_data?.compatible_vehicles,
+        engine_types: validatedData.metadata?.flat_data?.engine_types,
+        
+        // Market information
+        estimated_price: validatedData.metadata?.flat_data?.estimated_price ||
+                        validatedData.metadata?.enhanced_sections?.market_analysis?.price_estimate,
+        suppliers: validatedData.metadata?.flat_data?.suppliers ||
+                  validatedData.metadata?.enhanced_sections?.market_analysis?.suppliers,
+        buy_links: validatedData.metadata?.flat_data?.buy_links ||
+                  validatedData.metadata?.enhanced_sections?.market_analysis?.purchase_links,
+        
+        // Installation and usage information
+        fitment_tips: validatedData.metadata?.flat_data?.fitment_tips,
+        additional_instructions: validatedData.metadata?.flat_data?.additional_instructions,
+        
+        // AI analysis insights
+        confidence_score: validatedData.metadata?.flat_data?.confidence_score ||
+                         validatedData.metadata?.enhanced_sections?.ai_insights?.confidence_score,
+        confidence_explanation: validatedData.metadata?.enhanced_sections?.ai_insights?.confidence_explanation,
+        
+        // Legacy compatibility
         analysis: fullAnalysis,
         confidence: (req.body as any).confidence || primaryPrediction.confidence,
-        ai_metadata: (req.body as any).metadata || {},
-        supabase_image_url: validatedData.image_url
+        ai_metadata: validatedData.metadata || {},
+        supabase_image_url: validatedData.image_url,
+        
+        // Complete flat data structure for future reference
+        complete_flat_data: validatedData.metadata?.flat_data,
+        complete_enhanced_sections: validatedData.metadata?.enhanced_sections
       }
     };
 

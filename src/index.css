@@ -27,34 +27,31 @@
 
 @layer base {
      :root {
-        --background: 222.2 84% 4.9%;
         --background: 0 0% 100%;
         --foreground: 222.2 84% 4.9%;
-        --card-foreground: 210 40% 98%;
         --card: 0 0% 100%;
         --card-foreground: 222.2 84% 4.9%;
-        --primary: 210 40% 98%;
         --popover: 0 0% 100%;
         --popover-foreground: 222.2 84% 4.9%;
-        --secondary-foreground: 210 40% 98%;
-        --primary: 222.2 47.4% 11.2%;
+        --primary: 221.2 83.2% 53.3%;
         --primary-foreground: 210 40% 98%;
-        --accent: 217.2 32.6% 17.5%;
-        --secondary: 210 40% 96.1%;
-        --secondary-foreground: 222.2 47.4% 11.2%;
-        --destructive-foreground: 210 40% 98%;
-        --muted: 210 40% 96.1%;
+        --secondary: 210 40% 96%;
+        --secondary-foreground: 222.2 84% 4.9%;
+        --muted: 210 40% 96%;
         --muted-foreground: 215.4 16.3% 46.9%;
-        --ring: 222.2 84% 4.9%;
-        --accent: 210 40% 96.1%;
-        --accent-foreground: 222.2 47.4% 11.2%;
-        --sidebar-foreground: 240 5.3% 26.1%;
+        --accent: 210 40% 96%;
+        --accent-foreground: 222.2 84% 4.9%;
         --destructive: 0 84.2% 60.2%;
-        --sidebar-primary-foreground: 0 0% 98%;
-        --sidebar-accent: 240 4.8% 95.9%;
-        --sidebar-accent-foreground: 240 5.9% 10%;
-        --sidebar-border: 220 13% 91%;
-        --sidebar-ring: 217.2 91.2% 59.8%;
+        --destructive-foreground: 210 40% 98%;
+        --border: 214.3 31.8% 91.4%;
+        --input: 214.3 31.8% 91.4%;
+        --ring: 221.2 83.2% 53.3%;
+        --radius: 0.5rem;
+        --chart-1: 12 76% 61%;
+        --chart-2: 173 58% 39%;
+        --chart-3: 197 37% 24%;
+        --chart-4: 43 74% 66%;
+        --chart-5: 27 87% 67%;
     }
     .dark {
         --background: 222.2 84% 4.9%;
@@ -63,8 +60,8 @@
         --card-foreground: 210 40% 98%;
         --popover: 222.2 84% 4.9%;
         --popover-foreground: 210 40% 98%;
-        --primary: 210 40% 98%;
-        --primary-foreground: 222.2 47.4% 11.2%;
+        --primary: 217.2 91.2% 59.8%;
+        --primary-foreground: 222.2 84% 4.9%;
         --secondary: 217.2 32.6% 17.5%;
         --secondary-foreground: 210 40% 98%;
         --muted: 217.2 32.6% 17.5%;
@@ -75,15 +72,12 @@
         --destructive-foreground: 210 40% 98%;
         --border: 217.2 32.6% 17.5%;
         --input: 217.2 32.6% 17.5%;
-        --ring: 212.7 26.8% 83.9%;
-        --sidebar-background: 240 5.9% 10%;
-        --sidebar-foreground: 240 4.8% 95.9%;
-        --sidebar-primary: 224.3 76.3% 48%;
-        --sidebar-primary-foreground: 0 0% 100%;
-        --sidebar-accent: 240 3.7% 15.9%;
-        --sidebar-accent-foreground: 240 4.8% 95.9%;
-        --sidebar-border: 240 3.7% 15.9%;
-        --sidebar-ring: 217.2 91.2% 59.8%;
+        --ring: 224.3 76.3% 94.1%;
+        --chart-1: 220 70% 50%;
+        --chart-2: 160 60% 45%;
+        --chart-3: 30 80% 55%;
+        --chart-4: 280 65% 60%;
+        --chart-5: 340 75% 55%;
     }
     .light {
         --background: 0 0% 100%;
@@ -186,4 +180,191 @@
 
 ::-webkit-scrollbar-thumb:hover {
     background: rgba(168, 85, 247, 0.7);
+}
+
+
+/* Custom styles for AI Analysis markdown content */
+
+.analysis-markdown .analysis-content h1,
+.analysis-markdown .analysis-content h2,
+.analysis-markdown .analysis-content h3,
+.analysis-markdown .analysis-content h4 {
+    @apply text-blue-600 dark:text-blue-400 font-bold mt-4 mb-2 border-b border-gray-200 dark:border-gray-700 pb-1;
+}
+
+.analysis-markdown .analysis-content h1 {
+    @apply text-xl;
+}
+
+.analysis-markdown .analysis-content h2 {
+    @apply text-lg;
+}
+
+.analysis-markdown .analysis-content h3 {
+    @apply text-base;
+}
+
+.analysis-markdown .analysis-content h4 {
+    @apply text-sm font-semibold;
+}
+
+.analysis-markdown .analysis-content ul,
+.analysis-markdown .analysis-content ol {
+    @apply my-2 pl-6 space-y-1;
+}
+
+.analysis-markdown .analysis-content li {
+    @apply leading-relaxed;
+}
+
+.analysis-markdown .analysis-content strong {
+    @apply font-semibold text-gray-900 dark:text-gray-100;
+}
+
+.analysis-markdown .analysis-content p {
+    @apply leading-relaxed my-2;
+}
+
+.analysis-markdown .analysis-content em {
+    @apply italic text-gray-600 dark:text-gray-400;
+}
+
+.analysis-markdown .analysis-content code {
+    @apply bg-gray-100 dark:bg-gray-800 px-1 py-0.5 rounded text-sm font-mono;
+}
+
+.analysis-markdown .analysis-content pre {
+    @apply bg-gray-100 dark:bg-gray-800 p-3 rounded-lg overflow-x-auto my-3;
+}
+
+.analysis-markdown .analysis-content blockquote {
+    @apply border-l-4 border-blue-500 pl-4 py-2 bg-gray-50 dark:bg-gray-800 rounded-r-lg my-3 italic;
+}
+
+
+/* Technical data table styling */
+
+.analysis-markdown .technical-data-table {
+    @apply w-full border-collapse my-4 text-sm;
+}
+
+.analysis-markdown .technical-data-table th,
+.analysis-markdown .technical-data-table td {
+    @apply border border-gray-300 dark:border-gray-600 px-3 py-2 text-left;
+}
+
+.analysis-markdown .technical-data-table th {
+    @apply bg-gray-100 dark:bg-gray-700 font-semibold text-gray-800 dark:text-gray-200;
+}
+
+.analysis-markdown .technical-data-table td {
+    @apply bg-white dark:bg-gray-800;
+}
+
+
+/* Emoji styling */
+
+.analysis-markdown .analysis-content .emoji {
+    @apply text-lg mr-2;
+}
+
+
+/* Supplier and Where to Buy section styling */
+
+.analysis-markdown .where-to-buy {
+    @apply my-6 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700;
+}
+
+.analysis-markdown .where-to-buy h2 {
+    @apply text-lg font-bold text-green-700 dark:text-green-400 mb-3 border-b border-green-200 dark:border-green-600 pb-2;
+}
+
+.analysis-markdown .supplier-content {
+    @apply space-y-2;
+}
+
+.analysis-markdown .supplier-line {
+    @apply py-2 px-3 bg-white dark:bg-gray-700 rounded border-l-4 border-blue-400 shadow-sm;
+}
+
+.analysis-markdown .supplier-content a {
+    @apply text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 underline font-medium transition-colors;
+}
+
+.analysis-markdown .supplier-content a:hover {
+    @apply bg-blue-50 dark:bg-blue-900 px-1 rounded;
+}
+
+
+/* Part identification section styling */
+
+.analysis-markdown .part-id {
+    @apply my-6 p-4 bg-blue-50 dark:bg-blue-900 rounded-lg border border-blue-200 dark:border-blue-700;
+}
+
+.analysis-markdown .part-id h2 {
+    @apply text-lg font-bold text-blue-800 dark:text-blue-200 mb-3;
+}
+
+.analysis-markdown .part-id-item {
+    @apply py-1 text-sm;
+}
+
+.analysis-markdown .part-id-item strong {
+    @apply text-blue-900 dark:text-blue-100;
+}
+
+
+/* Technical description section styling */
+
+.analysis-markdown .tech-desc {
+    @apply my-6 p-4 bg-purple-50 dark:bg-purple-900 rounded-lg border border-purple-200 dark:border-purple-700;
+}
+
+.analysis-markdown .tech-desc h2 {
+    @apply text-lg font-bold text-purple-800 dark:text-purple-200 mb-3;
+}
+
+.analysis-markdown .tech-desc h3 {
+    @apply text-base font-semibold text-purple-700 dark:text-purple-300 mt-4 mb-2;
+}
+
+.analysis-markdown .use-cases,
+.analysis-markdown .part-differences {
+    @apply pl-4 space-y-1;
+}
+
+.analysis-markdown .use-cases li,
+.analysis-markdown .part-differences li {
+    @apply text-sm text-gray-700 dark:text-gray-300;
+}
+
+
+/* Data sheet section styling */
+
+.analysis-markdown .data-sheet {
+    @apply my-6;
+}
+
+.analysis-markdown .data-sheet h2 {
+    @apply text-lg font-bold text-gray-800 dark:text-gray-200 mb-3;
+}
+
+
+/* Generic section styling */
+
+.analysis-markdown .generic-section {
+    @apply my-6 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700;
+}
+
+.analysis-markdown .generic-section h2 {
+    @apply text-lg font-bold text-gray-800 dark:text-gray-200 mb-3;
+}
+
+.analysis-markdown .section-content {
+    @apply text-sm text-gray-700 dark:text-gray-300 leading-relaxed;
+}
+
+.analysis-markdown .section-content li {
+    @apply my-1 pl-2;
 }

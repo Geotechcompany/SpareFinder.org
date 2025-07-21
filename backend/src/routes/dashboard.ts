@@ -2,7 +2,7 @@ import { Router, Request, Response } from 'express';
 import { createClient } from '@supabase/supabase-js';
 import dotenv from 'dotenv';
 import path from 'path';
-
+// import { z } from 'zod';
 import winston from 'winston';
 import { authenticateToken } from '../middleware/auth';  // Import authentication middleware
 import { AuthRequest } from '../types/auth';  // Import the correct auth request type
@@ -20,9 +20,15 @@ const logger = winston.createLogger({
   ]
 });
 
+// Performance Metrics Result Type with Zod
+// const PerformanceMetricsSchema = z.object({
+//   total_searches: z.number().int().min(0),
+//   avg_confidence: z.number().min(0).max(100),
+//   avg_process_time: z.number().min(0),
+//   match_rate: z.number().min(0).max(1)
+// });
 
-
-
+// type PerformanceMetricsResult = z.infer<typeof PerformanceMetricsSchema>;
 
 // Environment Variable Validation
 const validateEnvVars = () => {
@@ -311,6 +317,7 @@ router.get('/stats', async (req: AuthRequest, res: Response) => {
     const userId = req.user?.userId;
 
     console.log('📊 Dashboard stats - User ID:', userId);
+    console.log('📊 Dashboard stats - Full user object:', req.user);
 
     if (!userId) {
       console.log('❌ Dashboard stats - No user ID found');
@@ -336,7 +343,7 @@ router.get('/stats', async (req: AuthRequest, res: Response) => {
     // Calculate average confidence and processing time
     const { data: statsData, error: statsError } = await supabase
       .from('part_searches')
-      .select('confidence_score, processing_time_ms')
+      .select('confidence_score, processing_time, processing_time_ms')
       .eq('user_id', userId);
 
     if (uploadsError || successfulError || statsError) {
@@ -347,12 +354,23 @@ router.get('/stats', async (req: AuthRequest, res: Response) => {
       });
     }
 
+    // Calculate average confidence (handle both decimal 0.95 and percentage 95 formats)
     const avgConfidence = statsData?.length 
-      ? statsData.reduce((sum, item) => sum + (item.confidence_score || 0), 0) / statsData.length 
+      ? statsData.reduce((sum, item) => {
+          let confidence = item.confidence_score || 0;
+          // If confidence is stored as decimal (0.95), convert to percentage
+          if (confidence <= 1) {
+            confidence = confidence * 100;
+          }
+          return sum + confidence;
+        }, 0) / statsData.length 
       : 0;
 
+    // Calculate average processing time (handle both processing_time and processing_time_ms)
     const avgProcessTime = statsData?.length 
-      ? statsData.reduce((sum, item) => sum + (item.processing_time_ms || 0), 0) / statsData.length 
+      ? statsData.reduce((sum, item) => {
+          return sum + (item.processing_time_ms || item.processing_time || 0);
+        }, 0) / statsData.length 
       : 0;
 
     console.log('📊 Dashboard stats calculated:', {
@@ -360,7 +378,8 @@ router.get('/stats', async (req: AuthRequest, res: Response) => {
       successfulUploads: successfulUploads || 0,
       avgConfidence: avgConfidence,
       avgProcessTime: avgProcessTime,
-      rawData: statsData?.length || 0
+      rawData: statsData?.length || 0,
+      sampleData: statsData?.slice(0, 3) // Log first 3 records for debugging
     });
 
     return res.json({
@@ -368,7 +387,7 @@ router.get('/stats', async (req: AuthRequest, res: Response) => {
       data: {
         totalUploads: totalUploads || 0,
         successfulUploads: successfulUploads || 0,
-        avgConfidence: Math.round(avgConfidence * 100) || 0, // Convert to percentage and round
+        avgConfidence: Math.round(avgConfidence) || 0, // Already converted to percentage above
         avgProcessTime: Math.round(avgProcessTime) || 0 // Round to whole number
       }
     });

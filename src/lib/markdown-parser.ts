@@ -3,14 +3,61 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
 export const parseAIResponse = (markdown: string): string => {
-  // Utility to escape HTML to prevent XSS
-  const escapeHtml = (unsafe: string): string => {
-    return unsafe
+  // Utility to convert URLs, emails, and markdown formatting to HTML
+  const convertLinksToHtml = (text: string): string => {
+    // Convert markdown bold **text** to HTML bold
+    text = text.replace(/\*\*([^*]+)\*\*/g, '<strong class="font-bold text-gray-900 dark:text-gray-100">$1</strong>');
+    
+    // Convert markdown italic *text* to HTML italic (but avoid conflicting with bold)
+    text = text.replace(/(?<!\*)\*([^*]+)\*(?!\*)/g, '<em class="italic text-gray-800 dark:text-gray-200">$1</em>');
+    
+    // Convert markdown links [text](url) to HTML links
+    text = text.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer" class="text-blue-500 hover:text-blue-400 underline">$1</a>');
+    
+    // Convert bare URLs to clickable links
+    text = text.replace(/(^|[\s\[\(])((https?:\/\/[^\s\)\],]+))/g, '$1<a href="$2" target="_blank" rel="noopener noreferrer" class="text-blue-500 hover:text-blue-400 underline break-words">$2</a>');
+    
+    // Convert www.domain.com to clickable links
+    text = text.replace(/(^|[\s\[\(])(www\.[^\s\)\],]+)/g, '$1<a href="http://$2" target="_blank" rel="noopener noreferrer" class="text-blue-500 hover:text-blue-400 underline break-words">$2</a>');
+    
+    // Convert email addresses to clickable mailto links
+    text = text.replace(/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/g, '<a href="mailto:$1" class="text-blue-500 hover:text-blue-400 underline">$1</a>');
+    
+    // Convert markdown inline code `code` to HTML code
+    text = text.replace(/`([^`]+)`/g, '<code class="bg-gray-100 dark:bg-gray-800 px-1 py-0.5 rounded text-sm font-mono">$1</code>');
+    
+    return text;
+  };
+
+  // Utility to escape HTML while preserving our converted links and formatting
+  const escapeHtmlButPreserveLinks = (unsafe: string): string => {
+    // First convert links and formatting
+    let safe = convertLinksToHtml(unsafe);
+    
+    // Then escape other HTML characters, but preserve our generated HTML tags
+    const htmlPlaceholders: string[] = [];
+    
+    // Replace HTML tags with placeholders
+    safe = safe.replace(/<(a [^>]*>.*?<\/a|strong [^>]*>.*?<\/strong|em [^>]*>.*?<\/em|code [^>]*>.*?<\/code)>/g, (match) => {
+      const placeholder = `__HTML_PLACEHOLDER_${htmlPlaceholders.length}__`;
+      htmlPlaceholders.push(match);
+      return placeholder;
+    });
+    
+    // Escape HTML characters
+    safe = safe
       .replace(/&/g, "&amp;")
       .replace(/</g, "&lt;")
       .replace(/>/g, "&gt;")
       .replace(/"/g, "&quot;")
       .replace(/'/g, "&#039;");
+    
+    // Restore HTML tags
+    htmlPlaceholders.forEach((html, index) => {
+      safe = safe.replace(`__HTML_PLACEHOLDER_${index}__`, html);
+    });
+    
+    return safe;
   };
 
   // Utility to convert markdown table to HTML table
@@ -27,7 +74,7 @@ export const parseAIResponse = (markdown: string): string => {
     // Table Header
     htmlTable += '<thead><tr>';
     headers.forEach(header => {
-      htmlTable += `<th>${escapeHtml(header)}</th>`;
+      htmlTable += `<th>${escapeHtmlButPreserveLinks(header)}</th>`;
     });
     htmlTable += '</thead></tr>';
 
@@ -36,7 +83,7 @@ export const parseAIResponse = (markdown: string): string => {
     data.forEach(row => {
       htmlTable += '<tr>';
       row.forEach(cell => {
-        htmlTable += `<td>${escapeHtml(cell)}</td>`;
+        htmlTable += `<td>${escapeHtmlButPreserveLinks(cell)}</td>`;
       });
       htmlTable += '</tr>';
     });
@@ -61,8 +108,8 @@ export const parseAIResponse = (markdown: string): string => {
             const [label, value] = line.replace(/^-\s*/, '').split(':').map(s => s.trim());
             return `
               <div class="part-id-item">
-                <strong>${escapeHtml(label)}:</strong> 
-                <span>${escapeHtml(value)}</span>
+                <strong>${escapeHtmlButPreserveLinks(label)}:</strong> 
+                <span>${escapeHtmlButPreserveLinks(value)}</span>
               </div>
             `;
           })
@@ -70,7 +117,7 @@ export const parseAIResponse = (markdown: string): string => {
 
         return `
           <section class="part-id">
-            <h2>${escapeHtml(title)}</h2>
+            <h2>${escapeHtmlButPreserveLinks(title)}</h2>
             <div class="part-id-details">
               ${bulletPoints}
             </div>
@@ -89,7 +136,7 @@ export const parseAIResponse = (markdown: string): string => {
             useCases = para.replace('Common Use Cases:', '')
               .split('\n')
               .filter(line => line.trim().startsWith('- '))
-              .map(line => `<li>${escapeHtml(line.replace(/^-\s*/, '').trim())}</li>`)
+              .map(line => `<li>${escapeHtmlButPreserveLinks(line.replace(/^-\s*/, '').trim())}</li>`)
               .join('');
           }
 
@@ -97,15 +144,15 @@ export const parseAIResponse = (markdown: string): string => {
             differences = para.replace('Differences from Similar Parts:', '')
               .split('\n')
               .filter(line => line.trim().startsWith('- '))
-              .map(line => `<li>${escapeHtml(line.replace(/^-\s*/, '').trim())}</li>`)
+              .map(line => `<li>${escapeHtmlButPreserveLinks(line.replace(/^-\s*/, '').trim())}</li>`)
               .join('');
           }
         });
 
         return `
           <section class="tech-desc">
-            <h2>${escapeHtml(title)}</h2>
-            <p>${escapeHtml(mainDescription)}</p>
+            <h2>${escapeHtmlButPreserveLinks(title)}</h2>
+            <p>${escapeHtmlButPreserveLinks(mainDescription)}</p>
             
             ${useCases ? `
               <h3>Common Use Cases</h3>
@@ -129,17 +176,48 @@ export const parseAIResponse = (markdown: string): string => {
 
         return `
           <section class="data-sheet">
-            <h2>${escapeHtml(title)}</h2>
+            <h2>${escapeHtmlButPreserveLinks(title)}</h2>
             ${tableHtml}
           </section>
         `;
 
+      case '🌍': // Where to Buy - Special handling for supplier information
+        const supplierContent = sectionContent
+          .split('\n')
+          .map(line => {
+            if (line.trim().startsWith('- ')) {
+              return `<div class="supplier-line">${escapeHtmlButPreserveLinks(line.replace(/^-\s*/, '').trim())}</div>`;
+            }
+            return escapeHtmlButPreserveLinks(line);
+          })
+          .join('<br>');
+
+        return `
+          <section class="where-to-buy">
+            <h2>${escapeHtmlButPreserveLinks(title)}</h2>
+            <div class="supplier-content">
+              ${supplierContent}
+            </div>
+          </section>
+        `;
+
       default: // Generic section
+        // Convert line breaks and basic formatting for generic sections
+        const processedContent = sectionContent
+          .split('\n')
+          .map(line => {
+            if (line.trim().startsWith('- ')) {
+              return `<li>${escapeHtmlButPreserveLinks(line.replace(/^-\s*/, '').trim())}</li>`;
+            }
+            return escapeHtmlButPreserveLinks(line.trim());
+          })
+          .join('<br>');
+
         return `
           <section class="generic-section">
-            <h2>${escapeHtml(cleanTitle)}</h2>
+            <h2>${escapeHtmlButPreserveLinks(cleanTitle)}</h2>
             <div class="section-content">
-              ${escapeHtml(sectionContent)}
+              ${processedContent}
             </div>
           </section>
         `;
@@ -166,20 +244,44 @@ export type ParsedAIResponse = {
 }; 
 
 export const parseMarkdownSections = (markdown: string) => {
+  // Enhanced regex to handle various markdown heading formats
   const sectionRegex = /^(#+\s*[^\n]+)\n((?:(?!^#+\s*[^\n]+)[\s\S])*)/gm;
-  const sections: { title: string; content: string; emoji?: string }[] = [];
+  const sections: { title: string; content: string; emoji?: string; level?: number }[] = [];
 
   let match;
   while ((match = sectionRegex.exec(markdown)) !== null) {
     const [, sectionTitle, sectionContent] = match;
+    
+    // Extract heading level
+    const levelMatch = sectionTitle.match(/^(#+)/);
+    const level = levelMatch ? levelMatch[1].length : 1;
+    
     const cleanTitle = sectionTitle.replace(/^#+\s*/, '').trim();
-    const emoji = cleanTitle.match(/^([^\s]+)/)?.[1];
-    const title = cleanTitle.replace(/^[^\s]+\s*/, '').trim();
+    
+    // Enhanced emoji extraction - now supports more emojis
+    const emojiMatch = cleanTitle.match(/^([🔧📊🚗💰🌍📈📤🛞📘🔍⚙️🎯📋💡🔗📞📧🏷️📦⭐🔄📝🎨🔧]+)/);
+    const emoji = emojiMatch ? emojiMatch[1] : undefined;
+    
+    // Clean title by removing emoji and extra spaces
+    const title = cleanTitle.replace(/^[🔧📊🚗💰🌍📈📤🛞📘🔍⚙️🎯📋💡🔗📞📧🏷️📦⭐🔄📝🎨🔧]+\s*/, '').trim();
+
+    // Skip empty sections
+    if (!title && !sectionContent.trim()) continue;
 
     sections.push({
-      title,
+      title: title || 'Additional Information',
       content: sectionContent.trim(),
-      emoji
+      emoji,
+      level
+    });
+  }
+
+  // If no sections found with headers, treat entire content as one section
+  if (sections.length === 0 && markdown.trim()) {
+    sections.push({
+      title: 'Analysis Results',
+      content: markdown.trim(),
+      emoji: '📋'
     });
   }
 
@@ -191,6 +293,7 @@ interface MarkdownCardProps {
   content: string; 
   emoji?: string;
   className?: string;
+  level?: number;
 }
 
 export const MarkdownCard: React.FC<MarkdownCardProps> = (props) => {
@@ -198,85 +301,209 @@ export const MarkdownCard: React.FC<MarkdownCardProps> = (props) => {
     title, 
     content, 
     emoji, 
-    className = '' 
+    className = '',
+    level = 1
   } = props;
 
+  // Enhanced emoji mapping with more automotive and technical emojis
   const getEmojiIcon = React.useCallback((emoji?: string) => {
     const emojiMap: { [key: string]: string } = {
-      '🛞': '🛞',
-      '📘': '📘',
-      '📊': '📊',
+      '🛞': '🛞', // Part Identification
+      '📘': '📘', // Technical Description  
+      '📊': '📊', // Technical Data Sheet
+      '🔧': '🔧', // Technical Specifications
+      '🚗': '🚗', // Compatible Vehicles
+      '💰': '💰', // Pricing & Availability
+      '🌍': '🌍', // Where to Buy
+      '📈': '📈', // Confidence Score
+      '📤': '📤', // Additional Instructions
+      '🔍': '🔍', // Analysis
+      '⚙️': '⚙️', // Mechanical Parts
+      '🎯': '🎯', // Accuracy/Targeting
+      '📋': '📋', // General Information
+      '💡': '💡', // Tips/Suggestions
+      '🔗': '🔗', // Links
+      '📞': '📞', // Contact
+      '📧': '📧', // Email
+      '🏷️': '🏷️', // Labels/Tags
+      '📦': '📦', // Products
+      '⭐': '⭐', // Rating/Quality
+      '🔄': '🔄', // Process/Workflow
+      '📝': '📝', // Documentation
+      '🎨': '🎨' // Design/Styling
     };
-    return emojiMap[emoji || ''] || '📝';
+    return emojiMap[emoji || ''] || '📋';
   }, []);
+
+  // Get section-specific styling based on content type
+  const getSectionStyling = React.useCallback((title: string, emoji?: string) => {
+    const lowerTitle = title.toLowerCase();
+    
+    if (lowerTitle.includes('technical') || lowerTitle.includes('specification') || emoji === '🔧' || emoji === '📊') {
+      return 'bg-gradient-to-br from-green-900/20 to-emerald-900/20 border-green-500/30';
+    }
+    if (lowerTitle.includes('pricing') || lowerTitle.includes('cost') || emoji === '💰') {
+      return 'bg-gradient-to-br from-yellow-900/20 to-amber-900/20 border-yellow-500/30';
+    }
+    if (lowerTitle.includes('vehicle') || lowerTitle.includes('compatible') || emoji === '🚗') {
+      return 'bg-gradient-to-br from-blue-900/20 to-cyan-900/20 border-blue-500/30';
+    }
+    if (lowerTitle.includes('where') || lowerTitle.includes('buy') || emoji === '🌍') {
+      return 'bg-gradient-to-br from-purple-900/20 to-violet-900/20 border-purple-500/30';
+    }
+    return 'bg-gray-800/50 border-gray-700/50';
+  }, []);
+
+  // State for expanded content
+  const [isExpanded, setIsExpanded] = React.useState(false);
+  const contentLength = content.length;
+  const shouldShowMore = contentLength > 1000; // Show expand for content longer than 1000 chars
+  const displayContent = shouldShowMore && !isExpanded ? content.substring(0, 1000) + '...' : content;
 
   return React.createElement('div', {
     className: `
-      bg-gray-800 
+      ${getSectionStyling(title, emoji)}
       text-white 
       p-6 
       rounded-xl 
       border 
-      border-gray-700 
       shadow-md 
       mb-4 
       transition-all 
       duration-300 
       hover:shadow-lg 
+      hover:border-opacity-60
+      w-full
       ${className}
     `.trim()
   }, [
     React.createElement('div', { 
       key: 'header',
-      className: 'flex items-center mb-4 pb-3 border-b border-gray-700' 
+      className: 'flex items-center justify-between mb-4 pb-3 border-b border-current border-opacity-20' 
     }, [
-      React.createElement('span', { 
-        key: 'emoji', 
-        className: 'text-2xl mr-3' 
-      }, getEmojiIcon(emoji)),
-      React.createElement('h2', { 
-        key: 'title', 
-        className: 'text-xl font-bold text-gray-200' 
-      }, title)
+      React.createElement('div', {
+        key: 'header-content',
+        className: 'flex items-center'
+      }, [
+        React.createElement('span', { 
+          key: 'emoji', 
+          className: 'text-2xl mr-3 filter drop-shadow-sm' 
+        }, getEmojiIcon(emoji)),
+        React.createElement(`h${Math.min(level + 1, 6)}`, { 
+          key: 'title', 
+          className: `text-xl font-bold text-gray-100 ${level === 1 ? 'text-2xl' : level === 2 ? 'text-xl' : 'text-lg'}` 
+        }, title)
+      ]),
+      shouldShowMore && React.createElement('button', {
+        key: 'expand-button',
+        onClick: () => setIsExpanded(!isExpanded),
+        className: 'text-xs px-2 py-1 bg-gray-700 hover:bg-gray-600 rounded text-gray-300 hover:text-white transition-colors',
+      }, isExpanded ? 'Show Less' : 'Show More')
     ]),
     React.createElement('div', { 
       key: 'content',
-      className: 'prose prose-invert max-w-none' 
+      className: 'prose prose-invert max-w-none prose-sm overflow-visible'
     }, [
       React.createElement(ReactMarkdown, {
         key: 'markdown',
         remarkPlugins: [remarkGfm],
         components: {
+          // Enhanced heading styling
+          h1: ({node, ...props}) => React.createElement('h1', {
+            className: 'text-2xl font-bold text-gray-100 mt-6 mb-4 border-b border-gray-600 pb-2',
+            ...props
+          }),
+          h2: ({node, ...props}) => React.createElement('h2', {
+            className: 'text-xl font-semibold text-gray-200 mt-5 mb-3',
+            ...props
+          }),
           h3: ({node, ...props}) => React.createElement('h3', {
             className: 'text-lg font-semibold text-gray-300 mt-4 mb-2',
             ...props
           }),
+          
+          // Enhanced paragraph styling
+          p: ({node, ...props}) => React.createElement('p', {
+            className: 'text-gray-300 leading-relaxed mb-3 overflow-visible',
+            ...props
+          }),
+          
+          // Enhanced list styling
           ul: ({node, ...props}) => React.createElement('ul', {
-            className: 'list-disc list-inside text-gray-300 space-y-2',
+            className: 'list-disc list-inside text-gray-300 space-y-2 ml-4 overflow-visible',
+            ...props
+          }),
+          ol: ({node, ...props}) => React.createElement('ol', {
+            className: 'list-decimal list-inside text-gray-300 space-y-2 ml-4 overflow-visible',
             ...props
           }),
           li: ({node, ...props}) => React.createElement('li', {
-            className: 'pl-2 marker:text-blue-400',
+            className: 'pl-2 marker:text-blue-400 leading-relaxed overflow-visible',
             ...props
           }),
+          
+          // Enhanced table styling with better overflow handling
           table: ({node, ...props}) => React.createElement('div', {
-            className: 'overflow-x-auto'
+            className: 'overflow-x-auto my-4 rounded-lg border border-gray-600 shadow-lg w-full'
           }, [
             React.createElement('table', {
-              className: 'w-full border-collapse border border-gray-700 text-sm',
+              className: 'w-full min-w-full border-collapse bg-gray-800/80 text-sm',
               ...props
             })
           ]),
+          thead: ({node, ...props}) => React.createElement('thead', {
+            className: 'bg-gray-700/80',
+            ...props
+          }),
           th: ({node, ...props}) => React.createElement('th', {
-            className: 'border border-gray-700 bg-gray-900 p-2 text-left',
+            className: 'border border-gray-600 bg-gray-700 p-3 text-left font-semibold text-gray-100 whitespace-nowrap',
             ...props
           }),
           td: ({node, ...props}) => React.createElement('td', {
-            className: 'border border-gray-700 p-2',
+            className: 'border border-gray-600 p-3 text-gray-300 break-words',
+            ...props
+          }),
+          
+          // Enhanced link styling
+          a: ({node, href, children, ...props}) => React.createElement('a', {
+            className: 'text-blue-400 hover:text-blue-300 underline decoration-blue-400/50 hover:decoration-blue-300 transition-colors break-words',
+            href,
+            target: href?.startsWith('http') ? '_blank' : undefined,
+            rel: href?.startsWith('http') ? 'noopener noreferrer' : undefined,
+            ...props
+          }, children),
+          
+          // Enhanced code and pre styling
+          code: ({node, inline, ...props}: any) => React.createElement('code', {
+            className: inline 
+              ? 'bg-gray-700 text-green-300 px-1.5 py-0.5 rounded text-sm font-mono break-words'
+              : 'block bg-gray-900 text-green-300 p-4 rounded-lg overflow-x-auto text-sm font-mono whitespace-pre-wrap',
+            ...props
+          }),
+          pre: ({node, ...props}) => React.createElement('pre', {
+            className: 'bg-gray-900 border border-gray-700 rounded-lg p-4 overflow-x-auto my-4 whitespace-pre-wrap',
+            ...props
+          }),
+          
+          // Enhanced blockquote styling
+          blockquote: ({node, ...props}) => React.createElement('blockquote', {
+            className: 'border-l-4 border-blue-500 pl-4 py-2 bg-gray-800/50 rounded-r-lg my-4 italic text-gray-400 overflow-visible',
+            ...props
+          }),
+          
+          // Enhanced strong/bold styling
+          strong: ({node, ...props}) => React.createElement('strong', {
+            className: 'font-bold text-white',
+            ...props
+          }),
+          
+          // Enhanced emphasis/italic styling
+          em: ({node, ...props}) => React.createElement('em', {
+            className: 'italic text-gray-200',
             ...props
           })
         }
-      }, content)
+      }, displayContent)
     ])
   ])
 };
