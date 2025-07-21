@@ -1,5 +1,3 @@
-const fetch = require('node-fetch');
-
 exports.handler = async (event, context) => {
     const AI_SERVICE_URL = process.env.VITE_AI_SERVICE_URL || 'https://ai-sparefinder-com.onrender.com';
 
@@ -8,7 +6,7 @@ exports.handler = async (event, context) => {
 
         const response = await fetch(`${AI_SERVICE_URL}/health`, {
             method: 'GET',
-            timeout: 10000,
+            signal: AbortSignal.timeout(10000), // Use AbortSignal instead of timeout option
             headers: {
                 'User-Agent': 'SpareFinder-KeepAlive/1.0',
                 'Cache-Control': 'no-cache'
