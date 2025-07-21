@@ -50,7 +50,10 @@ app.use(cors({
       'http://localhost:3000', 
       'https://sparefinder.org',
       'https://www.sparefinder.org',
-      'https://part-finder-ai-vision.netlify.app'
+      'https://part-finder-ai-vision.netlify.app',
+      'https://sparefinder.org',
+      'https://www.sparefinder.org',
+      'https://api-sparefinder-org.onrender.com'
     ];
     
     console.log('🌐 CORS Request from origin:', origin);
@@ -59,14 +62,14 @@ app.use(cors({
       console.log('✅ CORS: Origin allowed');
       return callback(null, true);
     } else {
-      console.log('❌ CORS: Origin not allowed');
-      // For debugging, allow all origins temporarily
-      return callback(null, true);
+      console.log('❌ CORS: Origin not allowed:', origin);
+      return callback(new Error('Not allowed by CORS'));
     }
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Origin', 'Accept'],
+  optionsSuccessStatus: 200
 }));
 
 // Body parsing middleware
