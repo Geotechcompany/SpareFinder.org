@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stripe LIVE Payment Test</title>
+    <script src="https://js.stripe.com/v3/"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: white;
+        }
+        
+        .container {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 30px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        }
+        
+        h1 {
+            text-align: center;
+            margin-bottom: 30px;
+            background: linear-gradient(135deg, #ff6b6b, #4ecdc4);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .warning {
+            background: rgba(255, 193, 7, 0.2);
+            border: 1px solid rgba(255, 193, 7, 0.5);
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .error {
+            background: rgba(220, 53, 69, 0.2);
+            border: 1px solid rgba(220, 53, 69, 0.5);
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .success {
+            background: rgba(40, 167, 69, 0.2);
+            border: 1px solid rgba(40, 167, 69, 0.5);
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+        
+        input[type="text"],
+        input[type="email"] {
+            width: 100%;
+            padding: 12px;
+            margin: 10px 0;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            backdrop-filter: blur(5px);
+        }
+        
+        input[type="text"]::placeholder,
+        input[type="email"]::placeholder {
+            color: rgba(255, 255, 255, 0.7);
+        }
+        
+        button {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            width: 100%;
+            font-size: 16px;
+            margin: 10px 0;
+            transition: all 0.3s ease;
+        }
+        
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+        }
+        
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+        }
+        
+        #card-element {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 12px;
+            border-radius: 8px;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+        
+        .code {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 10px;
+            border-radius: 5px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            word-break: break-all;
+            margin: 10px 0;
+        }
+        
+        .key-info {
+            background: rgba(0, 123, 255, 0.2);
+            border: 1px solid rgba(0, 123, 255, 0.5);
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .test-cards {
+            background: rgba(40, 167, 69, 0.1);
+            border: 1px solid rgba(40, 167, 69, 0.3);
+            border-radius: 10px;
+            padding: 15px;
+            margin-top: 20px;
+        }
+        
+        .test-cards h3 {
+            margin-top: 0;
+            color: #4ecdc4;
+        }
+        
+        .card-number {
+            font-family: 'Courier New', monospace;
+            background: rgba(0, 0, 0, 0.2);
+            padding: 5px 8px;
+            border-radius: 4px;
+            margin: 5px 0;
+            display: inline-block;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>🔴 Stripe LIVE Payment Test</h1>
+
+        <!-- Live Key Testing Warning -->
+        <div class="warning">
+            <h3>🔴 LIVE API KEY TESTING</h3>
+            <p><strong>You are testing with LIVE Stripe keys - REAL payments will be processed!</strong></p>
+            <p>⚠️ <strong>Only use small amounts for testing</strong> - Charges will be real!</p>
+        </div>
+
+        <!-- Live Key Information -->
+        <div class="key-info">
+            <h3>🔑 Your Live Keys Setup:</h3>
+            <p><strong>✅ Secret Key (Backend):</strong> <code class="code">sk_live_51PkolJGNw...Q21deZg</code></p>
+            <p>☝️ Already configured in your database/backend</p>
+
+            <h4>🔗 Get Your Live Publishable Key:</h4>
+            <ol>
+                <li>Go to <a href="https://dashboard.stripe.com/apikeys" target="_blank" style="color: #4ecdc4;">Stripe Dashboard → API Keys</a></li>
+                <li>Copy the <strong>LIVE "Publishable key"</strong> (starts with `pk_live_`)</li>
+                <li>Paste it in the input field below</li>
+            </ol>
+        </div>
+
+        <!-- Live Publishable Key Input -->
+        <div class="form-group">
+            <label for="publishable-key">Enter Your LIVE Stripe Publishable Key:</label>
+            <input type="text" id="publishable-key" placeholder="pk_live_..." value="">
+            <button onclick="initializeStripe()">🚀 Initialize Live Stripe</button>
+        </div>
+
+        <div id="stripe-status"></div>
+
+        <!-- Payment Form -->
+        <form id="payment-form" style="display: none;">
+            <div class="form-group">
+                <label for="email">Email:</label>
+                <input type="email" id="email" placeholder="customer@example.com" required>
+            </div>
+
+            <div class="form-group">
+                <label for="amount">Amount (£) - REAL CHARGE:</label>
+                <input type="text" id="amount" placeholder="0.01" value="0.01">
+                <small style="color: #ff6b6b;">⚠️ This will be a REAL charge in LIVE mode!</small>
+            </div>
+
+            <div class="form-group">
+                <label for="card-element">Card Details:</label>
+                <div id="card-element"></div>
+                <div id="card-errors" role="alert"></div>
+            </div>
+
+            <button type="submit" id="submit-button">💳 Pay Now</button>
+        </form>
+
+        <!-- Live Testing Cards -->
+        <div class="test-cards">
+            <h3>💳 LIVE Testing (REAL CHARGES!):</h3>
+            <div class="warning" style="margin: 10px 0; padding: 10px;">
+                <p><strong>🚨 WARNING: These will create REAL charges in LIVE mode!</strong></p>
+            </div>
+            <p><strong>Success (REAL CHARGE):</strong> <span class="card-number">4242 4242 4242 4242</span></p>
+            <p><strong>Decline:</strong> <span class="card-number">4000 0000 0000 0002</span></p>
+            <p><strong>Insufficient Funds:</strong> <span class="card-number">4000 0000 0000 9995</span></p>
+            <p><strong>Any future expiry date (MM/YY) and any 3-digit CVC</strong></p>
+            <p><em>💡 Use small amounts (£0.01) for testing!</em></p>
+        </div>
+
+        <div id="result"></div>
+    </div>
+
+    <script>
+        let stripe = null;
+        let elements = null;
+        let cardElement = null;
+
+        function initializeStripe() {
+            const publishableKey = document.getElementById('publishable-key').value.trim();
+            const statusDiv = document.getElementById('stripe-status');
+
+            if (!publishableKey) {
+                statusDiv.innerHTML = '<div class="error">❌ Please enter your publishable key</div>';
+                return;
+            }
+
+            if (!publishableKey.startsWith('pk_live_')) {
+                statusDiv.innerHTML = '<div class="error">❌ Invalid key format. Live publishable keys must start with "pk_live_"</div>';
+                return;
+            }
+
+            try {
+                // Initialize Stripe
+                stripe = Stripe(publishableKey);
+                elements = stripe.elements();
+
+                // Create card element
+                cardElement = elements.create('card', {
+                    style: {
+                        base: {
+                            fontSize: '16px',
+                            color: '#ffffff',
+                            '::placeholder': {
+                                color: 'rgba(255, 255, 255, 0.7)',
+                            },
+                        },
+                    },
+                });
+
+                cardElement.mount('#card-element');
+
+                // Handle real-time validation errors from the card Element
+                cardElement.on('change', ({
+                    error
+                }) => {
+                    const displayError = document.getElementById('card-errors');
+                    if (error) {
+                        displayError.innerHTML = `<div class="error">${error.message}</div>`;
+                    } else {
+                        displayError.innerHTML = '';
+                    }
+                });
+
+                statusDiv.innerHTML = '<div class="success">✅ Stripe initialized successfully!</div>';
+                document.getElementById('payment-form').style.display = 'block';
+
+            } catch (error) {
+                statusDiv.innerHTML = `<div class="error">❌ Error initializing Stripe: ${error.message}</div>`;
+            }
+        }
+
+        // Handle form submission
+        document.getElementById('payment-form').addEventListener('submit', async(event) => {
+            event.preventDefault();
+
+            if (!stripe || !cardElement) {
+                return;
+            }
+
+            const submitButton = document.getElementById('submit-button');
+            const resultDiv = document.getElementById('result');
+
+            submitButton.disabled = true;
+            submitButton.textContent = '⏳ Processing...';
+
+            // Create payment method
+            const {
+                error,
+                paymentMethod
+            } = await stripe.createPaymentMethod({
+                type: 'card',
+                card: cardElement,
+                billing_details: {
+                    email: document.getElementById('email').value,
+                },
+            });
+
+            if (error) {
+                resultDiv.innerHTML = `<div class="error">❌ Payment failed: ${error.message}</div>`;
+            } else {
+                resultDiv.innerHTML = `
+                    <div class="success">
+                        ✅ <strong>Live Payment Method Created Successfully!</strong><br>
+                        <strong>Payment Method ID:</strong> ${paymentMethod.id}<br>
+                        <strong>Card Last 4:</strong> **** **** **** ${paymentMethod.card.last4}<br>
+                        <strong>Card Brand:</strong> ${paymentMethod.card.brand.toUpperCase()}<br>
+                        <br>
+                        <em>🔴 NOTE: This used LIVE keys - ready for real payments!</em>
+                    </div>
+                `;
+
+                console.log('Payment Method:', paymentMethod);
+            }
+
+            submitButton.disabled = false;
+            submitButton.textContent = '💳 Pay Now';
+        });
+
+        // Test secret key validation
+        function testSecretKey() {
+            const secretKey = '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';
+
+            fetch('http://localhost:4000/api/billing', {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': 'Bearer YOUR_JWT_TOKEN',
+                        'Content-Type': 'application/json'
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    console.log('Backend test result:', data);
+                })
+                .catch(error => {
+                    console.error('Backend test error:', error);
+                });
+        }
+    </script>
+</body>
+
+</html>

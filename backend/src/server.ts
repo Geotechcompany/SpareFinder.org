@@ -23,6 +23,7 @@ import settingsRoutes from './routes/settings';
 import notificationsRoutes from './routes/notifications';
 import billingRoutes from './routes/billing';
 import statisticsRoutes from './routes/statistics';
+import creditsRoutes from './routes/credits';
 import healthRoutes from './routes/health';
 
 // Initialize Supabase client
@@ -100,6 +101,7 @@ app.use('/api/settings', settingsRoutes);
 app.use('/api/notifications', notificationsRoutes);
 app.use('/api/billing', billingRoutes);
 app.use('/api/statistics', statisticsRoutes);
+app.use('/api/credits', creditsRoutes);
 
 // 404 handler
 app.use('*', (req, res) => {

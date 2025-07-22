@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -22,16 +22,41 @@ import {
   Upload,
   TrendingUp,
   Target,
-  Menu
+  Menu,
+  Loader2
 } from 'lucide-react';
 import DashboardSidebar from '@/components/DashboardSidebar';
 import MobileSidebar from '@/components/MobileSidebar';
+import { notificationsApi } from '@/lib/api';
+import { toast } from 'sonner';
+
+interface Notification {
+  id: string;
+  title: string;
+  message: string;
+  type: 'info' | 'success' | 'warning' | 'error';
+  read: boolean;
+  action_url?: string;
+  created_at: string;
+  expires_at?: string;
+  metadata?: any;
+}
+
+interface NotificationStats {
+  total: number;
+  unread: number;
+  read: number;
+  byType: Record<string, number>;
+}
 
 const Notifications = () => {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [selectedFilter, setSelectedFilter] = useState('all');
-  const [readNotifications, setReadNotifications] = useState<Set<number>>(new Set());
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [stats, setStats] = useState<NotificationStats | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [markingAsRead, setMarkingAsRead] = useState<Set<string>>(new Set());
 
   const handleToggleSidebar = () => {
     setIsCollapsed(!isCollapsed);
@@ -41,68 +66,33 @@ const Notifications = () => {
     setIsMobileMenuOpen(!isMobileMenuOpen);
   };
 
-  const notifications = [
-    {
-      id: 1,
-      type: 'success',
-      title: 'Part Successfully Identified',
-      message: 'Your brake pad set has been identified with 98.2% confidence',
-      timestamp: '2 minutes ago',
-      unread: true,
-      icon: CheckCircle,
-      color: 'from-green-600 to-emerald-600'
-    },
-    {
-      id: 2,
-      type: 'info',
-      title: 'New Feature Available',
-      message: 'Enhanced AI model now supports motorcycle parts identification',
-      timestamp: '1 hour ago',
-      unread: true,
-      icon: Zap,
-      color: 'from-blue-600 to-cyan-600'
-    },
-    {
-      id: 3,
-      type: 'warning',
-      title: 'Low Confidence Result',
-      message: 'Part identification completed with 73% confidence. Manual review recommended.',
-      timestamp: '3 hours ago',
-      unread: true,
-      icon: AlertTriangle,
-      color: 'from-yellow-600 to-orange-600'
-    },
-    {
-      id: 4,
-      type: 'success',
-      title: 'Upload Limit Increased',
-      message: 'Your monthly upload limit has been increased to 1,000 parts',
-      timestamp: '1 day ago',
-      unread: false,
-      icon: TrendingUp,
-      color: 'from-purple-600 to-pink-600'
-    },
-    {
-      id: 5,
-      type: 'info',
-      title: 'Weekly Report Ready',
-      message: 'Your weekly analysis report is ready for download',
-      timestamp: '2 days ago',
-      unread: false,
-      icon: Target,
-      color: 'from-indigo-600 to-purple-600'
-    },
-    {
-      id: 6,
-      type: 'success',
-      title: 'Achievement Unlocked',
-      message: 'Congratulations! You\'ve reached 95% accuracy rate',
-      timestamp: '3 days ago',
-      unread: false,
-      icon: CheckCircle,
-      color: 'from-green-600 to-emerald-600'
+  // Fetch notifications and stats
+  const fetchNotifications = async () => {
+    try {
+      setLoading(true);
+      const [notificationsResponse, statsResponse] = await Promise.all([
+        notificationsApi.getNotifications({ limit: 50 }),
+        notificationsApi.getStats()
+      ]);
+
+      if (notificationsResponse.success && notificationsResponse.data) {
+        setNotifications(notificationsResponse.data.notifications || []);
+      }
+
+      if (statsResponse.success && statsResponse.data) {
+        setStats(statsResponse.data);
+      }
+    } catch (error) {
+      console.error('Error fetching notifications:', error);
+      toast.error('Failed to load notifications');
+    } finally {
+      setLoading(false);
     }
-  ];
+  };
+
+  useEffect(() => {
+    fetchNotifications();
+  }, []);
 
   const notificationSettings = [
     {
@@ -141,19 +131,73 @@ const Notifications = () => {
 
   const filteredNotifications = notifications.filter(notification => {
     if (selectedFilter === 'all') return true;
-    if (selectedFilter === 'unread') return notification.unread && !readNotifications.has(notification.id);
+    if (selectedFilter === 'unread') return !notification.read;
     return notification.type === selectedFilter;
   });
 
-  const unreadCount = notifications.filter(n => n.unread && !readNotifications.has(n.id)).length;
+  const unreadCount = notifications.filter(n => !n.read).length;
 
-  const markAsRead = (id: number) => {
-    setReadNotifications(prev => new Set([...prev, id]));
+  const markAsRead = async (id: string) => {
+    try {
+      setMarkingAsRead(prev => new Set([...prev, id]));
+      const response = await notificationsApi.markAsRead(id);
+      
+      if (response.success) {
+        setNotifications(prev => 
+          prev.map(notification => 
+            notification.id === id 
+              ? { ...notification, read: true }
+              : notification
+          )
+        );
+        toast.success('Notification marked as read');
+      } else {
+        toast.error('Failed to mark notification as read');
+      }
+    } catch (error) {
+      console.error('Error marking notification as read:', error);
+      toast.error('Failed to mark notification as read');
+    } finally {
+      setMarkingAsRead(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(id);
+        return newSet;
+      });
+    }
   };
 
-  const markAllAsRead = () => {
-    const unreadIds = notifications.filter(n => n.unread).map(n => n.id);
-    setReadNotifications(prev => new Set([...prev, ...unreadIds]));
+  const markAllAsRead = async () => {
+    try {
+      const response = await notificationsApi.markAllAsRead();
+      
+      if (response.success) {
+        setNotifications(prev => 
+          prev.map(notification => ({ ...notification, read: true }))
+        );
+        toast.success('All notifications marked as read');
+      } else {
+        toast.error('Failed to mark all notifications as read');
+      }
+    } catch (error) {
+      console.error('Error marking all notifications as read:', error);
+      toast.error('Failed to mark all notifications as read');
+    }
+  };
+
+  const deleteNotification = async (id: string) => {
+    try {
+      const response = await notificationsApi.deleteNotification(id);
+      
+      if (response.success) {
+        setNotifications(prev => prev.filter(notification => notification.id !== id));
+        toast.success('Notification deleted');
+      } else {
+        toast.error('Failed to delete notification');
+      }
+    } catch (error) {
+      console.error('Error deleting notification:', error);
+      toast.error('Failed to delete notification');
+    }
   };
 
   const getTypeIcon = (type: string) => {
@@ -164,6 +208,8 @@ const Notifications = () => {
         return AlertTriangle;
       case 'info':
         return Info;
+      case 'error':
+        return AlertTriangle;
       default:
         return Bell;
     }
@@ -177,8 +223,28 @@ const Notifications = () => {
         return 'from-yellow-600 to-orange-600';
       case 'info':
         return 'from-blue-600 to-cyan-600';
+      case 'error':
+        return 'from-red-600 to-pink-600';
       default:
         return 'from-gray-600 to-gray-700';
+    }
+  };
+
+  const formatTimestamp = (timestamp: string) => {
+    const date = new Date(timestamp);
+    const now = new Date();
+    const diff = now.getTime() - date.getTime();
+    
+    const minutes = Math.floor(diff / (1000 * 60));
+    const hours = Math.floor(diff / (1000 * 60 * 60));
+    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+    
+    if (minutes < 60) {
+      return `${minutes} minutes ago`;
+    } else if (hours < 24) {
+      return `${hours} hours ago`;
+    } else {
+      return `${days} days ago`;
     }
   };
 
@@ -345,9 +411,10 @@ const Notifications = () => {
                 {[
                   { id: 'all', label: 'All', count: notifications.length },
                   { id: 'unread', label: 'Unread', count: unreadCount },
-                  { id: 'success', label: 'Success', count: notifications.filter(n => n.type === 'success').length },
-                  { id: 'warning', label: 'Warnings', count: notifications.filter(n => n.type === 'warning').length },
-                  { id: 'info', label: 'Info', count: notifications.filter(n => n.type === 'info').length }
+                  { id: 'success', label: 'Success', count: stats?.byType?.success || 0 },
+                  { id: 'warning', label: 'Warnings', count: stats?.byType?.warning || 0 },
+                  { id: 'info', label: 'Info', count: stats?.byType?.info || 0 },
+                  { id: 'error', label: 'Errors', count: stats?.byType?.error || 0 }
                 ].map((filter, index) => (
                   <motion.button
                     key={filter.id}
@@ -403,85 +470,95 @@ const Notifications = () => {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-3">
-                    <AnimatePresence>
-                      {filteredNotifications.map((notification, index) => {
-                        const isRead = !notification.unread || readNotifications.has(notification.id);
-                        const Icon = notification.icon;
-                        
-                        return (
-                          <motion.div
-                            key={notification.id}
-                            initial={{ opacity: 0, y: 20 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0, y: -20 }}
-                            transition={{ delay: index * 0.05 }}
-                            whileHover={{ scale: 1.02, y: -2 }}
-                            className={`relative group p-4 rounded-xl border transition-all duration-300 cursor-pointer ${
-                              isRead 
-                                ? 'bg-white/5 border-white/10 opacity-70' 
-                                : 'bg-white/10 border-white/20 hover:bg-white/15'
-                            }`}
-                            onClick={() => markAsRead(notification.id)}
-                          >
-                            <div className="flex items-start space-x-4">
-                              <div className={`w-12 h-12 rounded-xl flex items-center justify-center bg-gradient-to-r ${notification.color} flex-shrink-0`}>
-                                <Icon className="w-6 h-6 text-white" />
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <div className="flex items-center justify-between mb-1">
-                                  <h4 className="text-white font-medium truncate">{notification.title}</h4>
-                                  <div className="flex items-center space-x-2">
-                                    {!isRead && (
-                                      <div className="w-2 h-2 bg-blue-500 rounded-full" />
+                  {loading ? (
+                    <div className="flex items-center justify-center py-12">
+                      <Loader2 className="w-8 h-8 text-purple-400 animate-spin" />
+                      <span className="ml-2 text-gray-300">Loading notifications...</span>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      <AnimatePresence>
+                        {filteredNotifications.map((notification, index) => {
+                          const Icon = getTypeIcon(notification.type);
+                          const isBeingMarked = markingAsRead.has(notification.id);
+                          
+                          return (
+                            <motion.div
+                              key={notification.id}
+                              initial={{ opacity: 0, y: 20 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              exit={{ opacity: 0, y: -20 }}
+                              transition={{ delay: index * 0.05 }}
+                              whileHover={{ scale: 1.02, y: -2 }}
+                              className={`relative group p-4 rounded-xl border transition-all duration-300 cursor-pointer ${
+                                notification.read 
+                                  ? 'bg-white/5 border-white/10 opacity-70' 
+                                  : 'bg-white/10 border-white/20 hover:bg-white/15'
+                              }`}
+                              onClick={() => !notification.read && markAsRead(notification.id)}
+                            >
+                              <div className="flex items-start space-x-4">
+                                <div className={`w-12 h-12 rounded-xl flex items-center justify-center bg-gradient-to-r ${getTypeColor(notification.type)} flex-shrink-0`}>
+                                  <Icon className="w-6 h-6 text-white" />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center justify-between mb-1">
+                                    <h4 className="text-white font-medium truncate">{notification.title}</h4>
+                                    <div className="flex items-center space-x-2">
+                                      {!notification.read && (
+                                        <div className="w-2 h-2 bg-blue-500 rounded-full" />
+                                      )}
+                                      {isBeingMarked && (
+                                        <Loader2 className="w-4 h-4 text-blue-400 animate-spin" />
+                                      )}
+                                      <motion.button
+                                        whileHover={{ scale: 1.1 }}
+                                        whileTap={{ scale: 0.9 }}
+                                        className="opacity-0 group-hover:opacity-100 p-1 rounded-full hover:bg-white/10 transition-all"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          deleteNotification(notification.id);
+                                        }}
+                                      >
+                                        <X className="w-4 h-4 text-gray-400" />
+                                      </motion.button>
+                                    </div>
+                                  </div>
+                                  <p className="text-gray-400 text-sm mb-2">{notification.message}</p>
+                                  <div className="flex items-center justify-between">
+                                    <span className="text-gray-500 text-xs">{formatTimestamp(notification.created_at)}</span>
+                                    {notification.read && (
+                                      <span className="text-green-400 text-xs flex items-center">
+                                        <Check className="w-3 h-3 mr-1" />
+                                        Read
+                                      </span>
                                     )}
-                                    <motion.button
-                                      whileHover={{ scale: 1.1 }}
-                                      whileTap={{ scale: 0.9 }}
-                                      className="opacity-0 group-hover:opacity-100 p-1 rounded-full hover:bg-white/10 transition-all"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        markAsRead(notification.id);
-                                      }}
-                                    >
-                                      <X className="w-4 h-4 text-gray-400" />
-                                    </motion.button>
                                   </div>
                                 </div>
-                                <p className="text-gray-400 text-sm mb-2">{notification.message}</p>
-                                <div className="flex items-center justify-between">
-                                  <span className="text-gray-500 text-xs">{notification.timestamp}</span>
-                                  {isRead && (
-                                    <span className="text-green-400 text-xs flex items-center">
-                                      <Check className="w-3 h-3 mr-1" />
-                                      Read
-                                    </span>
-                                  )}
-                                </div>
                               </div>
-                            </div>
-                          </motion.div>
-                        );
-                      })}
-                    </AnimatePresence>
-                    
-                    {filteredNotifications.length === 0 && (
-                      <motion.div
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        className="text-center py-12"
-                      >
+                            </motion.div>
+                          );
+                        })}
+                      </AnimatePresence>
+                      
+                      {!loading && filteredNotifications.length === 0 && (
                         <motion.div
-                          animate={{ scale: [1, 1.1, 1] }}
-                          transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          className="text-center py-12"
                         >
-                          <Bell className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+                          <motion.div
+                            animate={{ scale: [1, 1.1, 1] }}
+                            transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+                          >
+                            <Bell className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+                          </motion.div>
+                          <p className="text-gray-300 text-lg mb-2">No notifications found</p>
+                          <p className="text-gray-400">Try adjusting your filter or check back later</p>
                         </motion.div>
-                        <p className="text-gray-300 text-lg mb-2">No notifications found</p>
-                        <p className="text-gray-400">Try adjusting your filter or check back later</p>
-                      </motion.div>
-                    )}
-                  </div>
+                      )}
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </motion.div>

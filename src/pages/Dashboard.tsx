@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import DashboardSidebar from '@/components/DashboardSidebar';
 import MobileSidebar from '@/components/MobileSidebar';
+import CreditsDisplay from '@/components/CreditsDisplay';
 import { useAuth } from '@/contexts/AuthContext';
 import { format } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
@@ -105,8 +106,6 @@ const Dashboard = () => {
       setIsDataLoading(true);
       setError(null);
 
-      console.log('🔄 Starting dashboard data fetch for user:', user?.id);
-
       // Fetch all data in parallel with proper error handling
       const [statsResponse, uploadsResponse, activitiesResponse, metricsResponse] = await Promise.allSettled([
         dashboardApi.getStats().catch(err => {
@@ -132,17 +131,40 @@ const Dashboard = () => {
         return;
       }
 
-      // Handle stats response
+      // Handle stats response with fallback calculation from uploads data
       if (statsResponse.status === 'fulfilled' && statsResponse.value.success) {
         const data = statsResponse.value.data;
-          setStats({
-          totalUploads: data.totalUploads || 0,
-          successfulUploads: data.successfulUploads || 0,
+        
+        // Map the API response to dashboard state
+        // Backend returns: totalSearches, avgConfidence, matchRate, avgProcessTime
+        // Frontend needs: totalUploads, successfulUploads, avgConfidence, avgProcessTime
+        const totalUploads = data.totalUploads || data.totalSearches || 0;
+        const successfulUploads = data.successfulUploads || Math.round((data.matchRate || 0) * totalUploads / 100) || 0;
+        
+        setStats({
+          totalUploads: totalUploads,
+          successfulUploads: successfulUploads,
           avgConfidence: data.avgConfidence || 0,
-          avgProcessTime: data.avgProcessTime || 0
+          avgProcessTime: data.avgProcessTime || data.avgResponseTime || 0
+        });
+      } else {
+        // Fallback: Calculate stats from uploads data if available
+        if (uploadsResponse.status === 'fulfilled' && uploadsResponse.value.success) {
+          const uploadsData = uploadsResponse.value.data?.uploads || [];
+          
+          const totalUploads = uploadsData.length;
+          const successfulUploads = uploadsData.filter((upload: any) => upload.confidence_score > 0).length;
+          const avgConfidence = totalUploads > 0 
+            ? uploadsData.reduce((sum: number, upload: any) => sum + (upload.confidence_score * 100 || 0), 0) / totalUploads 
+            : 0;
+          
+          setStats({
+            totalUploads,
+            successfulUploads,
+            avgConfidence: Math.round(avgConfidence),
+            avgProcessTime: 0 // Will be calculated from performance metrics
           });
         } else {
-        console.warn('❌ Failed to fetch dashboard stats:', statsResponse);
           setStats({
             totalUploads: 0,
             successfulUploads: 0,
@@ -150,6 +172,7 @@ const Dashboard = () => {
             avgProcessTime: 0
           });
         }
+      }
 
       // Handle uploads response
       if (uploadsResponse.status === 'fulfilled' && uploadsResponse.value.success) {
@@ -186,30 +209,44 @@ const Dashboard = () => {
       // Handle performance metrics response
       if (metricsResponse.status === 'fulfilled' && metricsResponse.value.success) {
         const data = metricsResponse.value.data;
-          setPerformanceMetrics([
-            {
-              label: 'AI Model Accuracy',
-            value: `${data.modelAccuracy?.toFixed(1) || 0}%`,
+        
+        // If stats endpoint failed but performance metrics has the data, use it as fallback
+        if ((statsResponse.status === 'rejected' || !statsResponse.value?.success) && data.totalSearches) {
+          const totalUploads = data.totalSearches || 0;
+          const successfulUploads = Math.round((data.matchRate || 0) * totalUploads / 100) || 0;
+          
+          setStats({
+            totalUploads: totalUploads,
+            successfulUploads: successfulUploads,
+            avgConfidence: data.avgConfidence || 0,
+            avgProcessTime: data.avgResponseTime || 0
+          });
+        }
+        
+        setPerformanceMetrics([
+          {
+            label: 'AI Model Accuracy',
+            value: `${data.modelAccuracy?.toFixed(1) || data.matchRate || 0}%`,
             change: `${data.accuracyChange > 0 ? '+' : ''}${data.accuracyChange?.toFixed(1) || 0}%`,
-              icon: Cpu,
-              color: 'from-green-600 to-emerald-600'
-            },
-            {
-              label: 'Total Searches',
+            icon: Cpu,
+            color: 'from-green-600 to-emerald-600'
+          },
+          {
+            label: 'Total Searches',
             value: `${data.totalSearches || 0}`,
             change: `${data.searchesGrowth > 0 ? '+' : ''}${data.searchesGrowth?.toFixed(1) || 0}%`,
-              icon: Database,
-              color: 'from-blue-600 to-cyan-600'
-            },
-            {
-              label: 'Response Time',
-            value: `${data.avgResponseTime || 0}ms`,
+            icon: Database,
+            color: 'from-blue-600 to-cyan-600'
+          },
+          {
+            label: 'Response Time',
+            value: `${data.avgResponseTime || data.avgProcessTime || 0}ms`,
             change: `${data.responseTimeChange < 0 ? '' : '+'}${data.responseTimeChange || 0}ms`,
-              icon: Activity,
-              color: 'from-purple-600 to-violet-600'
-            }
-          ]);
-        } else {
+            icon: Activity,
+            color: 'from-purple-600 to-violet-600'
+          }
+        ]);
+      } else {
         console.warn('❌ Failed to fetch performance metrics:', metricsResponse);
           setPerformanceMetrics([
             {
@@ -253,8 +290,6 @@ const Dashboard = () => {
         return;
       }
 
-      console.log('✅ Dashboard data fetch completed successfully');
-
     } catch (error: any) {
       if (error.message === 'Request aborted') {
         console.log('🔄 Request was aborted');
@@ -291,9 +326,12 @@ const Dashboard = () => {
   // Initialize data fetch - only run once when component mounts and user is authenticated
   useEffect(() => {
     if (!authLoading && isAuthenticated && user?.id && !isInitializedRef.current) {
-      console.log('📊 Initializing Dashboard data fetch for user:', user.id);
       isInitializedRef.current = true;
-      fetchDashboardData();
+      
+      // Add a small delay to ensure auth context is fully ready
+      setTimeout(() => {
+        fetchDashboardData();
+      }, 100);
     }
 
     // Reset initialization flag when user changes
@@ -309,7 +347,43 @@ const Dashboard = () => {
         setRecentActivities([]);
       setError(null);
     }
-  }, [isAuthenticated, user?.id, authLoading, fetchDashboardData]);
+  }, [isAuthenticated, user?.id, authLoading]);
+
+  // Separate effect to trigger fetch when auth state becomes ready
+  useEffect(() => {
+    const shouldFetch = !authLoading && isAuthenticated && user?.id && tokenStorage.getToken();
+    
+    if (shouldFetch && !isInitializedRef.current) {
+      isInitializedRef.current = true;
+      
+      // Ensure auth context is completely ready
+      const timeoutId = setTimeout(() => {
+        if (hasValidToken()) {
+          fetchDashboardData();
+        }
+      }, 200);
+      
+      return () => clearTimeout(timeoutId);
+    }
+  }, [isAuthenticated, user?.id, authLoading, hasValidToken, fetchDashboardData]);
+
+  // Auto-fetch when loading completes with valid auth state
+  useEffect(() => {
+    if (!isDataLoading && !authLoading && isAuthenticated && user?.id && 
+        stats.totalUploads === 0 && stats.successfulUploads === 0 && 
+        stats.avgConfidence === 0 && !error) {
+      
+      // Reset initialization flag to allow fetch
+      isInitializedRef.current = false;
+      
+      // Trigger fetch after a short delay
+      setTimeout(() => {
+        if (hasValidToken() && !isFetchingRef.current) {
+          fetchDashboardData();
+        }
+      }, 300);
+    }
+  }, [isDataLoading, authLoading, isAuthenticated, user?.id, stats, error, hasValidToken, fetchDashboardData]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -345,6 +419,19 @@ const Dashboard = () => {
       description: 'Dashboard data has been updated.',
     });
   };
+
+  // Auto-refresh after 2 seconds if data is still empty
+  useEffect(() => {
+    if (!authLoading && isAuthenticated && user?.id && !isDataLoading) {
+      const timer = setTimeout(() => {
+        if (stats.totalUploads === 0 && stats.successfulUploads === 0 && !isFetchingRef.current) {
+          handleRefreshData();
+        }
+      }, 2000);
+
+      return () => clearTimeout(timer);
+    }
+  }, [authLoading, isAuthenticated, user?.id, isDataLoading, stats.totalUploads, stats.successfulUploads]);
 
   if (isDataLoading) {
     return (
@@ -611,56 +698,78 @@ const Dashboard = () => {
           <div className="relative">
             <div className="absolute inset-0 bg-gradient-to-r from-purple-600/10 to-blue-600/10 rounded-2xl sm:rounded-3xl blur-xl opacity-60" />
             <div className="relative bg-black/20 backdrop-blur-xl rounded-2xl sm:rounded-3xl p-4 sm:p-6 border border-white/10">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
-                <div>
-                  <motion.h1 
-                    className="text-2xl sm:text-3xl lg:text-4xl font-bold bg-gradient-to-r from-white via-purple-200 to-blue-200 bg-clip-text text-transparent"
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: 0.2 }}
-                  >
-                    Welcome back, {user?.full_name || user?.email?.split('@')[0] || 'User'}
-                  </motion.h1>
-                  <motion.p 
-                    className="text-sm sm:text-base text-gray-400 mt-2"
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: 0.3 }}
-                  >
-                    Here's what's happening with your part identification today
-                  </motion.p>
-                </div>
-                <motion.div
-                  className="flex space-x-3"
-                  initial={{ opacity: 0, scale: 0.8 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={{ delay: 0.4 }}
-                >
-                  <motion.div
-                    whileHover={{ scale: 1.05, y: -2 }}
-                    whileTap={{ scale: 0.95 }}
-                    className="w-full sm:w-auto"
-                  >
-                    <Button 
-                      onClick={handleRefreshData}
-                      variant="outline"
-                      className="w-full sm:w-auto bg-black/20 border-white/10 text-white hover:bg-white/10 mr-2"
+              <div className="flex flex-col gap-4">
+                {/* Top Row - Welcome Message and Actions */}
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
+                  <div>
+                    <motion.h1 
+                      className="text-2xl sm:text-3xl lg:text-4xl font-bold bg-gradient-to-r from-white via-purple-200 to-blue-200 bg-clip-text text-transparent"
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: 0.2 }}
                     >
-                      <Loader2 className="w-4 h-4 mr-2" />
-                      Refresh Data
-                    </Button>
-                  </motion.div>
+                      Welcome back, {user?.full_name || user?.email?.split('@')[0] || 'User'}
+                    </motion.h1>
+                    <motion.p 
+                      className="text-sm sm:text-base text-gray-400 mt-2"
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: 0.3 }}
+                    >
+                      Here's what's happening with your part identification today
+                    </motion.p>
+                  </div>
                   <motion.div
-                    whileHover={{ scale: 1.05, y: -2 }}
-                    whileTap={{ scale: 0.95 }}
-                    className="w-full sm:w-auto"
+                    className="flex space-x-3"
+                    initial={{ opacity: 0, scale: 0.8 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ delay: 0.4 }}
                   >
-                    <Button className="w-full sm:w-auto bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 shadow-lg shadow-purple-500/25">
-                      <Upload className="w-4 h-4 mr-2" />
-                      New Upload
-                    </Button>
+                    <motion.div
+                      whileHover={{ scale: 1.05, y: -2 }}
+                      whileTap={{ scale: 0.95 }}
+                      className="w-full sm:w-auto"
+                    >
+                      <Button 
+                        onClick={handleRefreshData}
+                        variant="outline"
+                        className="w-full sm:w-auto bg-black/20 border-white/10 text-white hover:bg-white/10 mr-2"
+                      >
+                        <Loader2 className="w-4 h-4 mr-2" />
+                        Refresh Data
+                      </Button>
+                    </motion.div>
+
+                    <motion.div
+                      whileHover={{ scale: 1.05, y: -2 }}
+                      whileTap={{ scale: 0.95 }}
+                      className="w-full sm:w-auto"
+                    >
+                      <Button 
+                        onClick={() => navigate('/upload')}
+                        className="w-full sm:w-auto bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 shadow-lg shadow-purple-500/25"
+                      >
+                        <Upload className="w-4 h-4 mr-2" />
+                        New Upload
+                      </Button>
+                    </motion.div>
                   </motion.div>
+                </div>
+
+                {/* Bottom Row - Credits Display */}
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.5 }}
+                  className="flex justify-center sm:justify-start"
+                >
+                  <CreditsDisplay 
+                    size="medium" 
+                    className="w-full sm:w-auto max-w-md"
+                  />
                 </motion.div>
+
+
               </div>
             </div>
           </div>
@@ -679,7 +788,7 @@ const Dashboard = () => {
               { 
                 title: 'Successful IDs', 
                 value: stats.successfulUploads?.toString() || '0', 
-                change: stats.totalUploads > 0 ? `${((stats.successfulUploads / stats.totalUploads) * 100).toFixed(1)}%` : '0%', 
+                change: stats.totalUploads > 0 ? `${((stats.successfulUploads / stats.totalUploads) * 100).toFixed(1)}% success rate` : '0%', 
                 icon: CheckCircle, 
                 color: 'from-green-600 to-emerald-600',
                 bgColor: 'from-green-600/20 to-emerald-600/20'

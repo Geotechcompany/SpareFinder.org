@@ -55,6 +55,7 @@ import { parseMarkdownSections, MarkdownCard } from '@/lib/markdown-parser';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import { parseAIResponse } from '@/lib/markdown-parser';
+import CreditsDisplay from '@/components/CreditsDisplay';
 
 
 
@@ -2329,6 +2330,19 @@ const Upload = () => {
           <div className="relative">
             <div className="absolute inset-0 bg-gradient-to-r from-purple-600/10 to-blue-600/10 rounded-3xl blur-xl opacity-60" />
             <div className="relative bg-black/20 backdrop-blur-xl rounded-3xl p-6 border border-white/10">
+              {/* Credits Display - Top Right */}
+              <motion.div
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.1 }}
+                className="absolute top-4 right-4"
+              >
+                <CreditsDisplay 
+                  size="small" 
+                  className="bg-black/30 backdrop-blur-sm border-white/20"
+                />
+              </motion.div>
+
               <div className="text-center">
                 <motion.div
                   initial={{ opacity: 0, scale: 0.8 }}
