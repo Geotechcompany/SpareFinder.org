@@ -1,5 +1,19 @@
 import axios, { AxiosInstance, AxiosResponse } from 'axios';
 
+// Define a generic API response type
+export type ApiResponse<T = any> = {
+  success: boolean;
+  data?: T;
+  error?: string;
+  message?: string;
+  user?: any;
+  token?: string;
+  refresh_token?: string;
+};
+
+// Remove the Axios module declaration and the duplicate interface
+// Type assertions will be used in the code instead
+
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 
                       import.meta.env.VITE_API_URL || 
                       'https://api-sparefinder-org.onrender.com';
@@ -207,17 +221,6 @@ apiClient.interceptors.response.use(
     return Promise.reject(error);
   }
 );
-
-// API response interface
-interface ApiResponse<T = any> {
-  success: boolean;
-  data?: T;
-  user?: any; // Auth endpoints return user directly
-  token?: string; // Auth endpoints return token
-  refresh_token?: string; // Auth endpoints return refresh token
-  message?: string;
-  error?: string;
-}
 
 // Authentication API
 export const authApi = {
@@ -759,15 +762,239 @@ export const statisticsApi = {
   }
 };
 
-// Export the main API object
+// Notifications API
+export const notificationsApi = {
+  getNotifications: async (options?: {
+    page?: number;
+    limit?: number;
+  }): Promise<ApiResponse> => {
+    try {
+      const params = new URLSearchParams();
+      if (options?.page) params.append('page', options.page.toString());
+      if (options?.limit) params.append('limit', options.limit.toString());
+      
+      const response = await apiClient.get(`/notifications?${params.toString()}`);
+      return response.data;
+    } catch (error) {
+      console.error('Notifications fetch error:', error);
+      throw error;
+    }
+  },
+
+  markAsRead: async (notificationId: string): Promise<ApiResponse> => {
+    try {
+      const response = await apiClient.patch(`/notifications/${notificationId}/read`);
+      return response.data;
+    } catch (error) {
+      console.error('Mark notification as read error:', error);
+      throw error;
+    }
+  },
+
+  markAllAsRead: async (): Promise<ApiResponse> => {
+    try {
+      const response = await apiClient.patch('/notifications/mark-all-read');
+      return response.data;
+    } catch (error) {
+      console.error('Mark all notifications as read error:', error);
+      throw error;
+    }
+  },
+
+  deleteNotification: async (notificationId: string): Promise<ApiResponse> => {
+    try {
+      const response = await apiClient.delete(`/notifications/${notificationId}`);
+      return response.data;
+    } catch (error) {
+      console.error('Delete notification error:', error);
+      throw error;
+    }
+  },
+
+  createNotification: async (notification: {
+    title: string;
+    message: string;
+    type?: 'info' | 'success' | 'warning' | 'error';
+    action_url?: string;
+  }): Promise<ApiResponse> => {
+    try {
+      const response = await apiClient.post('/notifications', notification);
+      return response.data;
+    } catch (error) {
+      console.error('Create notification error:', error);
+      throw error;
+    }
+  },
+
+  getStats: async (): Promise<ApiResponse> => {
+    try {
+      const response = await apiClient.get('/notifications/stats');
+      return response.data;
+    } catch (error) {
+      console.error('Notifications stats error:', error);
+      throw error;
+    }
+  }
+};
+
+// Credits API
+export const creditsApi = {
+  getBalance: async (): Promise<ApiResponse> => {
+    try {
+      const response = await apiClient.get('/credits/balance');
+      return response.data;
+    } catch (error) {
+      console.error('Credits balance fetch error:', error);
+      throw error;
+    }
+  },
+
+  getTransactions: async (options?: {
+    page?: number;
+    limit?: number;
+  }): Promise<ApiResponse> => {
+    try {
+      const params = new URLSearchParams();
+      if (options?.page) params.append('page', options.page.toString());
+      if (options?.limit) params.append('limit', options.limit.toString());
+      
+      const response = await apiClient.get(`/credits/transactions?${params.toString()}`);
+      return response.data;
+    } catch (error) {
+      console.error('Credits transactions fetch error:', error);
+      throw error;
+    }
+  },
+
+  checkCredits: async (amount: number = 1): Promise<ApiResponse> => {
+    try {
+      const response = await apiClient.get(`/credits/check/${amount}`);
+      return response.data;
+    } catch (error) {
+      console.error('Credits check error:', error);
+      throw error;
+    }
+  },
+
+  // Admin only
+  addCredits: async (userId: string, amount: number, reason?: string): Promise<ApiResponse> => {
+    try {
+      const response = await apiClient.post('/credits/add', {
+        user_id: userId,
+        amount,
+        reason
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Add credits error:', error);
+      throw error;
+    }
+  },
+
+  // Admin only
+  getStatistics: async (): Promise<ApiResponse> => {
+    try {
+      const response = await apiClient.get('/credits/statistics');
+      return response.data;
+    } catch (error) {
+      console.error('Credits statistics error:', error);
+      throw error;
+    }
+  }
+};
+
+// Export combined API
 export const api = {
   auth: authApi,
-  dashboard: dashboardApi,
-  admin: adminApi,
-  billing: billingApi,
-  profile: profileApi,
+  user: {
+    getProfile: () => apiClient.get('/user/profile'),
+    updateProfile: (profileData: { 
+      full_name?: string; 
+      company?: string; 
+      phone?: string; 
+      bio?: string; 
+      location?: string; 
+      website?: string;
+      preferences?: {
+        emailNotifications?: boolean;
+        smsNotifications?: boolean;
+        autoSave?: boolean;
+        darkMode?: boolean;
+        analytics?: boolean;
+        marketing?: boolean;
+      }
+    }) => apiClient.put('/user/profile', profileData),
+    changePassword: async (currentPassword: string, newPassword: string): Promise<ApiResponse> => {
+      const response = await apiClient.post('/profile/change-password', {
+        currentPassword,
+        newPassword
+          });
+          return response.data;
+    },
+    deleteAccount: async (): Promise<ApiResponse> => {
+      const response = await apiClient.delete('/profile/delete-account');
+      return response.data;
+    },
+    getAchievements: async (): Promise<ApiResponse> => {
+      // Mock achievements data
+      const mockAchievements = [
+        {
+          id: 'first-upload',
+          title: 'First Upload',
+          description: 'Upload your first part image',
+          icon: '🎯',
+          color: 'from-green-600 to-emerald-600',
+          earned: true,
+          earnedAt: new Date().toISOString()
+        },
+        {
+          id: 'accuracy-master',
+          title: 'Accuracy Master',
+          description: 'Achieve 95% accuracy rate',
+          icon: '🎯',
+          color: 'from-blue-600 to-cyan-600',
+          earned: false
+        },
+        {
+          id: 'speed-demon',
+          title: 'Speed Demon',
+          description: 'Complete 50 identifications',
+          icon: '⚡',
+          color: 'from-yellow-600 to-orange-600',
+          earned: false
+        },
+        {
+          id: 'streak-master',
+          title: 'Streak Master',
+          description: 'Use the app for 7 consecutive days',
+          icon: '🔥',
+          color: 'from-red-600 to-pink-600',
+          earned: false
+        }
+      ];
+
+      const earned = mockAchievements.filter(a => a.earned).length;
+      
+          return {
+            success: true,
+        data: {
+          achievements: mockAchievements,
+          totalEarned: earned,
+          totalAvailable: mockAchievements.length
+        }
+      };
+    },
+    getRecentActivities: async (limit: number = 5): Promise<ApiResponse> => {
+      const response = await apiClient.get(`/dashboard/recent-activities?limit=${limit}`);
+      return response.data;
+    }
+  },
   upload: uploadApi,
-  statistics: statisticsApi
+  admin: adminApi,
+  notifications: notificationsApi,
+  billing: billingApi,
+  statistics: statisticsApi,
+  credits: creditsApi
 };
 
 // Export individual APIs for backward compatibility

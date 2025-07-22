@@ -580,7 +580,7 @@ router.post('/stripe-webhook', express.raw({ type: 'application/json' }), async 
         .from('payment_methods')
         .select('webhook_secret')
         .eq('provider', 'stripe')
-        .eq('is_active', true)
+        .eq('status', 'active')
         .single();
       
       webhookSecret = stripeMethod?.webhook_secret;

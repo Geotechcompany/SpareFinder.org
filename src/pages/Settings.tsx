@@ -8,7 +8,7 @@ import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/components/ui/use-toast';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Eye, EyeOff } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 import { 
@@ -25,7 +25,6 @@ import {
   Zap,
   Sparkles,
   Globe,
-  Eye,
   Lock,
   Building2,
   Briefcase,
@@ -35,26 +34,45 @@ import {
 import DashboardSidebar from '@/components/DashboardSidebar';
 import MobileSidebar from '@/components/MobileSidebar';
 
-interface UserProfile {
-  id: string;
-  email: string;
-  username: string | null;
-  full_name: string;
-  avatar_url: string | null;
-  preferences?: {
-    emailNotifications: boolean;
-    smsNotifications: boolean;
-    autoSave: boolean;
-    darkMode: boolean;
-    analytics: boolean;
-    marketing: boolean;
+// Define a type for API response
+interface ApiResponse {
+  success?: boolean;
+  data?: {
+    success?: boolean;
+    error?: string;
   };
+  error?: string;
 }
+
+// Utility function to check if response is successful
+const isSuccessResponse = (response: any): boolean => {
+  // If response is null or undefined, return false
+  if (!response) return false;
+
+  // Check if response has a success property directly
+  if (response.success === true) return true;
+
+  // Check if response has a data property with success
+  if (response.data && response.data.success === true) return true;
+
+  return false;
+};
+
+// Utility function to extract error message
+const getErrorMessage = (response: any): string => {
+  // Check for error messages in various locations
+  if (response?.error) return response.error;
+  if (response?.data?.error) return response.data.error;
+  if (response?.message) return response.message;
+  if (response?.data?.message) return response.data.message;
+  
+  return 'An unexpected error occurred';
+};
 
 const Settings = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [formData, setFormData] = useState<Partial<UserProfile>>({
+  const [formData, setFormData] = useState({
     email: '',
     username: '',
     full_name: '',
@@ -70,13 +88,29 @@ const Settings = () => {
     marketing: false
   });
 
+  // New state for password change
+  const [passwordData, setPasswordData] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmNewPassword: ''
+  });
+
+  const [passwordVisibility, setPasswordVisibility] = useState({
+    currentPassword: false,
+    newPassword: false,
+    confirmNewPassword: false
+  });
+
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
+  const [passwordError, setPasswordError] = useState<string | null>(null);
+
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('profile');
   const [isSaving, setIsSaving] = useState(false);
   
   const { toast } = useToast();
-  const { user } = useAuth(); // Get Google profile data from auth context
+  const { user, logout } = useAuth(); // Get Google profile data from auth context
 
   useEffect(() => {
     fetchUserProfile();
@@ -92,14 +126,14 @@ const Settings = () => {
         setFormData({
           email: user.email,
           username: '', // Username not available
-          full_name: user.user_metadata?.full_name || user.full_name || '',
-          avatar_url: user.user_metadata?.avatar_url || user.avatar_url || ''
+          full_name: user.full_name || '',
+          avatar_url: user.avatar_url || ''
         });
       } else {
         // Fallback to API if no auth context data
-        const profileResponse = await apiClient.getProfile();
+        const profileResponse = await api.user.getProfile();
         
-        if (profileResponse.success && profileResponse.data?.profile) {
+        if (profileResponse && profileResponse.data && profileResponse.data.profile) {
           const profile = profileResponse.data.profile;
           setFormData({
             email: profile.email,
@@ -112,21 +146,20 @@ const Settings = () => {
 
       // Fetch settings
       try {
-        const settingsResponse = await apiClient.getSettings();
+        const profileResponse = await api.user.getProfile();
         
-        if (settingsResponse.success && settingsResponse.data?.settings) {
-          const settings = settingsResponse.data.settings;
+        if (profileResponse && profileResponse.data && profileResponse.data.profile && profileResponse.data.profile.preferences) {
+          const prefs = profileResponse.data.profile.preferences;
           setPreferences({
-            emailNotifications: settings.notifications?.email ?? true,
-            smsNotifications: settings.notifications?.push ?? false,
-            autoSave: true, // Default value since not in API
-            darkMode: settings.preferences?.theme === 'dark',
-            analytics: settings.privacy?.dataSharing ?? true,
-            marketing: settings.notifications?.marketing ?? false
+            emailNotifications: prefs.emailNotifications ?? true,
+            smsNotifications: prefs.smsNotifications ?? false,
+            autoSave: prefs.autoSave ?? true,
+            darkMode: prefs.darkMode ?? true,
+            analytics: prefs.analytics ?? true,
+            marketing: prefs.marketing ?? false
           });
         }
       } catch (settingsError) {
-        // Settings might not exist yet, use defaults
         console.log('Settings not found, using defaults');
       }
     } catch (err) {
@@ -156,32 +189,25 @@ const Settings = () => {
       setError(null);
 
       // Update profile data
-      const profileResponse = await apiClient.updateProfileData({
+      const profileResponse = await api.user.updateProfile({
         full_name: formData.full_name,
-        // Note: username and avatar_url updates would need additional API endpoints
       });
 
-      // Update settings
-      const settingsData = {
-        notifications: {
-          email: preferences.emailNotifications,
-          push: preferences.smsNotifications,
-          marketing: preferences.marketing
-        },
-        privacy: {
-          dataSharing: preferences.analytics,
-          profileVisibility: 'private' as const
-        },
-        preferences: {
-          theme: preferences.darkMode ? 'dark' as const : 'light' as const,
-          language: 'en',
-          timezone: 'UTC'
-        }
+      // Update preferences within the profile
+      const updatedPreferences = {
+        emailNotifications: preferences.emailNotifications,
+        smsNotifications: preferences.smsNotifications,
+        autoSave: preferences.autoSave,
+        darkMode: preferences.darkMode,
+        analytics: preferences.analytics,
+        marketing: preferences.marketing
       };
 
-      const settingsResponse = await apiClient.updateSettings(settingsData);
+      const preferencesResponse = await api.user.updateProfile({
+        preferences: updatedPreferences
+      });
 
-      if (profileResponse.success && settingsResponse.success) {
+      if ((profileResponse as any).success && (preferencesResponse as any).success) {
         toast({
           title: "Success",
           description: "Your settings have been saved successfully.",
@@ -202,6 +228,212 @@ const Settings = () => {
     }
   };
 
+  const handlePasswordChange = async () => {
+    // Reset previous errors
+    setPasswordError(null);
+
+    // Validate inputs
+    if (!passwordData.currentPassword) {
+      setPasswordError('Current password is required');
+      return;
+    }
+    if (!passwordData.newPassword) {
+      setPasswordError('New password is required');
+      return;
+    }
+    if (passwordData.newPassword !== passwordData.confirmNewPassword) {
+      setPasswordError('New passwords do not match');
+      return;
+    }
+    if (passwordData.newPassword.length < 8) {
+      setPasswordError('New password must be at least 8 characters long');
+      return;
+    }
+
+    try {
+      setIsChangingPassword(true);
+      
+      const response = await api.user.changePassword(
+        passwordData.currentPassword, 
+        passwordData.newPassword
+      );
+
+      // Type assertion to handle API response
+      const passwordChangeResponse = response as unknown as ApiResponse;
+
+      if (passwordChangeResponse.success) {
+        toast({
+          title: "Password Changed",
+          description: "Your password has been updated successfully.",
+          variant: "default"
+        });
+
+        // Clear password fields
+        setPasswordData({
+          currentPassword: '',
+          newPassword: '',
+          confirmNewPassword: ''
+        });
+
+        // Optional: Force logout to re-authenticate
+        await logout();
+      } else {
+        // Handle specific error messages from the backend
+        const errorMessage = passwordChangeResponse.error || 'Failed to change password';
+        
+        setPasswordError(errorMessage);
+        
+        toast({
+          title: "Password Change Failed",
+          description: errorMessage,
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      console.error('Password change error:', error);
+      const errorMessage = error instanceof Error 
+        ? error.message 
+        : 'An unexpected error occurred';
+      
+      setPasswordError(errorMessage);
+      
+      toast({
+        title: "Error",
+        description: errorMessage,
+        variant: "destructive"
+      });
+    } finally {
+      setIsChangingPassword(false);
+    }
+  };
+
+  const togglePasswordVisibility = (field: keyof typeof passwordVisibility) => {
+    setPasswordVisibility(prev => ({
+      ...prev,
+      [field]: !prev[field]
+    }));
+  };
+
+  // Render the password change section
+  const renderPasswordChangeSection = () => {
+    return (
+      <div className="space-y-6">
+        <div className="space-y-4">
+          {/* Current Password */}
+          <div className="space-y-2">
+            <Label htmlFor="currentPassword" className="text-gray-200 flex items-center space-x-2">
+              <Lock className="w-4 h-4" />
+              <span>Current Password</span>
+            </Label>
+            <div className="relative">
+              <Input
+                id="currentPassword"
+                type={passwordVisibility.currentPassword ? "text" : "password"}
+                value={passwordData.currentPassword}
+                onChange={(e) => setPasswordData(prev => ({
+                  ...prev, 
+                  currentPassword: e.target.value
+                }))}
+                className="bg-white/5 border-white/10 text-white placeholder:text-gray-400 focus:border-purple-500/50 focus:ring-purple-500/20 h-12 pr-10"
+                placeholder="Enter current password"
+              />
+              <button
+                type="button"
+                onClick={() => togglePasswordVisibility('currentPassword')}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white"
+              >
+                {passwordVisibility.currentPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+              </button>
+            </div>
+          </div>
+
+          {/* New Password */}
+          <div className="space-y-2">
+            <Label htmlFor="newPassword" className="text-gray-200 flex items-center space-x-2">
+              <Lock className="w-4 h-4" />
+              <span>New Password</span>
+            </Label>
+            <div className="relative">
+              <Input
+                id="newPassword"
+                type={passwordVisibility.newPassword ? "text" : "password"}
+                value={passwordData.newPassword}
+                onChange={(e) => setPasswordData(prev => ({
+                  ...prev, 
+                  newPassword: e.target.value
+                }))}
+                className="bg-white/5 border-white/10 text-white placeholder:text-gray-400 focus:border-purple-500/50 focus:ring-purple-500/20 h-12 pr-10"
+                placeholder="Enter new password"
+              />
+              <button
+                type="button"
+                onClick={() => togglePasswordVisibility('newPassword')}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white"
+              >
+                {passwordVisibility.newPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+              </button>
+            </div>
+          </div>
+
+          {/* Confirm New Password */}
+          <div className="space-y-2">
+            <Label htmlFor="confirmNewPassword" className="text-gray-200 flex items-center space-x-2">
+              <Lock className="w-4 h-4" />
+              <span>Confirm New Password</span>
+            </Label>
+            <div className="relative">
+              <Input
+                id="confirmNewPassword"
+                type={passwordVisibility.confirmNewPassword ? "text" : "password"}
+                value={passwordData.confirmNewPassword}
+                onChange={(e) => setPasswordData(prev => ({
+                  ...prev, 
+                  confirmNewPassword: e.target.value
+                }))}
+                className="bg-white/5 border-white/10 text-white placeholder:text-gray-400 focus:border-purple-500/50 focus:ring-purple-500/20 h-12 pr-10"
+                placeholder="Confirm new password"
+              />
+              <button
+                type="button"
+                onClick={() => togglePasswordVisibility('confirmNewPassword')}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white"
+              >
+                {passwordVisibility.confirmNewPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+              </button>
+            </div>
+          </div>
+
+          {/* Password Error Message */}
+          {passwordError && (
+            <div className="bg-red-500/20 border border-red-500/30 rounded-lg p-3 text-red-300 text-sm flex items-center space-x-2">
+              <AlertCircle className="w-5 h-5 text-red-400" />
+              <span>{passwordError}</span>
+            </div>
+          )}
+        </div>
+
+        {/* Change Password Button */}
+        <Button 
+          onClick={handlePasswordChange}
+          disabled={isChangingPassword}
+          className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 shadow-lg shadow-purple-500/25 h-12"
+        >
+          {isChangingPassword ? (
+            <>
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              Changing Password...
+            </>
+          ) : (
+            <>
+              <Lock className="w-4 h-4 mr-2" />
+              Change Password
+            </>
+          )}
+        </Button>
+      </div>
+    );
+  };
+
   const handleToggleSidebar = () => {
     setIsCollapsed(!isCollapsed);
   };
@@ -210,10 +442,11 @@ const Settings = () => {
     setIsMobileMenuOpen(!isMobileMenuOpen);
   };
 
+  // Modify the existing tabs to include the password change section
   const tabs = [
     { id: 'profile', label: 'Profile', icon: User },
     { id: 'notifications', label: 'Notifications', icon: Bell },
-    { id: 'privacy', label: 'Privacy', icon: Shield },
+    { id: 'security', label: 'Security', icon: Shield },
     { id: 'appearance', label: 'Appearance', icon: Palette }
   ];
 
@@ -465,8 +698,11 @@ const Settings = () => {
                           <div className="space-y-2">
                             <div className="flex items-center justify-between">
                               <Label htmlFor="fullName" className="text-gray-200">Full Name</Label>
-                              {user?.user_metadata?.avatar_url && (
-                                <Badge className="bg-blue-600/20 text-blue-300 border-blue-500/30 text-xs">
+                              {user?.avatar_url && (
+                                <Badge 
+                                  key="google-badge"
+                                  className="bg-blue-600/20 text-blue-300 border-blue-500/30 text-xs"
+                                >
                                   <svg className="w-3 h-3 mr-1" viewBox="0 0 24 24" fill="currentColor">
                                     <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
                                     <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
@@ -532,37 +768,7 @@ const Settings = () => {
                         </CardDescription>
                       </CardHeader>
                       <CardContent className="space-y-6">
-                        <div className="space-y-4">
-                          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 p-4 rounded-xl bg-white/5 border border-white/10">
-                            <div>
-                              <h4 className="text-white font-medium">Password</h4>
-                              <p className="text-gray-400 text-sm">Last changed 3 months ago</p>
-                            </div>
-                            <Button variant="outline" className="border-orange-500/30 text-orange-400 hover:bg-orange-600/10 hover:border-orange-500/50 h-10 w-full sm:w-auto">
-                              Change Password
-                            </Button>
-                          </div>
-
-                          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 p-4 rounded-xl bg-white/5 border border-white/10">
-                            <div>
-                              <h4 className="text-white font-medium">Two-Factor Authentication</h4>
-                              <p className="text-gray-400 text-sm">Add an extra layer of security</p>
-                            </div>
-                            <Button variant="outline" className="border-green-500/30 text-green-400 hover:bg-green-600/10 hover:border-green-500/50 h-10 w-full sm:w-auto">
-                              Enable 2FA
-                            </Button>
-                          </div>
-
-                          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 p-4 rounded-xl bg-white/5 border border-white/10">
-                            <div>
-                              <h4 className="text-white font-medium">Login Sessions</h4>
-                              <p className="text-gray-400 text-sm">Manage your active sessions</p>
-                            </div>
-                            <Button variant="outline" className="border-blue-500/30 text-blue-400 hover:bg-blue-600/10 hover:border-blue-500/50 h-10 w-full sm:w-auto">
-                              View Sessions
-                            </Button>
-                          </div>
-                        </div>
+                        {renderPasswordChangeSection()}
                       </CardContent>
                     </Card>
                   </div>
@@ -652,7 +858,7 @@ const Settings = () => {
                 </motion.div>
               )}
 
-              {(activeTab === 'privacy' || activeTab === 'appearance') && (
+              {(activeTab === 'security' || activeTab === 'appearance') && (
                 <motion.div
                   key={activeTab}
                   initial={{ opacity: 0, x: 20 }}
@@ -665,15 +871,15 @@ const Settings = () => {
                     <Card className="relative bg-black/20 backdrop-blur-xl border-white/10">
                       <CardHeader>
                         <CardTitle className="text-white flex items-center space-x-2">
-                          {activeTab === 'privacy' ? (
+                          {activeTab === 'security' ? (
                             <Shield className="w-5 h-5 text-green-400" />
                           ) : (
                             <Palette className="w-5 h-5 text-pink-400" />
                           )}
-                          <span>{activeTab === 'privacy' ? 'Privacy Settings' : 'Appearance'}</span>
+                          <span>{activeTab === 'security' ? 'Privacy Settings' : 'Appearance'}</span>
                         </CardTitle>
                         <CardDescription className="text-gray-400">
-                          {activeTab === 'privacy' 
+                          {activeTab === 'security' 
                             ? 'Control your privacy and data settings' 
                             : 'Customize the look and feel'}
                         </CardDescription>
@@ -684,7 +890,7 @@ const Settings = () => {
                             animate={{ scale: [1, 1.1, 1] }}
                             transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
                           >
-                            {activeTab === 'privacy' ? (
+                            {activeTab === 'security' ? (
                               <Shield className="w-16 h-16 text-gray-400 mx-auto mb-4" />
                             ) : (
                               <Palette className="w-16 h-16 text-gray-400 mx-auto mb-4" />

@@ -8,6 +8,8 @@ import { supabase } from '../server';
 import { DatabaseLogger, PartSearchData, SearchHistoryData } from '../services/database-logger';
 import { z } from 'zod';
 import { v4 as uuidv4 } from 'uuid';
+import { emailService, AnalysisEmailData } from '../services/email-service';
+import { creditService, CreditResult } from '../services/credit-service';
 
 const router = Router();
 
@@ -132,7 +134,29 @@ router.post('/image', authenticateToken, upload.single('image'), handleMulterErr
       userId
     });
 
-    // Step 1: Upload image to Supabase Storage for persistence
+    // Step 1: Check and deduct credits before processing
+    console.log('Checking user credits for analysis...');
+    const creditResult: CreditResult = await creditService.processAnalysisCredits(userId);
+    
+    if (!creditResult.success) {
+      console.log('Insufficient credits for user:', userId, creditResult);
+      return res.status(402).json({
+        success: false,
+        error: 'insufficient_credits',
+        message: 'You do not have enough credits to perform this analysis',
+        current_credits: creditResult.current_credits || 0,
+        required_credits: creditResult.required_credits || 1,
+        upgrade_required: true
+      });
+    }
+
+    console.log('Credits deducted successfully:', {
+      userId,
+      credits_before: creditResult.credits_before,
+      credits_after: creditResult.credits_after
+    });
+
+    // Step 2: Upload image to Supabase Storage for persistence
     const bucketName = process.env.SUPABASE_BUCKET_NAME || 'sparefinder';
     const fileName = `${userId}/${Date.now()}-${originalname}`;
     const { data: _storageData, error: storageError } = await supabase.storage
@@ -155,7 +179,7 @@ router.post('/image', authenticateToken, upload.single('image'), handleMulterErr
       .from(bucketName)
       .getPublicUrl(fileName);
 
-    // Step 2: Check AI service availability and send image for analysis
+    // Step 3: Check AI service availability and send image for analysis
     const aiServiceUrl = process.env.AI_SERVICE_URL;
     const aiServiceApiKey = process.env.AI_SERVICE_API_KEY;
     
@@ -301,6 +325,19 @@ router.post('/image', authenticateToken, upload.single('image'), handleMulterErr
       };
       await DatabaseLogger.logSearchHistory(searchHistoryData);
 
+      // Refund credits since analysis failed
+      console.log('Analysis failed, refunding credits to user:', userId);
+      try {
+        const refundResult = await creditService.refundAnalysisCredits(userId, `Analysis failed: ${errorMessage}`);
+        if (refundResult.success) {
+          console.log('Credits refunded successfully:', refundResult);
+        } else {
+          console.error('Failed to refund credits:', refundResult.error);
+        }
+      } catch (refundError) {
+        console.error('Error during credit refund:', refundError);
+      }
+
       // Return appropriate error based on type
       const statusCode = errorType === 'file_too_large' ? 413 : 
                         errorType === 'unauthorized' ? 401 : 
@@ -317,7 +354,8 @@ router.post('/image', authenticateToken, upload.single('image'), handleMulterErr
           ai_service_url: aiServiceUrl,
           error_type: errorType,
           timestamp: new Date().toISOString()
-        }
+        },
+        credits_refunded: true
       });
     }
 
@@ -333,7 +371,7 @@ router.post('/image', authenticateToken, upload.single('image'), handleMulterErr
     // Debug: Log the full AI response
     console.log('Full AI service response:', JSON.stringify(aiResponse.data, null, 2));
 
-    // Step 3: Save analysis result to database using enhanced logger
+    // Step 4: Save analysis result to database using enhanced logger
     // Handle both flat format (new) and predictions array (legacy)
     const isFlat = aiResponse.data.class_name || aiResponse.data.precise_part_name;
     const partName = isFlat ? 
@@ -399,7 +437,42 @@ router.post('/image', authenticateToken, upload.single('image'), handleMulterErr
     };
     await DatabaseLogger.logSearchHistory(searchHistoryData);
 
-    // Step 4: Return results to frontend
+    // Step 5: Send email notification for successful analysis
+    if (aiResponse.data.success && partName) {
+      try {
+        // Get user details for email
+        const { data: userProfile } = await supabase
+          .from('profiles')
+          .select('email, full_name')
+          .eq('id', userId)
+          .single();
+
+        if (userProfile?.email) {
+          const emailData: AnalysisEmailData = {
+            userEmail: userProfile.email,
+            userName: userProfile.full_name || 'User',
+            partName: partName,
+            confidence: confidence,
+            description: aiResponse.data.description || aiResponse.data.full_analysis || 'Part analysis completed successfully',
+            imageUrl: urlData.publicUrl,
+            analysisId: analysisData.id,
+            processingTime: processingTime
+          };
+
+          // Send email notification (non-blocking)
+          emailService.sendAnalysisCompleteEmail(emailData).catch(error => {
+            console.error('Failed to send analysis complete email:', error);
+          });
+
+          console.log('✅ Email notification triggered for successful analysis:', partName);
+        }
+      } catch (emailError) {
+        console.error('Error preparing email notification:', emailError);
+        // Don't fail the request if email fails
+      }
+    }
+
+    // Step 6: Return results to frontend
     // Return flat format directly if available, otherwise legacy format
     if (isFlat) {
       return res.json({
@@ -469,9 +542,24 @@ router.post('/image', authenticateToken, upload.single('image'), handleMulterErr
       });
     }
 
+    // Refund credits since upload/analysis failed
+    try {
+      const userId = req.user?.userId;
+      if (userId) {
+        console.log('General error occurred, refunding credits to user:', userId);
+        const refundResult = await creditService.refundAnalysisCredits(userId, `Upload failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        if (refundResult.success) {
+          console.log('Credits refunded successfully after general error:', refundResult);
+        }
+      }
+    } catch (refundError) {
+      console.error('Error during credit refund in catch block:', refundError);
+    }
+
     return res.status(500).json({
       error: 'Upload and analysis failed',
-      message: error instanceof Error ? error.message : 'Unknown error'
+      message: error instanceof Error ? error.message : 'Unknown error',
+      credits_refunded: true
     });
   }
 });
@@ -798,6 +886,38 @@ router.post('/save-results', authenticateToken, async (req: AuthRequest, res: Re
     };
 
     await DatabaseLogger.logSearchHistory(searchHistoryData);
+
+    // Send email notification for manually saved analysis results
+    try {
+      const { data: userProfile } = await supabase
+        .from('profiles')
+        .select('email, full_name')
+        .eq('id', userId)
+        .single();
+
+      if (userProfile?.email) {
+        const emailData: AnalysisEmailData = {
+          userEmail: userProfile.email,
+          userName: userProfile.full_name || 'User',
+          partName: primaryPrediction.class_name,
+          confidence: primaryPrediction.confidence,
+          description: fullAnalysis || primaryPrediction.description || 'Part analysis saved to your history',
+          imageUrl: validatedData.image_url || undefined,
+          analysisId: analysisId,
+          processingTime: validatedData.processing_time
+        };
+
+        // Send email notification (non-blocking)
+        emailService.sendAnalysisCompleteEmail(emailData).catch(error => {
+          console.error('Failed to send save results email:', error);
+        });
+
+        console.log('✅ Email notification triggered for saved analysis:', primaryPrediction.class_name);
+      }
+    } catch (emailError) {
+      console.error('Error preparing save results email notification:', emailError);
+      // Don't fail the request if email fails
+    }
 
     console.log('✅ Analysis results saved successfully:', analysisId);
 

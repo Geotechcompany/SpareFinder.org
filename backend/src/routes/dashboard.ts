@@ -316,11 +316,7 @@ router.get('/stats', async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.user?.userId;
 
-    console.log('📊 Dashboard stats - User ID:', userId);
-    console.log('📊 Dashboard stats - Full user object:', req.user);
-
     if (!userId) {
-      console.log('❌ Dashboard stats - No user ID found');
       return res.status(401).json({ 
         success: false, 
         error: 'Unauthorized' 
@@ -345,6 +341,8 @@ router.get('/stats', async (req: AuthRequest, res: Response) => {
       .from('part_searches')
       .select('confidence_score, processing_time, processing_time_ms')
       .eq('user_id', userId);
+
+
 
     if (uploadsError || successfulError || statsError) {
       console.error('Stats Fetch Errors:', { uploadsError, successfulError, statsError });
@@ -373,14 +371,7 @@ router.get('/stats', async (req: AuthRequest, res: Response) => {
         }, 0) / statsData.length 
       : 0;
 
-    console.log('📊 Dashboard stats calculated:', {
-      totalUploads: totalUploads || 0,
-      successfulUploads: successfulUploads || 0,
-      avgConfidence: avgConfidence,
-      avgProcessTime: avgProcessTime,
-      rawData: statsData?.length || 0,
-      sampleData: statsData?.slice(0, 3) // Log first 3 records for debugging
-    });
+
 
     return res.json({
       success: true,
