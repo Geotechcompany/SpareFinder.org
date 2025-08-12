@@ -164,11 +164,12 @@ router.post('/keywords', authenticateToken, async (req: AuthRequest, res: Respon
 
     // Optional health check could be added here similar to upload route
     const start = Date.now();
+    const keywordTimeoutMs = Number(process.env.AI_KEYWORDS_TIMEOUT_MS || process.env.AI_REQUEST_TIMEOUT_MS || 120000);
     const response = await axios.post(
       `${aiServiceUrl}/search/keywords`,
       { keywords: normalized },
       {
-        timeout: 10000,
+        timeout: isNaN(keywordTimeoutMs) ? 120000 : keywordTimeoutMs,
         headers: {
           'Content-Type': 'application/json',
           ...(aiServiceApiKey ? { 'x-api-key': aiServiceApiKey } : {})

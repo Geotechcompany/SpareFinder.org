@@ -54,22 +54,27 @@ class EmailService {
         .eq('setting_key', 'email_enabled')
         .single();
 
-      const emailEnabled = notificationSettings?.setting_value === 'true';
+      const emailEnabled = notificationSettings?.setting_value === 'true' || process.env.EMAIL_ENABLED === 'true';
       if (!emailEnabled) {
         console.log('Email notifications are disabled in system settings');
         return;
       }
 
+      // Prefer environment variables for Gmail SMTP
+      const envHost = process.env.SMTP_HOST || 'smtp.gmail.com';
+      const envPort = parseInt(process.env.SMTP_PORT || '587');
+      const envSecure = process.env.SMTP_SECURE === 'true' || envPort === 465;
+
       // Create transporter with SMTP settings
       const smtpConfig = {
-        host: settings.smtp_host || process.env.SMTP_HOST || 'smtp.gmail.com',
-        port: parseInt(settings.smtp_port) || parseInt(process.env.SMTP_PORT || '587'),
-        secure: settings.smtp_secure === 'true' || process.env.SMTP_SECURE === 'true', // true for 465, false for other ports
+        host: settings.smtp_host || envHost,
+        port: parseInt(settings.smtp_port) || envPort,
+        secure: (settings.smtp_secure === 'true') || envSecure, // true for 465 (SSL)
         auth: {
           user: settings.smtp_user || process.env.SMTP_USER,
-          pass: process.env.SMTP_PASS || process.env.SMTP_PASSWORD // Keep password in env vars for security
+          pass: process.env.SMTP_PASS || process.env.SMTP_PASSWORD
         }
-      };
+      } as const;
 
       // Validate required settings
       if (!smtpConfig.auth.user || !smtpConfig.auth.pass) {
@@ -81,49 +86,41 @@ class EmailService {
 
       // Verify connection
       await this.transporter.verify();
-      this.isConfigured = true;
-      console.log('Email service initialized successfully');
 
+      this.isConfigured = true;
+      console.log('✅ Email transporter configured:', {
+        host: smtpConfig.host,
+        port: smtpConfig.port,
+        secure: smtpConfig.secure
+      });
     } catch (error) {
-      console.error('Failed to initialize email service:', error);
+      console.error('Email transporter initialization failed:', error);
       this.isConfigured = false;
     }
   }
 
   async sendEmail(options: EmailOptions): Promise<boolean> {
-    if (!this.isConfigured || !this.transporter) {
-      console.warn('Email service not configured, skipping email send');
-      return false;
-    }
-
     try {
-      // Get sender configuration from system settings
-      const { data: smtpSettings } = await supabase
-        .from('system_settings')
-        .select('setting_key, setting_value')
-        .eq('category', 'email')
-        .in('setting_key', ['smtp_user', 'smtp_from_name']);
+      if (!this.transporter || !this.isConfigured) {
+        await this.initializeTransporter();
+      }
 
-      const settings: Record<string, string> = {};
-      smtpSettings?.forEach(setting => {
-        settings[setting.setting_key] = setting.setting_value;
-      });
-
-      const fromName = settings.smtp_from_name || 'SpareFinder AI';
-      const fromEmail = settings.smtp_user || process.env.SMTP_USER;
+      if (!this.transporter || !this.isConfigured) {
+        console.log('Email service not configured, skipping email send');
+        return false;
+      }
 
       const mailOptions = {
-        from: `"${fromName}" <${fromEmail}>`,
+        from: process.env.EMAIL_FROM || process.env.SMTP_USER,
         to: options.to,
         subject: options.subject,
         html: options.html,
-        text: options.text || options.html.replace(/<[^>]*>/g, '') // Strip HTML for text version
+        text: options.text
       };
 
-      const result = await this.transporter.sendMail(mailOptions);
-      console.log('Email sent successfully:', result.messageId);
+      await this.transporter.sendMail(mailOptions);
+      console.log(`📧 Email sent to ${options.to}: ${options.subject}`);
       return true;
-
     } catch (error) {
       console.error('Failed to send email:', error);
       return false;
