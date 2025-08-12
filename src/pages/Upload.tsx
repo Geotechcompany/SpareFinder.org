@@ -20,7 +20,8 @@ import {
   Target,
   Plus,
   Info,
-  AlertCircle
+  AlertCircle,
+  Search
 } from 'lucide-react';
 import { 
   Card, 
@@ -56,6 +57,8 @@ import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import { parseAIResponse } from '@/lib/markdown-parser';
 import CreditsDisplay from '@/components/CreditsDisplay';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { dashboardApi } from '@/lib/api';
 
 
 
@@ -759,6 +762,8 @@ const Upload = () => {
   // New state for keywords
   const [keywords, setKeywords] = useState<string>('');
   const [savedKeywords, setSavedKeywords] = useState<string[]>([]);
+  const [confirmKeywordSearchOpen, setConfirmKeywordSearchOpen] = useState(false);
+  const [isKeywordSearching, setIsKeywordSearching] = useState(false);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   const keywordsInputRef = useRef<HTMLInputElement>(null);
@@ -844,6 +849,88 @@ const Upload = () => {
   // Remove a specific keyword
   const handleRemoveKeyword = (keywordToRemove: string) => {
     setSavedKeywords(prev => prev.filter(keyword => keyword !== keywordToRemove));
+  };
+
+  // Keyword-only search flow
+  const openKeywordSearchModal = () => {
+    // Ensure at least one keyword exists (consider pending input)
+    if (savedKeywords.length === 0 && !keywords.trim()) {
+      toast({ title: 'Add keywords', description: 'Please enter at least one keyword.' , variant: 'destructive'});
+      return;
+    }
+    // If the input has a value not yet saved, include it implicitly
+    if (keywords.trim() && !savedKeywords.includes(keywords.trim())) {
+      setSavedKeywords(prev => [...prev, keywords.trim()]);
+      setKeywords('');
+    }
+    setConfirmKeywordSearchOpen(true);
+  };
+
+  const performKeywordSearch = async () => {
+    try {
+      setIsKeywordSearching(true);
+      setAnalysisResults(null);
+      setSelectedPrediction(null);
+      setOriginalAiResponse(null);
+
+      const response = await dashboardApi.searchByKeywords(savedKeywords);
+      if (!response.success) {
+        throw new Error(response.message || 'Keyword search failed');
+      }
+
+      const results = (response as any).results || [];
+
+      // Map keyword results to AnalysisResponse shape for display reuse
+      const predictions = results.map((r: any) => ({
+        class_name: r.name || 'Automotive Component',
+        confidence: 0.75,
+        description: `${r.category || 'Category'} by ${r.manufacturer || 'Unknown'}\nPrice: ${typeof r.price === 'number' ? `$${r.price}` : r.price || 'N/A'}\nAvailability: ${r.availability || 'Unknown'}\nPart No: ${r.part_number || 'N/A'}`,
+        category: r.category || 'Unspecified',
+        manufacturer: r.manufacturer || 'Unknown',
+        estimated_price: typeof r.price === 'number' ? `$${r.price}` : r.price || 'Price not available',
+        part_number: r.part_number || null,
+        compatibility: []
+      }));
+
+      const analysis: AnalysisResponse = {
+        success: true,
+        predictions: predictions.length ? predictions : [{
+          class_name: 'No Results',
+          confidence: 0,
+          description: 'No parts matched your keywords. Try different terms.',
+          category: 'N/A',
+          manufacturer: 'N/A',
+          estimated_price: 'N/A',
+          part_number: null,
+          compatibility: []
+        }],
+        similar_images: [],
+        model_version: 'Keyword Search',
+        processing_time: 0,
+        image_metadata: {
+          content_type: 'text/keywords',
+          size_bytes: 0
+        },
+        additional_details: {
+          full_analysis: predictions.length 
+            ? `Found ${predictions.length} results for keywords: ${savedKeywords.join(', ')}`
+            : `No results for keywords: ${savedKeywords.join(', ')}`,
+          technical_specifications: '',
+          market_information: '',
+          confidence_reasoning: ''
+        }
+      };
+
+      setAnalysisResults(analysis);
+      if (analysis.predictions.length > 0) setSelectedPrediction(analysis.predictions[0]);
+      toast({ title: 'Keyword Search Complete', description: `Found ${predictions.length} result(s).` });
+    } catch (err: any) {
+      console.error('Keyword search error:', err);
+      toast({ title: 'Search Failed', description: err.message || 'Unable to search by keywords', variant: 'destructive' });
+    } finally {
+      setIsKeywordSearching(false);
+      setConfirmKeywordSearchOpen(false);
+    }
   };
 
   // Update analyzeImage method to handle async processing
@@ -2373,8 +2460,9 @@ const Upload = () => {
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.4 }}
                 >
-                  Upload an image of your automotive part for instant AI identification
+                  Upload an image of your automotive part for instant AI identification or search using keywords only
                 </motion.p>
+                {/* Keyword controls are located below the upload section */}
               </div>
             </div>
           </div>
@@ -2559,6 +2647,15 @@ const Upload = () => {
                       >
                         <Plus className="w-4 h-4 mr-2" /> Add
                       </Button>
+                      {savedKeywords.length > 0 && (
+                        <Button 
+                          onClick={openKeywordSearchModal}
+                          disabled={isKeywordSearching}
+                          className="px-4 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700"
+                        >
+                          <Search className="w-4 h-4 mr-2" /> Search by Keywords
+                        </Button>
+                      )}
                     </div>
                     
                     {/* Saved Keywords Display */}
@@ -2938,6 +3035,29 @@ const Upload = () => {
           </div>
         </motion.div>
       </motion.div>
+
+      {/* Confirm keyword-only search modal */}
+      <Dialog open={confirmKeywordSearchOpen} onOpenChange={setConfirmKeywordSearchOpen}>
+        <DialogContent className="bg-black/90 border-white/10">
+          <DialogHeader>
+            <DialogTitle className="text-white">Search with keywords only?</DialogTitle>
+            <DialogDescription className="text-gray-300">
+              {uploadedFile
+                ? 'An image is currently selected. Proceed to search using only your keywords? The image will be ignored.'
+                : 'We will search our catalog using your keywords only. Results may be less precise than image analysis.'}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="text-gray-400 text-sm">
+            Keywords: {savedKeywords.join(', ')}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConfirmKeywordSearchOpen(false)} className="border-white/10">Cancel</Button>
+            <Button onClick={performKeywordSearch} disabled={isKeywordSearching} className="bg-gradient-to-r from-emerald-600 to-green-600">
+              {isKeywordSearching ? (<><Loader2 className="w-4 h-4 mr-2 animate-spin" />Searching...</>) : 'Search'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
