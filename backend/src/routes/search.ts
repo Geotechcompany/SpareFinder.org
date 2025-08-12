@@ -4,6 +4,7 @@ import { authenticateToken } from '../middleware/auth';
 import { AuthRequest } from '../types/auth';
 import { supabase } from '../server';
 import axios from 'axios';
+import { creditService } from '../services/credit-service';
 
 const router = Router();
 
@@ -149,6 +150,20 @@ router.post('/keywords', authenticateToken, async (req: AuthRequest, res: Respon
         success: false,
         error: 'invalid_request',
         message: 'Please provide one or more keywords'
+      });
+    }
+
+    // Credits: charge 1 credit for keyword search
+    const userId = req.user!.userId;
+    const creditResult = await creditService.processKeywordSearchCredits(userId);
+    if (!creditResult.success) {
+      return res.status(402).json({
+        success: false,
+        error: 'insufficient_credits',
+        message: 'You do not have enough credits to perform this keyword search',
+        current_credits: creditResult.current_credits || 0,
+        required_credits: creditResult.required_credits || 1,
+        upgrade_required: true
       });
     }
 

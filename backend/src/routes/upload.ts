@@ -874,10 +874,12 @@ router.post('/save-results', authenticateToken, async (req: AuthRequest, res: Re
     }
 
     // Also log this as a search history entry
+    const searchType: SearchHistoryData['search_type'] = 
+      validatedData.image_metadata?.content_type === 'text/keywords' ? 'text_search' : 'image_upload';
     const searchHistoryData: SearchHistoryData = {
       user_id: userId,
       part_search_id: analysisId,
-      search_type: 'image_upload',
+      search_type: searchType,
       search_query: `Manual save: ${primaryPrediction.class_name}`,
       results_count: validatedData.predictions.length,
       session_id: req.headers['x-session-id'] as string,
