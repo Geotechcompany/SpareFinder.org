@@ -43,6 +43,7 @@ const Dashboard = () => {
   const isInitializedRef = useRef(false);
   const isFetchingRef = useRef(false);
   const abortControllerRef = useRef<AbortController | null>(null);
+  const hasLoadedOnceRef = useRef(false);
   
   // State for dashboard data
   const [stats, setStats] = useState({
@@ -103,7 +104,10 @@ const Dashboard = () => {
 
     try {
       isFetchingRef.current = true;
-      setIsDataLoading(true);
+      // Only show the global loading state on the very first load to avoid blinking
+      if (!hasLoadedOnceRef.current) {
+        setIsDataLoading(true);
+      }
       setError(null);
 
       // Fetch all data in parallel with proper error handling
@@ -211,7 +215,9 @@ const Dashboard = () => {
         const data = metricsResponse.value.data;
         
         // If stats endpoint failed but performance metrics has the data, use it as fallback
-        if ((statsResponse.status === 'rejected' || !statsResponse.value?.success) && data.totalSearches) {
+        if ((
+          statsResponse.status === 'rejected' || !(statsResponse as any).value?.success
+        ) && data.totalSearches) {
           const totalUploads = data.totalSearches || 0;
           const successfulUploads = Math.round((data.matchRate || 0) * totalUploads / 100) || 0;
           
@@ -276,7 +282,7 @@ const Dashboard = () => {
       // Check if any request failed with auth error
       const authErrors = [statsResponse, uploadsResponse, activitiesResponse, metricsResponse].filter(
         response => response.status === 'rejected' && 
-        response.reason?.response?.status === 401
+        (response as any).reason?.response?.status === 401
       );
 
       if (authErrors.length > 0) {
@@ -289,6 +295,9 @@ const Dashboard = () => {
         await logout();
         return;
       }
+
+      // Mark that we've completed at least one successful load
+      hasLoadedOnceRef.current = true;
 
     } catch (error: any) {
       if (error.message === 'Request aborted') {
@@ -367,23 +376,7 @@ const Dashboard = () => {
     }
   }, [isAuthenticated, user?.id, authLoading, hasValidToken, fetchDashboardData]);
 
-  // Auto-fetch when loading completes with valid auth state
-  useEffect(() => {
-    if (!isDataLoading && !authLoading && isAuthenticated && user?.id && 
-        stats.totalUploads === 0 && stats.successfulUploads === 0 && 
-        stats.avgConfidence === 0 && !error) {
-      
-      // Reset initialization flag to allow fetch
-      isInitializedRef.current = false;
-      
-      // Trigger fetch after a short delay
-      setTimeout(() => {
-        if (hasValidToken() && !isFetchingRef.current) {
-          fetchDashboardData();
-        }
-      }, 300);
-    }
-  }, [isDataLoading, authLoading, isAuthenticated, user?.id, stats, error, hasValidToken, fetchDashboardData]);
+  // Removed auto-refetch loop on empty stats to prevent infinite polling and UI blinking
 
   // Cleanup on unmount
   useEffect(() => {
@@ -420,18 +413,7 @@ const Dashboard = () => {
     });
   };
 
-  // Auto-refresh after 2 seconds if data is still empty
-  useEffect(() => {
-    if (!authLoading && isAuthenticated && user?.id && !isDataLoading) {
-      const timer = setTimeout(() => {
-        if (stats.totalUploads === 0 && stats.successfulUploads === 0 && !isFetchingRef.current) {
-          handleRefreshData();
-        }
-      }, 2000);
-
-      return () => clearTimeout(timer);
-    }
-  }, [authLoading, isAuthenticated, user?.id, isDataLoading, stats.totalUploads, stats.successfulUploads]);
+  // Removed periodic auto-refresh to avoid repeated background requests when stats are legitimately empty
 
   if (isDataLoading) {
     return (

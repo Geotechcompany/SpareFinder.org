@@ -24,6 +24,7 @@ export const CreditsDisplay: React.FC<CreditsDisplayProps> = ({
   const [credits, setCredits] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const hasFetchedOnceRef = React.useRef(false);
 
   const fetchCredits = async () => {
     try {
@@ -47,6 +48,11 @@ export const CreditsDisplay: React.FC<CreditsDisplayProps> = ({
   };
 
   useEffect(() => {
+    if (hasFetchedOnceRef.current) {
+      // Avoid duplicate fetch in StrictMode double-invoke
+      return;
+    }
+    hasFetchedOnceRef.current = true;
     fetchCredits();
   }, []);
 
