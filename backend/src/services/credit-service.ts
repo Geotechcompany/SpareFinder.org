@@ -200,6 +200,23 @@ class CreditService {
   }
 
   /**
+   * Check and deduct credits for keyword-only searches
+   */
+  async processKeywordSearchCredits(userId: string): Promise<CreditResult> {
+    const hasCredits = await this.hasEnoughCredits(userId, 1);
+    if (!hasCredits) {
+      const currentCredits = await this.getUserCredits(userId);
+      return {
+        success: false,
+        error: 'insufficient_credits',
+        current_credits: currentCredits,
+        required_credits: 1
+      };
+    }
+    return this.deductCredits(userId, 1, 'Keyword search');
+  }
+
+  /**
    * Refund credits if analysis fails
    */
   async refundAnalysisCredits(userId: string, reason: string = 'Analysis failed - credit refund'): Promise<CreditResult> {
