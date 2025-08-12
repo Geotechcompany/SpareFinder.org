@@ -28,6 +28,9 @@ from dotenv import load_dotenv
 from .services.ai_service import analyze_part_image
 from .core.config import settings
 
+class KeywordSearchRequest(BaseModel):
+    keywords: Optional[List[str]] = None
+
 # Enhanced logging configuration
 def configure_logging():
     """
@@ -229,6 +232,63 @@ async def shutdown_event():
     finally:
         # Ensure logging is flushed
         logging.shutdown()
+
+@app.post("/search/keywords")
+async def search_by_keywords(payload: KeywordSearchRequest):
+    try:
+        if not payload.keywords or (isinstance(payload.keywords, list) and len(payload.keywords) == 0):
+            return JSONResponse(
+                status_code=400,
+                content={
+                    "success": False,
+                    "error": "Invalid request",
+                    "message": "Please provide one or more keywords"
+                }
+            )
+
+        # Normalize keywords
+        normalized = [str(k).strip().lower() for k in (payload.keywords or []) if str(k).strip()]
+
+        # Mock searchable catalog (can be replaced with real search integration)
+        catalog = [
+            {"part_number": "BP-001-2024", "name": "Brake Pad Set", "category": "Braking System", "manufacturer": "AutoParts Inc", "price": 45.99, "availability": "In Stock"},
+            {"part_number": "AF-002-2024", "name": "Air Filter", "category": "Engine", "manufacturer": "FilterTech", "price": 19.99, "availability": "Limited Stock"},
+            {"part_number": "OF-010-2023", "name": "Oil Filter", "category": "Engine", "manufacturer": "LubePro", "price": 12.49, "availability": "In Stock"},
+            {"part_number": "SP-050-2022", "name": "Spark Plug", "category": "Ignition", "manufacturer": "IgniteX", "price": 8.99, "availability": "In Stock"},
+            {"part_number": "RT-700-2021", "name": "Radiator", "category": "Cooling System", "manufacturer": "CoolFlow", "price": 129.99, "availability": "Backordered"}
+        ]
+
+        # Simple keyword match across key fields
+        def matches(item: Dict[str, Any]) -> bool:
+            text = " ".join([
+                str(item.get("name", "")),
+                str(item.get("category", "")),
+                str(item.get("manufacturer", "")),
+                str(item.get("part_number", "")),
+            ]).lower()
+            return any(k in text for k in normalized)
+
+        results = [item for item in catalog if matches(item)]
+
+        return JSONResponse(
+            status_code=200,
+            content={
+                "success": True,
+                "results": results,
+                "total": len(results),
+                "query": {"keywords": normalized}
+            }
+        )
+    except Exception as e:
+        logger.error(f"Keyword search error: {e}")
+        return JSONResponse(
+            status_code=500,
+            content={
+                "success": False,
+                "error": "Search failed",
+                "message": str(e)
+            }
+        )
 
 @app.post("/analyze-part/")
 async def analyze_part(

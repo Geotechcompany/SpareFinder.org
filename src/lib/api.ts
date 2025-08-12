@@ -297,6 +297,13 @@ export const dashboardApi = {
       throw error;
     }
   },
+  
+  // Keyword-only search (backend mock; switch to real integration when available)
+  searchByKeywords: async (keywords: string[] | string): Promise<ApiResponse> => {
+    const payload = { keywords };
+    const response = await apiClient.post('/search/keywords', payload);
+    return response.data;
+  },
 
   getRecentUploads: async (limit: number = 5): Promise<ApiResponse> => {
     console.log('📋 Fetching recent uploads...');

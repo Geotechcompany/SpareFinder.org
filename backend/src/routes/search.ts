@@ -3,6 +3,7 @@ import multer from 'multer';
 import { authenticateToken } from '../middleware/auth';
 import { AuthRequest } from '../types/auth';
 import { supabase } from '../server';
+import axios from 'axios';
 
 const router = Router();
 
@@ -131,6 +132,78 @@ router.get('/parts/search', authenticateToken, async (req: AuthRequest, res: Res
     return res.status(500).json({
       error: 'Search failed',
       message: 'An error occurred while searching for parts'
+    });
+  }
+});
+
+// Keyword-only part search endpoint (proxied to AI service)
+router.post('/keywords', authenticateToken, async (req: AuthRequest, res: Response) => {
+  try {
+    const { keywords } = req.body as { keywords?: string | string[] };
+
+    // Validate input
+    const provided = Array.isArray(keywords) ? keywords : (typeof keywords === 'string' ? [keywords] : []);
+    const normalized = provided.map(k => String(k).trim()).filter(Boolean);
+    if (normalized.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'invalid_request',
+        message: 'Please provide one or more keywords'
+      });
+    }
+
+    const aiServiceUrl = process.env.AI_SERVICE_URL;
+    const aiServiceApiKey = process.env.AI_SERVICE_API_KEY;
+    if (!aiServiceUrl) {
+      return res.status(500).json({
+        success: false,
+        error: 'ai_service_not_configured',
+        message: 'AI service URL is not configured'
+      });
+    }
+
+    // Optional health check could be added here similar to upload route
+    const start = Date.now();
+    const response = await axios.post(
+      `${aiServiceUrl}/search/keywords`,
+      { keywords: normalized },
+      {
+        timeout: 10000,
+        headers: {
+          'Content-Type': 'application/json',
+          ...(aiServiceApiKey ? { 'x-api-key': aiServiceApiKey } : {})
+        },
+        validateStatus: status => status < 500
+      }
+    );
+
+    const duration = Date.now() - start;
+    if (response.status !== 200 || !response.data) {
+      return res.status(502).json({
+        success: false,
+        error: 'bad_gateway',
+        message: `AI service returned status ${response.status}`,
+        elapsed_ms: duration
+      });
+    }
+
+    // Pass-through AI service results
+    return res.status(200).json({ ...response.data, elapsed_ms: duration });
+  } catch (error: any) {
+    if (axios.isAxiosError(error)) {
+      return res.status(502).json({
+        success: false,
+        error: 'ai_service_error',
+        message: error.message,
+        status: error.response?.status,
+        code: error.code
+      });
+    }
+    console.error('Keyword search error:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'search_failed',
+      message: 'An error occurred while searching by keywords'
     });
   }
 });
