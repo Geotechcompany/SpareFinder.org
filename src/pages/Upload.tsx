@@ -2022,29 +2022,30 @@ const Upload = () => {
         analysis: fullAnalysis, // Store the full AI analysis
         confidence: analysisResults.flatData?.confidence_score || 
                    analysisResults.predictions?.[0]?.confidence || 0,
-        metadata: {
-          ai_service_id: originalAiResponse?.id,
-          upload_timestamp: new Date().toISOString(),
-          frontend_version: '2.0.0',
-          model_version: analysisResults.model_version,
-          processing_time: analysisResults.processing_time,
-          // Include flat data structure for comprehensive storage
-          flat_data: analysisResults.flatData ? {
-            class_name: analysisResults.flatData.class_name,
-            category: analysisResults.flatData.category,
-            precise_part_name: analysisResults.flatData.precise_part_name,
-            material_composition: analysisResults.flatData.material_composition,
-            manufacturer: analysisResults.flatData.manufacturer,
-            confidence_score: analysisResults.flatData.confidence_score,
-            estimated_price: analysisResults.flatData.estimated_price,
-            technical_data_sheet: analysisResults.flatData.technical_data_sheet,
-            compatible_vehicles: analysisResults.flatData.compatible_vehicles,
-            engine_types: analysisResults.flatData.engine_types,
-            suppliers: analysisResults.flatData.suppliers,
-            buy_links: analysisResults.flatData.buy_links,
-            fitment_tips: analysisResults.flatData.fitment_tips,
-            additional_instructions: analysisResults.flatData.additional_instructions
-          } : null,
+                  metadata: {
+           ai_service_id: originalAiResponse?.id,
+           upload_timestamp: new Date().toISOString(),
+           frontend_version: '2.0.0',
+           model_version: analysisResults.model_version,
+           processing_time: analysisResults.processing_time,
+           // Include flat data structure for comprehensive storage
+           flat_data: analysisResults.flatData ? {
+             class_name: analysisResults.flatData.class_name,
+             category: analysisResults.flatData.category,
+             precise_part_name: analysisResults.flatData.precise_part_name,
+             material_composition: analysisResults.flatData.material_composition,
+             manufacturer: analysisResults.flatData.manufacturer,
+             confidence_score: analysisResults.flatData.confidence_score,
+             estimated_price: analysisResults.flatData.estimated_price,
+             technical_data_sheet: analysisResults.flatData.technical_data_sheet,
+             compatible_vehicles: analysisResults.flatData.compatible_vehicles,
+             engine_types: analysisResults.flatData.engine_types,
+             suppliers: analysisResults.flatData.suppliers,
+             buy_links: analysisResults.flatData.buy_links,
+             fitment_tips: analysisResults.flatData.fitment_tips,
+             additional_instructions: analysisResults.flatData.additional_instructions
+           } : undefined, 
+           
           // Store enhanced analysis sections
           enhanced_sections: {
             part_identification: {
