@@ -22,6 +22,7 @@ from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
 from starlette.status import HTTP_422_UNPROCESSABLE_ENTITY
 from pydantic import BaseModel
+from openai import OpenAI
 
 from dotenv import load_dotenv
 
@@ -152,6 +153,7 @@ class SupplierInfo(BaseModel):
 
 # Flat Analysis Response Model
 class AnalysisResponse(BaseModel):
+    model_config = {"protected_namespaces": ()}
     success: bool
     status: str
     filename: Optional[str] = None
@@ -249,26 +251,80 @@ async def search_by_keywords(payload: KeywordSearchRequest):
         # Normalize keywords
         normalized = [str(k).strip().lower() for k in (payload.keywords or []) if str(k).strip()]
 
-        # Mock searchable catalog (can be replaced with real search integration)
-        catalog = [
-            {"part_number": "BP-001-2024", "name": "Brake Pad Set", "category": "Braking System", "manufacturer": "AutoParts Inc", "price": 45.99, "availability": "In Stock"},
-            {"part_number": "AF-002-2024", "name": "Air Filter", "category": "Engine", "manufacturer": "FilterTech", "price": 19.99, "availability": "Limited Stock"},
-            {"part_number": "OF-010-2023", "name": "Oil Filter", "category": "Engine", "manufacturer": "LubePro", "price": 12.49, "availability": "In Stock"},
-            {"part_number": "SP-050-2022", "name": "Spark Plug", "category": "Ignition", "manufacturer": "IgniteX", "price": 8.99, "availability": "In Stock"},
-            {"part_number": "RT-700-2021", "name": "Radiator", "category": "Cooling System", "manufacturer": "CoolFlow", "price": 129.99, "availability": "Backordered"}
-        ]
+        # Ensure OpenAI API key is configured
+        api_key = os.getenv('OPENAI_API_KEY')
+        if not api_key:
+            logger.error("OPENAI_API_KEY not configured")
+            return JSONResponse(
+                status_code=500,
+                content={
+                    "success": False,
+                    "error": "ai_not_configured",
+                    "message": "OPENAI_API_KEY is not set on the AI service"
+                }
+            )
 
-        # Simple keyword match across key fields
-        def matches(item: Dict[str, Any]) -> bool:
-            text = " ".join([
-                str(item.get("name", "")),
-                str(item.get("category", "")),
-                str(item.get("manufacturer", "")),
-                str(item.get("part_number", "")),
-            ]).lower()
-            return any(k in text for k in normalized)
+        # Build prompt to request structured JSON results
+        system_prompt = (
+            "You are an expert automotive parts search assistant. Given a list of keywords, "
+            "return a JSON object containing: (1) an array named 'results' of relevant parts where each result has: "
+            "name, category, manufacturer (optional), part_number (optional), price (string, optional), availability (optional); "
+            "and (2) a 'markdown' string. The 'markdown' must be formatted as follows: \n\n"
+            "- For the FIRST (most relevant) part: expand with the following 8 sections using markdown headings and lists: \n"
+            "  1. 🛞 Part Identification\n  2. 📘 Technical Description\n  3. 📊 Technical Data Sheet (as a markdown table)\n  4. 🚗 Compatible Vehicles\n  5. 💰 Pricing & Availability\n  6. 🌍 Where to Buy\n  7. 📈 Confidence Score\n  8. 📤 Additional Instructions\n"
+            "- For REMAINING parts: provide a compact bullet list with: Name — Category — Manufacturer (if known).\n"
+            "Do NOT include prose outside of the JSON. Respond ONLY with valid JSON containing 'results' and 'markdown'."
+        )
 
-        results = [item for item in catalog if matches(item)]
+        user_prompt = (
+            "Keywords: " + ", ".join(normalized) + "\n\n" +
+            "Return strictly this JSON schema: {\n  \"results\": [\n    { \"name\": string, \"category\": string, \"manufacturer\": string?, \"part_number\": string?, \"price\": string?, \"availability\": string? }\n  ],\n  \"markdown\": string\n}"
+        )
+
+        client = OpenAI(api_key=api_key)
+
+        def call_openai() -> Dict[str, Any]:
+            resp = client.chat.completions.create(
+                model="gpt-4o",
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt}
+                ],
+                temperature=0.2,
+                max_tokens=600
+            )
+            content = resp.choices[0].message.content or "{}"
+            # Attempt to parse JSON; fallback: extract JSON block
+            try:
+                return json.loads(content)
+            except Exception:
+                import re
+                match = re.search(r"\{[\s\S]*\}", content)
+                if match:
+                    try:
+                        return json.loads(match.group(0))
+                    except Exception:
+                        return {"results": []}
+                return {"results": []}
+
+        # Run blocking OpenAI call in a thread with timeout
+        try:
+            ai_result = await asyncio.wait_for(asyncio.to_thread(call_openai), timeout=15.0)
+        except asyncio.TimeoutError:
+            logger.warning("Keyword AI search timed out")
+            return JSONResponse(
+                status_code=504,
+                content={
+                    "success": False,
+                    "error": "timeout",
+                    "message": "Keyword AI search timed out"
+                }
+            )
+
+        results = ai_result.get("results", [])
+        if not isinstance(results, list):
+            results = []
+        markdown = ai_result.get("markdown", "")
 
         return JSONResponse(
             status_code=200,
@@ -276,7 +332,9 @@ async def search_by_keywords(payload: KeywordSearchRequest):
                 "success": True,
                 "results": results,
                 "total": len(results),
-                "query": {"keywords": normalized}
+                "query": {"keywords": normalized},
+                "model_version": "Keyword AI v1.0",
+                "markdown": markdown
             }
         )
     except Exception as e:

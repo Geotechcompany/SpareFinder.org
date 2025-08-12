@@ -59,6 +59,7 @@ import { parseAIResponse } from '@/lib/markdown-parser';
 import CreditsDisplay from '@/components/CreditsDisplay';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { dashboardApi } from '@/lib/api';
+import KeywordMarkdownResults from '@/components/KeywordMarkdownResults';
 
 
 
@@ -879,12 +880,27 @@ const Upload = () => {
       }
 
       const results = (response as any).results || [];
+      let keywordMarkdown: string = (response as any).markdown || '';
+      // Normalize markdown to help the parser (handle CRLF and leading spaces)
+      if (keywordMarkdown) {
+        keywordMarkdown = keywordMarkdown.replace(/\r\n/g, '\n').replace(/\t/g, '  ').trimStart();
+      }
+
+      // If backend didn't return markdown, synthesize an 8-section markdown for the first result
+      if (!keywordMarkdown && results.length > 0) {
+        const first = results[0] || {};
+        const compactOthers = results.slice(1).map((r: any) => `- **${r.name || 'Unknown'} — ${r.category || 'Unspecified'}${r.manufacturer ? ` — ${r.manufacturer}` : ''}**`).join('\n');
+        const techTable = `| Specification | Details |\n|---|---|\n| Material | ${first.material || 'N/A'} |\n| Warranty | ${first.warranty || 'N/A'} |`;
+        keywordMarkdown = `# 🛞 Part Identification\n- **Name:** ${first.name || 'Automotive Component'}\n- **Category:** ${first.category || 'Unspecified'}\n- **Manufacturer:** ${first.manufacturer || 'Unknown'}\n- **Part Number:** ${first.part_number || 'N/A'}\n\n# 📘 Technical Description\n- ${first.description || 'Keyword-based part suggestion.'}\n\n# 📊 Technical Data Sheet\n${techTable}\n\n# 🚗 Compatible Vehicles\n- ${first.compatibility?.[0] || 'Not specified'}\n\n# 💰 Pricing & Availability\n- **Price:** ${first.price || 'Not available'}\n- **Availability:** ${first.availability || 'Unknown'}\n\n# 🌍 Where to Buy\n- ${first.buy_link || 'Check major retailers or OEM suppliers.'}\n\n# 📈 Confidence Score\n- **Score:** ${Math.round(75)}% (keyword match)\n\n# 📤 Additional Instructions\n- Review specifications and confirm fitment before purchase.\n\n${compactOthers}`;
+      }
 
       // Map keyword results to AnalysisResponse shape for display reuse
-      const predictions = results.map((r: any) => ({
+      const predictions = results.map((r: any, idx: number) => ({
         class_name: r.name || 'Automotive Component',
         confidence: 0.75,
-        description: `${r.category || 'Category'} by ${r.manufacturer || 'Unknown'}\nPrice: ${typeof r.price === 'number' ? `$${r.price}` : r.price || 'N/A'}\nAvailability: ${r.availability || 'Unknown'}\nPart No: ${r.part_number || 'N/A'}`,
+        description: idx === 0 && keywordMarkdown
+          ? keywordMarkdown
+          : `${r.category || 'Category'} by ${r.manufacturer || 'Unknown'}\nPrice: ${typeof r.price === 'number' ? `$${r.price}` : r.price || 'N/A'}\nAvailability: ${r.availability || 'Unknown'}\nPart No: ${r.part_number || 'N/A'}`,
         category: r.category || 'Unspecified',
         manufacturer: r.manufacturer || 'Unknown',
         estimated_price: typeof r.price === 'number' ? `$${r.price}` : r.price || 'Price not available',
@@ -905,16 +921,16 @@ const Upload = () => {
           compatibility: []
         }],
         similar_images: [],
-        model_version: 'Keyword Search',
-        processing_time: 0,
+        model_version: (response as any).model_version || 'Keyword Search',
+        processing_time: ((response as any).elapsed_ms ? Math.round((response as any).elapsed_ms / 1000) : 0),
         image_metadata: {
           content_type: 'text/keywords',
           size_bytes: 0
         },
         additional_details: {
-          full_analysis: predictions.length 
+          full_analysis: keywordMarkdown || (predictions.length 
             ? `Found ${predictions.length} results for keywords: ${savedKeywords.join(', ')}`
-            : `No results for keywords: ${savedKeywords.join(', ')}`,
+            : `No results for keywords: ${savedKeywords.join(', ')}`),
           technical_specifications: '',
           market_information: '',
           confidence_reasoning: ''
@@ -2299,7 +2315,7 @@ const Upload = () => {
                       initial={{ opacity: 0, y: 20 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ delay: 0.2 }}
-                      className="bg-gradient-to-br from-blue-900/10 to-purple-900/10 border border-blue-500/30 rounded-2xl p-6 backdrop-blur-sm general-container"
+                      className="relative bg-gradient-to-br from-blue-900/10 to-purple-900/10 border border-blue-500/30 rounded-2xl p-6 backdrop-blur-sm general-container"
                     >
                       <div className="flex items-center space-x-3 mb-6 pb-3 border-b border-blue-500/30">
                         <motion.div
@@ -2338,6 +2354,18 @@ const Upload = () => {
                           </motion.div>
                         ))}
                       </div>
+                    </motion.div>
+                  )}
+
+                  {/* Fallback: render raw markdown if no sections were parsed */}
+                  {sections.technical.length === 0 && sections.general.length === 0 && analysisContent && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.2 }}
+                      className="bg-black/20 backdrop-blur-xl border border-white/10 rounded-2xl p-6"
+                    >
+                      <MarkdownCard title="AI Analysis" content={analysisContent} level={2} />
                     </motion.div>
                   )}
                 </>
@@ -2993,7 +3021,16 @@ const Upload = () => {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-6">
-                    {analysisResults && analysisResults.flatData ? (
+                    {analysisResults && analysisResults.image_metadata?.content_type === 'text/keywords' ? (
+                      <ScrollArea className="h-[calc(100vh-400px)] min-h-[600px] max-h-none w-full pr-4">
+                        <div className="space-y-6 pb-8">
+                          <KeywordMarkdownResults 
+                            markdown={analysisResults.additional_details?.full_analysis || analysisResults.predictions?.[0]?.description || ''}
+                            modelVersion={analysisResults.model_version}
+                          />
+                        </div>
+                      </ScrollArea>
+                    ) : analysisResults && analysisResults.flatData ? (
                       <ScrollArea className="h-[calc(100vh-400px)] min-h-[600px] max-h-none w-full pr-4">
                         <div className="space-y-6 pb-8">
                           {/* Debug component for development */}

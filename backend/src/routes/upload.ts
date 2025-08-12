@@ -244,7 +244,7 @@ router.post('/image', authenticateToken, upload.single('image'), handleMulterErr
             ...formData.getHeaders(),
             ...(aiServiceApiKey && { 'Authorization': `Bearer ${aiServiceApiKey}` })
           },
-          timeout: 30000, // 30 second timeout
+          timeout: 120000, // 120 second timeout to accommodate longer AI analysis
           validateStatus: (status) => status < 500 // Accept 4xx as valid response
         }
       );

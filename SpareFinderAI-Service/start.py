@@ -42,7 +42,9 @@ def main():
             host="0.0.0.0", 
             port=8000, 
             reload=True,
-            log_level="info"
+            log_level="info",
+            # Restrict reload watch paths to exclude 'uploads'
+            reload_dirs=[os.path.join(project_root, 'app')]
         )
     except Exception as e:
         logger.error(f"Failed to start service: {e}", exc_info=True)
