@@ -532,6 +532,7 @@ export const billingApi = {
     billing_cycle: string;
     success_url: string;
     cancel_url: string;
+    trial_days?: number;
   }): Promise<ApiResponse> => {
     const response = await apiClient.post('/billing/checkout-session', checkoutData);
     return response.data;

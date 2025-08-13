@@ -59,8 +59,8 @@ interface BillingData {
 
 const PLAN_FEATURES = {
   free: {
-    name: 'Free',
-    price: 0,
+    name: 'Starter',
+    price: 15,
     currency: 'USD',
     color: 'from-gray-600 to-gray-700',
     icon: Shield,
@@ -68,7 +68,8 @@ const PLAN_FEATURES = {
       '10 part searches per month',
       '50 API calls per month',
       '100MB storage',
-      'Basic support'
+      'Basic support',
+      '30-day free trial'
     ]
   },
   pro: {
@@ -142,15 +143,23 @@ export const SubscriptionManager: React.FC = () => {
 
     setIsUpdating(tier);
     try {
-      // For free tier, just update directly
+      // Starter (free tier label) -> Stripe checkout with 30-day trial @ £15
       if (tier === 'free') {
-        const response = await api.billing.updateSubscription(tier);
-        
-        if (response.success) {
-          await fetchBillingData(); // Refresh data
-          toast.success('Subscription updated successfully');
+        const plan = PLAN_FEATURES['free'];
+        const checkoutData = {
+          plan: plan.name,
+          amount: 15,
+          currency: 'gbp',
+          billing_cycle: 'monthly',
+          trial_days: 30,
+          success_url: `${window.location.origin}/dashboard/billing?payment_success=true&tier=starter`,
+          cancel_url: `${window.location.origin}/dashboard/billing?payment_cancelled=true`
+        };
+        const checkoutResponse = await api.billing.createCheckoutSession(checkoutData);
+        if (checkoutResponse.success && checkoutResponse.data?.checkout_url) {
+          window.location.href = checkoutResponse.data.checkout_url;
         } else {
-          toast.error('Failed to update subscription');
+          toast.error('Failed to start Starter trial.');
         }
         return;
       }
@@ -162,8 +171,8 @@ export const SubscriptionManager: React.FC = () => {
         amount: plan.price,
         currency: plan.currency.toLowerCase(),
         billing_cycle: 'monthly',
-        success_url: `${window.location.origin}/billing?success=true&tier=${tier}`,
-        cancel_url: `${window.location.origin}/billing?canceled=true`
+        success_url: `${window.location.origin}/dashboard/billing?payment_success=true&tier=${tier}`,
+        cancel_url: `${window.location.origin}/dashboard/billing?payment_cancelled=true`
       };
 
       const checkoutResponse = await api.billing.createCheckoutSession(checkoutData);
@@ -483,100 +492,65 @@ export const SubscriptionManager: React.FC = () => {
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {Object.entries(PLAN_FEATURES).map(([tier, plan]) => (
-              <div 
-                key={tier}
-                className={`p-6 rounded-lg border-2 ${
-                  subscription.tier === tier 
-                    ? 'border-primary bg-primary/5' 
-                    : 'border-border'
-                }`}
-              >
-                <div className="flex items-center gap-3 mb-4">
-                  <div className={`w-10 h-10 rounded-lg bg-gradient-to-r ${plan.color} flex items-center justify-center`}>
-                    <plan.icon className="w-5 h-5 text-white" />
+            {Object.entries(PLAN_FEATURES).map(([tier, plan]) => {
+              const isCurrent = subscription.tier === tier;
+              return (
+                <div
+                  key={tier}
+                  className={`p-6 rounded-lg border-2 ${
+                    isCurrent ? 'border-primary bg-primary/5' : 'border-border'
+                  }`}
+                >
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className={`w-10 h-10 rounded-lg bg-gradient-to-r ${plan.color} flex items-center justify-center`}>
+                      <plan.icon className="w-5 h-5 text-white" />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold">{plan.name}</h3>
+                      <p className="text-2xl font-bold">
+                        {plan.price === 0 ? 'Free' : `£${plan.price}`}
+                        {plan.price > 0 && (
+                          <span className="text-sm font-normal text-muted-foreground">/month</span>
+                        )}
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <h3 className="font-semibold">{plan.name}</h3>
-                    <p className="text-2xl font-bold">
-                      {plan.price === 0 ? 'Free' : `£${plan.price}`}
-                      {plan.price > 0 && <span className="text-sm font-normal text-muted-foreground">/month</span>}
-                    </p>
-                  </div>
+
+                  <ul className="space-y-2 mb-4">
+                    {plan.features.map((feature: string, index: number) => (
+                      <li key={index} className="flex items-center gap-2 text-sm">
+                        <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0" />
+                        {feature}
+                      </li>
+                    ))}
+                  </ul>
+
+                  {subscription.tier !== tier ? (
+                    <Button
+                      onClick={() => handleUpgradeSubscription(tier as 'free' | 'pro' | 'enterprise')}
+                      disabled={!!isUpdating}
+                      variant={tier === 'free' ? 'outline' : 'default'}
+                      className="w-full"
+                    >
+                      {isUpdating === tier ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" /> Processing...
+                        </>
+                      ) : (
+                        <>Select {plan.name}</>
+                      )}
+                    </Button>
+                  ) : (
+                    <Button disabled className="w-full">Current Plan</Button>
+                  )}
                 </div>
-                
-                <ul className="space-y-2 mb-4">
-                  {plan.features.map((feature, index) => (
-                    <li key={index} className="flex items-center gap-2 text-sm">
-                      <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0" />
-                      {feature}
-                    </li>
-                  ))}
-                </ul>
-                
-                {subscription.tier !== tier && (
-                  <Button 
-                    onClick={() => handleUpgradeSubscription(tier as 'free' | 'pro' | 'enterprise')}
-                    disabled={!!isUpdating}
-                    variant={tier === 'free' ? 'outline' : 'default'}
-                    className="w-full"
-                  >
-                    {isUpdating === tier ? (
-                      <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Processing...</>
-                    ) : (
-                      <>
-                        {tier === 'free' ? 'Downgrade' : 'Upgrade'} to {plan.name}
-                      </>
-                    )}
-                  </Button>
-                )}
-                
-                {subscription.tier === tier && (
-                  <Button disabled className="w-full">
-                    Current Plan
-                  </Button>
-                )}
-              </div>
-            ))}
+              );
+            })}
           </div>
         </CardContent>
       </Card>
-
-      {/* Recent Invoices */}
-      {billingData.invoices && billingData.invoices.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Recent Invoices</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {billingData.invoices.slice(0, 5).map((invoice) => (
-                <div key={invoice.id} className="flex items-center justify-between p-3 border rounded-lg">
-                  <div>
-                    <p className="font-medium">Invoice #{invoice.id}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {new Date(invoice.created_at).toLocaleDateString()}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <Badge variant={invoice.status === 'paid' ? 'default' : 'destructive'}>
-                      {invoice.status}
-                    </Badge>
-                    <span className="font-medium">
-                      {invoice.currency.toUpperCase()} {invoice.amount}
-                    </span>
-                    <Button size="sm" variant="outline" asChild>
-                      <a href={invoice.invoice_url} target="_blank" rel="noopener noreferrer">
-                        <ExternalLink className="w-4 h-4" />
-                      </a>
-                    </Button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
     </div>
   );
-}; 
+};
+
+export default SubscriptionManager;

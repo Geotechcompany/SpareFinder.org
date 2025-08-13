@@ -9,6 +9,8 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Eye, EyeOff, Mail, Lock, User, Zap, ArrowLeft, Sparkles, Building, Loader, AlertCircle, CheckCircle, X } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
+import { api } from '@/lib/api';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
 const Register = () => {
   const navigate = useNavigate();
@@ -17,6 +19,8 @@ const Register = () => {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [errors, setErrors] = useState<string[]>([]);
+  const [showTrialModal, setShowTrialModal] = useState(false);
+  const [isStartingTrial, setIsStartingTrial] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -79,20 +83,20 @@ const Register = () => {
       });
       
       if (result.success) {
-      // Clear form data
-      setFormData({
-        name: '',
-        email: '',
-        company: '',
-        password: '',
-        confirmPassword: ''
-      });
-      
+        // Clear form data
+        setFormData({
+          name: '',
+          email: '',
+          company: '',
+          password: '',
+          confirmPassword: ''
+        });
+        
         // Show success message
         toast.success('Registration successful! Welcome to SpareFinder!');
-      
-        // Redirect to dashboard
-        navigate('/dashboard');
+        
+        // Redirect to trial onboarding page before dashboard access
+        navigate('/onboarding/trial', { replace: true });
       } else {
         setErrors([result.error || 'Registration failed. Please try again.']);
       }
@@ -419,6 +423,64 @@ const Register = () => {
           </div>
         </motion.div>
       </div>
+      {/* Trial Modal */}
+      <Dialog open={showTrialModal} onOpenChange={(open) => {
+        setShowTrialModal(open);
+        if (!open) {
+          // If user closes modal without starting trial, send them to billing page with decline flag
+          navigate('/dashboard/billing?trial_declined=true', { replace: true });
+        }
+      }}>
+        <DialogContent className="sm:max-w-lg border-white/10 bg-gradient-to-b from-gray-900 to-black text-white">
+          <DialogHeader>
+            <DialogTitle className="text-2xl">Start your 30-day free trial</DialogTitle>
+            <DialogDescription className="text-gray-300">
+              Enjoy full access to SpareFinder Starter for 30 days. No charge today. £15/month after trial. Cancel anytime.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="mt-2">
+            <div className="relative overflow-hidden rounded-xl border border-white/10">
+              <img src="/favicon.svg" alt="Starter Trial" className="w-full h-40 object-contain bg-gradient-to-r from-purple-600/10 to-blue-600/10" />
+            </div>
+            <ul className="mt-4 space-y-2 text-gray-300 text-sm">
+              <li>• 30-day free trial, then £15/month</li>
+              <li>• 50 AI identifications/month</li>
+              <li>• Basic web scraping and email support</li>
+            </ul>
+          </div>
+          <DialogFooter className="mt-4 flex gap-3">
+            <Button variant="secondary" className="bg-white/10 hover:bg-white/20" onClick={() => {
+              setShowTrialModal(false);
+              navigate('/dashboard/billing?trial_declined=true', { replace: true });
+            }}>Maybe later</Button>
+            <Button disabled={isStartingTrial} onClick={async () => {
+              try {
+                setIsStartingTrial(true);
+                const resp = await api.billing.createCheckoutSession({
+                  plan: 'Starter',
+                  amount: 15,
+                  currency: 'GBP',
+                  billing_cycle: 'monthly',
+                  trial_days: 30,
+                  success_url: `${window.location.origin}/dashboard/billing?payment_success=true`,
+                  cancel_url: `${window.location.origin}/dashboard/billing?payment_cancelled=true`
+                });
+                if (resp.success && resp.data?.checkout_url) {
+                  window.location.href = resp.data.checkout_url;
+                } else {
+                  setShowTrialModal(false);
+                  navigate('/dashboard');
+                }
+              } catch (e) {
+                setShowTrialModal(false);
+                navigate('/dashboard');
+              } finally {
+                setIsStartingTrial(false);
+              }
+            }}>{isStartingTrial ? 'Starting trial...' : 'Start 30-day Free Trial'}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

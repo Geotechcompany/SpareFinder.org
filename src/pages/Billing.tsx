@@ -58,6 +58,7 @@ const Billing = () => {
     const paymentSuccess = searchParams.get('payment_success');
     const paymentCancelled = searchParams.get('payment_cancelled');
     const sessionId = searchParams.get('session_id');
+    const trialDeclined = searchParams.get('trial_declined');
     
     if (paymentSuccess === 'true') {
       toast({
@@ -67,7 +68,7 @@ const Billing = () => {
       });
       
       // Clear the URL parameters
-      navigate('/billing', { replace: true });
+      navigate('/dashboard/billing', { replace: true });
     } else if (paymentCancelled === 'true') {
       toast({
         title: "Payment Cancelled",
@@ -76,7 +77,13 @@ const Billing = () => {
       });
       
       // Clear the URL parameters
-      navigate('/billing', { replace: true });
+      navigate('/dashboard/billing', { replace: true });
+    } else if (trialDeclined === 'true') {
+      toast({
+        title: "Trial skipped",
+        description: "You can start your 30-day free trial anytime from Billing.",
+      });
+      navigate('/dashboard/billing', { replace: true });
     } else if (sessionId) {
       // Handle Stripe checkout session success
       toast({
@@ -87,7 +94,7 @@ const Billing = () => {
       
       // You could verify the session here
       setTimeout(() => {
-        navigate('/billing', { replace: true });
+        navigate('/dashboard/billing', { replace: true });
       }, 3000);
     }
   }, [searchParams, navigate, toast]);
@@ -153,6 +160,27 @@ const Billing = () => {
 
   const handlePlanChange = async (planId: string) => {
     try {
+      // Starter (free) -> begin 30-day trial at £15/month via Stripe
+      if (planId === 'free') {
+        const starter = plans.find(p => p.id === 'free');
+        const checkoutResponse = await api.billing.createCheckoutSession({
+          plan: 'Starter',
+          amount: 15,
+          currency: 'GBP',
+          billing_cycle: 'monthly',
+          trial_days: 30,
+          success_url: `${window.location.origin}/dashboard/billing?payment_success=true&tier=starter`,
+          cancel_url: `${window.location.origin}/dashboard/billing?payment_cancelled=true`
+        });
+
+        if (checkoutResponse.success && checkoutResponse.data?.checkout_url) {
+          window.location.href = checkoutResponse.data.checkout_url;
+        } else {
+          throw new Error('Failed to start Starter trial');
+        }
+        return;
+      }
+
       // For paid plans, use Stripe checkout
       if (planId !== 'free') {
         const selectedPlan = plans.find(p => p.id === planId);
@@ -166,8 +194,8 @@ const Billing = () => {
           amount: selectedPlan.price,
           currency: 'GBP',
           billing_cycle: 'monthly',
-          success_url: `${window.location.origin}/billing?payment_success=true&session_id={CHECKOUT_SESSION_ID}`,
-          cancel_url: `${window.location.origin}/billing?payment_cancelled=true`
+          success_url: `${window.location.origin}/dashboard/billing?payment_success=true&session_id={CHECKOUT_SESSION_ID}`,
+          cancel_url: `${window.location.origin}/dashboard/billing?payment_cancelled=true`
         });
 
         if (checkoutResponse.data?.checkout_url) {
@@ -228,9 +256,9 @@ const Billing = () => {
     {
       id: 'free',
       name: 'Starter',
-      price: 0,
+      price: 15,
       period: 'month',
-      description: 'Perfect for trying out SpareFinder',
+      description: '30-day free trial, then £15/month',
       features: [
         '10 uploads per month',
         'Basic AI identification',
@@ -294,7 +322,7 @@ const Billing = () => {
           billingData.subscription.tier === 'pro' ? 'Professional' : 'Enterprise',
     status: billingData.subscription.status,
     nextBilling: billingData.subscription.current_period_end,
-    amount: billingData.subscription.tier === 'free' ? 0 : 
+    amount: billingData.subscription.tier === 'free' ? 15 : 
             billingData.subscription.tier === 'pro' ? 29 : 149,
     daysLeft: Math.ceil((new Date(billingData.subscription.current_period_end).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))
   } : {
@@ -340,6 +368,10 @@ const Billing = () => {
         return <Check className="w-4 h-4" />;
     }
   };
+
+  const isStarter = billingData?.subscription?.tier === 'free';
+  const trialDaysLeft = billingData?.subscription ? Math.max(0, Math.ceil((new Date(billingData.subscription.current_period_end).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))) : 0;
+  const trialActive = isStarter && trialDaysLeft > 0;
 
   return (
     <div className="min-h-screen flex w-full bg-gradient-to-br from-gray-900 via-purple-900/20 to-blue-900/20 relative overflow-hidden">
@@ -437,7 +469,7 @@ const Billing = () => {
                     <Button 
                       variant="ghost" 
                       size="sm"
-                      onClick={() => navigate('/billing', { replace: true })}
+                      onClick={() => navigate('/dashboard/billing', { replace: true })}
                       className="text-green-200 hover:text-white"
                     >
                       <X className="w-4 h-4" />

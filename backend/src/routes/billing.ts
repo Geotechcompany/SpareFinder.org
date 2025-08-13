@@ -3,13 +3,38 @@ import { authenticateToken } from '../middleware/auth';
 import { AuthRequest } from '../types/auth';
 import { supabase } from '../server';
 import Stripe from 'stripe';
+import { creditService } from '../services/credit-service';
 
 const router = Router();
 
-// Function to get Stripe instance with API key from database
+// Public config: Stripe publishable key
+router.get('/config', async (_req: express.Request, res: Response) => {
+  try {
+    const publishableKey = process.env.STRIPE_PUBLISHABLE_KEY || process.env.STRIPE_PUBLIC_KEY;
+    if (!publishableKey) {
+      return res.status(200).json({ success: true, configured: false, publishableKey: null });
+    }
+    return res.json({ success: true, configured: true, publishableKey });
+  } catch (error) {
+    console.error('Stripe config error:', error);
+    return res.status(500).json({ success: false, error: 'config_error' });
+  }
+});
+
+// Function to get Stripe instance with API key
 async function getStripeInstance(): Promise<Stripe | null> {
   try {
-    // Fetch active Stripe payment method from database
+    // 1) Prefer environment secret if present
+    const envSecret = process.env.STRIPE_SECRET_KEY || process.env.STRIPE_API_KEY || process.env.STRIPE_SECRET || process.env.STRIPE_PRIVATE_KEY;
+    if (envSecret) {
+      if (envSecret.startsWith('pk_')) {
+        console.error('Stripe env key is publishable (pk_). A secret key (sk_) is required.');
+        return null;
+      }
+      return new Stripe(envSecret, { apiVersion: '2025-06-30.basil' });
+    }
+
+    // 2) Fallback to database-configured key
     const { data: stripeMethod, error } = await supabase
       .from('payment_methods')
       .select('api_key, secret_key, status')
@@ -17,14 +42,19 @@ async function getStripeInstance(): Promise<Stripe | null> {
       .eq('status', 'active')
       .single();
 
-    if (error || !stripeMethod || !stripeMethod.api_key) {
-      console.error('No active Stripe API key found:', error);
+    if (error || !stripeMethod) {
+      console.error('No active Stripe config found:', error);
       return null;
     }
 
-    // Initialize Stripe with the secret key from database (stored in api_key field)
-    const stripe = new Stripe(stripeMethod.api_key, {
-      apiVersion: '2025-06-30.basil', // Use latest API version
+    const dbSecret = stripeMethod.secret_key || stripeMethod.api_key;
+    if (!dbSecret || dbSecret.startsWith('pk_')) {
+      console.error('Stripe DB key is missing or publishable (pk_). A secret key (sk_) is required.');
+      return null;
+    }
+
+    const stripe = new Stripe(dbSecret, {
+      apiVersion: '2025-06-30.basil',
     });
 
     return stripe;
@@ -170,6 +200,31 @@ router.post('/subscription', authenticateToken, async (req: AuthRequest, res: Re
       });
     }
 
+    // If downgrading to free, cancel Stripe subscription if exists
+    if (tier === 'free') {
+      // Find existing subscription
+      const { data: existing, error: findErr } = await supabase
+        .from('subscriptions')
+        .select('stripe_subscription_id, stripe_customer_id, status')
+        .eq('user_id', userId)
+        .single();
+
+      if (findErr && findErr.code !== 'PGRST116') {
+        console.warn('Fetch current subscription failed (free downgrade):', findErr);
+      }
+
+      try {
+        if (existing?.stripe_subscription_id) {
+          const stripe = await getStripeInstance();
+          if (stripe) {
+            await stripe.subscriptions.cancel(existing.stripe_subscription_id);
+          }
+        }
+      } catch (e) {
+        console.warn('Stripe cancel on free downgrade failed:', e);
+      }
+    }
+
     // Check if subscription exists
     const { data: existingSubscription, error: fetchError } = await supabase
       .from('subscriptions')
@@ -257,6 +312,29 @@ router.post('/subscription', authenticateToken, async (req: AuthRequest, res: Re
 router.post('/subscription/cancel', authenticateToken, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.user!.userId;
+
+    // Load subscription record
+    const { data: sub, error: loadErr } = await supabase
+      .from('subscriptions')
+      .select('stripe_subscription_id')
+      .eq('user_id', userId)
+      .single();
+
+    if (loadErr && loadErr.code !== 'PGRST116') {
+      console.warn('Load subscription for cancel failed:', loadErr);
+    }
+
+    // Ask Stripe to cancel at period end if an active subscription exists
+    try {
+      if (sub?.stripe_subscription_id) {
+        const stripe = await getStripeInstance();
+        if (stripe) {
+          await stripe.subscriptions.update(sub.stripe_subscription_id, { cancel_at_period_end: true });
+        }
+      }
+    } catch (e) {
+      console.warn('Stripe cancel_at_period_end update failed:', e);
+    }
 
     const { data: subscription, error } = await supabase
       .from('subscriptions')
@@ -417,7 +495,15 @@ router.get('/usage', authenticateToken, async (req: AuthRequest, res: Response) 
 router.post('/checkout-session', authenticateToken, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.user!.userId;
-    const { plan, amount, currency, billing_cycle: _billing_cycle, success_url, cancel_url } = req.body;
+    const { plan, amount, currency, billing_cycle: _billing_cycle, success_url, cancel_url, trial_days } = req.body as {
+      plan: string;
+      amount?: number;
+      currency?: string;
+      billing_cycle?: string;
+      success_url: string;
+      cancel_url: string;
+      trial_days?: number;
+    };
 
     // Validate required fields
     if (!plan || !success_url || !cancel_url) {
@@ -426,6 +512,9 @@ router.post('/checkout-session', authenticateToken, async (req: AuthRequest, res
         message: 'plan, success_url, and cancel_url are required'
       });
     }
+
+    // Normalize and validate trial period
+    const trialDays = typeof trial_days === 'number' && trial_days > 0 ? Math.min(trial_days, 30) : undefined;
 
     // Get user email from Supabase Auth
     const { data: user, error: userError } = await supabase.auth.admin.getUserById(userId);
@@ -459,14 +548,15 @@ router.post('/checkout-session', authenticateToken, async (req: AuthRequest, res
       amount: finalAmount,
       currency: finalCurrency,
       unitAmount,
-      userEmail: user.user?.email
+      userEmail: user.user?.email,
+      trialDays
     });
 
     // Create Stripe checkout session
-    const session = await stripe.checkout.sessions.create({
+    const sessionParams: Stripe.Checkout.SessionCreateParams = {
       payment_method_types: ['card'],
       mode: 'subscription',
-      customer_email: user.user?.email,
+      customer_email: user.user?.email || undefined,
       line_items: [
         {
           price_data: {
@@ -492,7 +582,12 @@ router.post('/checkout-session', authenticateToken, async (req: AuthRequest, res
         amount: finalAmount.toString(),
         currency: finalCurrency,
       },
-    });
+    };
+    if (trialDays) {
+      sessionParams.subscription_data = { trial_period_days: trialDays };
+    }
+
+    const session = await stripe.checkout.sessions.create(sessionParams);
 
     console.log('Stripe checkout session created:', {
       sessionId: session.id,
@@ -529,17 +624,20 @@ router.post('/checkout-session', authenticateToken, async (req: AuthRequest, res
     }
 
     return res.json({
-      checkout_url: session.url,
-      session_id: session.id,
-      session: {
-        id: session.id,
-        url: session.url,
-        payment_status: session.payment_status,
-        customer_email: session.customer_email || user.user?.email,
-        amount_total: session.amount_total,
-        currency: session.currency,
-        mode: session.mode,
-        created: session.created
+      success: true,
+      data: {
+        checkout_url: session.url,
+        session_id: session.id,
+        session: {
+          id: session.id,
+          url: session.url,
+          payment_status: session.payment_status,
+          customer_email: session.customer_email || user.user?.email,
+          amount_total: session.amount_total,
+          currency: session.currency,
+          mode: session.mode,
+          created: session.created
+        }
       }
     });
 
@@ -680,6 +778,8 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
       tier = 'pro';
     } else if (plan.toLowerCase().includes('enterprise')) {
       tier = 'enterprise';
+    } else if (plan.toLowerCase().includes('starter')) {
+      tier = 'starter';
     }
 
     // Update user's subscription
@@ -703,6 +803,33 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
       console.error('Error updating subscription:', subscriptionError);
     } else {
       console.log('Subscription updated successfully for user:', userId);
+    }
+
+    // Award credits only after trial session completes for Starter plan
+    try {
+      if (tier === 'starter') {
+        // Check if subscription is in trialing state
+        const stripe = await getStripeInstance();
+        let isTrialing = false;
+        if (stripe && typeof session.subscription === 'string') {
+          try {
+            const sub = await stripe.subscriptions.retrieve(session.subscription);
+            isTrialing = sub.status === 'trialing';
+          } catch (e) {
+            console.warn('Unable to retrieve subscription to verify trial status:', e);
+          }
+        }
+
+        // Also treat zero total as trial start
+        const zeroTotal = (typeof session.amount_total === 'number' ? session.amount_total : 0) === 0;
+        if (isTrialing || zeroTotal) {
+          const creditAmount = Number(process.env.STARTER_TRIAL_CREDITS || 10);
+          const result = await creditService.addCredits(userId, creditAmount, 'Starter trial activation credit');
+          console.log('Starter trial credits grant result:', result);
+        }
+      }
+    } catch (grantErr) {
+      console.warn('Granting starter trial credits failed:', grantErr);
     }
 
   } catch (error) {

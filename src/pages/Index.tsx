@@ -118,8 +118,8 @@ const Index = () => {
     {
       id: "starter",
       name: "Starter",
-      price: "£24",
-      priceValue: 24,
+      price: "£15",
+      priceValue: 15,
       period: "/month",
       description: "Perfect for small workshops and hobbyists",
       features: [
@@ -127,7 +127,8 @@ const Index = () => {
         "Basic web scraping",
         "Email support",
         "Upload history (90 days)",
-        "Mobile app access"
+        "Mobile app access",
+        "30-day free trial"
       ],
       popular: false,
       color: "from-gray-600 to-gray-700",

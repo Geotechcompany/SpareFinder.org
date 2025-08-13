@@ -130,7 +130,20 @@ export const CreditsDisplay: React.FC<CreditsDisplayProps> = ({
           disabled={refreshing}
           className={`p-0 h-auto hover:bg-white/10 ${size === 'small' ? 'ml-1' : 'ml-2'}`}
         >
-          <RefreshCw className={`${size === 'small' ? 'w-3 h-3' : 'w-4 h-4'} text-white/60 hover:text-white transition-colors`} />
+          {refreshing ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+        </Button>
+      )}
+
+      {!loading && (credits === null || credits === 0) && (
+        <Button
+          variant="outline"
+          size="sm"
+          className={`ml-2 bg-white/5 hover:bg-white/10 text-white border-white/20 ${size === 'small' ? 'px-2 py-1' : 'px-3 py-1.5'}`}
+          onClick={() => {
+            window.location.href = '/dashboard/billing';
+          }}
+        >
+          Upgrade plan to get credits
         </Button>
       )}
     </motion.div>

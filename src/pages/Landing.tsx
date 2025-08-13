@@ -115,8 +115,8 @@ const Landing = () => {
         amount: parseFloat(plan.price[isAnnual ? 'annual' : 'monthly']),
         currency: 'GBP',
         billing_cycle: isAnnual ? 'annual' : 'monthly',
-        success_url: `${window.location.origin}/dashboard?payment=success`,
-        cancel_url: `${window.location.origin}/?payment=cancelled`
+        success_url: `${window.location.origin}/dashboard/billing?payment_success=true`,
+        cancel_url: `${window.location.origin}/dashboard/billing?payment_cancelled=true`
       };
 
       const response = await api.billing.createCheckoutSession(checkoutData);
