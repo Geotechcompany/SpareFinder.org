@@ -34,6 +34,7 @@ import AdminProtectedRoute from '@/components/AdminProtectedRoute';
 import Landing from '@/pages/Landing';
 import PrivacyPolicy from '@/pages/PrivacyPolicy';
 import TermsOfService from '@/pages/TermsOfService';
+import Trial from '@/pages/Trial';
 import Unauthorized from '@/pages/Unauthorized';
 
 const queryClient = new QueryClient();
@@ -62,6 +63,11 @@ const App = () => (
               <Route path="/dashboard" element={
                 <ProtectedRoute>
                   <Dashboard />
+                </ProtectedRoute>
+              } />
+              <Route path="/onboarding/trial" element={
+                <ProtectedRoute>
+                  <Trial />
                 </ProtectedRoute>
               } />
               <Route path="/dashboard/upload" element={
