@@ -11,26 +11,24 @@ ENV PYTHONUNBUFFERED=1 \
 WORKDIR /app
 
 # Install system dependencies for web scraping and image processing
-RUN apt-get update && apt-get install -y \
+RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     curl \
     wget \
     unzip \
     gnupg \
     ca-certificates \
-    apt-transport-https \
-    software-properties-common \
-    libgl1-mesa-glx \
+    libgl1 \
     libglib2.0-0 \
     libsm6 \
     libxext6 \
-    libxrender-dev \
+    libxrender1 \
     libgomp1 \
     libgcc-s1 \
     libfontconfig1 \
     libfreetype6 \
     libxss1 \
-    libappindicator3-1 \
+    libayatana-appindicator3-1 \
     libasound2 \
     libatk-bridge2.0-0 \
     libdrm2 \
@@ -43,22 +41,24 @@ RUN apt-get update && apt-get install -y \
     libxfixes3 \
     libxi6 \
     libxrandr2 \
-    libxss1 \
     libxtst6 \
     fonts-liberation \
     xvfb \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Chrome and ChromeDriver with version matching and fallback
-RUN apt-get update && apt-get install -y \
+RUN apt-get update && apt-get install -y --no-install-recommends \
     wget \
     unzip \
     xvfb \
     curl \
-    && wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | apt-key add - \
-    && echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google-chrome.list \
+    ca-certificates \
+    gnupg \
+    && mkdir -p /etc/apt/keyrings \
+    && curl -fsSL https://dl.google.com/linux/linux_signing_key.pub | gpg --dearmor -o /etc/apt/keyrings/google-chrome.gpg \
+    && echo "deb [arch=amd64 signed-by=/etc/apt/keyrings/google-chrome.gpg] http://dl.google.com/linux/chrome/deb/ stable main" > /etc/apt/sources.list.d/google-chrome.list \
     && apt-get update \
-    && apt-get install -y google-chrome-stable \
+    && apt-get install -y --no-install-recommends google-chrome-stable \
     && CHROME_VERSION=$(google-chrome --version | cut -d " " -f3 | cut -d "." -f1-3) \
     && echo "Chrome version: $CHROME_VERSION" \
     && (CHROMEDRIVER_VERSION=$(curl -s "https://googlechromelabs.github.io/chrome-for-testing/LATEST_RELEASE_$CHROME_VERSION") \
