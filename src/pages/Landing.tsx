@@ -1,52 +1,63 @@
-import { motion, AnimatePresence, useScroll, useTransform } from 'framer-motion';
-import { Button } from '@/components/ui/button';
-import { 
-  Rocket, 
-  ShieldCheck, 
-  BarChart, 
-  Globe, 
-  Zap, 
-  Cloud, 
-  Factory, 
-  Cpu, 
-  Database, 
-  Server, 
-  TestTube2, 
-  Upload, 
-  Check, 
-  X, 
-  Target, 
-  Shield, 
-  Sparkles, 
-  Clock, 
-  Award, 
-  Users, 
-  Scale, 
-  Lock, 
+import {
+  motion,
+  AnimatePresence,
+  useScroll,
+  useTransform,
+} from "framer-motion";
+import { Button } from "@/components/ui/button";
+import {
+  Rocket,
+  ShieldCheck,
+  BarChart,
+  Globe,
+  Zap,
+  Cloud,
+  Factory,
+  Cpu,
+  Database,
+  Server,
+  TestTube2,
+  Upload,
+  Check,
+  X,
+  Target,
+  Shield,
+  Sparkles,
+  Clock,
+  Award,
+  Users,
+  Scale,
+  Lock,
   Menu,
   CreditCard,
   ExternalLink,
   Loader2,
   CheckCircle,
-  AlertCircle
-} from 'lucide-react';
-import { Link } from 'react-router-dom';
-import { useState, useEffect, useRef } from 'react';
-import { useInView } from 'framer-motion';
-import Header from '@/components/Header';
-import Footer from '@/components/Footer';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
-import { useToast } from '@/components/ui/use-toast';
-import { api } from '@/lib/api';
+  AlertCircle,
+} from "lucide-react";
+import { Link } from "react-router-dom";
+import { useState, useEffect, useRef } from "react";
+import { useInView } from "framer-motion";
+import Header from "@/components/Header";
+import Footer from "@/components/Footer";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import { useToast } from "@/components/ui/use-toast";
+import { api } from "@/lib/api";
 
 // Cookie consent component
 const CookieConsent = () => {
   const [show, setShow] = useState(true);
-  
+
   if (!show) return null;
-  
+
   return (
-    <motion.div 
+    <motion.div
       initial={{ y: 100 }}
       animate={{ y: 0 }}
       exit={{ y: 100 }}
@@ -54,18 +65,19 @@ const CookieConsent = () => {
     >
       <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
         <p className="text-gray-300 text-sm">
-          We use cookies to enhance your experience. By continuing to visit this site you agree to our use of cookies.
+          We use cookies to enhance your experience. By continuing to visit this
+          site you agree to our use of cookies.
         </p>
         <div className="flex gap-3">
-          <Button 
-            variant="outline" 
+          <Button
+            variant="outline"
             size="sm"
             onClick={() => setShow(false)}
             className="text-gray-400 border-gray-700 hover:bg-gray-800"
           >
             Decline
           </Button>
-          <Button 
+          <Button
             size="sm"
             onClick={() => setShow(false)}
             className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
@@ -101,22 +113,22 @@ const Landing = () => {
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState<any>(null);
   const [isProcessing, setIsProcessing] = useState(false);
-  
+
   const { toast } = useToast();
 
   // Stripe Checkout function
   const processStripePayment = async (plan: any) => {
     try {
       setIsProcessing(true);
-      
+
       // Create Stripe checkout session
       const checkoutData = {
         plan: plan.name,
-        amount: parseFloat(plan.price[isAnnual ? 'annual' : 'monthly']),
-        currency: 'GBP',
-        billing_cycle: isAnnual ? 'annual' : 'monthly',
+        amount: parseFloat(plan.price[isAnnual ? "annual" : "monthly"]),
+        currency: "GBP",
+        billing_cycle: "monthly",
         success_url: `${window.location.origin}/dashboard/billing?payment_success=true`,
-        cancel_url: `${window.location.origin}/dashboard/billing?payment_cancelled=true`
+        cancel_url: `${window.location.origin}/dashboard/billing?payment_cancelled=true`,
       };
 
       const response = await api.billing.createCheckoutSession(checkoutData);
@@ -125,14 +137,16 @@ const Landing = () => {
         // Redirect to Stripe Checkout
         window.location.href = response.data.checkout_url;
       } else {
-        throw new Error(response.error || 'Failed to create checkout session');
+        throw new Error(response.error || "Failed to create checkout session");
       }
-
     } catch (error) {
-      console.error('Stripe checkout error:', error);
+      console.error("Stripe checkout error:", error);
       toast({
         title: "Checkout Error",
-        description: error instanceof Error ? error.message : 'Failed to start checkout process',
+        description:
+          error instanceof Error
+            ? error.message
+            : "Failed to start checkout process",
         variant: "destructive",
       });
       setIsProcessing(false);
@@ -141,27 +155,21 @@ const Landing = () => {
 
   // Handle plan selection with Stripe integration
   const handlePlanSelect = async (plan: any) => {
-    if (plan.name === 'Starter') {
-      // Free plan - direct signup
-      toast({
-        title: "Free Plan Selected",
-        description: "Please create an account to get started with your free plan.",
-        variant: "default",
-      });
-      return;
-    }
-    
-    if (plan.name === 'Enterprise') {
+    if (
+      typeof plan.name === "string" &&
+      plan.name.toLowerCase().includes("enterprise")
+    ) {
       // Enterprise plan - contact sales
       toast({
         title: "Enterprise Plan",
-        description: "Our sales team will contact you to discuss custom enterprise solutions.",
+        description:
+          "Our sales team will contact you to discuss custom enterprise solutions.",
         variant: "default",
       });
       return;
     }
-    
-    // Pro plan - show Stripe checkout confirmation
+
+    // Paid plans - show Stripe checkout confirmation
     setSelectedPlan(plan);
     setIsPaymentModalOpen(true);
   };
@@ -169,7 +177,7 @@ const Landing = () => {
   // Handle Stripe checkout
   const handleStripeCheckout = async () => {
     if (!selectedPlan) return;
-    
+
     setIsPaymentModalOpen(false);
     await processStripePayment(selectedPlan);
   };
@@ -182,41 +190,53 @@ const Landing = () => {
   };
 
   const features = [
-    { 
-      icon: Cpu, 
-      title: "AI-Powered Recognition", 
-      description: "Advanced computer vision models identify parts with 99.9% accuracy across 50+ industrial categories",
-      image: "https://images.unsplash.com/photo-1639322537228-f710d8465a4d?auto=format&fit=crop&w=800"
+    {
+      icon: Cpu,
+      title: "AI-Powered Recognition",
+      description:
+        "Advanced computer vision models identify parts with 99.9% accuracy across 50+ industrial categories",
+      image:
+        "https://images.unsplash.com/photo-1639322537228-f710d8465a4d?auto=format&fit=crop&w=800",
     },
-    { 
-      icon: Database, 
-      title: "Comprehensive Database", 
-      description: "Over 10 million parts from 1000+ manufacturers with detailed specifications and pricing",
-      image: "https://images.unsplash.com/photo-1558494949-ef010cbdcc31?auto=format&fit=crop&w=800"
+    {
+      icon: Database,
+      title: "Comprehensive Database",
+      description:
+        "Over 10 million parts from 1000+ manufacturers with detailed specifications and pricing",
+      image:
+        "https://images.unsplash.com/photo-1558494949-ef010cbdcc31?auto=format&fit=crop&w=800",
     },
-    { 
-      icon: Zap, 
-      title: "Instant Results", 
-      description: "Get complete part information, specifications, and supplier contacts in milliseconds",
-      image: "https://images.unsplash.com/photo-1460925895917-afdab827c52f?auto=format&fit=crop&w=800"
+    {
+      icon: Zap,
+      title: "Instant Results",
+      description:
+        "Get complete part information, specifications, and supplier contacts in milliseconds",
+      image:
+        "https://images.unsplash.com/photo-1460925895917-afdab827c52f?auto=format&fit=crop&w=800",
     },
-    { 
-      icon: Cloud, 
-      title: "Multi-Format Support", 
-      description: "Upload images, PDFs, CAD files, or even capture photos directly from your mobile device",
-      image: "https://images.unsplash.com/photo-1573164713712-03790a178651?auto=format&fit=crop&w=800"
+    {
+      icon: Cloud,
+      title: "Multi-Format Support",
+      description:
+        "Upload images, PDFs, CAD files, or even capture photos directly from your mobile device",
+      image:
+        "https://images.unsplash.com/photo-1573164713712-03790a178651?auto=format&fit=crop&w=800",
     },
-    { 
-      icon: Server, 
-      title: "Enterprise Integration", 
-      description: "REST APIs, webhook support, and seamless integration with ERP systems and inventory management",
-      image: "https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&w=800"
+    {
+      icon: Server,
+      title: "Enterprise Integration",
+      description:
+        "REST APIs, webhook support, and seamless integration with ERP systems and inventory management",
+      image:
+        "https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&w=800",
     },
-    { 
-      icon: ShieldCheck, 
-      title: "Quality Assurance", 
-      description: "Verified suppliers, authentic parts, and comprehensive warranty information to ensure reliability",
-      image: "https://images.unsplash.com/photo-1587614382340-3ec188b4e842?auto=format&fit=crop&w=800"
+    {
+      icon: ShieldCheck,
+      title: "Quality Assurance",
+      description:
+        "Verified suppliers, authentic parts, and comprehensive warranty information to ensure reliability",
+      image:
+        "https://images.unsplash.com/photo-1587614382340-3ec188b4e842?auto=format&fit=crop&w=800",
     },
   ];
 
@@ -225,20 +245,23 @@ const Landing = () => {
       title: "Industrial Manufacturing",
       icon: Factory,
       description: "Automated part identification for assembly lines",
-      image: "https://images.unsplash.com/photo-1456735190827-d1262f71b8a3?auto=format&fit=crop&w=800"
+      image:
+        "https://images.unsplash.com/photo-1456735190827-d1262f71b8a3?auto=format&fit=crop&w=800",
     },
     {
       title: "AI Processing",
       icon: Cpu,
       description: "Neural network-powered recognition systems",
-      image: "https://images.unsplash.com/photo-1573164713712-03790a178651?auto=format&fit=crop&w=800"
+      image:
+        "https://images.unsplash.com/photo-1573164713712-03790a178651?auto=format&fit=crop&w=800",
     },
     {
       title: "Quality Control",
       icon: TestTube2,
       description: "Automated defect detection systems",
-      image: "https://images.unsplash.com/photo-1581092580497-e0d23cbdf1dc?auto=format&fit=crop&w=800"
-    }
+      image:
+        "https://images.unsplash.com/photo-1581092580497-e0d23cbdf1dc?auto=format&fit=crop&w=800",
+    },
   ];
 
   const testimonials = [
@@ -246,40 +269,46 @@ const Landing = () => {
       name: "Marcus Johnson",
       role: "CTO, AutoParts Pro",
       text: "Reduced part identification time by 70% while improving accuracy. This AI system has revolutionized our entire supply chain management process.",
-      avatar: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=150&h=150",
+      avatar:
+        "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=150&h=150",
       company: "AutoParts Pro",
-      rating: 5
+      rating: 5,
     },
     {
       name: "Sarah Chen",
       role: "Lead Manufacturing Engineer",
       text: "The AI recognition system transformed our maintenance workflows. We've seen a 40% reduction in downtime and significant cost savings.",
-      avatar: "https://images.unsplash.com/photo-1494790108755-2616b332c3cc?auto=format&fit=crop&w=150&h=150",
+      avatar:
+        "https://images.unsplash.com/photo-1494790108755-2616b332c3cc?auto=format&fit=crop&w=150&h=150",
       company: "Industrial Solutions Ltd",
-      rating: 5
+      rating: 5,
     },
     {
       name: "David Rodriguez",
       role: "Operations Director",
       text: "Integration was seamless and the accuracy is incredible. Our team can now identify complex automotive parts in seconds instead of hours.",
-      avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=150&h=150",
+      avatar:
+        "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=150&h=150",
       company: "MechTech Industries",
-      rating: 5
-    }
+      rating: 5,
+    },
   ];
 
   const faqs = [
     {
       question: "How accurate is the part identification?",
-      answer: "Our AI models achieve 99.3% accuracy across 50+ industrial categories"
+      answer:
+        "Our AI models achieve 99.3% accuracy across 50+ industrial categories",
     },
     {
       question: "What file formats are supported?",
-      answer: "We support JPG, PNG, PDF, and CAD files with automatic conversion"
-    }
+      answer:
+        "We support JPG, PNG, PDF, and CAD files with automatic conversion",
+    },
   ];
 
-  const aiInterfaceImage = "https://images.unsplash.com/photo-1639322537228-f710d8465a4d?auto=format&fit=crop&w=1920";
+  const aiInterfaceImage =
+    "https://images.unsplash.com/photo-1639322537228-f710d8465a4d?auto=format&fit=crop&w=1920";
 
   const howItWorks = [
     {
@@ -301,22 +330,37 @@ const Landing = () => {
 
   const pricing = [
     {
-      name: "Starter",
-      price: { monthly: "0", annual: "0" },
-      features: ["5 free scans/month", "Basic part details", "Email support"],
+      name: "Starter / Basic",
+      price: { monthly: "12.99", annual: "12.99" },
+      features: [
+        "20 image recognitions per month",
+        "Basic search & match results",
+        "Access via web portal only",
+      ],
       cta: "Get Started",
     },
     {
-      name: "Pro",
-      price: { monthly: "82", annual: "66" },
-      features: ["Unlimited scans", "Advanced analytics", "Priority support", "Bulk processing"],
+      name: "Professional / Business",
+      price: { monthly: "69.99", annual: "69.99" },
+      features: [
+        "500 recognitions per month",
+        "Catalogue storage (part lists, drawings)",
+        "API access for ERP/CMMS",
+        "Analytics dashboard",
+      ],
       cta: "Go Professional",
       featured: true,
     },
     {
       name: "Enterprise",
-      price: { monthly: "Custom", annual: "Custom" },
-      features: ["Dedicated AI cluster", "SLA guarantees", "Custom integration", "24/7 support"],
+      price: { monthly: "460", annual: "460" },
+      features: [
+        "Unlimited recognition",
+        "Advanced AI customisation (train on your data)",
+        "ERP/CMMS full integration",
+        "Predictive demand analytics",
+        "Dedicated support & SLA",
+      ],
       cta: "Contact Sales",
     },
   ];
@@ -325,58 +369,78 @@ const Landing = () => {
     {
       icon: Target,
       title: "Precision & Accuracy",
-      description: "99.9% accurate part identification powered by state-of-the-art computer vision",
-      gradient: "from-blue-600 to-cyan-500"
+      description:
+        "99.9% accurate part identification powered by state-of-the-art computer vision",
+      gradient: "from-blue-600 to-cyan-500",
     },
     {
       icon: Shield,
       title: "Enterprise Security",
-      description: "Bank-grade encryption and SOC 2 Type II compliance for your data",
-      gradient: "from-purple-600 to-pink-500"
+      description:
+        "Bank-grade encryption and SOC 2 Type II compliance for your data",
+      gradient: "from-purple-600 to-pink-500",
     },
     {
       icon: Clock,
       title: "Lightning Fast",
-      description: "Results in milliseconds, not minutes. Time is money in manufacturing",
-      gradient: "from-orange-600 to-red-500"
+      description:
+        "Results in milliseconds, not minutes. Time is money in manufacturing",
+      gradient: "from-orange-600 to-red-500",
     },
     {
       icon: Award,
       title: "Quality Guaranteed",
-      description: "Only verified suppliers and authentic parts in our database",
-      gradient: "from-green-600 to-emerald-500"
+      description:
+        "Only verified suppliers and authentic parts in our database",
+      gradient: "from-green-600 to-emerald-500",
     },
     {
       icon: Users,
       title: "Expert Support",
-      description: "24/7 technical support from automotive and engineering experts",
-      gradient: "from-yellow-600 to-orange-500"
+      description:
+        "24/7 technical support from automotive and engineering experts",
+      gradient: "from-yellow-600 to-orange-500",
     },
     {
       icon: Scale,
       title: "Cost Effective",
       description: "Save up to 40% on parts through our global marketplace",
-      gradient: "from-indigo-600 to-purple-500"
-    }
+      gradient: "from-indigo-600 to-purple-500",
+    },
   ];
 
   useEffect(() => {
     const allImages = [
       aiInterfaceImage,
-      ...features.map(f => f.image),
-      ...useCases.map(u => u.image)
+      ...features.map((f) => f.image),
+      ...useCases.map((u) => u.image),
     ];
-    
-    Promise.all(allImages.map(url => 
-      loadImage(url).then(() => {
-        setLoadedImages(prev => new Set([...prev, url]));
-      })
-    )).catch(console.error);
+
+    Promise.all(
+      allImages.map((url) =>
+        loadImage(url).then(() => {
+          setLoadedImages((prev) => new Set([...prev, url]));
+        })
+      )
+    ).catch(console.error);
   }, []);
 
-  function Step({ title, description, icon: Icon, index }: { title: string; description: string; icon: any; index: number }) {
+  function Step({
+    title,
+    description,
+    icon: Icon,
+    index,
+  }: {
+    title: string;
+    description: string;
+    icon: any;
+    index: number;
+  }) {
     const ref = useRef(null);
-    const isInView = useInView(ref, { once: true, margin: "-40% 0px -40% 0px" });
+    const isInView = useInView(ref, {
+      once: true,
+      margin: "-40% 0px -40% 0px",
+    });
 
     return (
       <motion.div
@@ -395,15 +459,24 @@ const Landing = () => {
     );
   }
 
-  function ValueCard({ icon: Icon, title, description, gradient, index }: { 
-    icon: any; 
-    title: string; 
-    description: string; 
+  function ValueCard({
+    icon: Icon,
+    title,
+    description,
+    gradient,
+    index,
+  }: {
+    icon: any;
+    title: string;
+    description: string;
     gradient: string;
     index: number;
   }) {
     const ref = useRef(null);
-    const isInView = useInView(ref, { once: true, margin: "-40% 0px -40% 0px" });
+    const isInView = useInView(ref, {
+      once: true,
+      margin: "-40% 0px -40% 0px",
+    });
 
     return (
       <motion.div
@@ -414,7 +487,9 @@ const Landing = () => {
         className="group relative overflow-hidden rounded-2xl border border-gray-800 bg-gray-900/50 p-8 hover:bg-gray-800/50 transition-colors"
       >
         <div className="relative z-10">
-          <div className={`mb-6 inline-block rounded-xl bg-gradient-to-r ${gradient} p-3`}>
+          <div
+            className={`mb-6 inline-block rounded-xl bg-gradient-to-r ${gradient} p-3`}
+          >
             <Icon className="h-6 w-6 text-white" />
           </div>
           <h3 className="mb-2 text-xl font-semibold text-white">{title}</h3>
@@ -437,10 +512,13 @@ const Landing = () => {
         <div className="absolute inset-0 bg-gradient-to-br from-black via-gray-900/50 to-black" />
         <div className="absolute inset-0">
           <div className="absolute top-1/4 left-1/4 w-[600px] h-[600px] bg-purple-500/10 rounded-full blur-3xl animate-pulse" />
-          <div className="absolute bottom-1/4 right-1/4 w-[400px] h-[400px] bg-blue-500/10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: "1s" }} />
+          <div
+            className="absolute bottom-1/4 right-1/4 w-[400px] h-[400px] bg-blue-500/10 rounded-full blur-3xl animate-pulse"
+            style={{ animationDelay: "1s" }}
+          />
           <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-gradient-to-r from-purple-500/5 to-blue-500/5 rounded-full blur-3xl" />
         </div>
-        
+
         <div className="max-w-7xl mx-auto relative z-10">
           <div className="text-center">
             <motion.div
@@ -457,7 +535,9 @@ const Landing = () => {
                 >
                   <Sparkles className="w-5 h-5 text-purple-400" />
                 </motion.div>
-                <span className="text-purple-300 font-semibold text-sm">Next-Generation AI Technology</span>
+                <span className="text-purple-300 font-semibold text-sm">
+                  Next-Generation AI Technology
+                </span>
                 <div className="ml-3 w-2 h-2 bg-green-400 rounded-full animate-pulse" />
               </div>
             </motion.div>
@@ -475,15 +555,20 @@ const Landing = () => {
                   Part Recognition
                 </span>
               </h1>
-              
-              <motion.p 
+
+              <motion.p
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ delay: 0.5, duration: 0.8 }}
                 className="text-2xl text-gray-200 mb-12 max-w-4xl mx-auto leading-relaxed font-light"
               >
-                Revolutionary computer vision technology that identifies industrial parts with 
-                <span className="text-purple-300 font-semibold"> 99.9% accuracy</span> in milliseconds
+                Revolutionary computer vision technology that identifies
+                industrial parts with
+                <span className="text-purple-300 font-semibold">
+                  {" "}
+                  99.9% accuracy
+                </span>{" "}
+                in milliseconds
               </motion.p>
             </motion.div>
 
@@ -493,8 +578,14 @@ const Landing = () => {
               transition={{ delay: 0.7, duration: 0.8 }}
               className="flex flex-col sm:flex-row justify-center gap-6 items-center mb-16"
             >
-              <Button asChild className="group relative overflow-hidden bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white text-xl px-10 py-8 rounded-2xl shadow-2xl shadow-purple-500/25 hover:shadow-purple-500/40 transform hover:scale-105 transition-all duration-300 w-full sm:w-auto">
-                <Link to="/register" className="flex items-center justify-center gap-3">
+              <Button
+                asChild
+                className="group relative overflow-hidden bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white text-xl px-10 py-8 rounded-2xl shadow-2xl shadow-purple-500/25 hover:shadow-purple-500/40 transform hover:scale-105 transition-all duration-300 w-full sm:w-auto"
+              >
+                <Link
+                  to="/register"
+                  className="flex items-center justify-center gap-3"
+                >
                   <span className="font-semibold">Start Free Trial</span>
                   <motion.div
                     animate={{ x: [0, 4, 0] }}
@@ -510,8 +601,11 @@ const Landing = () => {
                   />
                 </Link>
               </Button>
-              
-              <Button variant="outline" className="group text-white border-2 border-gray-600/50 hover:border-purple-500/50 hover:bg-purple-500/10 text-xl px-10 py-8 rounded-2xl backdrop-blur-xl transition-all duration-300 w-full sm:w-auto">
+
+              <Button
+                variant="outline"
+                className="group text-white border-2 border-gray-600/50 hover:border-purple-500/50 hover:bg-purple-500/10 text-xl px-10 py-8 rounded-2xl backdrop-blur-xl transition-all duration-300 w-full sm:w-auto"
+              >
                 <span className="flex items-center gap-3">
                   <span className="font-semibold">Watch Demo</span>
                   <div className="relative">
@@ -540,7 +634,7 @@ const Landing = () => {
               {[
                 { metric: "99.9%", label: "Accuracy Rate", icon: Target },
                 { metric: "<100ms", label: "Recognition Speed", icon: Zap },
-                { metric: "10M+", label: "Parts Database", icon: Database }
+                { metric: "10M+", label: "Parts Database", icon: Database },
               ].map((item, index) => (
                 <motion.div
                   key={item.label}
@@ -550,29 +644,34 @@ const Landing = () => {
                   className="bg-gray-900/40 backdrop-blur-xl rounded-2xl p-6 border border-gray-800/50 hover:border-purple-500/30 transition-all duration-300"
                 >
                   <item.icon className="w-8 h-8 text-purple-400 mx-auto mb-3" />
-                  <div className="text-3xl font-bold text-white mb-2">{item.metric}</div>
+                  <div className="text-3xl font-bold text-white mb-2">
+                    {item.metric}
+                  </div>
                   <div className="text-gray-400 text-sm">{item.label}</div>
                 </motion.div>
               ))}
             </motion.div>
 
             {/* Enhanced AI Interface Preview */}
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: loadedImages.has(aiInterfaceImage) ? 1 : 0, scale: 1 }}
+              animate={{
+                opacity: loadedImages.has(aiInterfaceImage) ? 1 : 0,
+                scale: 1,
+              }}
               transition={{ duration: 0.8 }}
               style={{ y: y2 }}
               className="mt-20 relative max-w-6xl mx-auto"
             >
               <div className="relative rounded-3xl overflow-hidden border border-white/10 backdrop-blur-xl">
                 <div className="absolute inset-0 bg-gradient-to-r from-purple-900/30 to-blue-900/30" />
-                <img 
+                <img
                   src={aiInterfaceImage}
                   alt="AI Interface"
                   className="w-full h-auto object-cover opacity-90 scale-[1.02] hover:scale-100 transition-transform duration-700"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
-                
+
                 {/* Interactive Feature Indicators */}
                 <div className="absolute inset-0">
                   <motion.div
@@ -588,7 +687,7 @@ const Landing = () => {
                       </div>
                     </div>
                   </motion.div>
-                  
+
                   <motion.div
                     initial={{ scale: 0 }}
                     animate={{ scale: [0, 1, 1.1, 1] }}
@@ -658,9 +757,7 @@ const Landing = () => {
             viewport={{ once: true }}
             className="mt-16 text-center"
           >
-            <Button
-              className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-lg px-8 py-6"
-            >
+            <Button className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-lg px-8 py-6">
               Learn More About Our Technology
             </Button>
           </motion.div>
@@ -674,9 +771,9 @@ const Landing = () => {
           <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl" />
           <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl" />
         </div>
-        
+
         <div className="max-w-7xl mx-auto relative z-10">
-          <motion.div 
+          <motion.div
             className="text-center mb-20"
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
@@ -689,16 +786,19 @@ const Landing = () => {
               className="inline-flex items-center px-4 py-2 bg-gradient-to-r from-purple-500/20 to-blue-500/20 rounded-full border border-purple-500/30 mb-8"
             >
               <Sparkles className="w-4 h-4 text-purple-400 mr-2" />
-              <span className="text-sm text-purple-300 font-medium">Powered by Advanced AI</span>
+              <span className="text-sm text-purple-300 font-medium">
+                Powered by Advanced AI
+              </span>
             </motion.div>
             <h2 className="text-5xl lg:text-6xl font-bold bg-gradient-to-r from-white via-purple-200 to-blue-200 bg-clip-text text-transparent mb-6">
               Core Capabilities
             </h2>
             <p className="text-xl text-gray-400 max-w-3xl mx-auto leading-relaxed">
-              Revolutionary part identification technology that transforms how industrial teams work
+              Revolutionary part identification technology that transforms how
+              industrial teams work
             </p>
           </motion.div>
-          
+
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {features.map((feature, index) => (
               <motion.div
@@ -711,7 +811,7 @@ const Landing = () => {
                 <div className="absolute -inset-px bg-gradient-to-r from-purple-600 to-blue-600 rounded-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 blur-sm" />
                 <div className="relative h-full bg-gray-900/80 backdrop-blur-xl rounded-3xl border border-gray-800/50 group-hover:border-transparent transition-all duration-500 overflow-hidden">
                   <div className="absolute inset-0 bg-gradient-to-br from-purple-900/20 via-transparent to-blue-900/20 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-                  
+
                   <div className="relative p-8 h-full flex flex-col">
                     <div className="mb-8">
                       <div className="relative">
@@ -721,15 +821,15 @@ const Landing = () => {
                         </div>
                       </div>
                     </div>
-                    
+
                     <h3 className="text-2xl font-bold text-white mb-4 group-hover:bg-gradient-to-r group-hover:from-purple-300 group-hover:to-blue-300 group-hover:bg-clip-text group-hover:text-transparent transition-all duration-300">
                       {feature.title}
                     </h3>
-                    
+
                     <p className="text-gray-400 leading-relaxed flex-grow text-lg">
                       {feature.description}
                     </p>
-                    
+
                     <div className="mt-6 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
                       <div className="w-full h-px bg-gradient-to-r from-transparent via-purple-500/50 to-transparent" />
                       <div className="mt-4 flex items-center text-purple-400 text-sm font-medium">
@@ -748,8 +848,8 @@ const Landing = () => {
               </motion.div>
             ))}
           </div>
-          
-          <motion.div 
+
+          <motion.div
             className="text-center mt-16"
             initial={{ opacity: 0 }}
             whileInView={{ opacity: 1 }}
@@ -787,7 +887,9 @@ const Landing = () => {
                     <div className="w-12 h-12 bg-gradient-to-r from-purple-600 to-blue-600 rounded-lg flex items-center justify-center">
                       <useCase.icon className="w-6 h-6 text-white" />
                     </div>
-                    <h3 className="text-2xl font-semibold text-white">{useCase.title}</h3>
+                    <h3 className="text-2xl font-semibold text-white">
+                      {useCase.title}
+                    </h3>
                     <p className="text-gray-300">{useCase.description}</p>
                   </div>
                 </div>
@@ -800,8 +902,8 @@ const Landing = () => {
       {/* Stats Section */}
       <section className="relative py-20">
         <div className="absolute inset-0">
-          <img 
-            src="/images/circuit-board-bg.jpg" 
+          <img
+            src="/images/circuit-board-bg.jpg"
             className="w-full h-full object-cover opacity-20"
             alt="Circuit board background"
           />
@@ -813,7 +915,7 @@ const Landing = () => {
               { value: "1M+", label: "Parts Identified" },
               { value: "99.9%", label: "Accuracy Rate" },
               { value: "50+", label: "Industries Served" },
-              { value: "24/7", label: "Global Support" }
+              { value: "24/7", label: "Global Support" },
             ].map((stat, index) => (
               <motion.div
                 key={stat.label}
@@ -825,7 +927,9 @@ const Landing = () => {
                 <div className="text-5xl font-bold bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent mb-2">
                   {stat.value}
                 </div>
-                <div className="text-gray-300 uppercase text-sm tracking-wider">{stat.label}</div>
+                <div className="text-gray-300 uppercase text-sm tracking-wider">
+                  {stat.label}
+                </div>
               </motion.div>
             ))}
           </div>
@@ -839,9 +943,9 @@ const Landing = () => {
           <div className="absolute top-0 left-1/3 w-72 h-72 bg-purple-500/5 rounded-full blur-3xl" />
           <div className="absolute bottom-0 right-1/3 w-72 h-72 bg-blue-500/5 rounded-full blur-3xl" />
         </div>
-        
+
         <div className="max-w-7xl mx-auto relative z-10">
-          <motion.div 
+          <motion.div
             className="text-center mb-20"
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
@@ -854,16 +958,19 @@ const Landing = () => {
               className="inline-flex items-center px-4 py-2 bg-gradient-to-r from-green-500/20 to-emerald-500/20 rounded-full border border-green-500/30 mb-8"
             >
               <Users className="w-4 h-4 text-green-400 mr-2" />
-              <span className="text-sm text-green-300 font-medium">Success Stories</span>
+              <span className="text-sm text-green-300 font-medium">
+                Success Stories
+              </span>
             </motion.div>
             <h2 className="text-5xl lg:text-6xl font-bold bg-gradient-to-r from-white via-green-200 to-emerald-200 bg-clip-text text-transparent mb-6">
               Trusted by Industry Leaders
             </h2>
             <p className="text-xl text-gray-400 max-w-3xl mx-auto leading-relaxed">
-              See how leading manufacturers are transforming their operations with our AI-powered part identification
+              See how leading manufacturers are transforming their operations
+              with our AI-powered part identification
             </p>
           </motion.div>
-          
+
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {testimonials.map((testimonial, index) => (
               <motion.div
@@ -876,7 +983,7 @@ const Landing = () => {
                 <div className="absolute -inset-px bg-gradient-to-r from-green-600/50 to-emerald-600/50 rounded-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 blur-sm" />
                 <div className="relative h-full bg-gray-900/90 backdrop-blur-xl rounded-3xl border border-gray-800/50 group-hover:border-green-500/30 transition-all duration-500 p-8">
                   <div className="absolute inset-0 bg-gradient-to-br from-green-900/10 via-transparent to-emerald-900/10 opacity-0 group-hover:opacity-100 transition-opacity duration-500 rounded-3xl" />
-                  
+
                   <div className="relative">
                     {/* Rating Stars */}
                     <div className="flex items-center gap-1 mb-6">
@@ -891,14 +998,18 @@ const Landing = () => {
                         </motion.div>
                       ))}
                     </div>
-                    
+
                     {/* Testimonial Text */}
                     <blockquote className="text-gray-300 text-lg leading-relaxed mb-8 relative">
-                      <div className="absolute -top-2 -left-2 text-6xl text-green-500/20 font-serif">"</div>
+                      <div className="absolute -top-2 -left-2 text-6xl text-green-500/20 font-serif">
+                        "
+                      </div>
                       {testimonial.text}
-                      <div className="absolute -bottom-4 -right-2 text-6xl text-green-500/20 font-serif">"</div>
+                      <div className="absolute -bottom-4 -right-2 text-6xl text-green-500/20 font-serif">
+                        "
+                      </div>
                     </blockquote>
-                    
+
                     {/* Author Info */}
                     <div className="flex items-center gap-4">
                       <div className="relative">
@@ -926,14 +1037,16 @@ const Landing = () => {
               </motion.div>
             ))}
           </div>
-          
-          <motion.div 
+
+          <motion.div
             className="text-center mt-16"
             initial={{ opacity: 0 }}
             whileInView={{ opacity: 1 }}
             transition={{ delay: 0.8, duration: 0.8 }}
           >
-            <p className="text-gray-400 mb-6">Join 500+ companies already transforming their operations</p>
+            <p className="text-gray-400 mb-6">
+              Join 500+ companies already transforming their operations
+            </p>
             <Button className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white px-8 py-4 rounded-2xl text-lg font-semibold shadow-2xl shadow-green-500/25 hover:shadow-green-500/40 transition-all duration-300 transform hover:scale-105">
               Read More Success Stories
             </Button>
@@ -956,7 +1069,9 @@ const Landing = () => {
                 transition={{ delay: index * 0.1 }}
                 className="bg-white/5 p-6 rounded-xl border border-white/10"
               >
-                <h3 className="text-lg font-semibold text-white mb-2">{faq.question}</h3>
+                <h3 className="text-lg font-semibold text-white mb-2">
+                  {faq.question}
+                </h3>
                 <p className="text-gray-400">{faq.answer}</p>
               </motion.div>
             ))}
@@ -972,13 +1087,20 @@ const Landing = () => {
               Ready to Revolutionize Your Part Identification?
             </h2>
             <p className="text-gray-300 mb-8 max-w-2xl mx-auto">
-              Join hundreds of manufacturers already using our AI-powered platform
+              Join hundreds of manufacturers already using our AI-powered
+              platform
             </p>
             <div className="flex justify-center gap-4">
-              <Button asChild className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-lg px-8 py-6">
+              <Button
+                asChild
+                className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-lg px-8 py-6"
+              >
                 <Link to="/register">Start Free Trial</Link>
               </Button>
-              <Button variant="outline" className="text-white border-gray-600 hover:bg-white/10 text-lg px-8 py-6">
+              <Button
+                variant="outline"
+                className="text-white border-gray-600 hover:bg-white/10 text-lg px-8 py-6"
+              >
                 Contact Sales
               </Button>
             </div>
@@ -996,7 +1118,7 @@ const Landing = () => {
           >
             How It Works
           </motion.h2>
-          
+
           <div className="grid grid-cols-1 md:grid-cols-3 gap-12">
             {howItWorks.map((step, index) => (
               <Step key={step.title} {...step} index={index} />
@@ -1011,7 +1133,7 @@ const Landing = () => {
           <div className="absolute inset-0 bg-[url('/images/grid-pattern.svg')] bg-repeat opacity-5" />
           <div className="absolute inset-0 bg-gradient-to-b from-gray-900 via-black to-black opacity-90" />
         </div>
-        
+
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -1026,34 +1148,11 @@ const Landing = () => {
               Choose Your Plan
             </h2>
             <p className="text-gray-400 mb-12 max-w-2xl mx-auto">
-              Start with our free tier and scale as you grow. All plans include core AI features.
+              Start with our free tier and scale as you grow. All plans include
+              core AI features.
             </p>
           </motion.div>
 
-          <div className="flex justify-center mb-12">
-            <div className="bg-gray-800/50 p-1 rounded-full backdrop-blur-sm">
-              <div className="relative flex">
-                <button
-                  onClick={() => setIsAnnual(false)}
-                  className={`px-6 py-2 text-sm font-medium rounded-full transition-colors ${
-                    !isAnnual ? 'text-white bg-gradient-to-r from-purple-600 to-blue-600' : 'text-gray-400'
-                  }`}
-                >
-                  Monthly
-                </button>
-                <button
-                  onClick={() => setIsAnnual(true)}
-                  className={`px-6 py-2 text-sm font-medium rounded-full transition-colors ${
-                    isAnnual ? 'text-white bg-gradient-to-r from-purple-600 to-blue-600' : 'text-gray-400'
-                  }`}
-                >
-                  Annual
-                  <span className="ml-1 text-xs text-purple-400">Save 20%</span>
-                </button>
-              </div>
-            </div>
-          </div>
-          
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             {pricing.map((plan, index) => (
               <motion.div
@@ -1063,9 +1162,9 @@ const Landing = () => {
                 viewport={{ once: true }}
                 transition={{ delay: index * 0.2 }}
                 className={`relative group rounded-2xl p-8 ${
-                  plan.featured 
-                    ? 'bg-gradient-to-b from-purple-900/30 to-blue-900/30 border-2 border-purple-500/30'
-                    : 'bg-gray-800/30 border border-gray-700/50'
+                  plan.featured
+                    ? "bg-gradient-to-b from-purple-900/30 to-blue-900/30 border-2 border-purple-500/30"
+                    : "bg-gray-800/30 border border-gray-700/50"
                 }`}
               >
                 {plan.featured && (
@@ -1073,28 +1172,28 @@ const Landing = () => {
                     Most Popular
                   </div>
                 )}
-                
+
                 <div className="text-center">
-                  <h3 className="text-2xl font-semibold text-white mb-4">{plan.name}</h3>
+                  <h3 className="text-2xl font-semibold text-white mb-4">
+                    {plan.name}
+                  </h3>
                   <div className="mb-6">
                     <div className="flex items-center justify-center">
                       <span className="text-5xl font-bold bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent">
-                        £{isAnnual ? plan.price.annual : plan.price.monthly}
+                        £{plan.price.monthly}
                       </span>
                       {plan.price.monthly !== "Custom" && (
                         <span className="text-gray-400 ml-2">/mo</span>
                       )}
                     </div>
-                    {isAnnual && plan.price.monthly !== "Custom" && (
-                      <div className="text-sm text-purple-400 mt-1">
-                        Billed annually
-                      </div>
-                    )}
                   </div>
-                  
+
                   <ul className="space-y-4 mb-8">
                     {plan.features.map((feature) => (
-                      <li key={feature} className="flex items-center text-gray-300">
+                      <li
+                        key={feature}
+                        className="flex items-center text-gray-300"
+                      >
                         <div className="mr-2 rounded-full p-1 bg-green-500/10">
                           <Check className="h-4 w-4 text-green-400" />
                         </div>
@@ -1102,13 +1201,13 @@ const Landing = () => {
                       </li>
                     ))}
                   </ul>
-                  
+
                   <Button
                     onClick={() => handlePlanSelect(plan)}
                     className={`w-full group relative overflow-hidden ${
                       plan.featured
-                        ? 'bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700'
-                        : 'bg-gray-700 hover:bg-gray-600'
+                        ? "bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
+                        : "bg-gray-700 hover:bg-gray-600"
                     }`}
                     size="lg"
                   >
@@ -1129,148 +1228,183 @@ const Landing = () => {
         </div>
       </section>
 
-             {/* Payment Modal */}
-       <AnimatePresence>
-         {isPaymentModalOpen && (
-           <Dialog open={isPaymentModalOpen} onOpenChange={resetPaymentModal}>
-             <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 border border-gray-700 text-white">
-               <DialogHeader>
-                 <DialogTitle className="text-2xl font-bold bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent">
-                   {selectedPlan ? `Complete Your Payment for ${selectedPlan.name}` : 'Payment Required'}
-                 </DialogTitle>
-                 <DialogDescription className="text-gray-300">
-                   {selectedPlan ? `Subscribe to ${selectedPlan.name} plan for £${selectedPlan.price[isAnnual ? 'annual' : 'monthly']}/${isAnnual ? 'year' : 'month'}` : 'Please select a plan to proceed with payment.'}
-                 </DialogDescription>
-               </DialogHeader>
+      {/* Payment Modal */}
+      <AnimatePresence>
+        {isPaymentModalOpen && (
+          <Dialog open={isPaymentModalOpen} onOpenChange={resetPaymentModal}>
+            <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 border border-gray-700 text-white">
+              <DialogHeader>
+                <DialogTitle className="text-2xl font-bold bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent">
+                  {selectedPlan
+                    ? `Complete Your Payment for ${selectedPlan.name}`
+                    : "Payment Required"}
+                </DialogTitle>
+                <DialogDescription className="text-gray-300">
+                  {selectedPlan
+                    ? `Subscribe to ${selectedPlan.name} plan for £${
+                        selectedPlan.price[isAnnual ? "annual" : "monthly"]
+                      }/${isAnnual ? "year" : "month"}`
+                    : "Please select a plan to proceed with payment."}
+                </DialogDescription>
+              </DialogHeader>
 
-               <AnimatePresence mode="wait">
-                 {selectedPlan && (
-                   <motion.div
-                     key="payment"
-                     initial={{ opacity: 0, x: 20 }}
-                     animate={{ opacity: 1, x: 0 }}
-                     exit={{ opacity: 0, x: -20 }}
-                     transition={{ duration: 0.3 }}
-                     className="space-y-6 py-4"
-                   >
-                     {/* Plan Summary */}
-                     <div className="bg-gradient-to-r from-purple-900/20 to-blue-900/20 rounded-xl p-4 border border-purple-500/30">
-                       <h3 className="text-lg font-semibold text-purple-300 mb-2">Plan Summary</h3>
-                       <div className="flex justify-between items-center text-gray-300">
-                         <span>{selectedPlan?.name} Plan ({isAnnual ? 'Annual' : 'Monthly'})</span>
-                         <span className="text-xl font-bold text-white">
-                           £{selectedPlan?.price[isAnnual ? 'annual' : 'monthly']}/{isAnnual ? 'year' : 'month'}
-                         </span>
-                       </div>
-                       {isAnnual && (
-                         <div className="text-sm text-green-400 mt-1">
-                           💰 Save 20% with annual billing
-                         </div>
-                       )}
-                     </div>
+              <AnimatePresence mode="wait">
+                {selectedPlan && (
+                  <motion.div
+                    key="payment"
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -20 }}
+                    transition={{ duration: 0.3 }}
+                    className="space-y-6 py-4"
+                  >
+                    {/* Plan Summary */}
+                    <div className="bg-gradient-to-r from-purple-900/20 to-blue-900/20 rounded-xl p-4 border border-purple-500/30">
+                      <h3 className="text-lg font-semibold text-purple-300 mb-2">
+                        Plan Summary
+                      </h3>
+                      <div className="flex justify-between items-center text-gray-300">
+                        <span>
+                          {selectedPlan?.name} Plan (
+                          {isAnnual ? "Annual" : "Monthly"})
+                        </span>
+                        <span className="text-xl font-bold text-white">
+                          £
+                          {selectedPlan?.price[isAnnual ? "annual" : "monthly"]}
+                          /{isAnnual ? "year" : "month"}
+                        </span>
+                      </div>
+                      {isAnnual && (
+                        <div className="text-sm text-green-400 mt-1">
+                          💰 Save 20% with annual billing
+                        </div>
+                      )}
+                    </div>
 
-                                           {/* Stripe Checkout Information */}
-                      <div className="space-y-6">
-                        <h3 className="text-lg font-semibold text-green-300 flex items-center">
-                          <CreditCard className="w-5 h-5 mr-2" />
-                          Secure Payment via Stripe
-                        </h3>
-                        
-                        {/* Stripe Benefits */}
-                        <div className="bg-gradient-to-r from-green-900/20 to-emerald-900/20 rounded-xl p-4 border border-green-500/30">
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                            <div className="flex items-center text-green-300">
-                              <Shield className="w-4 h-4 mr-2" />
-                              Bank-level security
-                            </div>
-                            <div className="flex items-center text-green-300">
-                              <Lock className="w-4 h-4 mr-2" />
-                              PCI DSS compliant
-                            </div>
-                            <div className="flex items-center text-green-300">
-                              <CreditCard className="w-4 h-4 mr-2" />
-                              Multiple payment methods
-                            </div>
-                            <div className="flex items-center text-green-300">
-                              <Globe className="w-4 h-4 mr-2" />
-                              Global payment processing
-                            </div>
+                    {/* Stripe Checkout Information */}
+                    <div className="space-y-6">
+                      <h3 className="text-lg font-semibold text-green-300 flex items-center">
+                        <CreditCard className="w-5 h-5 mr-2" />
+                        Secure Payment via Stripe
+                      </h3>
+
+                      {/* Stripe Benefits */}
+                      <div className="bg-gradient-to-r from-green-900/20 to-emerald-900/20 rounded-xl p-4 border border-green-500/30">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                          <div className="flex items-center text-green-300">
+                            <Shield className="w-4 h-4 mr-2" />
+                            Bank-level security
+                          </div>
+                          <div className="flex items-center text-green-300">
+                            <Lock className="w-4 h-4 mr-2" />
+                            PCI DSS compliant
+                          </div>
+                          <div className="flex items-center text-green-300">
+                            <CreditCard className="w-4 h-4 mr-2" />
+                            Multiple payment methods
+                          </div>
+                          <div className="flex items-center text-green-300">
+                            <Globe className="w-4 h-4 mr-2" />
+                            Global payment processing
                           </div>
                         </div>
+                      </div>
 
-                        <div className="space-y-3">
-                          <p className="text-gray-300">
-                            🔒 You will be redirected to Stripe's secure payment page to complete your payment.
-                          </p>
-                          <p className="text-gray-400 text-sm">
-                            ✓ Your subscription will be activated instantly upon successful payment<br/>
-                            ✓ You'll receive a confirmation email with your subscription details<br/>
-                            ✓ Cancel anytime from your dashboard
-                          </p>
-                        </div>
-
-                        {/* Action Buttons */}
-                        <div className="space-y-4">
-                          <Button
-                            onClick={handleStripeCheckout}
-                            disabled={isProcessing}
-                            className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white w-full h-12 text-lg font-semibold shadow-lg shadow-purple-500/25"
-                          >
-                            {isProcessing ? (
-                              <>
-                                <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                                Redirecting to Stripe...
-                              </>
-                            ) : (
-                              <>
-                                <CreditCard className="w-5 h-5 mr-2" />
-                                Proceed to Secure Payment
-                                <ExternalLink className="w-4 h-4 ml-2" />
-                              </>
-                            )}
-                          </Button>
-                          
-                          <Button
-                            variant="outline"
-                            onClick={resetPaymentModal}
-                            disabled={isProcessing}
-                            className="border-gray-600 text-gray-300 hover:bg-gray-800 w-full"
-                          >
-                            Cancel
-                          </Button>
-                        </div>
-
-                        <p className="text-xs text-gray-500 text-center">
-                          By proceeding, you agree to our <Link to="/terms" className="underline hover:text-purple-400">Terms of Service</Link> and acknowledge our <Link to="/privacy" className="underline hover:text-purple-400">Privacy Policy</Link>.
+                      <div className="space-y-3">
+                        <p className="text-gray-300">
+                          🔒 You will be redirected to Stripe's secure payment
+                          page to complete your payment.
+                        </p>
+                        <p className="text-gray-400 text-sm">
+                          ✓ Your subscription will be activated instantly upon
+                          successful payment
+                          <br />
+                          ✓ You'll receive a confirmation email with your
+                          subscription details
+                          <br />✓ Cancel anytime from your dashboard
                         </p>
                       </div>
-                   </motion.div>
-                 )}
 
-                 {!selectedPlan && (
-                   <motion.div
-                     key="no-plan"
-                     initial={{ opacity: 0, scale: 0.9 }}
-                     animate={{ opacity: 1, scale: 1 }}
-                     exit={{ opacity: 0, scale: 0.9 }}
-                     transition={{ duration: 0.3 }}
-                     className="text-center py-12"
-                   >
-                     <h3 className="text-xl font-semibold text-white mb-2">No Plan Selected</h3>
-                     <p className="text-gray-400 mb-6">Please select a plan to proceed with payment.</p>
-                     <Button 
-                       onClick={() => setIsPaymentModalOpen(false)}
-                       className="bg-gray-700 hover:bg-gray-600 text-white"
-                     >
-                       Cancel
-                     </Button>
-                   </motion.div>
-                 )}
-               </AnimatePresence>
-             </DialogContent>
-           </Dialog>
-         )}
-       </AnimatePresence>
+                      {/* Action Buttons */}
+                      <div className="space-y-4">
+                        <Button
+                          onClick={handleStripeCheckout}
+                          disabled={isProcessing}
+                          className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white w-full h-12 text-lg font-semibold shadow-lg shadow-purple-500/25"
+                        >
+                          {isProcessing ? (
+                            <>
+                              <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                              Redirecting to Stripe...
+                            </>
+                          ) : (
+                            <>
+                              <CreditCard className="w-5 h-5 mr-2" />
+                              Proceed to Secure Payment
+                              <ExternalLink className="w-4 h-4 ml-2" />
+                            </>
+                          )}
+                        </Button>
+
+                        <Button
+                          variant="outline"
+                          onClick={resetPaymentModal}
+                          disabled={isProcessing}
+                          className="border-gray-600 text-gray-300 hover:bg-gray-800 w-full"
+                        >
+                          Cancel
+                        </Button>
+                      </div>
+
+                      <p className="text-xs text-gray-500 text-center">
+                        By proceeding, you agree to our{" "}
+                        <Link
+                          to="/terms"
+                          className="underline hover:text-purple-400"
+                        >
+                          Terms of Service
+                        </Link>{" "}
+                        and acknowledge our{" "}
+                        <Link
+                          to="/privacy"
+                          className="underline hover:text-purple-400"
+                        >
+                          Privacy Policy
+                        </Link>
+                        .
+                      </p>
+                    </div>
+                  </motion.div>
+                )}
+
+                {!selectedPlan && (
+                  <motion.div
+                    key="no-plan"
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.9 }}
+                    transition={{ duration: 0.3 }}
+                    className="text-center py-12"
+                  >
+                    <h3 className="text-xl font-semibold text-white mb-2">
+                      No Plan Selected
+                    </h3>
+                    <p className="text-gray-400 mb-6">
+                      Please select a plan to proceed with payment.
+                    </p>
+                    <Button
+                      onClick={() => setIsPaymentModalOpen(false)}
+                      className="bg-gray-700 hover:bg-gray-600 text-white"
+                    >
+                      Cancel
+                    </Button>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </DialogContent>
+          </Dialog>
+        )}
+      </AnimatePresence>
 
       <Footer />
 
@@ -1279,4 +1413,4 @@ const Landing = () => {
   );
 };
 
-export default Landing; 
+export default Landing;

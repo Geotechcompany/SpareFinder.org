@@ -9,6 +9,15 @@ const router = Router();
 router.get('/balance', authenticateToken, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.user!.userId;
+    // Admins should display unlimited credits
+    if (req.user?.role === 'admin' || req.user?.role === 'super_admin') {
+      return res.json({
+        success: true,
+        credits: Infinity,
+        user_id: userId,
+        unlimited: true
+      });
+    }
     const credits = await creditService.getUserCredits(userId);
     
     return res.json({
