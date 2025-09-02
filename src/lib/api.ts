@@ -264,6 +264,11 @@ export const authApi = {
     return response.data;
   },
 
+  resetPassword: async (email: string): Promise<ApiResponse> => {
+    const response = await apiClient.post('/auth/reset-password', { email });
+    return response.data;
+  },
+
   logout: async (): Promise<ApiResponse> => {
     try {
       const response = await apiClient.post('/auth/logout');
@@ -535,6 +540,16 @@ export const billingApi = {
     trial_days?: number;
   }): Promise<ApiResponse> => {
     const response = await apiClient.post('/billing/checkout-session', checkoutData);
+    return response.data;
+  },
+
+  // Pay-as-you-go credits purchase
+  createCreditsCheckoutSession: async (options: {
+    credits: number;
+    success_url: string;
+    cancel_url: string;
+  }): Promise<ApiResponse> => {
+    const response = await apiClient.post('/billing/credits/checkout-session', options);
     return response.data;
   }
 };

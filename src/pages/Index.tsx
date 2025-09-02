@@ -1,16 +1,22 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { 
-  Upload, 
-  Zap, 
-  Shield, 
-  BarChart3, 
-  Check, 
-  ArrowRight, 
-  Camera, 
-  Search, 
+import {
+  Upload,
+  Zap,
+  Shield,
+  BarChart3,
+  Check,
+  ArrowRight,
+  Camera,
+  Search,
   DollarSign,
   Star,
   Play,
@@ -24,13 +30,20 @@ import {
   X,
   CreditCard,
   Loader2,
-  CheckCircle
+  CheckCircle,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Link } from "react-router-dom";
 import ThemeToggle from "@/components/ThemeToggle";
 import { Calendar } from "@/components/ui/calendar";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/components/ui/use-toast";
@@ -44,14 +57,16 @@ const Index = () => {
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState<any>(null);
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
-  const [paymentStep, setPaymentStep] = useState<'details' | 'processing' | 'success' | 'error'>('details');
+  const [paymentStep, setPaymentStep] = useState<
+    "details" | "processing" | "success" | "error"
+  >("details");
   const [paymentForm, setPaymentForm] = useState({
-    email: '',
-    cardNumber: '',
-    expiryDate: '',
-    cvv: '',
-    name: '',
-    company: ''
+    email: "",
+    cardNumber: "",
+    expiryDate: "",
+    cvv: "",
+    name: "",
+    company: "",
   });
 
   const { toast } = useToast();
@@ -60,247 +75,250 @@ const Index = () => {
     {
       icon: Camera,
       title: "AI Vision Analysis",
-      description: "Upload any spare part image and get instant AI-powered identification with detailed specs and compatibility data",
-      color: "from-purple-500 to-blue-500"
+      description:
+        "Upload any spare part image and get instant AI-powered identification with detailed specs and compatibility data",
+      color: "from-purple-500 to-blue-500",
     },
     {
       icon: Search,
       title: "Smart Web Scraping",
-      description: "Automatically search across 50+ marketplaces including Amazon, eBay, and specialized automotive retailers",
-      color: "from-blue-500 to-cyan-500"
+      description:
+        "Automatically search across 50+ marketplaces including Amazon, eBay, and specialized automotive retailers",
+      color: "from-blue-500 to-cyan-500",
     },
     {
       icon: BarChart3,
       title: "Advanced Analytics",
-      description: "Track market trends, price fluctuations, and get predictive insights on part availability",
-      color: "from-cyan-500 to-teal-500"
+      description:
+        "Track market trends, price fluctuations, and get predictive insights on part availability",
+      color: "from-cyan-500 to-teal-500",
     },
     {
       icon: Shield,
       title: "Enterprise Security",
-      description: "Military-grade encryption, GDPR compliance, and secure cloud infrastructure with 99.9% uptime",
-      color: "from-teal-500 to-green-500"
-    }
+      description:
+        "Military-grade encryption, GDPR compliance, and secure cloud infrastructure with 99.9% uptime",
+      color: "from-teal-500 to-green-500",
+    },
   ];
 
   const testimonials = [
     {
       name: "Michael Rodriguez",
       role: "Senior Mechanic at AutoTech Solutions",
-      content: "SpareFinder has revolutionized our workflow. What used to take hours now takes seconds. The accuracy is phenomenal.",
+      content:
+        "SpareFinder has revolutionized our workflow. What used to take hours now takes seconds. The accuracy is phenomenal.",
       avatar: "MR",
-      rating: 5
+      rating: 5,
     },
     {
       name: "Sarah Chen",
       role: "Parts Manager at Global Motors",
-      content: "We've reduced our part identification errors by 95%. The ROI was evident within the first month of implementation.",
+      content:
+        "We've reduced our part identification errors by 95%. The ROI was evident within the first month of implementation.",
       avatar: "SC",
-      rating: 5
+      rating: 5,
     },
     {
       name: "David Thompson",
       role: "Fleet Manager at TransLogistics",
-      content: "The AI's ability to find rare parts across multiple platforms has saved us thousands in downtime costs.",
+      content:
+        "The AI's ability to find rare parts across multiple platforms has saved us thousands in downtime costs.",
       avatar: "DT",
-      rating: 5
-    }
+      rating: 5,
+    },
   ];
 
   const stats = [
     { label: "Parts Identified", value: "2.5M+", icon: Camera },
     { label: "Happy Customers", value: "50K+", icon: Users },
     { label: "Accuracy Rate", value: "99.2%", icon: Award },
-    { label: "Time Saved", value: "5M+ hrs", icon: TrendingUp }
+    { label: "Time Saved", value: "5M+ hrs", icon: TrendingUp },
   ];
 
   const plans = [
     {
       id: "starter",
-      name: "Starter",
-      price: "£15",
-      priceValue: 15,
+      name: "Starter / Basic",
+      price: "£12.99",
+      priceValue: 12.99,
       period: "/month",
-      description: "Perfect for small workshops and hobbyists",
+      description: "For small users testing the service",
       features: [
-        "50 AI identifications per month",
-        "Basic web scraping",
-        "Email support",
-        "Upload history (90 days)",
-        "Mobile app access",
-        "30-day free trial"
+        "20 image recognitions per month",
+        "Basic search & match results",
+        "Access via web portal only",
       ],
       popular: false,
       color: "from-gray-600 to-gray-700",
-      billingCycle: "monthly"
+      billingCycle: "monthly",
     },
     {
       id: "professional",
-      name: "Professional",
-      price: "£74",
-      priceValue: 74,
+      name: "Professional / Business",
+      price: "£69.99",
+      priceValue: 69.99,
       period: "/month",
-      description: "Ideal for growing businesses and service centers",
+      description: "For SMEs managing spare parts more actively",
       features: [
-        "500 AI identifications per month",
-        "Advanced web scraping",
-        "Priority support (24/7)",
-        "Unlimited upload history",
-        "API access & integrations",
-        "Team collaboration tools",
-        "Custom reports & analytics"
+        "500 recognitions per month",
+        "Catalogue storage (part lists, drawings)",
+        "API access for ERP/CMMS integration",
+        "Analytics dashboard",
       ],
       popular: true,
       color: "from-purple-600 to-blue-600",
-      billingCycle: "monthly"
+      billingCycle: "monthly",
     },
     {
       id: "enterprise",
       name: "Enterprise",
-      price: "£249",
-      priceValue: 249,
+      price: "£460",
+      priceValue: 460,
       period: "/month",
-      description: "For large organizations and dealerships",
+      description: "For OEMs, large factories, distributors",
       features: [
         "Unlimited AI identifications",
-        "Real-time market data",
-        "Dedicated account manager",
-        "White-label solutions",
-        "Custom AI model training",
-        "Enterprise SSO",
-        "SLA guarantees",
-        "On-premise deployment option"
+        "Advanced AI customisation (train on their data)",
+        "ERP/CMMS full integration",
+        "Predictive demand analytics",
+        "Dedicated support & SLA",
       ],
       popular: false,
       color: "from-amber-500 to-orange-600",
-      billingCycle: "monthly"
-    }
+      billingCycle: "monthly",
+    },
   ];
 
   // Payment processing functions
   const handlePlanSelect = (plan: any) => {
     setSelectedPlan(plan);
-    setPaymentStep('details');
+    setPaymentStep("details");
     setIsPaymentModalOpen(true);
   };
 
   const handlePaymentFormChange = (field: string, value: string) => {
-    setPaymentForm(prev => ({
+    setPaymentForm((prev) => ({
       ...prev,
-      [field]: value
+      [field]: value,
     }));
   };
 
   const validatePaymentForm = () => {
     const { email, cardNumber, expiryDate, cvv, name } = paymentForm;
-    
-    if (!email || !email.includes('@')) {
+
+    if (!email || !email.includes("@")) {
       toast({
         variant: "destructive",
         title: "Invalid Email",
-        description: "Please enter a valid email address"
+        description: "Please enter a valid email address",
       });
       return false;
     }
-    
-    if (!cardNumber || cardNumber.replace(/\s/g, '').length < 16) {
+
+    if (!cardNumber || cardNumber.replace(/\s/g, "").length < 16) {
       toast({
         variant: "destructive",
         title: "Invalid Card Number",
-        description: "Please enter a valid card number"
+        description: "Please enter a valid card number",
       });
       return false;
     }
-    
+
     if (!expiryDate || !/^\d{2}\/\d{2}$/.test(expiryDate)) {
       toast({
         variant: "destructive",
         title: "Invalid Expiry Date",
-        description: "Please enter expiry date in MM/YY format"
+        description: "Please enter expiry date in MM/YY format",
       });
       return false;
     }
-    
+
     if (!cvv || cvv.length < 3) {
       toast({
         variant: "destructive",
         title: "Invalid CVV",
-        description: "Please enter a valid CVV"
+        description: "Please enter a valid CVV",
       });
       return false;
     }
-    
+
     if (!name.trim()) {
       toast({
         variant: "destructive",
         title: "Name Required",
-        description: "Please enter the cardholder name"
+        description: "Please enter the cardholder name",
       });
       return false;
     }
-    
+
     return true;
   };
 
   const processPayment = async () => {
     if (!validatePaymentForm() || !selectedPlan) return;
-    
+
     try {
       setIsProcessingPayment(true);
-      setPaymentStep('processing');
+      setPaymentStep("processing");
 
       // Simulate payment processing (replace with actual payment gateway integration)
       const paymentData = {
         plan: selectedPlan.id,
         amount: selectedPlan.priceValue,
-        currency: 'GBP',
+        currency: "GBP",
         billing_cycle: selectedPlan.billingCycle,
         customer: {
           email: paymentForm.email,
           name: paymentForm.name,
-          company: paymentForm.company
+          company: paymentForm.company,
         },
         payment_method: {
-          card_number: paymentForm.cardNumber.replace(/\s/g, ''),
+          card_number: paymentForm.cardNumber.replace(/\s/g, ""),
           expiry_date: paymentForm.expiryDate,
-          cvv: paymentForm.cvv
-        }
+          cvv: paymentForm.cvv,
+        },
       };
 
       // Process payment using configured payment methods
       try {
         const response = await api.billing.processPayment(paymentData);
-        
+
         if (response.success) {
-          setPaymentStep('success');
+          setPaymentStep("success");
           toast({
             title: "Payment Successful!",
-            description: `Welcome to SpareFinder ${selectedPlan.name}. Check your email for confirmation.`
+            description: `Welcome to SpareFinder ${selectedPlan.name}. Check your email for confirmation.`,
           });
-          
+
           // Clear form
           setPaymentForm({
-            email: '',
-            cardNumber: '',
-            expiryDate: '',
-            cvv: '',
-            name: '',
-            company: ''
+            email: "",
+            cardNumber: "",
+            expiryDate: "",
+            cvv: "",
+            name: "",
+            company: "",
           });
         } else {
-          throw new Error(response.message || 'Payment failed. Please try again.');
+          throw new Error(
+            response.message || "Payment failed. Please try again."
+          );
         }
       } catch (apiError) {
-        console.error('API Error:', apiError);
+        console.error("API Error:", apiError);
         throw apiError; // Re-throw to be caught by outer catch
       }
     } catch (error) {
-      console.error('Payment error:', error);
-      setPaymentStep('error');
+      console.error("Payment error:", error);
+      setPaymentStep("error");
       toast({
         variant: "destructive",
         title: "Payment Failed",
-        description: error instanceof Error ? error.message : "An unexpected error occurred"
+        description:
+          error instanceof Error
+            ? error.message
+            : "An unexpected error occurred",
       });
     } finally {
       setIsProcessingPayment(false);
@@ -309,16 +327,16 @@ const Index = () => {
 
   const formatCardNumber = (value: string) => {
     // Remove all non-digit characters
-    const v = value.replace(/\s+/g, '').replace(/[^0-9]/gi, '');
+    const v = value.replace(/\s+/g, "").replace(/[^0-9]/gi, "");
     // Add spaces every 4 digits
     const matches = v.match(/\d{4,16}/g);
-    const match = matches && matches[0] || '';
+    const match = (matches && matches[0]) || "";
     const parts = [];
     for (let i = 0, len = match.length; i < len; i += 4) {
       parts.push(match.substring(i, i + 4));
     }
     if (parts.length) {
-      return parts.join(' ');
+      return parts.join(" ");
     } else {
       return v;
     }
@@ -326,10 +344,10 @@ const Index = () => {
 
   const formatExpiryDate = (value: string) => {
     // Remove all non-digit characters
-    const v = value.replace(/\D/g, '');
+    const v = value.replace(/\D/g, "");
     // Add slash after 2 digits
     if (v.length >= 2) {
-      return v.substring(0, 2) + '/' + v.substring(2, 4);
+      return v.substring(0, 2) + "/" + v.substring(2, 4);
     }
     return v;
   };
@@ -355,7 +373,7 @@ const Index = () => {
               className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40 md:hidden"
               onClick={() => setIsMobileMenuOpen(false)}
             />
-            
+
             {/* Mobile Menu */}
             <motion.div
               initial={{ x: "100%" }}
@@ -380,7 +398,9 @@ const Index = () => {
                   <div className="w-10 h-10 bg-gradient-to-r from-purple-500 to-blue-500 rounded-xl flex items-center justify-center shadow-lg shadow-purple-500/25">
                     <Zap className="w-6 h-6 text-white" />
                   </div>
-                  <span className="text-xl font-bold text-white">SpareFinder</span>
+                  <span className="text-xl font-bold text-white">
+                    SpareFinder
+                  </span>
                 </div>
 
                 {/* Navigation Links */}
@@ -404,8 +424,8 @@ const Index = () => {
                 {/* Action Buttons */}
                 <div className="space-y-4">
                   <Link to="/login" className="block">
-                    <Button 
-                      variant="ghost" 
+                    <Button
+                      variant="ghost"
                       className="w-full text-white hover:bg-white/10 rounded-xl justify-start"
                       onClick={() => setIsMobileMenuOpen(false)}
                     >
@@ -413,7 +433,7 @@ const Index = () => {
                     </Button>
                   </Link>
                   <Link to="/register" className="block">
-                    <Button 
+                    <Button
                       className="w-full bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 text-white shadow-lg shadow-purple-500/25 rounded-xl"
                       onClick={() => setIsMobileMenuOpen(false)}
                     >
@@ -432,7 +452,7 @@ const Index = () => {
       <nav className="fixed top-4 left-4 right-4 z-50 backdrop-blur-xl bg-black/30 border border-white/20 rounded-2xl shadow-2xl shadow-black/20">
         <div className="px-6 py-4">
           <div className="flex items-center justify-between">
-            <motion.div 
+            <motion.div
               className="flex items-center space-x-3"
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
@@ -451,10 +471,16 @@ const Index = () => {
                   SpareFinder
                 </span>
                 <div className="flex items-center space-x-1">
-                  <Badge variant="secondary" className="text-xs bg-purple-500/20 text-purple-300 border-purple-500/30">
+                  <Badge
+                    variant="secondary"
+                    className="text-xs bg-purple-500/20 text-purple-300 border-purple-500/30"
+                  >
                     Pro
                   </Badge>
-                  <Badge variant="secondary" className="text-xs bg-green-500/20 text-green-300 border-green-500/30">
+                  <Badge
+                    variant="secondary"
+                    className="text-xs bg-green-500/20 text-green-300 border-green-500/30"
+                  >
                     AI Powered
                   </Badge>
                 </div>
@@ -462,15 +488,24 @@ const Index = () => {
             </motion.div>
 
             <div className="hidden md:flex items-center space-x-8">
-              <a href="#features" className="text-gray-300 hover:text-white transition-colors relative group">
+              <a
+                href="#features"
+                className="text-gray-300 hover:text-white transition-colors relative group"
+              >
                 Features
                 <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-purple-400 transition-all group-hover:w-full"></span>
               </a>
-              <a href="#pricing" className="text-gray-300 hover:text-white transition-colors relative group">
+              <a
+                href="#pricing"
+                className="text-gray-300 hover:text-white transition-colors relative group"
+              >
                 Pricing
                 <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-purple-400 transition-all group-hover:w-full"></span>
               </a>
-              <a href="#testimonials" className="text-gray-300 hover:text-white transition-colors relative group">
+              <a
+                href="#testimonials"
+                className="text-gray-300 hover:text-white transition-colors relative group"
+              >
                 Reviews
                 <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-purple-400 transition-all group-hover:w-full"></span>
               </a>
@@ -478,11 +513,14 @@ const Index = () => {
 
             <div className="flex items-center space-x-4">
               <ThemeToggle />
-              
+
               {/* Desktop Buttons */}
               <div className="hidden md:flex items-center space-x-4">
                 <Link to="/login">
-                  <Button variant="ghost" className="text-white hover:text-purple-300 hover:bg-white/10 rounded-xl">
+                  <Button
+                    variant="ghost"
+                    className="text-white hover:text-purple-300 hover:bg-white/10 rounded-xl"
+                  >
                     Sign In
                   </Button>
                 </Link>
@@ -526,7 +564,7 @@ const Index = () => {
               <Sparkles className="w-4 h-4 mr-2" />
               Revolutionary AI Technology
             </Badge>
-            
+
             <h1 className="text-5xl md:text-7xl lg:text-8xl font-bold mb-8 leading-tight relative z-20">
               <span className="bg-gradient-to-r from-white via-gray-100 to-white bg-clip-text text-transparent">
                 Industrial AI{" "}
@@ -538,20 +576,32 @@ const Index = () => {
             </h1>
 
             <p className="text-xl md:text-2xl text-gray-200 mb-12 max-w-4xl mx-auto leading-relaxed relative z-20 ">
-              Revolutionary computer vision technology that identifies industrial parts with{" "}
-              <span className="text-purple-300 font-semibold">99.9% accuracy</span>{" "}
+              Revolutionary computer vision technology that identifies
+              industrial parts with{" "}
+              <span className="text-purple-300 font-semibold">
+                99.9% accuracy
+              </span>{" "}
               in milliseconds
             </p>
 
             <div className="flex flex-col sm:flex-row gap-6 justify-center items-center mb-16">
-              <Button size="lg" className="bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 text-lg px-10 py-4 h-14 shadow-xl shadow-purple-500/25 group">
+              <Button
+                size="lg"
+                className="bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 text-lg px-10 py-4 h-14 shadow-xl shadow-purple-500/25 group"
+              >
                 Start Free Trial
                 <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform" />
               </Button>
-              <Button size="lg" variant="outline" className="border-white/20 text-white hover:bg-white/10 text-lg px-10 py-4 h-14 backdrop-blur-sm group">
+              <Button
+                size="lg"
+                variant="outline"
+                className="border-white/20 text-white hover:bg-white/10 text-lg px-10 py-4 h-14 backdrop-blur-sm group"
+              >
                 <Play className="mr-2 w-5 h-5" />
                 Watch Demo
-                <span className="ml-2 text-sm bg-red-500 text-white px-2 py-1 rounded-full">2:30</span>
+                <span className="ml-2 text-sm bg-red-500 text-white px-2 py-1 rounded-full">
+                  2:30
+                </span>
               </Button>
             </div>
 
@@ -568,7 +618,9 @@ const Index = () => {
                   <div className="w-12 h-12 bg-gradient-to-r from-purple-500/20 to-blue-500/20 rounded-xl flex items-center justify-center mx-auto mb-3 border border-purple-500/30">
                     <stat.icon className="w-6 h-6 text-purple-300" />
                   </div>
-                  <div className="text-2xl md:text-3xl font-bold text-white mb-1">{stat.value}</div>
+                  <div className="text-2xl md:text-3xl font-bold text-white mb-1">
+                    {stat.value}
+                  </div>
                   <div className="text-sm text-gray-400">{stat.label}</div>
                 </motion.div>
               ))}
@@ -592,11 +644,15 @@ const Index = () => {
             </Badge>
             <h2 className="text-4xl md:text-6xl font-bold text-white mb-6">
               Next-Generation
-              <span className="bg-gradient-to-r from-blue-400 to-cyan-400 bg-clip-text text-transparent"> Technology</span>
+              <span className="bg-gradient-to-r from-blue-400 to-cyan-400 bg-clip-text text-transparent">
+                {" "}
+                Technology
+              </span>
             </h2>
             <p className="text-xl text-gray-300 max-w-3xl mx-auto">
-              Our cutting-edge platform combines computer vision, machine learning, 
-              and real-time data processing to deliver unprecedented accuracy and speed.
+              Our cutting-edge platform combines computer vision, machine
+              learning, and real-time data processing to deliver unprecedented
+              accuracy and speed.
             </p>
           </motion.div>
 
@@ -611,7 +667,9 @@ const Index = () => {
               >
                 <Card className="bg-gradient-to-br from-gray-800/40 to-gray-900/40 border-gray-700/50 backdrop-blur-xl hover:border-purple-500/50 transition-all duration-500 h-full group-hover:scale-105 group-hover:shadow-2xl group-hover:shadow-purple-500/20">
                   <CardHeader>
-                    <div className={`w-16 h-16 bg-gradient-to-r ${feature.color} rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300 shadow-lg`}>
+                    <div
+                      className={`w-16 h-16 bg-gradient-to-r ${feature.color} rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300 shadow-lg`}
+                    >
                       <feature.icon className="w-8 h-8 text-white" />
                     </div>
                     <CardTitle className="text-xl font-bold text-white group-hover:text-purple-300 transition-colors">
@@ -631,7 +689,10 @@ const Index = () => {
       </section>
 
       {/* Testimonials Section */}
-      <section id="testimonials" className="py-24 px-6 bg-gradient-to-r from-purple-900/20 to-blue-900/20">
+      <section
+        id="testimonials"
+        className="py-24 px-6 bg-gradient-to-r from-purple-900/20 to-blue-900/20"
+      >
         <div className="container mx-auto">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -653,7 +714,10 @@ const Index = () => {
               <CardContent className="p-8 md:p-12">
                 <div className="flex justify-center mb-6">
                   {[...Array(5)].map((_, i) => (
-                    <Star key={i} className="w-6 h-6 text-yellow-400 fill-current" />
+                    <Star
+                      key={i}
+                      className="w-6 h-6 text-yellow-400 fill-current"
+                    />
                   ))}
                 </div>
                 <blockquote className="text-xl md:text-2xl text-white text-center mb-8 font-medium leading-relaxed">
@@ -664,8 +728,12 @@ const Index = () => {
                     {testimonials[activeTestimonial].avatar}
                   </div>
                   <div>
-                    <div className="text-white font-semibold">{testimonials[activeTestimonial].name}</div>
-                    <div className="text-gray-400">{testimonials[activeTestimonial].role}</div>
+                    <div className="text-white font-semibold">
+                      {testimonials[activeTestimonial].name}
+                    </div>
+                    <div className="text-gray-400">
+                      {testimonials[activeTestimonial].role}
+                    </div>
                   </div>
                 </div>
               </CardContent>
@@ -677,9 +745,9 @@ const Index = () => {
                   key={index}
                   onClick={() => setActiveTestimonial(index)}
                   className={`w-3 h-3 rounded-full transition-all ${
-                    index === activeTestimonial 
-                      ? 'bg-purple-500 w-8' 
-                      : 'bg-gray-600 hover:bg-gray-500'
+                    index === activeTestimonial
+                      ? "bg-purple-500 w-8"
+                      : "bg-gray-600 hover:bg-gray-500"
                   }`}
                 />
               ))}
@@ -703,7 +771,10 @@ const Index = () => {
             </Badge>
             <h2 className="text-4xl md:text-6xl font-bold text-white mb-6">
               Choose Your
-              <span className="bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent"> Plan</span>
+              <span className="bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
+                {" "}
+                Plan
+              </span>
             </h2>
             <p className="text-xl text-gray-300 max-w-2xl mx-auto">
               Start free, scale as you grow. No hidden fees, no surprises.
@@ -721,9 +792,15 @@ const Index = () => {
                 onHoverEnd={() => setHoveredPlan(null)}
                 className="relative"
               >
-                <Card className={`relative bg-gradient-to-br from-gray-800/40 to-gray-900/40 border-gray-700/50 backdrop-blur-xl transition-all duration-500 h-full ${
-                  plan.popular ? 'ring-2 ring-purple-500 scale-105' : ''
-                } ${hoveredPlan === plan.id ? 'scale-105 shadow-2xl shadow-purple-500/20' : ''}`}>
+                <Card
+                  className={`relative bg-gradient-to-br from-gray-800/40 to-gray-900/40 border-gray-700/50 backdrop-blur-xl transition-all duration-500 h-full ${
+                    plan.popular ? "ring-2 ring-purple-500 scale-105" : ""
+                  } ${
+                    hoveredPlan === plan.id
+                      ? "scale-105 shadow-2xl shadow-purple-500/20"
+                      : ""
+                  }`}
+                >
                   {plan.popular && (
                     <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
                       <Badge className="bg-gradient-to-r from-purple-500 to-pink-500 text-white px-6 py-2 text-sm font-bold shadow-lg">
@@ -732,48 +809,91 @@ const Index = () => {
                       </Badge>
                     </div>
                   )}
-                  
+
                   <CardHeader className="text-center pb-8">
-                    <div className={`w-16 h-16 bg-gradient-to-r ${plan.color} rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg`}>
-                      {plan.id === 'starter' && <Camera className="w-8 h-8 text-white" />}
-                      {plan.id === 'professional' && <Zap className="w-8 h-8 text-white" />}
-                      {plan.id === 'enterprise' && <Shield className="w-8 h-8 text-white" />}
+                    <div
+                      className={`w-16 h-16 bg-gradient-to-r ${plan.color} rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg`}
+                    >
+                      {plan.id === "starter" && (
+                        <Camera className="w-8 h-8 text-white" />
+                      )}
+                      {plan.id === "professional" && (
+                        <Zap className="w-8 h-8 text-white" />
+                      )}
+                      {plan.id === "enterprise" && (
+                        <Shield className="w-8 h-8 text-white" />
+                      )}
                     </div>
-                    <CardTitle className="text-2xl font-bold text-white mb-2">{plan.name}</CardTitle>
+                    <CardTitle className="text-2xl font-bold text-white mb-2">
+                      {plan.name}
+                    </CardTitle>
                     <div className="flex items-baseline justify-center mb-4">
-                      <span className="text-4xl md:text-5xl font-bold text-white">{plan.price}</span>
+                      <span className="text-4xl md:text-5xl font-bold text-white">
+                        {plan.price}
+                      </span>
                       <span className="text-gray-400 ml-2">{plan.period}</span>
                     </div>
                     <CardDescription className="text-gray-300 text-base">
                       {plan.description}
                     </CardDescription>
                   </CardHeader>
-                  
+
                   <CardContent className="pt-0">
                     <ul className="space-y-4 mb-8">
                       {plan.features.map((feature, featureIndex) => (
-                        <li key={featureIndex} className="flex items-start text-gray-300">
+                        <li
+                          key={featureIndex}
+                          className="flex items-start text-gray-300"
+                        >
                           <Check className="w-5 h-5 text-green-400 mr-3 flex-shrink-0 mt-0.5" />
                           <span>{feature}</span>
                         </li>
                       ))}
                     </ul>
-                    
-                    <Button 
-                      className={`w-full h-12 text-lg font-semibold ${plan.popular 
-                        ? 'bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 shadow-lg shadow-purple-500/25' 
-                        : 'bg-white/10 hover:bg-white/20 text-white border border-white/20'
+
+                    <Button
+                      className={`w-full h-12 text-lg font-semibold ${
+                        plan.popular
+                          ? "bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 shadow-lg shadow-purple-500/25"
+                          : "bg-white/10 hover:bg-white/20 text-white border border-white/20"
                       }`}
                       variant={plan.popular ? "default" : "outline"}
-                      onClick={() => plan.id === "enterprise" ? null : handlePlanSelect(plan)}
+                      onClick={() =>
+                        plan.id === "enterprise" ? null : handlePlanSelect(plan)
+                      }
                     >
-                      {plan.id === "enterprise" ? "Contact Sales" : "Get Started"}
+                      {plan.id === "enterprise"
+                        ? "Contact Sales"
+                        : "Get Started"}
                       <ChevronRight className="ml-2 w-5 h-5" />
                     </Button>
                   </CardContent>
                 </Card>
               </motion.div>
             ))}
+          </div>
+
+          {/* Pay-as-you-go banner */}
+          <div className="max-w-4xl mx-auto mt-10">
+            <Card className="bg-gradient-to-br from-gray-800/40 to-gray-900/40 border-gray-700/50 backdrop-blur-xl">
+              <CardHeader className="text-center">
+                <CardTitle className="text-white text-2xl">
+                  Pay‑as‑you‑go
+                </CardTitle>
+                <CardDescription className="text-gray-300">
+                  £0.70 per upload — perfect for occasional use
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="flex flex-col sm:flex-row items-center justify-center gap-4 pb-8">
+                <div className="text-4xl font-bold text-white">£0.70</div>
+                <div className="text-gray-400">per image recognition</div>
+                <Link to="/register">
+                  <Button className="bg-white/10 hover:bg-white/20 text-white border border-white/20">
+                    Get Started
+                  </Button>
+                </Link>
+              </CardContent>
+            </Card>
           </div>
         </div>
       </section>
@@ -792,23 +912,34 @@ const Index = () => {
               <Sparkles className="w-4 h-4 mr-2" />
               Limited Time Offer
             </Badge>
-            
+
             <h2 className="text-4xl md:text-6xl font-bold text-white mb-6">
               Ready to Transform Your
-              <span className="bg-gradient-to-r from-yellow-400 to-orange-400 bg-clip-text text-transparent"> Workflow?</span>
+              <span className="bg-gradient-to-r from-yellow-400 to-orange-400 bg-clip-text text-transparent">
+                {" "}
+                Workflow?
+              </span>
             </h2>
-            
+
             <p className="text-xl text-gray-300 mb-10 max-w-3xl mx-auto">
-              Join over 50,000 mechanics, engineers, and hobbyists who trust SpareFinder 
-              for accurate, instant spare part identification. Start your free trial today.
+              Join over 50,000 mechanics, engineers, and hobbyists who trust
+              SpareFinder for accurate, instant spare part identification. Start
+              your free trial today.
             </p>
-            
+
             <div className="flex flex-col sm:flex-row gap-6 justify-center">
-              <Button size="lg" className="bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 text-black font-bold text-lg px-12 py-4 h-16 shadow-xl shadow-yellow-500/25 group">
+              <Button
+                size="lg"
+                className="bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 text-black font-bold text-lg px-12 py-4 h-16 shadow-xl shadow-yellow-500/25 group"
+              >
                 Start Free Trial - 14 Days
                 <ArrowRight className="ml-2 w-6 h-6 group-hover:translate-x-1 transition-transform" />
               </Button>
-              <Button size="lg" variant="outline" className="border-white/20 text-white hover:bg-white/10 text-lg px-12 py-4 h-16 backdrop-blur-sm">
+              <Button
+                size="lg"
+                variant="outline"
+                className="border-white/20 text-white hover:bg-white/10 text-lg px-12 py-4 h-16 backdrop-blur-sm"
+              >
                 Schedule Demo
                 <Calendar
                   mode="single"
@@ -818,7 +949,7 @@ const Index = () => {
                 />
               </Button>
             </div>
-            
+
             <div className="mt-8 text-sm text-gray-400">
               No credit card required • Cancel anytime • 99.9% uptime guarantee
             </div>
@@ -835,11 +966,13 @@ const Index = () => {
                 <div className="w-10 h-10 bg-gradient-to-r from-purple-500 to-blue-500 rounded-xl flex items-center justify-center">
                   <Zap className="w-6 h-6 text-white" />
                 </div>
-                <span className="text-xl font-bold text-white">SpareFinder</span>
+                <span className="text-xl font-bold text-white">
+                  SpareFinder
+                </span>
               </div>
               <p className="text-gray-400 mb-6 max-w-md">
-                Revolutionizing automotive part identification with cutting-edge AI technology. 
-                Trusted by professionals worldwide.
+                Revolutionizing automotive part identification with cutting-edge
+                AI technology. Trusted by professionals worldwide.
               </p>
               <div className="flex space-x-4">
                 <div className="w-10 h-10 bg-gray-800 rounded-lg flex items-center justify-center hover:bg-gray-700 transition-colors cursor-pointer">
@@ -847,36 +980,74 @@ const Index = () => {
                 </div>
               </div>
             </div>
-            
+
             <div>
               <h3 className="text-white font-semibold mb-4">Product</h3>
               <ul className="space-y-2 text-gray-400">
-                <li><a href="#" className="hover:text-white transition-colors">Features</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Pricing</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">API</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Integrations</a></li>
+                <li>
+                  <a href="#" className="hover:text-white transition-colors">
+                    Features
+                  </a>
+                </li>
+                <li>
+                  <a href="#" className="hover:text-white transition-colors">
+                    Pricing
+                  </a>
+                </li>
+                <li>
+                  <a href="#" className="hover:text-white transition-colors">
+                    API
+                  </a>
+                </li>
+                <li>
+                  <a href="#" className="hover:text-white transition-colors">
+                    Integrations
+                  </a>
+                </li>
               </ul>
             </div>
-            
+
             <div>
               <h3 className="text-white font-semibold mb-4">Support</h3>
               <ul className="space-y-2 text-gray-400">
-                <li><a href="#" className="hover:text-white transition-colors">Documentation</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Help Center</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Contact</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Status</a></li>
+                <li>
+                  <a href="#" className="hover:text-white transition-colors">
+                    Documentation
+                  </a>
+                </li>
+                <li>
+                  <a href="#" className="hover:text-white transition-colors">
+                    Help Center
+                  </a>
+                </li>
+                <li>
+                  <a href="#" className="hover:text-white transition-colors">
+                    Contact
+                  </a>
+                </li>
+                <li>
+                  <a href="#" className="hover:text-white transition-colors">
+                    Status
+                  </a>
+                </li>
               </ul>
             </div>
           </div>
-          
+
           <div className="border-t border-white/10 pt-8 flex flex-col md:flex-row justify-between items-center">
             <div className="text-gray-400 mb-4 md:mb-0">
               <p>&copy; 2025 SpareFinder. All rights reserved.</p>
             </div>
             <div className="flex space-x-6 text-gray-400">
-              <a href="#" className="hover:text-white transition-colors">Privacy</a>
-              <a href="#" className="hover:text-white transition-colors">Terms</a>
-              <a href="#" className="hover:text-white transition-colors">Security</a>
+              <a href="#" className="hover:text-white transition-colors">
+                Privacy
+              </a>
+              <a href="#" className="hover:text-white transition-colors">
+                Terms
+              </a>
+              <a href="#" className="hover:text-white transition-colors">
+                Security
+              </a>
             </div>
           </div>
         </div>
@@ -887,53 +1058,71 @@ const Index = () => {
         <DialogContent className="bg-black/95 backdrop-blur-xl border-white/20 max-w-md">
           <DialogHeader>
             <DialogTitle className="text-white text-2xl font-bold">
-              {paymentStep === 'success' ? 'Payment Successful!' : 
-               paymentStep === 'error' ? 'Payment Failed' :
-               paymentStep === 'processing' ? 'Processing Payment...' : 
-               `Subscribe to ${selectedPlan?.name}`}
+              {paymentStep === "success"
+                ? "Payment Successful!"
+                : paymentStep === "error"
+                ? "Payment Failed"
+                : paymentStep === "processing"
+                ? "Processing Payment..."
+                : `Subscribe to ${selectedPlan?.name}`}
             </DialogTitle>
             <DialogDescription className="text-gray-400">
-              {paymentStep === 'success' ? 'Welcome to SpareFinder! Check your email for confirmation.' :
-               paymentStep === 'error' ? 'There was an issue processing your payment. Please try again.' :
-               paymentStep === 'processing' ? 'Please wait while we process your payment...' :
-               `${selectedPlan?.price}${selectedPlan?.period} - ${selectedPlan?.description}`}
+              {paymentStep === "success"
+                ? "Welcome to SpareFinder! Check your email for confirmation."
+                : paymentStep === "error"
+                ? "There was an issue processing your payment. Please try again."
+                : paymentStep === "processing"
+                ? "Please wait while we process your payment..."
+                : `${selectedPlan?.price}${selectedPlan?.period} - ${selectedPlan?.description}`}
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-6 pt-4">
-            {paymentStep === 'details' && (
+            {paymentStep === "details" && (
               <div className="space-y-4">
                 {/* Customer Information */}
                 <div className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <Label htmlFor="name" className="text-gray-200">Full Name</Label>
+                      <Label htmlFor="name" className="text-gray-200">
+                        Full Name
+                      </Label>
                       <Input
                         id="name"
                         value={paymentForm.name}
-                        onChange={(e) => handlePaymentFormChange('name', e.target.value)}
+                        onChange={(e) =>
+                          handlePaymentFormChange("name", e.target.value)
+                        }
                         placeholder="John Doe"
                         className="bg-white/10 border-white/20 text-white mt-1"
                       />
                     </div>
                     <div>
-                      <Label htmlFor="company" className="text-gray-200">Company (Optional)</Label>
+                      <Label htmlFor="company" className="text-gray-200">
+                        Company (Optional)
+                      </Label>
                       <Input
                         id="company"
                         value={paymentForm.company}
-                        onChange={(e) => handlePaymentFormChange('company', e.target.value)}
+                        onChange={(e) =>
+                          handlePaymentFormChange("company", e.target.value)
+                        }
                         placeholder="Company Ltd"
                         className="bg-white/10 border-white/20 text-white mt-1"
                       />
                     </div>
                   </div>
                   <div>
-                    <Label htmlFor="email" className="text-gray-200">Email Address</Label>
+                    <Label htmlFor="email" className="text-gray-200">
+                      Email Address
+                    </Label>
                     <Input
                       id="email"
                       type="email"
                       value={paymentForm.email}
-                      onChange={(e) => handlePaymentFormChange('email', e.target.value)}
+                      onChange={(e) =>
+                        handlePaymentFormChange("email", e.target.value)
+                      }
                       placeholder="john@example.com"
                       className="bg-white/10 border-white/20 text-white mt-1"
                     />
@@ -948,11 +1137,18 @@ const Index = () => {
                   </h3>
                   <div className="space-y-4">
                     <div>
-                      <Label htmlFor="cardNumber" className="text-gray-200">Card Number</Label>
+                      <Label htmlFor="cardNumber" className="text-gray-200">
+                        Card Number
+                      </Label>
                       <Input
                         id="cardNumber"
                         value={paymentForm.cardNumber}
-                        onChange={(e) => handlePaymentFormChange('cardNumber', formatCardNumber(e.target.value))}
+                        onChange={(e) =>
+                          handlePaymentFormChange(
+                            "cardNumber",
+                            formatCardNumber(e.target.value)
+                          )
+                        }
                         placeholder="1234 5678 9012 3456"
                         maxLength={19}
                         className="bg-white/10 border-white/20 text-white mt-1 font-mono"
@@ -960,22 +1156,36 @@ const Index = () => {
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                       <div>
-                        <Label htmlFor="expiryDate" className="text-gray-200">Expiry Date</Label>
+                        <Label htmlFor="expiryDate" className="text-gray-200">
+                          Expiry Date
+                        </Label>
                         <Input
                           id="expiryDate"
                           value={paymentForm.expiryDate}
-                          onChange={(e) => handlePaymentFormChange('expiryDate', formatExpiryDate(e.target.value))}
+                          onChange={(e) =>
+                            handlePaymentFormChange(
+                              "expiryDate",
+                              formatExpiryDate(e.target.value)
+                            )
+                          }
                           placeholder="MM/YY"
                           maxLength={5}
                           className="bg-white/10 border-white/20 text-white mt-1 font-mono"
                         />
                       </div>
                       <div>
-                        <Label htmlFor="cvv" className="text-gray-200">CVV</Label>
+                        <Label htmlFor="cvv" className="text-gray-200">
+                          CVV
+                        </Label>
                         <Input
                           id="cvv"
                           value={paymentForm.cvv}
-                          onChange={(e) => handlePaymentFormChange('cvv', e.target.value.replace(/\D/g, '').slice(0, 4))}
+                          onChange={(e) =>
+                            handlePaymentFormChange(
+                              "cvv",
+                              e.target.value.replace(/\D/g, "").slice(0, 4)
+                            )
+                          }
                           placeholder="123"
                           maxLength={4}
                           className="bg-white/10 border-white/20 text-white mt-1 font-mono"
@@ -990,7 +1200,8 @@ const Index = () => {
                   <div className="flex justify-between items-center text-lg">
                     <span className="text-gray-300">Total:</span>
                     <span className="text-white font-bold">
-                      {selectedPlan?.price}{selectedPlan?.period}
+                      {selectedPlan?.price}
+                      {selectedPlan?.period}
                     </span>
                   </div>
                   <p className="text-sm text-gray-400 mt-2">
@@ -998,7 +1209,7 @@ const Index = () => {
                   </p>
                 </div>
 
-                <Button 
+                <Button
                   onClick={processPayment}
                   disabled={isProcessingPayment}
                   className="w-full h-12 bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 text-white font-semibold"
@@ -1009,22 +1220,29 @@ const Index = () => {
               </div>
             )}
 
-            {paymentStep === 'processing' && (
+            {paymentStep === "processing" && (
               <div className="text-center py-8">
                 <Loader2 className="w-12 h-12 animate-spin text-purple-500 mx-auto mb-4" />
-                <p className="text-white font-semibold">Processing your payment...</p>
-                <p className="text-gray-400 text-sm mt-2">This may take a few moments</p>
+                <p className="text-white font-semibold">
+                  Processing your payment...
+                </p>
+                <p className="text-gray-400 text-sm mt-2">
+                  This may take a few moments
+                </p>
               </div>
             )}
 
-            {paymentStep === 'success' && (
+            {paymentStep === "success" && (
               <div className="text-center py-8">
                 <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
-                <p className="text-white font-semibold mb-2">Payment Successful!</p>
-                <p className="text-gray-300 mb-6">
-                  Welcome to SpareFinder {selectedPlan?.name}. You'll receive a confirmation email shortly.
+                <p className="text-white font-semibold mb-2">
+                  Payment Successful!
                 </p>
-                <Button 
+                <p className="text-gray-300 mb-6">
+                  Welcome to SpareFinder {selectedPlan?.name}. You'll receive a
+                  confirmation email shortly.
+                </p>
+                <Button
                   onClick={() => setIsPaymentModalOpen(false)}
                   className="w-full bg-green-600 hover:bg-green-700 text-white"
                 >
@@ -1033,21 +1251,22 @@ const Index = () => {
               </div>
             )}
 
-            {paymentStep === 'error' && (
+            {paymentStep === "error" && (
               <div className="text-center py-8">
                 <X className="w-16 h-16 text-red-500 mx-auto mb-4" />
                 <p className="text-white font-semibold mb-2">Payment Failed</p>
                 <p className="text-gray-300 mb-6">
-                  There was an issue processing your payment. Please check your card details and try again.
+                  There was an issue processing your payment. Please check your
+                  card details and try again.
                 </p>
                 <div className="space-y-3">
-                  <Button 
-                    onClick={() => setPaymentStep('details')}
+                  <Button
+                    onClick={() => setPaymentStep("details")}
                     className="w-full bg-purple-600 hover:bg-purple-700 text-white"
                   >
                     Try Again
                   </Button>
-                  <Button 
+                  <Button
                     onClick={() => setIsPaymentModalOpen(false)}
                     variant="outline"
                     className="w-full border-white/20 text-white hover:bg-white/10"

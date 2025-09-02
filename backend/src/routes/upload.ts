@@ -134,27 +134,31 @@ router.post('/image', authenticateToken, upload.single('image'), handleMulterErr
       userId
     });
 
-    // Step 1: Check and deduct credits before processing
-    console.log('Checking user credits for analysis...');
-    const creditResult: CreditResult = await creditService.processAnalysisCredits(userId);
-    
-    if (!creditResult.success) {
-      console.log('Insufficient credits for user:', userId, creditResult);
-      return res.status(402).json({
-        success: false,
-        error: 'insufficient_credits',
-        message: 'You do not have enough credits to perform this analysis',
-        current_credits: creditResult.current_credits || 0,
-        required_credits: creditResult.required_credits || 1,
-        upgrade_required: true
+    // Step 1: Credits (admins have unlimited access)
+    if (req.user?.role === 'admin' || req.user?.role === 'super_admin') {
+      console.log('Admin upload detected - bypassing credits for user:', userId);
+    } else {
+      console.log('Checking user credits for analysis...');
+      const creditResult: CreditResult = await creditService.processAnalysisCredits(userId);
+      
+      if (!creditResult.success) {
+        console.log('Insufficient credits for user:', userId, creditResult);
+        return res.status(402).json({
+          success: false,
+          error: 'insufficient_credits',
+          message: 'You do not have enough credits to perform this analysis',
+          current_credits: creditResult.current_credits || 0,
+          required_credits: creditResult.required_credits || 1,
+          upgrade_required: true
+        });
+      }
+
+      console.log('Credits deducted successfully:', {
+        userId,
+        credits_before: creditResult.credits_before,
+        credits_after: creditResult.credits_after
       });
     }
-
-    console.log('Credits deducted successfully:', {
-      userId,
-      credits_before: creditResult.credits_before,
-      credits_after: creditResult.credits_after
-    });
 
     // Step 2: Upload image to Supabase Storage for persistence
     const bucketName = process.env.SUPABASE_BUCKET_NAME || 'sparefinder';

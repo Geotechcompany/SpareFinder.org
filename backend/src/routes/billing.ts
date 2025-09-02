@@ -67,28 +67,43 @@ async function getStripeInstance(): Promise<Stripe | null> {
 // Helper function to determine price based on plan
 function getPlanPrice(planName: string): { amount: number; currency: string } {
   const plan = planName.toLowerCase();
-  
-  if (plan.includes('pro') || plan.includes('professional')) {
-    return { amount: 29, currency: 'gbp' };
-  } else if (plan.includes('enterprise')) {
-    return { amount: 149, currency: 'gbp' };
+
+  // New pricing per business model
+  if (plan.includes('enterprise')) {
+    return { amount: 460, currency: 'gbp' };
   }
-  
-  return { amount: 0, currency: 'gbp' };
+  if (plan.includes('pro') || plan.includes('professional') || plan.includes('business')) {
+    return { amount: 69.99, currency: 'gbp' };
+  }
+  if (plan.includes('starter') || plan.includes('basic')) {
+    return { amount: 12.99, currency: 'gbp' };
+  }
+
+  // Default to Starter price if unspecified
+  return { amount: 12.99, currency: 'gbp' };
 }
 
 // Subscription limits by tier
 const SUBSCRIPTION_LIMITS = {
+  // Starter/Basic (mapped to 'free' tier key)
   free: {
-    searches: 10,
-    api_calls: 50,
-    storage: 100 * 1024 * 1024 // 100MB
+    // 20 image recognitions per month
+    searches: 20,
+    // Web portal only (no API access)
+    api_calls: 0,
+    // Keep modest storage available
+    storage: 1 * 1024 * 1024 * 1024 // 1GB
   },
+  // Professional/Business
   pro: {
-    searches: 1000,
+    // 500 recognitions per month
+    searches: 500,
+    // API access enabled
     api_calls: 5000,
-    storage: 10 * 1024 * 1024 * 1024 // 10GB
+    // Catalogue storage
+    storage: 25 * 1024 * 1024 * 1024 // 25GB
   },
+  // Enterprise
   enterprise: {
     searches: -1, // unlimited
     api_calls: -1, // unlimited
@@ -142,14 +157,24 @@ router.get('/', authenticateToken, async (req: AuthRequest, res: Response) => {
       cancel_at_period_end: false
     };
 
-    const userSubscription = subscription || defaultSubscription;
+    let userSubscription = subscription || defaultSubscription;
+    // Admins have unlimited/enterprise-equivalent access
+    if (req.user?.role === 'admin' || req.user?.role === 'super_admin') {
+      userSubscription = {
+        ...userSubscription,
+        tier: 'enterprise',
+        status: 'active'
+      } as any;
+    }
     const userUsage = usage || {
       searches_count: 0,
       api_calls_count: 0,
       storage_used: 0
     };
 
-    const limits = SUBSCRIPTION_LIMITS[userSubscription.tier as keyof typeof SUBSCRIPTION_LIMITS];
+    const limits = (req.user?.role === 'admin' || req.user?.role === 'super_admin')
+      ? SUBSCRIPTION_LIMITS['enterprise']
+      : SUBSCRIPTION_LIMITS[userSubscription.tier as keyof typeof SUBSCRIPTION_LIMITS];
 
     // Get recent invoices (mock data for now)
     const invoices = [
@@ -372,50 +397,60 @@ router.get('/invoices', authenticateToken, async (req: AuthRequest, res: Respons
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 10;
 
-    // Get subscription to determine pricing
-    const { data: subscription } = await supabase
+    // First, try to read stored invoices from database
+    const { data: storedInvoices, error: storedErr } = await supabase
+      .from('invoices')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .range((page - 1) * limit, (page - 1) * limit + limit - 1);
+
+    if (!storedErr && storedInvoices && storedInvoices.length > 0) {
+      return res.json({
+        invoices: storedInvoices,
+        pagination: { page, limit, total: storedInvoices.length }
+      });
+    }
+
+    // If none found, attempt to fetch from Stripe and cache
+    const stripe = await getStripeInstance();
+    if (!stripe) {
+      return res.json({ invoices: [], pagination: { page, limit, total: 0 } });
+    }
+
+    // Find customer's Stripe ID
+    const { data: subRec } = await supabase
       .from('subscriptions')
-      .select('tier, created_at')
+      .select('stripe_customer_id')
       .eq('user_id', userId)
       .single();
 
-    // Mock invoice data based on subscription
-    const mockInvoices = [];
-    if (subscription && subscription.tier !== 'free') {
-      const amount = subscription.tier === 'pro' ? 29.99 : 99.99;
-      const startDate = new Date(subscription.created_at);
-      
-      // Generate mock invoices for the last 6 months
-      for (let i = 0; i < 6; i++) {
-        const invoiceDate = new Date(startDate);
-        invoiceDate.setMonth(invoiceDate.getMonth() + i);
-        
-        if (invoiceDate <= new Date()) {
-          mockInvoices.push({
-            id: `inv_${userId.slice(-8)}_${i + 1}`,
-            amount,
-            currency: 'USD',
-            status: 'paid',
-            created_at: invoiceDate.toISOString(),
-            invoice_url: `${process.env.FRONTEND_URL}/invoices/inv_${userId.slice(-8)}_${i + 1}`
-          });
-        }
-      }
+    if (!subRec?.stripe_customer_id) {
+      return res.json({ invoices: [], pagination: { page, limit, total: 0 } });
     }
 
-    // Apply pagination
-    const startIndex = (page - 1) * limit;
-    const endIndex = startIndex + limit;
-    const paginatedInvoices = mockInvoices.slice(startIndex, endIndex);
-
-    return res.json({
-      invoices: paginatedInvoices,
-      pagination: {
-        page,
-        limit,
-        total: mockInvoices.length
-      }
+    const invs = await stripe.invoices.list({
+      customer: subRec.stripe_customer_id,
+      limit
     });
+
+    // Upsert fetched invoices to DB
+    if (invs?.data?.length) {
+      const mapped = invs.data.map((inv) => ({
+        id: inv.id,
+        user_id: userId,
+        amount: (inv.amount_paid ?? inv.amount_due ?? 0) / 100,
+        currency: (inv.currency || 'gbp').toUpperCase(),
+        status: inv.status || 'open',
+        created_at: new Date((inv.created || 0) * 1000).toISOString(),
+        invoice_url: inv.hosted_invoice_url || inv.invoice_pdf || null,
+        raw: inv as any
+      }));
+      await supabase.from('invoices').upsert(mapped, { onConflict: 'id' });
+      return res.json({ invoices: mapped, pagination: { page, limit, total: mapped.length } });
+    }
+
+    return res.json({ invoices: [], pagination: { page, limit, total: 0 } });
 
   } catch (error) {
     console.error('Get invoices error:', error);
@@ -660,6 +695,90 @@ router.post('/checkout-session', authenticateToken, async (req: AuthRequest, res
   }
 });
 
+// One-off credits purchase checkout (pay-as-you-go)
+// price: £0.70 per credit
+router.post('/credits/checkout-session', authenticateToken, async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user!.userId;
+    const { credits, success_url, cancel_url } = req.body as {
+      credits: number;
+      success_url: string;
+      cancel_url: string;
+    };
+
+    if (!credits || credits <= 0 || !Number.isFinite(credits)) {
+      return res.status(400).json({ error: 'Invalid credits amount' });
+    }
+    if (!success_url || !cancel_url) {
+      return res.status(400).json({ error: 'Missing redirect URLs' });
+    }
+
+    const stripe = await getStripeInstance();
+    if (!stripe) {
+      return res.status(500).json({ error: 'Payment system not configured' });
+    }
+
+    const unitPriceGbp = 0.70;
+    const totalAmount = Math.round(credits * unitPriceGbp * 100); // in pence
+
+    // Get user email
+    const { data: user } = await supabase.auth.admin.getUserById(userId);
+
+    const session = await stripe.checkout.sessions.create({
+      payment_method_types: ['card'],
+      mode: 'payment',
+      customer_email: user?.user?.email || undefined,
+      line_items: [
+        {
+          price_data: {
+            currency: 'gbp',
+            product_data: {
+              name: `SpareFinder AI Credits` ,
+              description: `${credits} credits @ £${unitPriceGbp.toFixed(2)} per credit`,
+            },
+            unit_amount: totalAmount,
+          },
+          quantity: 1,
+        },
+      ],
+      success_url,
+      cancel_url,
+      metadata: {
+        user_id: userId,
+        purchase_type: 'credits',
+        credits: String(credits),
+        unit_price_gbp: String(unitPriceGbp),
+      },
+    });
+
+    // Track credits checkout
+    await supabase.from('checkout_sessions').insert([
+      {
+        id: session.id,
+        user_id: userId,
+        plan: 'credits',
+        amount: totalAmount / 100,
+        currency: 'gbp',
+        status: 'created',
+        session_data: {
+          stripe_session_id: session.id,
+          created: session.created,
+          mode: session.mode,
+          payment_status: session.payment_status,
+          url: session.url,
+          credits,
+        },
+        created_at: new Date().toISOString(),
+      },
+    ]);
+
+    return res.json({ success: true, data: { checkout_url: session.url, session_id: session.id } });
+  } catch (error) {
+    console.error('Create credits checkout session error:', error);
+    return res.status(500).json({ error: 'Failed to create credits checkout session' });
+  }
+});
+
 // Handle Stripe webhooks
 router.post('/stripe-webhook', express.raw({ type: 'application/json' }), async (req: any, res: Response) => {
   try {
@@ -709,7 +828,19 @@ router.post('/stripe-webhook', express.raw({ type: 'application/json' }), async 
     switch (event.type) {
       case 'checkout.session.completed': {
         const session = event.data.object as Stripe.Checkout.Session;
-        await handleCheckoutSessionCompleted(session);
+        // If this was a credits purchase, grant credits; otherwise handle subscription
+        const purchaseType = (session.metadata as any)?.purchase_type;
+        if (purchaseType === 'credits') {
+          await handleCreditsCheckoutCompleted(session);
+        } else {
+          await handleCheckoutSessionCompleted(session);
+        }
+        break;
+      }
+      case 'invoice.payment_succeeded':
+      case 'invoice.finalized': {
+        const invoice = event.data.object as Stripe.Invoice;
+        await storeInvoice(invoice);
         break;
       }
       
@@ -774,12 +905,13 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
 
     // Determine tier based on plan
     let tier = 'free';
-    if (plan.toLowerCase().includes('pro') || plan.toLowerCase().includes('professional')) {
+    const normalized = plan.toLowerCase();
+    if (normalized.includes('pro') || normalized.includes('professional') || normalized.includes('business')) {
       tier = 'pro';
-    } else if (plan.toLowerCase().includes('enterprise')) {
+    } else if (normalized.includes('enterprise')) {
       tier = 'enterprise';
-    } else if (plan.toLowerCase().includes('starter')) {
-      tier = 'starter';
+    } else if (normalized.includes('starter') || normalized.includes('basic')) {
+      tier = 'free';
     }
 
     // Update user's subscription
@@ -834,6 +966,31 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
 
   } catch (error) {
     console.error('Error handling checkout session completed:', error);
+  }
+}
+
+// Grant credits for completed one-off credits checkout
+async function handleCreditsCheckoutCompleted(session: Stripe.Checkout.Session) {
+  try {
+    const userId = (session.metadata as any)?.user_id;
+    const creditsStr = (session.metadata as any)?.credits;
+    const credits = Number(creditsStr);
+    if (!userId || !Number.isFinite(credits) || credits <= 0) {
+      console.warn('Credits webhook missing data', { userId, creditsStr });
+      return;
+    }
+
+    // Update checkout session status
+    await supabase
+      .from('checkout_sessions')
+      .update({ status: 'completed', updated_at: new Date().toISOString() })
+      .eq('id', session.id);
+
+    // Add credits to user
+    const grant = await creditService.addCredits(userId, credits, `Credits purchase via Stripe: ${credits} credits`);
+    console.log('Credits granted result:', grant);
+  } catch (error) {
+    console.error('Error handling credits checkout completed:', error);
   }
 }
 
@@ -894,6 +1051,36 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
     
   } catch (error) {
     console.error('Error handling subscription deleted:', error);
+  }
+}
+
+// Helper to persist invoice to DB
+async function storeInvoice(invoice: Stripe.Invoice) {
+  try {
+    // Find user_id by stripe customer via subscriptions table
+    const { data: subRec } = await supabase
+      .from('subscriptions')
+      .select('user_id')
+      .eq('stripe_customer_id', invoice.customer as string)
+      .maybeSingle();
+
+    const userId = subRec?.user_id;
+    if (!userId) return;
+
+    const record = {
+      id: invoice.id,
+      user_id: userId,
+      amount: (invoice.amount_paid ?? invoice.amount_due ?? 0) / 100,
+      currency: (invoice.currency || 'gbp').toUpperCase(),
+      status: invoice.status || 'open',
+      created_at: new Date((invoice.created || 0) * 1000).toISOString(),
+      invoice_url: invoice.hosted_invoice_url || invoice.invoice_pdf || null,
+      raw: invoice as any
+    };
+
+    await supabase.from('invoices').upsert(record, { onConflict: 'id' });
+  } catch (e) {
+    console.warn('Invoice store failed:', e);
   }
 }
 

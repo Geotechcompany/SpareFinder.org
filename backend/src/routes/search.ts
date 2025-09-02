@@ -153,18 +153,22 @@ router.post('/keywords', authenticateToken, async (req: AuthRequest, res: Respon
       });
     }
 
-    // Credits: charge 1 credit for keyword search
+    // Credits: admins unlimited, others charge 1 credit
     const userId = req.user!.userId;
-    const creditResult = await creditService.processKeywordSearchCredits(userId);
-    if (!creditResult.success) {
-      return res.status(402).json({
-        success: false,
-        error: 'insufficient_credits',
-        message: 'You do not have enough credits to perform this keyword search',
-        current_credits: creditResult.current_credits || 0,
-        required_credits: creditResult.required_credits || 1,
-        upgrade_required: true
-      });
+    if (req.user?.role === 'admin' || req.user?.role === 'super_admin') {
+      // bypass credits
+    } else {
+      const creditResult = await creditService.processKeywordSearchCredits(userId);
+      if (!creditResult.success) {
+        return res.status(402).json({
+          success: false,
+          error: 'insufficient_credits',
+          message: 'You do not have enough credits to perform this keyword search',
+          current_credits: creditResult.current_credits || 0,
+          required_credits: creditResult.required_credits || 1,
+          upgrade_required: true
+        });
+      }
     }
 
     const aiServiceUrl = process.env.AI_SERVICE_URL;
