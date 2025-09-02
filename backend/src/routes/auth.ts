@@ -1,4 +1,5 @@
 import { Router, Request, Response } from 'express';
+import { emailService } from '../services/email-service';
 import { body, validationResult } from 'express-validator';
 import { supabase } from '../server';
 import { authenticateToken } from '../middleware/auth';
@@ -174,6 +175,14 @@ router.post('/register', registerValidation, async (req: Request, res: Response)
         message: 'Failed to create user profile'
       });
     }
+
+    // Fire-and-forget: send welcome email and create a notification
+    try {
+      emailService.sendWelcomeEmail({
+        userEmail: profile.email,
+        userName: profile.full_name || 'User'
+      }).catch(() => {});
+    } catch {}
 
     // Return the Supabase session token
     return res.status(201).json({
