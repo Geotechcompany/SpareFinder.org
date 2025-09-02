@@ -806,7 +806,7 @@ const Dashboard = () => {
                       className="w-full sm:w-auto"
                     >
                       <Button
-                        onClick={() => navigate("/upload")}
+                        onClick={() => navigate("/dashboard/upload")}
                         className="w-full sm:w-auto bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-400 hover:to-blue-500 shadow-lg shadow-blue-500/20 focus:ring-2 focus:ring-blue-400/40"
                       >
                         <Upload className="w-4 h-4 mr-2" />
@@ -1069,7 +1069,7 @@ const Dashboard = () => {
                     {
                       label: "Upload New Part",
                       icon: Upload,
-                      href: "/upload",
+                      href: "/dashboard/upload",
                       color: "from-blue-500 to-blue-600",
                     },
                     {

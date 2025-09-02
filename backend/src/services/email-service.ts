@@ -19,6 +19,11 @@ interface AnalysisEmailData {
   processingTime: number;
 }
 
+interface WelcomeEmailData {
+  userEmail: string;
+  userName: string;
+}
+
 class EmailService {
   private transporter: nodemailer.Transporter | null = null;
   private isConfigured = false;
@@ -190,6 +195,96 @@ class EmailService {
 
     } catch (error) {
       console.error('Failed to send analysis complete email:', error);
+      return false;
+    }
+  }
+
+  async sendWelcomeEmail(data: WelcomeEmailData): Promise<boolean> {
+    try {
+      // Respect global email enabled setting
+      const { data: notificationSettings } = await supabase
+        .from('system_settings')
+        .select('setting_value')
+        .eq('category', 'notifications')
+        .eq('setting_key', 'email_enabled')
+        .single();
+
+      const emailEnabled = notificationSettings?.setting_value === 'true' || process.env.EMAIL_ENABLED === 'true';
+      if (!emailEnabled) return false;
+
+      const subject = 'Welcome to SpareFinder AI – Let’s get you started';
+      const dashboardUrl = `${process.env.FRONTEND_URL || 'https://app.sparefinder.org'}/dashboard`;
+      const uploadUrl = `${process.env.FRONTEND_URL || 'https://app.sparefinder.org'}/dashboard/upload`;
+      const docsUrl = `${process.env.FRONTEND_URL || 'https://app.sparefinder.org'}/help`;
+
+      const html = `
+<!doctype html>
+<html>
+<body style="margin:0;padding:0;background:#0b1026;color:#edf2f7;font-family:Segoe UI,Arial,sans-serif;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:linear-gradient(135deg,#0b1026,#1a1033,#0c1226);padding:32px 0;">
+    <tr>
+      <td>
+        <table role="presentation" width="600" align="center" cellspacing="0" cellpadding="0" style="background:#0f172a;border-radius:14px;overflow:hidden;box-shadow:0 20px 50px rgba(0,0,0,.35);">
+          <tr>
+            <td style="padding:28px 32px;background:linear-gradient(135deg,#3b82f6,#1d4ed8);color:#fff;">
+              <h1 style="margin:0;font-size:24px;">Welcome, ${data.userName || 'there'} 👋</h1>
+              <p style="margin:6px 0 0 0;opacity:.9;">Your SpareFinder AI account is ready.</p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:28px 32px;">
+              <h2 style="margin:0 0 12px 0;color:#e2e8f0;font-size:18px;">Quick start</h2>
+              <ol style="margin:0;padding-left:18px;color:#cbd5e1;line-height:1.6;">
+                <li>Go to Upload and add a clear photo of the part.</li>
+                <li>Review the identification, confidence and details.</li>
+                <li>Save to history and export or share results.</li>
+              </ol>
+              <div style="margin:22px 0 8px 0;">
+                <a href="${uploadUrl}" style="display:inline-block;background:#3b82f6;color:#fff;text-decoration:none;padding:12px 18px;border-radius:10px;font-weight:600;">Upload your first part</a>
+              </div>
+              <p style="margin:16px 0 0;color:#94a3b8;">Need help? See tips and best practices in our guide.</p>
+              <a href="${docsUrl}" style="color:#60a5fa;text-decoration:none;">Read the getting‑started guide →</a>
+              <hr style="border:none;border-top:1px solid #223047;margin:24px 0;" />
+              <h3 style="margin:0 0 8px 0;color:#e2e8f0;font-size:16px;">What’s included</h3>
+              <ul style="margin:0;padding-left:18px;color:#cbd5e1;line-height:1.6;">
+                <li>AI identification with confidence scoring</li>
+                <li>History, sharing and export</li>
+                <li>Email notifications when analyses finish</li>
+              </ul>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:18px 32px;color:#94a3b8;border-top:1px solid #223047;font-size:12px;">
+              You can manage email preferences in Settings anytime. Visit your dashboard: <a href="${dashboardUrl}" style="color:#60a5fa;text-decoration:none;">${dashboardUrl}</a>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+  
+  </body>
+  </html>`;
+
+      const ok = await this.sendEmail({
+        to: data.userEmail,
+        subject,
+        html
+      });
+
+      if (ok) {
+        await supabase.from('notifications').insert({
+          user_id: await this.getUserIdByEmail(data.userEmail),
+          title: 'Welcome to SpareFinder AI',
+          message: 'Your account is ready. Start by uploading your first part.',
+          type: 'success',
+          action_url: uploadUrl
+        });
+      }
+
+      return ok;
+    } catch (e) {
+      console.error('Failed to send welcome email:', e);
       return false;
     }
   }
