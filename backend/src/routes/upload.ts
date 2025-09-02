@@ -927,6 +927,26 @@ router.post('/save-results', authenticateToken, async (req: AuthRequest, res: Re
 
     console.log('✅ Analysis results saved successfully:', analysisId);
 
+    // Create in-app notification for manual save
+    try {
+      await supabase
+        .from('notifications')
+        .insert({
+          user_id: userId,
+          title: 'Analysis Saved',
+          message: `${primaryPrediction.class_name} saved to your history`,
+          type: 'success',
+          action_url: `${process.env.FRONTEND_URL || 'https://app.sparefinder.org'}/dashboard/history`,
+          metadata: {
+            analysis_id: analysisId,
+            image_url: validatedData.image_url,
+            predictions_count: validatedData.predictions?.length || 0
+          }
+        });
+    } catch (notifErr) {
+      console.error('Failed to create save-results notification:', notifErr);
+    }
+
     return res.status(201).json({
       success: true,
       message: 'Analysis results saved successfully',
