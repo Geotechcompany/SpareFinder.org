@@ -6,6 +6,11 @@ import asyncio
 import sys
 import signal
 from typing import Dict, Any, Optional, List
+import smtplib
+from email.message import EmailMessage
+import ssl
+import base64
+import io
 import time
 
 import uvicorn
@@ -27,10 +32,29 @@ from openai import OpenAI
 from dotenv import load_dotenv
 
 from .services.ai_service import analyze_part_image
+from .services.email_templates import (
+    analysis_started_subject,
+    analysis_started_html,
+    analysis_completed_subject,
+    analysis_completed_html,
+    analysis_failed_subject,
+    analysis_failed_html,
+    keyword_started_subject,
+    keyword_started_html,
+    keyword_completed_subject,
+    keyword_completed_html,
+)
+from .services.scraper import scrape_supplier_page
 from .core.config import settings
+from .services.job_store import save_job_snapshot, load_job_snapshot
+from supabase import create_client
 
 class KeywordSearchRequest(BaseModel):
     keywords: Optional[List[str]] = None
+
+class KeywordScheduleRequest(BaseModel):
+    keywords: Optional[List[str]] = None
+    user_email: Optional[str] = None
 
 # Enhanced logging configuration
 def configure_logging():
@@ -112,6 +136,269 @@ app.add_middleware(
 
 # In-memory storage for analysis results (replace with Redis/database in production)
 analysis_results: Dict[str, Dict[str, Any]] = {}
+
+# Email utilities
+def _email_is_enabled() -> bool:
+    return bool(os.getenv('SMTP_HOST') and os.getenv('SMTP_FROM'))
+
+def _build_analysis_email_html(result: Dict[str, Any]) -> str:
+    part_name = result.get("precise_part_name") or result.get("class_name") or "Identified Part"
+    confidence = result.get("confidence_score", 0)
+    description = result.get("description") or "Analysis summary attached."
+    price = result.get("estimated_price") or {}
+    suppliers = result.get("suppliers") or []
+    processing_time = result.get("processing_time_seconds") or 0
+    filename = result.get("filename") or ""
+
+    # Build deep links
+    frontend_base = os.getenv("FRONTEND_BASE_URL", "http://localhost:5173").rstrip("/")
+    analysis_path = os.getenv("FRONTEND_ANALYSIS_PATH", "/upload")
+    view_url = f"{frontend_base}{analysis_path}?job={filename}" if filename else frontend_base
+    api_base = os.getenv("AI_SERVICE_PUBLIC_URL", "http://localhost:8000").rstrip("/")
+    status_url = f"{api_base}/analyze-part/status/{filename}" if filename else api_base
+
+    def esc(s: Any) -> str:
+        try:
+            return str(s)
+        except Exception:
+            return ""
+
+    supplier_rows = "".join([
+        f"<tr><td style='padding:8px;border-top:1px solid #223047'>{esc(s.get('name',''))}</td><td style='padding:8px;border-top:1px solid #223047'><a style='color:#60a5fa' href='{esc(s.get('url',''))}' target='_blank'>Link</a></td><td style='padding:8px;border-top:1px solid #223047'>{esc(s.get('price_range',''))}</td><td style='padding:8px;border-top:1px solid #223047'>{esc(s.get('shipping_region',''))}</td></tr>"
+        for s in suppliers[:5]
+    ])
+
+    # Charts
+    try:
+        confidence_val = float(confidence)
+    except Exception:
+        confidence_val = 0.0
+    confidence_img = _render_confidence_chart_png(confidence_val)
+    price_img = _render_price_chart_png(price)
+
+    return f"""
+<!doctype html>
+<html>
+<body style="margin:0;padding:0;background:#0b1026;color:#e2e8f0;font-family:Segoe UI,Arial,sans-serif;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:linear-gradient(135deg,#0b1026,#1a1033,#0c1226);padding:32px 0;">
+    <tr>
+      <td>
+        <table role="presentation" width="640" align="center" cellspacing="0" cellpadding="0" style="background:#0f172a;border-radius:14px;overflow:hidden;box-shadow:0 20px 50px rgba(0,0,0,.35);">
+          <tr>
+            <td style="padding:22px 28px;background:linear-gradient(135deg,#3b82f6,#1d4ed8);color:#fff;">
+              <h1 style="margin:0;font-size:20px;">Part analysis completed</h1>
+              <p style="margin:6px 0 0 0;opacity:.9;">SpareFinder AI</p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:24px 28px;">
+              <h2 style="margin:0 0 6px 0;color:#e2e8f0;font-size:18px;">{esc(part_name)}</h2>
+              <p style="margin:0 0 10px 0;color:#94a3b8;">Confidence: {esc(confidence)}%</p>
+              <div style="margin:8px 0 18px 0;">
+                <img alt="Confidence" src="{confidence_img}" style="display:block;border-radius:8px;max-width:100%;" />
+              </div>
+              <p style="margin:0 0 14px 0;color:#cbd5e1;">{esc(description)}</p>
+
+              <div style="margin:16px 0 8px 0;">
+                <table role="presentation" cellspacing="0" cellpadding="0" style="width:100%;border-collapse:collapse;">
+                  <tr>
+                    <td style="padding:8px;background:#0b1324;border-radius:8px;">
+                      <div style="color:#cbd5e1;font-size:14px;">
+                        <strong style="color:#e2e8f0;">Estimated price</strong>
+                        <div>New: {esc(price.get('new',''))}</div>
+                        <div>Used: {esc(price.get('used',''))}</div>
+                        <div>Refurbished: {esc(price.get('refurbished',''))}</div>
+                      </div>
+                    </td>
+                  </tr>
+                </table>
+              </div>
+              <div style="margin:8px 0 18px 0;">
+                <img alt="Price comparison" src="{price_img}" style="display:block;border-radius:8px;max-width:100%;" />
+              </div>
+
+              <div style="margin:18px 0 0 0;">
+                <a href="{view_url}"
+                   style="display:inline-block;background:#22c55e;color:#0b1026;text-decoration:none;padding:10px 14px;border-radius:10px;font-weight:600">
+                  View analysis in SpareFinder
+                </a>
+                <div style="margin-top:8px;color:#64748b;font-size:12px;">
+                  If the button doesn't work, open: <a href="{status_url}" style="color:#60a5fa;">status link</a>
+                </div>
+              </div>
+
+              {('<h3 style="margin:18px 0 8px 0;color:#e2e8f0;font-size:16px;">Suppliers</h3>' if suppliers else '')}
+              {('<table role="presentation" cellspacing="0" cellpadding="0" style="width:100%;border-collapse:collapse;background:#0b1324;border-radius:10px;">' if suppliers else '')}
+              {('<tr><th align="left" style="padding:10px;color:#94a3b8;">Name</th><th align="left" style="padding:10px;color:#94a3b8;">Link</th><th align="left" style="padding:10px;color:#94a3b8;">Price</th><th align="left" style="padding:10px;color:#94a3b8;">Region</th></tr>' if suppliers else '')}
+              {supplier_rows}
+              {('</table>' if suppliers else '')}
+
+              <p style="margin:16px 0 0;color:#64748b;font-size:12px;">Processed in ~{esc(processing_time)}s</p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+"""
+
+def _send_email(to_email: str, subject: str, html_body: str) -> bool:
+    try:
+        host = os.getenv('SMTP_HOST', '')
+        port = int(os.getenv('SMTP_PORT', '587'))
+        user = os.getenv('SMTP_USER', '')
+        password = os.getenv('SMTP_PASS') or os.getenv('SMTP_PASSWORD', '')
+        sender = os.getenv('SMTP_FROM', user or 'noreply.tpsinternational@gmail.com')
+        secure = os.getenv('SMTP_SECURE', 'starttls').lower()
+
+        if not host or not sender:
+            return False
+
+        msg = EmailMessage()
+        msg['Subject'] = subject
+        msg['From'] = sender
+        msg['To'] = to_email
+        msg.set_content('Your SpareFinder AI analysis is complete.')
+        msg.add_alternative(html_body, subtype='html')
+
+        if secure == 'ssl':
+            context = ssl.create_default_context()
+            with smtplib.SMTP_SSL(host, port, context=context) as server:
+                if user and password:
+                    server.login(user, password)
+                server.send_message(msg)
+        else:
+            with smtplib.SMTP(host, port) as server:
+                server.ehlo()
+                server.starttls(context=ssl.create_default_context())
+                server.ehlo()
+                if user and password:
+                    server.login(user, password)
+                server.send_message(msg)
+        return True
+    except Exception as e:
+        logger.error(f"Email send failed: {e}")
+        return False
+
+def _send_analysis_email(to_email: str, result: Dict[str, Any]) -> None:
+    try:
+        if not _email_is_enabled():
+            return
+        subject = f"SpareFinder AI – Analysis completed: {result.get('precise_part_name') or result.get('class_name') or 'Part'}"
+        html = _build_analysis_email_html(result)
+        ok = _send_email(to_email, subject, html)
+        if ok:
+            logger.info(f"Analysis email sent to {to_email}")
+        else:
+            logger.warning(f"Analysis email not sent to {to_email}")
+    except Exception as e:
+        logger.error(f"Failed to send analysis email: {e}")
+
+def _parse_price_range(value: Optional[str]) -> Optional[tuple]:
+    try:
+        if not value:
+            return None
+        import re
+        nums = re.findall(r"[-+]?[0-9]*\.?[0-9]+", value.replace(",", ""))
+        vals = [float(n) for n in nums]
+        if len(vals) >= 2:
+            low, high = vals[0], vals[1]
+            if high < low:
+                low, high = high, low
+            return (low, high)
+        if len(vals) == 1:
+            return (vals[0], vals[0])
+        return None
+    except Exception:
+        return None
+
+def _png_data_uri(img) -> str:
+    import PIL.Image
+    buf = io.BytesIO()
+    img.save(buf, format='PNG')
+    b64 = base64.b64encode(buf.getvalue()).decode('ascii')
+    return f"data:image/png;base64,{b64}"
+
+def _render_confidence_chart_png(confidence: float) -> str:
+    try:
+        from PIL import Image, ImageDraw, ImageFont
+        width, height = 480, 48
+        confidence = max(0.0, min(100.0, float(confidence)))
+        bar_w = int((confidence / 100.0) * (width - 20))
+        img = Image.new('RGB', (width, height), (11, 16, 38))
+        draw = ImageDraw.Draw(img)
+        draw.rounded_rectangle((10, height//2 - 10, width - 10, height//2 + 10), radius=10, fill=(34, 48, 71))
+        draw.rounded_rectangle((10, height//2 - 10, 10 + bar_w, height//2 + 10), radius=10, fill=(59, 130, 246))
+        label = f"Confidence: {int(round(confidence))}%"
+        try:
+            font = ImageFont.truetype("arial.ttf", 14)
+        except Exception:
+            font = ImageFont.load_default()
+        tw, th = draw.textsize(label, font=font)
+        draw.text(((width - tw)//2, (height - th)//2), label, fill=(226, 232, 240), font=font)
+        return _png_data_uri(img)
+    except Exception as e:
+        logger.warning(f"Confidence chart render failed: {e}")
+        from PIL import Image
+        return _png_data_uri(Image.new('RGB', (1, 1), (0, 0, 0)))
+
+def _render_price_chart_png(price: Dict[str, Any]) -> str:
+    try:
+        from PIL import Image, ImageDraw, ImageFont
+        width, height = 480, 160
+        padding = 12
+        img = Image.new('RGB', (width, height), (11, 16, 38))
+        draw = ImageDraw.Draw(img)
+        try:
+            font = ImageFont.truetype("arial.ttf", 13)
+            font_bold = ImageFont.truetype("arial.ttf", 14)
+        except Exception:
+            font = ImageFont.load_default()
+            font_bold = font
+
+        items = [
+            ("New", _parse_price_range((price or {}).get('new'))),
+            ("Used", _parse_price_range((price or {}).get('used'))),
+            ("Refurb", _parse_price_range((price or {}).get('refurbished'))),
+        ]
+        highs = [rng[1] for _, rng in items if rng]
+        max_high = max(highs) if highs else 0
+        if max_high <= 0:
+            from PIL import Image
+            return _png_data_uri(Image.new('RGB', (1, 1), (0, 0, 0)))
+
+        bar_area_w = width - padding * 2 - 80
+        y = padding + 8
+        for label, rng in items:
+            draw.text((padding, y), label, fill=(148, 163, 184), font=font_bold)
+            y_bar_top = y + 18
+            y_bar_bottom = y_bar_top + 18
+            draw.rounded_rectangle((padding + 64, y_bar_top, padding + 64 + bar_area_w, y_bar_bottom), radius=8, fill=(34, 48, 71))
+            if rng:
+                low, high = rng
+                low = max(0.0, low)
+                high = max(low, high)
+                x0 = padding + 64 + int((low / max_high) * bar_area_w)
+                x1 = padding + 64 + int((high / max_high) * bar_area_w)
+                draw.rounded_rectangle((x0, y_bar_top, x1, y_bar_bottom), radius=8, fill=(16, 185, 129))
+                val_text = f"${int(low)}–${int(high)}"
+                tw, th = draw.textsize(val_text, font=font)
+                tx = min(x1 + 6, width - tw - padding)
+                draw.text((tx, y_bar_top - 1), val_text, fill=(226, 232, 240), font=font)
+            y += 44
+
+        title = "Price ranges (scaled)"
+        tw, th = draw.textsize(title, font=font_bold)
+        draw.text(((width - tw)//2, 4), title, fill=(226, 232, 240), font=font_bold)
+
+        return _png_data_uri(img)
+    except Exception as e:
+        logger.warning(f"Price chart render failed: {e}")
+        from PIL import Image
+        return _png_data_uri(Image.new('RGB', (1, 1), (0, 0, 0)))
+
 
 # Custom exception handler for validation errors
 @app.exception_handler(RequestValidationError)
@@ -348,78 +635,410 @@ async def search_by_keywords(payload: KeywordSearchRequest):
             }
         )
 
+# -----------------------------
+# Background job helpers
+# -----------------------------
+async def _enrich_suppliers(response_data: Dict[str, Any]) -> None:
+    try:
+        supplier_urls: List[str] = []
+        for s in (response_data.get("suppliers") or [])[:5]:
+            if isinstance(s, dict) and s.get("url"):
+                supplier_urls.append(s.get("url"))
+        for _, u in (response_data.get("buy_links") or {}).items():
+            if isinstance(u, str) and u.startswith("http"):
+                supplier_urls.append(u)
+        supplier_urls = list(dict.fromkeys(supplier_urls))[:5]
+
+        enriched: List[Dict[str, Any]] = []
+        for u in supplier_urls:
+            try:
+                res = await scrape_supplier_page(u)
+                enriched.append(res)
+            except Exception as e:
+                enriched.append({"success": False, "url": u, "error": str(e)})
+        if enriched:
+            response_data["supplier_enrichment"] = enriched
+    except Exception as e:
+        logger.warning(f"Supplier enrichment failed: {e}")
+
+
+async def _run_analysis_job(
+    filename: str,
+    file_path: str,
+    keyword_list: List[str],
+    confidence_threshold: float,
+    max_predictions: int,
+    user_email: Optional[str]
+) -> None:
+    try:
+        # Mark as processing
+        analysis_results[filename] = {
+            "success": False,
+            "status": "processing",
+            "filename": filename
+        }
+        save_job_snapshot(filename, analysis_results[filename])
+
+        # Notify start
+        if user_email and _email_is_enabled():
+            try:
+                subj = analysis_started_subject(filename)
+                body = analysis_started_html(filename, keyword_list)
+                await asyncio.to_thread(_send_email, user_email, subj, body)
+            except Exception:
+                pass
+
+        # Perform analysis (no external await timeout here; handled by upstream timeouts inside service)
+        analysis_result = await analyze_part_image(
+            file_path,
+            keywords=keyword_list,
+            confidence_threshold=confidence_threshold,
+            max_predictions=max_predictions
+        )
+
+        if not analysis_result.get("success"):
+            analysis_result["filename"] = filename
+            analysis_results[filename] = analysis_result
+            save_job_snapshot(filename, analysis_result)
+            return
+
+        response_data = {"filename": filename, **analysis_result}
+
+        # Supplier enrichment
+        await _enrich_suppliers(response_data)
+
+        # Send completion email if requested
+        if user_email:
+            try:
+                # Modern template
+                subject = analysis_completed_subject(response_data)
+                html = analysis_completed_html(response_data)
+                await asyncio.to_thread(_send_email, user_email, subject, html)
+            except Exception as e:
+                logger.error(f"Email send failed (job): {e}")
+
+        analysis_results[filename] = response_data
+        save_job_snapshot(filename, response_data)
+
+        # Update database record with completed details if Supabase is configured
+        try:
+            supabase_url = os.getenv("SUPABASE_URL", "").strip()
+            service_key = (
+                os.getenv("SUPABASE_SERVICE_KEY")
+                or os.getenv("SUPABASE_ANON_KEY", "")
+            ).strip()
+            if supabase_url and service_key:
+                client = create_client(supabase_url, service_key)
+                primary = None
+                preds = response_data.get("predictions") or []
+                if isinstance(preds, list) and preds:
+                    primary = preds[0]
+                client.from_("part_searches").upsert(
+                    {
+                        "id": filename,
+                        "part_name": (primary or {}).get("class_name") or response_data.get("precise_part_name"),
+                        "manufacturer": (primary or {}).get("manufacturer"),
+                        "category": (primary or {}).get("category"),
+                        "part_number": (primary or {}).get("part_number"),
+                        "predictions": preds,
+                        "confidence_score": response_data.get("confidence") or response_data.get("confidence_score"),
+                        "processing_time": response_data.get("processing_time") or response_data.get("processing_time_seconds"),
+                        "processing_time_ms": response_data.get("processing_time") or response_data.get("processing_time_seconds"),
+                        "model_version": response_data.get("model_version"),
+                        "analysis_status": "completed" if response_data.get("success") else "failed",
+                        "metadata": {"analysis": response_data},
+                    },
+                    on_conflict="id",
+                ).execute()
+        except Exception as e:
+            logger.warning(f"DB upsert failed for {filename}: {e}")
+        logger.info(f"Analysis job completed for {filename}")
+    except Exception as e:
+        logger.error(f"Analysis job error for {filename}: {e}")
+        analysis_results[filename] = {
+            "success": False,
+            "status": "failed",
+            "error": str(e),
+            "filename": filename
+        }
+        save_job_snapshot(filename, analysis_results[filename])
+        # Mark failed in DB if possible
+        try:
+            supabase_url = os.getenv("SUPABASE_URL", "").strip()
+            service_key = (
+                os.getenv("SUPABASE_SERVICE_KEY")
+                or os.getenv("SUPABASE_ANON_KEY", "")
+            ).strip()
+            if supabase_url and service_key:
+                client = create_client(supabase_url, service_key)
+                client.from_("part_searches").upsert(
+                    {
+                        "id": filename,
+                        "analysis_status": "failed",
+                        "error_message": str(e),
+                    },
+                    on_conflict="id",
+                ).execute()
+        except Exception:
+            pass
+        # Failure email
+        if user_email and _email_is_enabled():
+            try:
+                subj = analysis_failed_subject(filename)
+                body = analysis_failed_html(filename, str(e))
+                await asyncio.to_thread(_send_email, user_email, subj, body)
+            except Exception:
+                pass
+
+async def _run_keyword_search_job(job_id: str, keyword_list: List[str], user_email: Optional[str]) -> None:
+    try:
+        # Mark as processing
+        analysis_results[job_id] = {
+            "success": False,
+            "status": "processing",
+            "filename": job_id,
+            "mode": "keywords_only",
+        }
+        save_job_snapshot(job_id, analysis_results[job_id])
+
+        # Email start
+        if user_email and _email_is_enabled():
+            try:
+                await asyncio.to_thread(
+                    _send_email,
+                    user_email,
+                    keyword_started_subject(keyword_list or []),
+                    keyword_started_html(keyword_list or []),
+                )
+            except Exception:
+                pass
+
+        # Reuse the inline logic from the /search/keywords endpoint
+        api_key = os.getenv('OPENAI_API_KEY')
+        if not api_key:
+            raise RuntimeError("OPENAI_API_KEY is not set")
+
+        normalized = [str(k).strip().lower() for k in (keyword_list or []) if str(k).strip()]
+
+        system_prompt = (
+            "You are SpareFinder AI. Given automotive keywords, return a concise JSON with 'results'[] and optional 'markdown' string."
+        )
+        user_prompt = (
+            f"Find automotive parts related to: {', '.join(normalized)}. Return fields: name, category, manufacturer, price, availability, part_number."
+        )
+
+        from openai import OpenAI as _OpenAI
+        client = _OpenAI(api_key=api_key)
+
+        def _call_openai() -> Dict[str, Any]:
+            resp = client.chat.completions.create(
+                model="gpt-4o",
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt},
+                ],
+                temperature=0.2,
+                max_tokens=600,
+            )
+            content = resp.choices[0].message.content or "{}"
+            try:
+                return json.loads(content)
+            except Exception:
+                import re
+                match = re.search(r"\{[\s\S]*\}", content)
+                if match:
+                    try:
+                        return json.loads(match.group(0))
+                    except Exception:
+                        return {"results": []}
+                return {"results": []}
+
+        ai_result = await asyncio.wait_for(asyncio.to_thread(_call_openai), timeout=20.0)
+        results = ai_result.get("results", [])
+        if not isinstance(results, list):
+            results = []
+        markdown = ai_result.get("markdown", "")
+
+        response_data = {
+            "success": True,
+            "status": "completed",
+            "filename": job_id,
+            "mode": "keywords_only",
+            "results": results,
+            "markdown": markdown,
+            "query": {"keywords": normalized},
+        }
+
+        # Optional email notification (completed)
+        if user_email and _email_is_enabled():
+            try:
+                await asyncio.to_thread(
+                    _send_email,
+                    user_email,
+                    keyword_completed_subject(normalized, len(results)),
+                    keyword_completed_html(normalized, len(results)),
+                )
+            except Exception as e:
+                logger.warning(f"Keyword email send failed: {e}")
+
+        analysis_results[job_id] = response_data
+        save_job_snapshot(job_id, response_data)
+    except Exception as e:
+        logger.error(f"Keyword job error for {job_id}: {e}")
+        analysis_results[job_id] = {
+            "success": False,
+            "status": "failed",
+            "error": str(e),
+            "filename": job_id,
+            "mode": "keywords_only",
+        }
+        save_job_snapshot(job_id, analysis_results[job_id])
+
+@app.post("/search/keywords/schedule")
+async def schedule_keyword_search(payload: KeywordScheduleRequest):
+    try:
+        if not payload.keywords or len(payload.keywords) == 0:
+            return JSONResponse(status_code=400, content={"success": False, "error": "Please provide one or more keywords"})
+
+        job_id = str(uuid.uuid4())
+        analysis_results[job_id] = {"success": False, "status": "pending", "filename": job_id, "mode": "keywords_only"}
+        save_job_snapshot(job_id, analysis_results[job_id])
+
+        asyncio.create_task(_run_keyword_search_job(job_id, payload.keywords or [], payload.user_email))
+        return JSONResponse(status_code=202, content={"success": True, "status": "pending", "filename": job_id})
+    except Exception as e:
+        logger.error(f"Schedule keyword search error: {e}")
+        return JSONResponse(status_code=500, content={"success": False, "error": str(e)})
+
+@app.get("/search/keywords/status/{job_id}")
+async def keyword_search_status(job_id: str):
+    try:
+        if job_id not in analysis_results:
+            snap = load_job_snapshot(job_id)
+            if snap:
+                analysis_results[job_id] = snap
+        if job_id not in analysis_results:
+            return JSONResponse(status_code=404, content={"success": False, "status": "not_found", "filename": job_id})
+        result = analysis_results[job_id]
+        code = 200
+        if result.get("status") in {"pending", "processing"}:
+            code = 202
+        elif not result.get("success") and result.get("status") == "failed":
+            code = 500
+        return JSONResponse(status_code=code, content=result)
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"success": False, "status": "failed", "error": str(e)})
+
 @app.post("/analyze-part/")
 async def analyze_part(
     file: UploadFile = File(...),
     keywords: Optional[str] = Query(None),
     confidence_threshold: float = Query(0.3),
-    max_predictions: int = Query(3)
+    max_predictions: int = Query(3),
+    user_email: Optional[str] = Query(None),
+    background_tasks: BackgroundTasks = None
 ):
     filename = None
     try:
         # Generate unique filename
         filename = f"{uuid.uuid4()}.{file.filename.split('.')[-1]}"
         file_path = os.path.join("uploads", filename)
-        
+
         # Save uploaded file
         with open(file_path, "wb") as buffer:
             buffer.write(await file.read())
-        
+
         logger.info(f"File saved: {filename}")
-        
+
         # Prepare keywords
-        keyword_list = keywords.split(", ") if keywords else []
-        
-        # Start async analysis with timeout
-        try:
-            analysis_result = await asyncio.wait_for(
-                analyze_part_image(
-                    file_path, 
-                    keywords=keyword_list, 
-                    confidence_threshold=confidence_threshold,
-                    max_predictions=max_predictions
-                ),
-                timeout=300.0  # 5-minute timeout
-            )
-        except asyncio.TimeoutError:
-            logger.error(f"Analysis timed out for {filename}")
-            return JSONResponse(
-                status_code=504,  # Gateway Timeout
-                content={
-                    "success": False,
-                    "status": "failed",
-                    "error": "Analysis timed out",
-                    "filename": filename
-                }
-            )
-        
-        # If analysis failed, return error response (now already in flat format)
-        if not analysis_result.get('success'):
-            # Add filename to the flat error response
-            analysis_result["filename"] = filename
-            return JSONResponse(
-                status_code=500,
-                content=analysis_result
-            )
-        
-        # Analysis successful - add filename to the flat response
-        response_data = {
-            "filename": filename,
-            **analysis_result  # Merge all flat analysis fields
+        keyword_list = [s.strip() for s in (keywords.split(",") if keywords else []) if s.strip()]
+
+        # Initialize pending job and schedule background coroutine
+        analysis_results[filename] = {
+            "success": False,
+            "status": "pending",
+            "filename": filename
         }
-        
-        # Store result for potential later retrieval
-        analysis_results[filename] = response_data
-        
-        logger.info(f"Analysis completed for {filename}")
-        
-        return JSONResponse(
-            status_code=200, 
-            content=response_data
+        save_job_snapshot(filename, analysis_results[filename])
+
+        # Persist initial record to database (part_searches) if Supabase is configured
+        try:
+            supabase_url = os.getenv("SUPABASE_URL", "").strip()
+            service_key = (
+                os.getenv("SUPABASE_SERVICE_KEY")
+                or os.getenv("SUPABASE_ANON_KEY", "")
+            ).strip()
+            if supabase_url and service_key:
+                client = create_client(supabase_url, service_key)
+                image_public_url = None
+                # Upload image to storage bucket if available
+                bucket = os.getenv("SUPABASE_BUCKET_NAME") or os.getenv(
+                    "S3_BUCKET_NAME", "sparefinder"
+                )
+                try:
+                    with open(file_path, "rb") as f:
+                        storage_path = f"uploads/{filename}"
+                        client.storage.from_(bucket).upload(
+                            storage_path,
+                            f,
+                            file_options={
+                                "content-type": file.content_type or "image/jpeg",
+                                "x-upsert": "true",
+                            },
+                        )
+                        # Build public URL (assumes bucket is public)
+                        image_public_url = (
+                            client.storage.from_(bucket).get_public_url(storage_path).get(
+                                "publicUrl"
+                            )
+                        )
+                except Exception:
+                    pass
+
+                metadata = {
+                    "filename": filename,
+                    "upload_timestamp": int(time.time()),
+                }
+                client.from_("part_searches").insert(
+                    {
+                        "id": filename,
+                        "user_id": None,  # Unknown at AI service level
+                        "search_term": (keywords or "Image Upload"),
+                        "search_type": "image_upload",
+                        "image_url": image_public_url or f"/uploads/{filename}",
+                        "image_name": file.filename,
+                        "image_size_bytes": os.path.getsize(file_path),
+                        "image_format": file.content_type or "image/jpeg",
+                        "upload_source": "ai_service",
+                        "analysis_status": "pending",
+                        "metadata": metadata,
+                    }
+                ).execute()
+        except Exception as e:
+            logger.warning(f"Initial DB insert failed for {filename}: {e}")
+
+        asyncio.create_task(
+            _run_analysis_job(
+                filename,
+                file_path,
+                keyword_list,
+                confidence_threshold,
+                max_predictions,
+                user_email,
+            )
         )
-    
+
+        return JSONResponse(
+            status_code=202,
+            content={
+                "success": True,
+                "status": "pending",
+                "filename": filename,
+                "message": "Analysis scheduled. Check status later."
+            }
+        )
     except Exception as e:
-        logger.error(f"Analysis error: {str(e)}")
+        logger.error(f"Analysis enqueue error: {str(e)}")
         return JSONResponse(
             status_code=500,
             content={
@@ -437,6 +1056,11 @@ async def get_analysis_status(
     max_predictions: int = Query(3)
 ):
     try:
+        # Try in-memory, then persistent snapshot
+        if filename not in analysis_results:
+            snap = load_job_snapshot(filename)
+            if snap:
+                analysis_results[filename] = snap
         # Check if result exists
         if filename not in analysis_results:
             return JSONResponse(
@@ -449,14 +1073,16 @@ async def get_analysis_status(
                 }
             )
         
-        # Retrieve stored result (now in flat format)
+        # Retrieve stored result (pending/processing/final)
         result = analysis_results[filename]
         
-        # Return the stored flat result
-        return JSONResponse(
-            status_code=200,
-            content=result
-        )
+        code = 200
+        if result.get("status") in {"pending", "processing"}:
+            code = 202
+        elif not result.get("success") and result.get("status") == "failed":
+            code = 500
+        
+        return JSONResponse(status_code=code, content=result)
     
     except Exception as e:
         logger.error(f"Status check error: {str(e)}")
@@ -509,6 +1135,48 @@ async def health_check():
         "service": "SpareFinderAI",
         "version": "1.0.0"
     }
+
+@app.post("/suppliers/enrich")
+async def suppliers_enrich(payload: Dict[str, Any]):
+    try:
+        urls = payload.get("urls") if isinstance(payload, dict) else None
+        if not urls or not isinstance(urls, list):
+            return JSONResponse(status_code=400, content={"success": False, "error": "invalid_request"})
+        urls = [u for u in urls if isinstance(u, str) and u.startswith("http")][:10]
+        results = []
+        for u in urls:
+            try:
+                results.append(await scrape_supplier_page(u))
+            except Exception as e:
+                results.append({"success": False, "url": u, "error": str(e)})
+        return JSONResponse(status_code=200, content={"success": True, "results": results})
+    except Exception as e:
+        logger.error(f"/suppliers/enrich error: {e}")
+        return JSONResponse(status_code=500, content={"success": False, "error": str(e)})
+
+@app.get("/jobs")
+async def list_jobs():
+    try:
+        # Merge in-memory with any local snapshots
+        jobs = []
+        for k, v in analysis_results.items():
+            jobs.append({"id": k, **v})
+        return JSONResponse(status_code=200, content={"success": True, "results": jobs})
+    except Exception as e:
+        logger.error(f"/jobs error: {e}")
+        return JSONResponse(status_code=500, content={"success": False, "error": str(e)})
+
+@app.get("/jobs/pending")
+async def list_pending_jobs():
+    try:
+        pending = []
+        for k, v in analysis_results.items():
+            if v.get("status") in {"pending", "processing"}:
+                pending.append({"id": k, **v})
+        return JSONResponse(status_code=200, content={"success": True, "results": pending})
+    except Exception as e:
+        logger.error(f"/jobs/pending error: {e}")
+        return JSONResponse(status_code=500, content={"success": False, "error": str(e)})
 
 # If running the script directly
 if __name__ == "__main__":

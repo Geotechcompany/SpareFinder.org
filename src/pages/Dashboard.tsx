@@ -28,16 +28,19 @@ import {
 } from "lucide-react";
 import DashboardSidebar from "@/components/DashboardSidebar";
 import MobileSidebar from "@/components/MobileSidebar";
+import { useDashboardLayout } from "@/contexts/DashboardLayoutContext";
 import CreditsDisplay from "@/components/CreditsDisplay";
 import { useAuth } from "@/contexts/AuthContext";
 import { format } from "date-fns";
 import { useNavigate } from "react-router-dom";
 import { Loader2 } from "lucide-react";
+import OnboardingGuide from "@/components/OnboardingGuide";
 import { dashboardApi, tokenStorage } from "@/lib/api";
 import { useToast } from "@/components/ui/use-toast";
 import DashboardSkeleton from "@/components/DashboardSkeleton";
 
 const Dashboard = () => {
+  const { inLayout } = useDashboardLayout();
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const { user, isLoading: authLoading, logout, isAuthenticated } = useAuth();
@@ -86,6 +89,11 @@ const Dashboard = () => {
   ]);
 
   const { toast } = useToast();
+  // Trigger onboarding from overview
+  const [showTourNow, setShowTourNow] = useState(false);
+  const startOnboarding = () => {
+    setShowTourNow(true);
+  };
 
   // Check if user has valid token and is authenticated
   const hasValidToken = useCallback(() => {
@@ -122,6 +130,7 @@ const Dashboard = () => {
         uploadsResponse,
         activitiesResponse,
         metricsResponse,
+        aiJobsResponse,
       ] = await Promise.allSettled([
         dashboardApi.getStats().catch((err) => {
           if (signal.aborted) throw new Error("Request aborted");
@@ -139,6 +148,17 @@ const Dashboard = () => {
           if (signal.aborted) throw new Error("Request aborted");
           throw err;
         }),
+        (async () => {
+          try {
+            const API_BASE =
+              (import.meta as any).env?.VITE_AI_SERVICE_URL ||
+              "http://localhost:8000";
+            const r = await fetch(`${API_BASE}/jobs`);
+            return await r.json();
+          } catch (e) {
+            return { success: false, results: [] } as any;
+          }
+        })(),
       ]);
 
       // Check if request was aborted
@@ -159,11 +179,18 @@ const Dashboard = () => {
           Math.round(((data.matchRate || 0) * totalUploads) / 100) ||
           0;
 
+        const rawTime = data.avgProcessTime || data.avgResponseTime || 0;
+        const avgSec =
+          typeof rawTime === "number"
+            ? rawTime > 100
+              ? Math.round(rawTime / 1000)
+              : Math.round(rawTime)
+            : 0;
         setStats({
           totalUploads: totalUploads,
           successfulUploads: successfulUploads,
           avgConfidence: data.avgConfidence || 0,
-          avgProcessTime: data.avgProcessTime || data.avgResponseTime || 0,
+          avgProcessTime: avgSec,
         });
       } else {
         // Fallback: Calculate stats from uploads data if available
@@ -186,11 +213,12 @@ const Dashboard = () => {
                 ) / totalUploads
               : 0;
 
+          const avgSecFallback = 0; // unknown from uploads list
           setStats({
             totalUploads,
             successfulUploads,
             avgConfidence: Math.round(avgConfidence),
-            avgProcessTime: 0, // Will be calculated from performance metrics
+            avgProcessTime: avgSecFallback,
           });
         } else {
           setStats({
@@ -222,14 +250,15 @@ const Dashboard = () => {
         setRecentUploads([]);
       }
 
-      // Handle activities response
-      if (
-        activitiesResponse.status === "fulfilled" &&
-        activitiesResponse.value.success
-      ) {
-        const activitiesData = activitiesResponse.value.data?.activities || [];
-        setRecentActivities(
-          activitiesData.map((activity) => ({
+      // Handle activities response and augment with AI service jobs
+      const activitiesMapped = (() => {
+        if (
+          activitiesResponse.status === "fulfilled" &&
+          activitiesResponse.value.success
+        ) {
+          const activitiesData =
+            activitiesResponse.value.data?.activities || [];
+          return activitiesData.map((activity) => ({
             id: activity.id,
             type: activity.resource_type,
             title: activity.action,
@@ -237,14 +266,118 @@ const Dashboard = () => {
             time: format(new Date(activity.created_at), "PPp"),
             confidence: activity.details.confidence ?? null,
             status: activity.details.status,
-          }))
+          }));
+        }
+        return [] as any[];
+      })();
+
+      const aiJobsMapped = (() => {
+        if (
+          aiJobsResponse.status === "fulfilled" &&
+          aiJobsResponse.value?.success &&
+          Array.isArray(aiJobsResponse.value.results)
+        ) {
+          const jobs = aiJobsResponse.value.results as any[];
+          const normalizeConfidence = (val: any): number | null => {
+            if (typeof val !== "number" || isNaN(val)) return null;
+            return val <= 1 ? Math.round(val * 100) : Math.round(val);
+          };
+
+          return jobs.map((j) => {
+            const isKeyword = String(j.mode) === "keywords_only";
+            const rawConf =
+              typeof j.confidence_score === "number"
+                ? j.confidence_score
+                : typeof j.confidence === "number"
+                ? j.confidence
+                : undefined;
+            const confidence = normalizeConfidence(rawConf);
+            const title = isKeyword
+              ? `Keyword search ${j.status}`
+              : `Image analysis ${j.status}`;
+            const desc =
+              j.precise_part_name ||
+              j.class_name ||
+              (Array.isArray(j.query?.keywords)
+                ? j.query.keywords.join(", ")
+                : "");
+            return {
+              id: j.id || j.filename,
+              type: isKeyword ? "search" : "upload",
+              title,
+              description: desc || "",
+              time: "",
+              confidence,
+              status: j.status,
+            };
+          });
+        }
+        return [] as any[];
+      })();
+
+      // Show only latest 3 image analyses with accurate confidence
+      const mergedActivities = aiJobsMapped
+        .filter((a) => a.type === "upload")
+        .slice(0, 3);
+      if (!mergedActivities.length) {
+        console.warn("❌ No recent activities available");
+      }
+      setRecentActivities(mergedActivities);
+
+      // Derive accurate stats from AI jobs when available
+      if (
+        aiJobsResponse.status === "fulfilled" &&
+        aiJobsResponse.value?.success &&
+        Array.isArray(aiJobsResponse.value.results)
+      ) {
+        const normalizeConfidence = (val: any): number | null => {
+          if (typeof val !== "number" || isNaN(val)) return null;
+          return val <= 1 ? val * 100 : val;
+        };
+        const toMs = (t: any): number | null => {
+          if (typeof t !== "number" || isNaN(t)) return null;
+          // if looks like seconds, convert to ms
+          return t < 50 ? Math.round(t * 1000) : Math.round(t);
+        };
+        const jobs = (aiJobsResponse.value.results as any[]).filter(
+          (j) => String(j.mode) !== "keywords_only"
         );
-      } else {
-        console.warn(
-          "❌ Failed to fetch recent activities:",
-          activitiesResponse
-        );
-        setRecentActivities([]);
+        const total = jobs.length;
+        const completed = jobs.filter(
+          (j) => String(j.status) === "completed" || j.success === true
+        ).length;
+        const confs = jobs
+          .map((j) =>
+            normalizeConfidence(
+              typeof j.confidence_score === "number"
+                ? j.confidence_score
+                : (j as any).confidence
+            )
+          )
+          .filter((n): n is number => typeof n === "number");
+        const times = jobs
+          .map((j) =>
+            toMs(
+              typeof j.processing_time_seconds === "number"
+                ? j.processing_time_seconds
+                : (j as any).processing_time
+            )
+          )
+          .filter((n): n is number => typeof n === "number");
+        const avgConf = confs.length
+          ? Math.round(confs.reduce((a, b) => a + b, 0) / confs.length)
+          : 0;
+        const avgMs = times.length
+          ? Math.round(times.reduce((a, b) => a + b, 0) / times.length)
+          : 0;
+        const avgSec = Math.round(avgMs / 1000);
+
+        setStats({
+          totalUploads: total,
+          successfulUploads: completed,
+          avgConfidence: avgConf,
+          avgProcessTime: avgSec,
+        });
       }
 
       // Handle performance metrics response
@@ -485,202 +618,7 @@ const Dashboard = () => {
   // Removed periodic auto-refresh to avoid repeated background requests when stats are legitimately empty
 
   if (isDataLoading) {
-    return (
-      <div className="min-h-screen flex w-full bg-gradient-to-br from-gray-900 via-purple-900/20 to-blue-900/20 relative overflow-hidden">
-        {/* Animated Background Elements */}
-        <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          <motion.div
-            className="absolute -top-40 -left-40 w-80 h-80 bg-purple-600/10 rounded-full blur-2xl opacity-30"
-            animate={{
-              scale: [1, 1.2, 1],
-              rotate: [0, 180, 360],
-            }}
-            transition={{
-              duration: 20,
-              repeat: Infinity,
-              ease: "linear",
-            }}
-          />
-          <motion.div
-            className="absolute top-1/2 -right-40 w-96 h-96 bg-blue-600/10 rounded-full blur-2xl opacity-25"
-            animate={{
-              scale: [1.2, 1, 1.2],
-              rotate: [360, 180, 0],
-            }}
-            transition={{
-              duration: 25,
-              repeat: Infinity,
-              ease: "linear",
-            }}
-          />
-        </div>
-
-        {/* Desktop Sidebar Skeleton */}
-        <div className="hidden md:flex h-screen bg-black/95 backdrop-blur-xl border-r border-white/10 flex-col fixed left-0 top-0 z-30 w-[320px]">
-          <div className="flex items-center justify-between p-6 border-b border-white/10">
-            <div className="flex items-center space-x-3">
-              <Skeleton className="w-10 h-10 rounded-xl" />
-              <div>
-                <Skeleton className="h-5 w-32 mb-1" />
-                <Skeleton className="h-3 w-24" />
-              </div>
-            </div>
-          </div>
-          <div className="flex-1 p-4 space-y-2">
-            {Array.from({ length: 7 }).map((_, i) => (
-              <div
-                key={i}
-                className="flex items-center space-x-3 p-3 rounded-xl"
-              >
-                <Skeleton className="w-5 h-5" />
-                <div className="flex-1">
-                  <Skeleton className="h-4 w-20 mb-1" />
-                  <Skeleton className="h-3 w-16" />
-                </div>
-              </div>
-            ))}
-          </div>
-          <div className="p-4 border-t border-white/10">
-            <div className="flex items-center space-x-3 p-3 rounded-xl">
-              <Skeleton className="w-10 h-10 rounded-full" />
-              <div className="flex-1">
-                <Skeleton className="h-4 w-24 mb-1" />
-                <Skeleton className="h-3 w-16" />
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Mobile Menu Button */}
-        <div className="fixed top-4 right-4 z-50 md:hidden">
-          <Skeleton className="w-10 h-10 rounded-lg" />
-        </div>
-
-        {/* Main Content */}
-        <div className="flex-1 p-2 sm:p-4 lg:p-8 relative z-10 overflow-x-hidden md:overflow-x-visible md:ml-[320px]">
-          <div className="space-y-4 sm:space-y-6 lg:space-y-8">
-            {/* Header Skeleton */}
-            <div className="relative">
-              <div className="absolute inset-0 bg-gradient-to-r from-purple-600/5 to-blue-600/5 rounded-2xl sm:rounded-3xl blur-xl opacity-20" />
-              <Card className="relative bg-black/50 backdrop-blur-xl rounded-2xl sm:rounded-3xl p-4 sm:p-6 border border-white/10">
-                <CardContent className="p-4 sm:p-6">
-                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
-                    <div className="flex-1">
-                      <Skeleton className="h-8 sm:h-10 w-64 sm:w-80 mb-3" />
-                      <Skeleton className="h-4 sm:h-5 w-48 sm:w-64" />
-                    </div>
-                    <Skeleton className="h-12 w-full sm:w-32" />
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* Stats Grid Skeleton */}
-            <div className="grid grid-cols-1 xs:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-6">
-              {Array.from({ length: 4 }).map((_, i) => (
-                <Card
-                  key={i}
-                  className="bg-black/40 backdrop-blur-xl border-white/10"
-                >
-                  <CardContent className="p-4 sm:p-6">
-                    <div className="flex items-center justify-between">
-                      <div className="flex-1">
-                        <Skeleton className="h-3 sm:h-4 w-20 mb-2" />
-                        <Skeleton className="h-6 sm:h-8 w-16 mb-2" />
-                        <Skeleton className="h-3 w-24" />
-                      </div>
-                      <Skeleton className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg" />
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-
-            {/* Performance Overview Skeleton */}
-            <Card className="bg-black/20 backdrop-blur-xl border-white/10">
-              <CardHeader className="p-4 sm:p-6">
-                <div className="flex items-center space-x-2">
-                  <Skeleton className="w-5 h-5" />
-                  <Skeleton className="h-6 w-48" />
-                </div>
-                <Skeleton className="h-4 w-64 mt-2" />
-              </CardHeader>
-              <CardContent className="p-4 sm:p-6">
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-                  {Array.from({ length: 3 }).map((_, i) => (
-                    <div
-                      key={i}
-                      className="p-4 rounded-2xl border border-white/10"
-                    >
-                      <div className="flex items-center justify-between mb-3">
-                        <Skeleton className="w-10 h-10 rounded-xl" />
-                        <Skeleton className="w-12 h-6 rounded-full" />
-                      </div>
-                      <Skeleton className="h-3 w-24 mb-2" />
-                      <Skeleton className="h-8 w-16" />
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Recent Activity Grid Skeleton */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 lg:gap-8">
-              {/* Recent Activity Card */}
-              <Card className="bg-black/20 backdrop-blur-xl border-white/10">
-                <CardHeader className="p-4 sm:p-6">
-                  <div className="flex items-center space-x-2">
-                    <Skeleton className="w-5 h-5" />
-                    <Skeleton className="h-6 w-32" />
-                  </div>
-                  <Skeleton className="h-4 w-48 mt-2" />
-                </CardHeader>
-                <CardContent className="space-y-3 sm:space-y-4 p-4 sm:p-6">
-                  {Array.from({ length: 4 }).map((_, i) => (
-                    <div
-                      key={i}
-                      className="flex items-start space-x-3 p-3 rounded-xl"
-                    >
-                      <Skeleton className="w-8 h-8 rounded-lg" />
-                      <div className="flex-1">
-                        <div className="flex items-center justify-between mb-1">
-                          <Skeleton className="h-4 w-32" />
-                          <Skeleton className="w-12 h-5 rounded-full" />
-                        </div>
-                        <Skeleton className="h-3 w-48 mb-1" />
-                        <Skeleton className="h-3 w-20" />
-                      </div>
-                    </div>
-                  ))}
-                </CardContent>
-              </Card>
-
-              {/* Quick Actions Card */}
-              <Card className="bg-black/20 backdrop-blur-xl border-white/10">
-                <CardHeader className="p-4 sm:p-6">
-                  <div className="flex items-center space-x-2">
-                    <Skeleton className="w-5 h-5" />
-                    <Skeleton className="h-6 w-32" />
-                  </div>
-                  <Skeleton className="h-4 w-48 mt-2" />
-                </CardHeader>
-                <CardContent className="space-y-2 sm:space-y-3 p-4 sm:p-6">
-                  {Array.from({ length: 4 }).map((_, i) => (
-                    <div
-                      key={i}
-                      className="flex items-center space-x-3 h-12 p-3 rounded-xl"
-                    >
-                      <Skeleton className="w-8 h-8 rounded-lg" />
-                      <Skeleton className="h-4 w-32" />
-                    </div>
-                  ))}
-                </CardContent>
-              </Card>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
+    return <DashboardSkeleton variant="user" showSidebar={!inLayout} />;
   }
 
   return (
@@ -713,37 +651,58 @@ const Dashboard = () => {
         />
       </div>
 
-      {/* Desktop Sidebar */}
-      <DashboardSidebar
-        isCollapsed={isCollapsed}
-        onToggle={handleToggleSidebar}
-      />
+      {/* Sidebar and mobile menu handled by layout when inLayout */}
+      {!inLayout && (
+        <>
+          <DashboardSidebar
+            isCollapsed={isCollapsed}
+            onToggle={handleToggleSidebar}
+          />
+          <MobileSidebar
+            isOpen={isMobileMenuOpen}
+            onClose={() => setIsMobileMenuOpen(false)}
+          />
+          <button
+            onClick={handleToggleMobileMenu}
+            className="fixed top-4 right-4 z-50 p-2 rounded-lg bg-black/20 backdrop-blur-xl border border-white/10 md:hidden"
+          >
+            <Menu className="w-5 h-5 text-white" />
+          </button>
+        </>
+      )}
 
-      {/* Mobile Sidebar */}
-      <MobileSidebar
-        isOpen={isMobileMenuOpen}
-        onClose={() => setIsMobileMenuOpen(false)}
-      />
-
-      {/* Mobile Menu Button */}
-      <button
-        onClick={handleToggleMobileMenu}
-        className="fixed top-4 right-4 z-50 p-2 rounded-lg bg-black/20 backdrop-blur-xl border border-white/10 md:hidden"
-      >
-        <Menu className="w-5 h-5 text-white" />
-      </button>
+      {/* Tour welcome when triggered from dashboard */}
+      {showTourNow && (
+        <OnboardingGuide
+          showWelcome
+          force
+          steps={[]}
+          onStart={() => {
+            try {
+              localStorage.setItem("onboarding_force_start_v1", "1");
+            } catch {}
+            setShowTourNow(false);
+            navigate("/dashboard/upload");
+          }}
+          onDismiss={() => setShowTourNow(false)}
+        />
+      )}
 
       {/* Main Content */}
       <motion.div
         initial={false}
-        animate={{
-          marginLeft: isCollapsed
-            ? "var(--collapsed-sidebar-width, 80px)"
-            : "var(--expanded-sidebar-width, 320px)",
-          width: isCollapsed
-            ? "calc(100% - var(--collapsed-sidebar-width, 80px))"
-            : "calc(100% - var(--expanded-sidebar-width, 320px))",
-        }}
+        animate={
+          inLayout
+            ? { marginLeft: 0, width: "100%" }
+            : {
+                marginLeft: isCollapsed
+                  ? "var(--collapsed-sidebar-width, 80px)"
+                  : "var(--expanded-sidebar-width, 320px)",
+                width: isCollapsed
+                  ? "calc(100% - var(--collapsed-sidebar-width, 80px))"
+                  : "calc(100% - var(--expanded-sidebar-width, 320px))",
+              }
+        }
         transition={{ duration: 0.3, ease: "easeInOut" }}
         className="flex-1 p-2 sm:p-4 lg:p-8 relative z-10 overflow-x-hidden md:overflow-x-visible"
       >
@@ -813,6 +772,18 @@ const Dashboard = () => {
                         New Upload
                       </Button>
                     </motion.div>
+                    <motion.div
+                      whileHover={{ scale: 1.05, y: -2 }}
+                      whileTap={{ scale: 0.95 }}
+                      className="w-full sm:w-auto"
+                    >
+                      <Button
+                        onClick={startOnboarding}
+                        className="w-full sm:w-auto bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 shadow-lg shadow-purple-500/25 focus:ring-2 focus:ring-purple-400/40"
+                      >
+                        <Zap className="w-4 h-4 mr-2" /> Start Guided Tour
+                      </Button>
+                    </motion.div>
                   </motion.div>
                 </div>
 
@@ -859,15 +830,15 @@ const Dashboard = () => {
               },
               {
                 title: "Avg Confidence",
-                value: `${stats.avgConfidence || 0}%`,
+                value: `${Number(stats.avgConfidence || 0).toFixed(1)}%`,
                 change: stats.avgConfidence > 0 ? "+2.1%" : "0%",
                 icon: TrendingUp,
                 color: "from-blue-500 to-blue-600",
                 bgColor: "from-slate-800/40 to-slate-700/20",
               },
               {
-                title: "Processing Time",
-                value: `${stats.avgProcessTime || 0}ms`,
+                title: "Avg Processing",
+                value: `${stats.avgProcessTime || 0}s`,
                 change: stats.avgProcessTime > 0 ? "-15%" : "0%",
                 icon: Clock,
                 color: "from-amber-500 to-amber-600",

@@ -37,6 +37,7 @@ import TermsOfService from "@/pages/TermsOfService";
 import Trial from "@/pages/Trial";
 import Unauthorized from "@/pages/Unauthorized";
 import ForgotPassword from "@/pages/ForgotPassword";
+import DashboardLayout from "@/components/DashboardLayout";
 
 const queryClient = new QueryClient();
 
@@ -79,63 +80,23 @@ const App = () => (
                 path="/dashboard"
                 element={
                   <ProtectedRoute>
-                    <Dashboard />
+                    <DashboardLayout />
                   </ProtectedRoute>
                 }
-              />
+              >
+                <Route index element={<Dashboard />} />
+                <Route path="upload" element={<Upload />} />
+                <Route path="history" element={<History />} />
+                <Route path="billing" element={<Billing />} />
+                <Route path="settings" element={<Settings />} />
+                <Route path="notifications" element={<Notifications />} />
+                <Route path="profile" element={<Profile />} />
+              </Route>
               <Route
                 path="/onboarding/trial"
                 element={
                   <ProtectedRoute>
                     <Trial />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/dashboard/upload"
-                element={
-                  <ProtectedRoute>
-                    <Upload />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/dashboard/history"
-                element={
-                  <ProtectedRoute>
-                    <History />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/dashboard/billing"
-                element={
-                  <ProtectedRoute>
-                    <Billing />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/dashboard/settings"
-                element={
-                  <ProtectedRoute>
-                    <Settings />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/dashboard/notifications"
-                element={
-                  <ProtectedRoute>
-                    <Notifications />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/dashboard/profile"
-                element={
-                  <ProtectedRoute>
-                    <Profile />
                   </ProtectedRoute>
                 }
               />
