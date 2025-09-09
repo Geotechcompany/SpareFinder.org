@@ -90,17 +90,28 @@ const OnboardingGuide: React.FC<OnboardingGuideProps> = ({
     if (!steps.length) return;
     const step = steps[Math.max(0, Math.min(stepIndex, steps.length - 1))];
     if (!step) return;
-    let el = document.querySelector(step.selector) as HTMLElement | null;
-    // Fallbacks for known selectors we control
-    if (!el && step.selector.includes("upload")) {
-      el = document.getElementById("tour-upload-dropzone");
-    }
-    if (!el) {
-      setRect(null);
-      return;
-    }
-    const r = el.getBoundingClientRect();
-    setRect(r);
+
+    // Add a small delay to ensure element is rendered
+    const timer = setTimeout(() => {
+      let el = document.querySelector(step.selector) as HTMLElement | null;
+      // Fallbacks for known selectors we control
+      if (!el && step.selector.includes("upload")) {
+        el = document.getElementById("tour-upload-dropzone");
+      }
+      if (!el) {
+        console.log(
+          "OnboardingGuide: Element not found for selector:",
+          step.selector
+        );
+        setRect(null);
+        return;
+      }
+      const r = el.getBoundingClientRect();
+      console.log("OnboardingGuide: Element found, rect:", r);
+      setRect(r);
+    }, 100);
+
+    return () => clearTimeout(timer);
   }, [stepIndex, steps]);
 
   if (!visible) return null;
@@ -109,8 +120,8 @@ const OnboardingGuide: React.FC<OnboardingGuideProps> = ({
   if (showWelcome && !started) {
     return (
       <>
-        <div className="fixed inset-0 bg-black/60 z-[60]" />
-        <div className="fixed inset-0 z-[62] flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-black/60 z-[9998]" />
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4">
           <Card
             className={`max-w-md w-full bg-black/90 border-white/10 ${className}`}
           >
@@ -215,10 +226,10 @@ const OnboardingGuide: React.FC<OnboardingGuideProps> = ({
   return (
     <>
       {/* Dim background above everything */}
-      <div className="fixed inset-0 bg-black/60 z-[1000]" />
+      <div className="fixed inset-0 bg-black/60 z-[9999]" />
       {rect && (
         <div
-          className="fixed z-[1001] rounded-xl shadow-[0_0_0_9999px_rgba(0,0,0,0.6)] border-2 border-blue-400 pointer-events-none"
+          className="fixed z-[10000] rounded-xl shadow-[0_0_0_9999px_rgba(0,0,0,0.6)] border-2 border-blue-400 pointer-events-none"
           style={{
             top: rect.top - 8,
             left: rect.left - 8,
@@ -228,12 +239,12 @@ const OnboardingGuide: React.FC<OnboardingGuideProps> = ({
         />
       )}
       <div
-        className="fixed z-[1002] max-w-sm bg-black/90 border border-white/10 rounded-xl p-4 text-gray-200"
+        className="fixed z-[10001] max-w-sm bg-black/90 border border-white/10 rounded-xl p-4 text-gray-200"
         style={{
           top: rect ? Math.min(rect.bottom + 12, window.innerHeight - 140) : 80,
           left: rect
-            ? Math.min(Math.max(rect.left, 96), window.innerWidth - 360)
-            : 96,
+            ? Math.min(Math.max(rect.left, 120), window.innerWidth - 360)
+            : 120,
         }}
       >
         <div className="flex items-center justify-between mb-2">

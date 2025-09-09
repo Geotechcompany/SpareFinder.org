@@ -17,9 +17,9 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { 
-  FileText, 
-  TrendingUp, 
+import {
+  FileText,
+  TrendingUp,
   Clock,
   CheckCircle,
   AlertTriangle,
@@ -127,7 +127,7 @@ const History = () => {
   const [deleteTarget, setDeleteTarget] = useState<
     { kind: "analysis"; job: any } | { kind: "upload"; id: string } | null
   >(null);
-  
+
   // Use refs to prevent multiple simultaneous requests
   const isInitializedRef = useRef(false);
   const isFetchingRef = useRef(false);
@@ -184,7 +184,7 @@ const History = () => {
           .then((r) => r.json())
           .catch((err) => {
             if (signal.aborted) throw new Error("Request aborted");
-          throw err;
+            throw err;
           }),
         // Optional: alternate SpareFinder service URL
         fetch(
@@ -208,8 +208,8 @@ const History = () => {
         const uploadsData = uploadsResponse.value.data?.uploads || [];
         setUploads(
           uploadsData.map((upload) => ({
-          id: upload.id,
-          name: upload.image_name,
+            id: upload.id,
+            name: upload.image_name,
             date: format(new Date(upload.created_at), "PPp"),
             confidence: Math.round((upload.confidence_score || 0) * 100),
             image_url:
@@ -367,7 +367,7 @@ const History = () => {
       const authErrors = [uploadsResponse, statsResponse].filter(
         (response) =>
           response.status === "rejected" &&
-        response.reason?.response?.status === 401
+          response.reason?.response?.status === 401
       );
 
       if (authErrors.length > 0) {
@@ -389,7 +389,7 @@ const History = () => {
       }
 
       console.error("❌ Error in fetchAllData:", error);
-      
+
       // Handle authentication errors
       if (error.response?.status === 401) {
         console.log("🔒 Authentication error, logging out...");
@@ -747,13 +747,13 @@ const History = () => {
             onToggle={handleToggleSidebar}
           />
         </div>
-        
+
         {/* Mobile Sidebar */}
         <MobileSidebar
           isOpen={isMobileMenuOpen}
           onClose={() => setIsMobileMenuOpen(false)}
         />
-        
+
         <motion.div
           initial={false}
           animate={{
@@ -848,7 +848,7 @@ const History = () => {
               <div className="flex flex-col gap-3 md:gap-4">
                 <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 md:gap-4">
                   <div className="flex-1 min-w-0">
-                    <motion.h1 
+                    <motion.h1
                       className="text-2xl md:text-3xl lg:text-4xl font-bold bg-gradient-to-r from-white via-purple-200 to-blue-200 bg-clip-text text-transparent mb-2 md:mb-3"
                       initial={{ opacity: 0, x: -20 }}
                       animate={{ opacity: 1, x: 0 }}
@@ -856,7 +856,7 @@ const History = () => {
                     >
                       Upload History
                     </motion.h1>
-                    <motion.p 
+                    <motion.p
                       className="text-gray-400 text-sm md:text-base lg:text-lg"
                       initial={{ opacity: 0, x: -20 }}
                       animate={{ opacity: 1, x: 0 }}
@@ -871,7 +871,7 @@ const History = () => {
                     transition={{ delay: 0.4 }}
                     className="flex-shrink-0"
                   >
-                    <Button 
+                    <Button
                       onClick={handleExportHistory}
                       className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 shadow-lg shadow-purple-500/25 text-sm md:text-base"
                       size="sm"
@@ -888,31 +888,31 @@ const History = () => {
           {/* Stats Grid */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 lg:gap-6">
             {[
-              { 
+              {
                 title: "Total Uploads",
-                value: stats.totalUploads.toString(), 
-                icon: FileText, 
+                value: stats.totalUploads.toString(),
+                icon: FileText,
                 color: "from-purple-600 to-blue-600",
                 bgColor: "from-purple-600/20 to-blue-600/20",
               },
-              { 
+              {
                 title: "Completed",
-                value: stats.completed.toString(), 
-                icon: CheckCircle, 
+                value: stats.completed.toString(),
+                icon: CheckCircle,
                 color: "from-green-600 to-emerald-600",
                 bgColor: "from-green-600/20 to-emerald-600/20",
               },
-              { 
+              {
                 title: "Avg Confidence",
-                value: `${stats.avgConfidence}%`, 
-                icon: TrendingUp, 
+                value: `${stats.avgConfidence}%`,
+                icon: TrendingUp,
                 color: "from-blue-600 to-cyan-600",
                 bgColor: "from-blue-600/20 to-cyan-600/20",
               },
-              { 
+              {
                 title: "Avg Processing",
-                value: stats.avgProcessingTime, 
-                icon: Clock, 
+                value: stats.avgProcessingTime,
+                icon: Clock,
                 color: "from-orange-600 to-red-600",
                 bgColor: "from-orange-600/20 to-red-600/20",
               },
@@ -991,98 +991,98 @@ const History = () => {
 
                     {/* Images Tab */}
                     <TabsContent value="images">
-                  <div className="overflow-x-auto">
-                    <table className="min-w-full text-xs md:text-sm">
-                      <thead>
-                        <tr className="text-left text-gray-400">
-                          <th className="py-3 pr-4 font-medium">Job ID</th>
-                          <th className="py-3 pr-4 font-medium">Status</th>
-                          <th className="py-3 pr-4 font-medium">Part</th>
+                      <div className="overflow-x-auto">
+                        <table className="min-w-full text-xs md:text-sm">
+                          <thead>
+                            <tr className="text-left text-gray-400">
+                              <th className="py-3 pr-4 font-medium">Job ID</th>
+                              <th className="py-3 pr-4 font-medium">Status</th>
+                              <th className="py-3 pr-4 font-medium">Part</th>
                               <th className="py-3 pr-4 font-medium">
                                 Confidence
                               </th>
                               <th className="py-3 pr-4 font-medium">
                                 Time (s)
                               </th>
-                          <th className="py-3 pr-4 font-medium">Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-white/10">
+                              <th className="py-3 pr-4 font-medium">Actions</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-white/10">
                             {pastAnalysis
                               .filter((j: any) => j.mode !== "keywords_only")
                               .map((j: any) => (
-                          <tr
-                            key={j.id}
-                            className="text-gray-200 hover:bg-white/5 transition-colors"
-                          >
-                            <td className="py-3 pr-4 font-mono truncate max-w-[200px]">
-                              {j.id}
-                            </td>
-                            <td className="py-3 pr-4 capitalize">
-                              <span
-                                className={`px-2 py-1 rounded text-xs ${
+                                <tr
+                                  key={j.id}
+                                  className="text-gray-200 hover:bg-white/5 transition-colors"
+                                >
+                                  <td className="py-3 pr-4 font-mono truncate max-w-[200px]">
+                                    {j.id}
+                                  </td>
+                                  <td className="py-3 pr-4 capitalize">
+                                    <span
+                                      className={`px-2 py-1 rounded text-xs ${
                                         String(
                                           jobStatusMap[j.id]?.status ||
                                             j.status ||
                                             ""
                                         ).toLowerCase() === "completed"
-                                    ? "bg-emerald-600/20 text-emerald-300 border border-emerald-500/30"
+                                          ? "bg-emerald-600/20 text-emerald-300 border border-emerald-500/30"
                                           : String(
                                               jobStatusMap[j.id]?.status ||
                                                 j.status ||
                                                 ""
                                             ).toLowerCase() === "failed"
-                                    ? "bg-red-600/20 text-red-300 border border-red-500/30"
-                                    : "bg-yellow-600/20 text-yellow-300 border border-yellow-500/30"
-                                }`}
-                              >
+                                          ? "bg-red-600/20 text-red-300 border border-red-500/30"
+                                          : "bg-yellow-600/20 text-yellow-300 border border-yellow-500/30"
+                                      }`}
+                                    >
                                       {jobStatusMap[j.id]?.status || j.status}
-                              </span>
-                            </td>
+                                    </span>
+                                  </td>
 
-                            <td className="py-3 pr-4">
+                                  <td className="py-3 pr-4">
                                     {jobStatusMap[j.id]?.precise_part_name ||
                                       j.precise_part_name ||
                                       j.class_name ||
                                       "-"}
-                            </td>
-                            <td className="py-3 pr-4">
+                                  </td>
+                                  <td className="py-3 pr-4">
                                     {typeof jobStatusMap[j.id]
                                       ?.confidence_score !== "undefined"
                                       ? jobStatusMap[j.id]?.confidence_score
                                       : j.confidence_score ?? "-"}
-                            </td>
-                            <td className="py-3 pr-4">
+                                  </td>
+                                  <td className="py-3 pr-4">
                                     {typeof jobStatusMap[j.id]
                                       ?.processing_time_seconds !== "undefined"
                                       ? jobStatusMap[j.id]
                                           ?.processing_time_seconds
                                       : j.processing_time_seconds ?? "-"}
-                            </td>
-                            <td className="py-3 pr-4">
-                              <div className="flex items-center gap-2">
-                            <Button
-                                  variant="outline"
-                              size="sm"
-                                  className="text-xs"
-                                  onClick={() => handleViewJob(j)}
-                            >
+                                  </td>
+                                  <td className="py-3 pr-4">
+                                    <div className="flex items-center gap-2">
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        className="text-xs"
+                                        onClick={() => handleViewJob(j)}
+                                      >
                                         {isAnalysisLoading
                                           ? "Loading..."
                                           : "View"}
-                            </Button>
-                                {j.success && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                                    className="text-xs"
+                                      </Button>
+                                      {j.success && (
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          className="text-xs"
                                           onClick={() =>
                                             handleDownloadAnalysisPdf(j)
                                           }
-                                  >
-                                    Download
-                            </Button>
-                                )}
+                                        >
+                                          Download
+                                        </Button>
+                                      )}
                                       <Button
                                         variant="ghost"
                                         size="sm"
@@ -1091,13 +1091,13 @@ const History = () => {
                                       >
                                         Delete
                                       </Button>
-                          </div>
-                            </td>
-                          </tr>
-                    ))}
-                      </tbody>
-                    </table>
-                  </div>
+                                    </div>
+                                  </td>
+                                </tr>
+                              ))}
+                          </tbody>
+                        </table>
+                      </div>
 
                       {Array.isArray(uploads) && uploads.length > 0 && (
                         <div className="mt-8 overflow-x-auto">
@@ -1171,7 +1171,7 @@ const History = () => {
                                       >
                                         Delete
                                       </Button>
-                  </div>
+                                    </div>
                                   </td>
                                 </tr>
                               ))}
@@ -1183,11 +1183,11 @@ const History = () => {
 
                     {/* Keywords Tab */}
                     <TabsContent value="keywords">
-                  <div className="overflow-x-auto">
-                    <table className="min-w-full text-xs md:text-sm">
-                      <thead>
-                        <tr className="text-left text-gray-400">
-                          <th className="py-3 pr-4 font-medium">Job ID</th>
+                      <div className="overflow-x-auto">
+                        <table className="min-w-full text-xs md:text-sm">
+                          <thead>
+                            <tr className="text-left text-gray-400">
+                              <th className="py-3 pr-4 font-medium">Job ID</th>
                               <th className="py-3 pr-4 font-medium">
                                 Keywords
                               </th>
@@ -1195,14 +1195,14 @@ const History = () => {
                                 Top Result
                               </th>
                               <th className="py-3 pr-4 font-medium">Results</th>
-                          <th className="py-3 pr-4 font-medium">Status</th>
+                              <th className="py-3 pr-4 font-medium">Status</th>
                               <th className="py-3 pr-4 font-medium">
                                 All Results
                               </th>
-                          <th className="py-3 pr-4 font-medium">Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-white/10">
+                              <th className="py-3 pr-4 font-medium">Actions</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-white/10">
                             {pastAnalysis
                               .filter((j: any) => j.mode === "keywords_only")
                               .map((j: any) => {
@@ -1214,13 +1214,13 @@ const History = () => {
                                   ? j.query.keywords.join(", ")
                                   : "-";
                                 return (
-                          <tr
-                            key={j.id}
+                                  <tr
+                                    key={j.id}
                                     className="text-gray-200 hover:bg-white/5 transition-colors align-top"
-                          >
-                            <td className="py-3 pr-4 font-mono truncate max-w-[200px]">
-                              {j.id}
-                            </td>
+                                  >
+                                    <td className="py-3 pr-4 font-mono truncate max-w-[200px]">
+                                      {j.id}
+                                    </td>
                                     <td className="py-3 pr-4">{keys}</td>
                                     <td className="py-3 pr-4">
                                       {top.name ? (
@@ -1243,22 +1243,22 @@ const History = () => {
                                       )}
                                     </td>
                                     <td className="py-3 pr-4">{list.length}</td>
-                            <td className="py-3 pr-4 capitalize">
-                              <span
-                                className={`px-2 py-1 rounded text-xs ${
+                                    <td className="py-3 pr-4 capitalize">
+                                      <span
+                                        className={`px-2 py-1 rounded text-xs ${
                                           String(j.status).toLowerCase() ===
                                           "completed"
-                                    ? "bg-emerald-600/20 text-emerald-300 border border-emerald-500/30"
-                                    : String(j.status).toLowerCase() ===
-                                      "failed"
-                                    ? "bg-red-600/20 text-red-300 border border-red-500/30"
-                                    : "bg-yellow-600/20 text-yellow-300 border border-yellow-500/30"
-                                }`}
-                              >
-                                {j.status}
-                              </span>
-                            </td>
-                            <td className="py-3 pr-4">
+                                            ? "bg-emerald-600/20 text-emerald-300 border border-emerald-500/30"
+                                            : String(j.status).toLowerCase() ===
+                                              "failed"
+                                            ? "bg-red-600/20 text-red-300 border border-red-500/30"
+                                            : "bg-yellow-600/20 text-yellow-300 border border-yellow-500/30"
+                                        }`}
+                                      >
+                                        {j.status}
+                                      </span>
+                                    </td>
+                                    <td className="py-3 pr-4">
                                       {list.length ? (
                                         <div className="max-h-32 overflow-auto pr-2">
                                           <ul className="list-disc pl-5 space-y-1">
@@ -1286,45 +1286,45 @@ const History = () => {
                                               </li>
                                             ))}
                                           </ul>
-                                  </div>
+                                        </div>
                                       ) : (
                                         "-"
                                       )}
-                            </td>
-                            <td className="py-3 pr-4">
-                              <div className="flex items-center gap-2">
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  className="text-xs"
+                                    </td>
+                                    <td className="py-3 pr-4">
+                                      <div className="flex items-center gap-2">
+                                        <Button
+                                          variant="outline"
+                                          size="sm"
+                                          className="text-xs"
                                           onClick={() => {
                                             setSelectedKeywordJob(j);
                                             setIsKeywordOpen(true);
                                           }}
-                                >
+                                        >
                                           View
-                                </Button>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="text-xs"
+                                        </Button>
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          className="text-xs"
                                           onClick={() =>
                                             downloadPdfFromData(
                                               j,
                                               `keyword_job_${j.id}`
                                             )
                                           }
-                                  >
-                                    Download
-                                  </Button>
-                              </div>
-                            </td>
-                          </tr>
+                                        >
+                                          Download
+                                        </Button>
+                                      </div>
+                                    </td>
+                                  </tr>
                                 );
                               })}
-                      </tbody>
-                    </table>
-                  </div>
+                          </tbody>
+                        </table>
+                      </div>
                     </TabsContent>
                   </Tabs>
                 )}
