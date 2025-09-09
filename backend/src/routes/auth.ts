@@ -176,6 +176,54 @@ router.post('/register', registerValidation, async (req: Request, res: Response)
       });
     }
 
+    // Create 5-day Starter trial subscription
+    try {
+      const now = new Date();
+      const trialEnd = new Date(now.getTime() + 5 * 24 * 60 * 60 * 1000);
+      // Check for existing subscription (may be created by DB trigger)
+      const { data: existingSub, error: findSubErr } = await supabase
+        .from('subscriptions')
+        .select('*')
+        .eq('user_id', profile.id)
+        .single();
+
+      if (findSubErr && findSubErr.code !== 'PGRST116') {
+        console.warn('Fetch subscription during signup failed:', findSubErr);
+      }
+
+      if (existingSub) {
+        const { error: updateErr } = await supabase
+          .from('subscriptions')
+          .update({
+            tier: 'free',
+            status: 'trialing',
+            current_period_start: now.toISOString(),
+            current_period_end: trialEnd.toISOString(),
+            cancel_at_period_end: false
+          })
+          .eq('id', existingSub.id);
+        if (updateErr) {
+          console.warn('Updating existing subscription to trial failed:', updateErr);
+        }
+      } else {
+        const { error: insertErr } = await supabase
+          .from('subscriptions')
+          .insert({
+            user_id: profile.id,
+            tier: 'free',
+            status: 'trialing',
+            current_period_start: now.toISOString(),
+            current_period_end: trialEnd.toISOString(),
+            cancel_at_period_end: false
+          });
+        if (insertErr) {
+          console.warn('Failed to insert trial subscription on signup:', insertErr);
+        }
+      }
+    } catch (e) {
+      console.warn('Unexpected error creating trial subscription:', e);
+    }
+
     // Fire-and-forget: send welcome email and create a notification
     try {
       emailService.sendWelcomeEmail({
@@ -506,6 +554,54 @@ router.post('/google', async (req: Request, res: Response) => {
       }
 
       profile = newProfile;
+
+      // New profile via Google OAuth: start 5-day Starter trial
+      try {
+        const now = new Date();
+        const trialEnd = new Date(now.getTime() + 5 * 24 * 60 * 60 * 1000);
+
+        const { data: existingSub, error: findSubErr } = await supabase
+          .from('subscriptions')
+          .select('*')
+          .eq('user_id', profile.id)
+          .single();
+
+        if (findSubErr && findSubErr.code !== 'PGRST116') {
+          console.warn('Fetch subscription during Google signup failed:', findSubErr);
+        }
+
+        if (existingSub) {
+          const { error: updateErr } = await supabase
+            .from('subscriptions')
+            .update({
+              tier: 'free',
+              status: 'trialing',
+              current_period_start: now.toISOString(),
+              current_period_end: trialEnd.toISOString(),
+              cancel_at_period_end: false
+            })
+            .eq('id', existingSub.id);
+          if (updateErr) {
+            console.warn('Updating existing subscription to trial (Google) failed:', updateErr);
+          }
+        } else {
+          const { error: insertErr } = await supabase
+            .from('subscriptions')
+            .insert({
+              user_id: profile.id,
+              tier: 'free',
+              status: 'trialing',
+              current_period_start: now.toISOString(),
+              current_period_end: trialEnd.toISOString(),
+              cancel_at_period_end: false
+            });
+          if (insertErr) {
+            console.warn('Failed to insert trial subscription on Google signup:', insertErr);
+          }
+        }
+      } catch (e) {
+        console.warn('Unexpected error creating trial subscription (Google):', e);
+      }
     } else if (profileError) {
       console.error('Profile fetch error:', profileError);
       return res.status(500).json({

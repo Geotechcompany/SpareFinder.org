@@ -23,7 +23,7 @@ import {
 interface Subscription {
   id: string;
   tier: "free" | "pro" | "enterprise";
-  status: "active" | "canceled" | "past_due" | "unpaid";
+  status: "active" | "canceled" | "past_due" | "unpaid" | "trialing";
   current_period_start: string;
   current_period_end: string;
   cancel_at_period_end: boolean;
@@ -166,7 +166,7 @@ export const SubscriptionManager: React.FC = () => {
 
     setIsUpdating(tier);
     try {
-      // Starter (free tier label) -> Stripe checkout with 30-day trial @ £15
+      // Starter (free tier label) -> Stripe checkout with 5-day trial @ £15
       if (tier === "free") {
         const plan = PLAN_FEATURES["free"];
         const checkoutData = {
@@ -174,7 +174,7 @@ export const SubscriptionManager: React.FC = () => {
           amount: 15,
           currency: "gbp",
           billing_cycle: "monthly",
-          trial_days: 30,
+          trial_days: 5,
           success_url: `${window.location.origin}/dashboard/billing?payment_success=true&tier=starter`,
           cancel_url: `${window.location.origin}/dashboard/billing?payment_cancelled=true`,
         };

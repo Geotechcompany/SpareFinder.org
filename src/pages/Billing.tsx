@@ -38,9 +38,12 @@ import {
 } from "lucide-react";
 import DashboardSidebar from "@/components/DashboardSidebar";
 import MobileSidebar from "@/components/MobileSidebar";
+import { useDashboardLayout } from "@/contexts/DashboardLayoutContext";
+import DashboardSkeleton from "@/components/DashboardSkeleton";
 
 const Billing = () => {
   const [currentPlan, setCurrentPlan] = useState("free");
+  const { inLayout } = useDashboardLayout();
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [billingData, setBillingData] = useState<any>(null);
@@ -461,46 +464,50 @@ const Billing = () => {
         />
       </div>
 
-      <DashboardSidebar
-        isCollapsed={isCollapsed}
-        onToggle={handleToggleSidebar}
-      />
-
-      {/* Mobile Sidebar */}
-      <MobileSidebar
-        isOpen={isMobileMenuOpen}
-        onClose={() => setIsMobileMenuOpen(false)}
-      />
-
-      {/* Mobile Menu Button */}
-      <button
-        onClick={handleToggleMobileMenu}
-        className="fixed top-4 right-4 z-50 p-2 rounded-lg bg-black/20 backdrop-blur-xl border border-white/10 md:hidden"
-      >
-        <Menu className="w-5 h-5 text-white" />
-      </button>
+      {/* Sidebar and mobile menu handled by layout when inLayout */}
+      {!inLayout && (
+        <>
+          <DashboardSidebar
+            isCollapsed={isCollapsed}
+            onToggle={handleToggleSidebar}
+          />
+          <MobileSidebar
+            isOpen={isMobileMenuOpen}
+            onClose={() => setIsMobileMenuOpen(false)}
+          />
+          <button
+            onClick={handleToggleMobileMenu}
+            className="fixed top-4 right-4 z-50 p-2 rounded-lg bg-black/20 backdrop-blur-xl border border-white/10 md:hidden"
+          >
+            <Menu className="w-5 h-5 text-white" />
+          </button>
+        </>
+      )}
 
       {/* Main Content */}
       <motion.div
         initial={false}
-        animate={{
-          marginLeft: isCollapsed
-            ? "var(--collapsed-sidebar-width, 80px)"
-            : "var(--expanded-sidebar-width, 320px)",
-          width: isCollapsed
-            ? "calc(100% - var(--collapsed-sidebar-width, 80px))"
-            : "calc(100% - var(--expanded-sidebar-width, 320px))",
-        }}
+        animate={
+          inLayout
+            ? { marginLeft: 0, width: "100%" }
+            : {
+                marginLeft: isCollapsed
+                  ? "var(--collapsed-sidebar-width, 80px)"
+                  : "var(--expanded-sidebar-width, 320px)",
+                width: isCollapsed
+                  ? "calc(100% - var(--collapsed-sidebar-width, 80px))"
+                  : "calc(100% - var(--expanded-sidebar-width, 320px))",
+              }
+        }
         transition={{ duration: 0.3, ease: "easeInOut" }}
         className="flex-1 p-2 sm:p-4 lg:p-8 relative z-10 overflow-x-hidden md:overflow-x-visible"
       >
         {isLoading ? (
-          <div className="flex items-center justify-center min-h-[400px]">
-            <div className="text-center">
-              <Loader2 className="w-12 h-12 animate-spin text-purple-400 mx-auto mb-4" />
-              <p className="text-gray-400">Loading billing information...</p>
-            </div>
-          </div>
+          <DashboardSkeleton
+            variant="user"
+            showSidebar={!inLayout}
+            showCharts={false}
+          />
         ) : (
           <motion.div
             initial={{ opacity: 0, y: 20 }}

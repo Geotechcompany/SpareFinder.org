@@ -309,6 +309,15 @@ export const dashboardApi = {
     const response = await apiClient.post('/search/keywords', payload);
     return response.data;
   },
+  scheduleKeywordSearch: async (keywords: string[] | string, userEmail?: string): Promise<ApiResponse> => {
+    const payload: any = { keywords: Array.isArray(keywords) ? keywords : [keywords] };
+    if (userEmail) payload.user_email = userEmail;
+    const AI_BASE = (import.meta as any).env?.VITE_AI_SERVICE_URL || 'http://localhost:8000';
+    const res = await axios.post(`${AI_BASE}/search/keywords/schedule`, payload, {
+      headers: { 'Content-Type': 'application/json' }
+    });
+    return res.data;
+  },
 
   getRecentUploads: async (limit: number = 5): Promise<ApiResponse> => {
     console.log('📋 Fetching recent uploads...');

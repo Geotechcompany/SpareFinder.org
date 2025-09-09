@@ -1,16 +1,43 @@
-import React, { useState } from 'react';
-import { motion } from 'framer-motion';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Label } from '@/components/ui/label';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { Eye, EyeOff, Mail, Lock, User, Zap, ArrowLeft, Sparkles, Building, Loader, AlertCircle, CheckCircle, X } from 'lucide-react';
-import { useAuth } from '@/contexts/AuthContext';
-import { toast } from 'sonner';
-import { api } from '@/lib/api';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import React, { useState } from "react";
+import { motion } from "framer-motion";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Label } from "@/components/ui/label";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Link, useNavigate, useLocation } from "react-router-dom";
+import {
+  Eye,
+  EyeOff,
+  Mail,
+  Lock,
+  User,
+  Zap,
+  ArrowLeft,
+  Sparkles,
+  Building,
+  Loader,
+  AlertCircle,
+  CheckCircle,
+  X,
+} from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
+import { toast } from "sonner";
+import { api } from "@/lib/api";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 const Register = () => {
   const navigate = useNavigate();
@@ -22,49 +49,52 @@ const Register = () => {
   const [showTrialModal, setShowTrialModal] = useState(false);
   const [isStartingTrial, setIsStartingTrial] = useState(false);
   const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    company: '',
-    password: '',
-    confirmPassword: ''
+    name: "",
+    email: "",
+    company: "",
+    password: "",
+    confirmPassword: "",
   });
 
   // Password validation requirements
   const passwordRequirements = [
-    { test: (pwd: string) => pwd.length >= 8, text: 'At least 8 characters' },
-    { test: (pwd: string) => /[A-Z]/.test(pwd), text: 'One uppercase letter' },
-    { test: (pwd: string) => /[a-z]/.test(pwd), text: 'One lowercase letter' },
-    { test: (pwd: string) => /\d/.test(pwd), text: 'One number' },
-    { test: (pwd: string) => /[!@#$%^&*(),.?":{}|<>]/.test(pwd), text: 'One special character (!@#$%^&*)' }
+    { test: (pwd: string) => pwd.length >= 8, text: "At least 8 characters" },
+    { test: (pwd: string) => /[A-Z]/.test(pwd), text: "One uppercase letter" },
+    { test: (pwd: string) => /[a-z]/.test(pwd), text: "One lowercase letter" },
+    { test: (pwd: string) => /\d/.test(pwd), text: "One number" },
+    {
+      test: (pwd: string) => /[!@#$%^&*(),.?":{}|<>]/.test(pwd),
+      text: "One special character (!@#$%^&*)",
+    },
   ];
 
   const validatePassword = (password: string) => {
-    return passwordRequirements.every(req => req.test(password));
+    return passwordRequirements.every((req) => req.test(password));
   };
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     // Clear previous errors
     setErrors([]);
-    
+
     // Form validation
     const newErrors: string[] = [];
-    
+
     if (!formData.name || formData.name.trim().length < 2) {
-      newErrors.push('Please enter your full name (at least 2 characters)');
+      newErrors.push("Please enter your full name (at least 2 characters)");
     }
-    
+
     if (!formData.email || !/\S+@\S+\.\S+/.test(formData.email)) {
-      newErrors.push('Please enter a valid email address');
+      newErrors.push("Please enter a valid email address");
     }
-    
+
     if (formData.password !== formData.confirmPassword) {
-      newErrors.push('Passwords do not match');
+      newErrors.push("Passwords do not match");
     }
 
     if (!validatePassword(formData.password)) {
-      newErrors.push('Password does not meet security requirements');
+      newErrors.push("Password does not meet security requirements");
     }
 
     if (newErrors.length > 0) {
@@ -73,7 +103,7 @@ const Register = () => {
     }
 
     setIsLoading(true);
-    
+
     try {
       const result = await signup({
         email: formData.email,
@@ -81,36 +111,35 @@ const Register = () => {
         full_name: formData.name.trim(),
         company: formData.company.trim() || undefined,
       });
-      
+
       if (result.success) {
         // Clear form data
         setFormData({
-          name: '',
-          email: '',
-          company: '',
-          password: '',
-          confirmPassword: ''
+          name: "",
+          email: "",
+          company: "",
+          password: "",
+          confirmPassword: "",
         });
-        
+
         // Show success message
-        toast.success('Registration successful! Welcome to SpareFinder!');
-        
+        toast.success("Registration successful! Welcome to SpareFinder!");
+
         // Redirect to trial onboarding page before dashboard access
-        navigate('/onboarding/trial', { replace: true });
+        navigate("/onboarding/trial", { replace: true });
       } else {
-        setErrors([result.error || 'Registration failed. Please try again.']);
+        setErrors([result.error || "Registration failed. Please try again."]);
       }
-      
     } catch (error: any) {
-      console.error('❌ Unexpected registration error:', error);
-      setErrors(['An unexpected error occurred. Please try again.']);
+      console.error("❌ Unexpected registration error:", error);
+      setErrors(["An unexpected error occurred. Please try again."]);
     } finally {
       setIsLoading(false);
     }
   };
 
   const updateFormData = (field: string, value: string) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+    setFormData((prev) => ({ ...prev, [field]: value }));
     // Clear errors when user starts typing
     if (errors.length > 0) {
       setErrors([]);
@@ -123,14 +152,17 @@ const Register = () => {
       <div className="absolute inset-0 bg-gradient-to-br from-purple-900/20 via-black to-blue-900/20" />
       <div className="absolute inset-0">
         <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl animate-pulse" />
-        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: "2s" }} />
+        <div
+          className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl animate-pulse"
+          style={{ animationDelay: "2s" }}
+        />
         <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-gradient-to-r from-purple-500/5 to-blue-500/5 rounded-full blur-3xl" />
       </div>
-      
+
       {/* Header */}
       <div className="absolute top-6 left-6 z-10">
-        <Link 
-          to="/" 
+        <Link
+          to="/"
           className="flex items-center gap-3 text-gray-400 hover:text-white transition-all duration-300 group"
         >
           <motion.div
@@ -146,7 +178,7 @@ const Register = () => {
       {/* Logo Header */}
       <div className="absolute top-6 right-6 z-10">
         <div className="flex items-center gap-3">
-          <motion.div 
+          <motion.div
             className="relative"
             whileHover={{ scale: 1.05, rotate: 5 }}
             transition={{ duration: 0.3 }}
@@ -166,7 +198,7 @@ const Register = () => {
           </span>
         </div>
       </div>
-      
+
       <div className="flex items-center justify-center min-h-screen p-6 relative z-10">
         <motion.div
           initial={{ opacity: 0, y: 20, scale: 0.95 }}
@@ -178,7 +210,6 @@ const Register = () => {
           <div className="relative">
             <div className="absolute inset-0 bg-gradient-to-br from-white/[0.07] via-white/[0.02] to-transparent backdrop-blur-3xl rounded-3xl border border-white/10" />
             <div className="relative bg-gray-900/20 backdrop-blur-3xl rounded-3xl border border-white/10 shadow-2xl shadow-purple-500/10 p-8">
-              
               {/* Animated Badge */}
               <motion.div
                 initial={{ opacity: 0, scale: 0.5 }}
@@ -189,12 +220,18 @@ const Register = () => {
                 <div className="inline-flex items-center px-4 py-2 bg-gradient-to-r from-purple-600/20 to-blue-600/20 rounded-full border border-purple-500/30 backdrop-blur-xl">
                   <motion.div
                     animate={{ rotate: [0, 360] }}
-                    transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
+                    transition={{
+                      duration: 3,
+                      repeat: Infinity,
+                      ease: "linear",
+                    }}
                     className="mr-2"
                   >
                     <Sparkles className="w-4 h-4 text-purple-400" />
                   </motion.div>
-                  <span className="text-purple-300 text-sm font-semibold">Join SpareFinder</span>
+                  <span className="text-purple-300 text-sm font-semibold">
+                    Join SpareFinder
+                  </span>
                 </div>
               </motion.div>
 
@@ -242,7 +279,9 @@ const Register = () => {
                 transition={{ delay: 0.4, duration: 0.6 }}
               >
                 <div className="space-y-2">
-                  <Label htmlFor="name" className="text-gray-200 font-medium">Full Name</Label>
+                  <Label htmlFor="name" className="text-gray-200 font-medium">
+                    Full Name
+                  </Label>
                   <div className="relative group">
                     <User className="absolute left-4 top-4 h-5 w-5 text-gray-400 group-focus-within:text-purple-400 transition-colors" />
                     <Input
@@ -250,23 +289,7 @@ const Register = () => {
                       type="text"
                       placeholder="Enter your full name"
                       value={formData.name}
-                      onChange={(e) => updateFormData('name', e.target.value)}
-                      className="pl-12 h-14 bg-white/5 border-white/10 text-white placeholder:text-gray-500 focus:border-purple-500/50 focus:ring-2 focus:ring-purple-500/20 rounded-xl backdrop-blur-xl transition-all duration-300"
-                      required
-                    />
-                  </div>
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="email" className="text-gray-200 font-medium">Email Address</Label>
-                  <div className="relative group">
-                    <Mail className="absolute left-4 top-4 h-5 w-5 text-gray-400 group-focus-within:text-purple-400 transition-colors" />
-                    <Input
-                      id="email"
-                      type="email"
-                      placeholder="Enter your email"
-                      value={formData.email}
-                      onChange={(e) => updateFormData('email', e.target.value)}
+                      onChange={(e) => updateFormData("name", e.target.value)}
                       className="pl-12 h-14 bg-white/5 border-white/10 text-white placeholder:text-gray-500 focus:border-purple-500/50 focus:ring-2 focus:ring-purple-500/20 rounded-xl backdrop-blur-xl transition-all duration-300"
                       required
                     />
@@ -274,7 +297,30 @@ const Register = () => {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="company" className="text-gray-200 font-medium">Company (Optional)</Label>
+                  <Label htmlFor="email" className="text-gray-200 font-medium">
+                    Email Address
+                  </Label>
+                  <div className="relative group">
+                    <Mail className="absolute left-4 top-4 h-5 w-5 text-gray-400 group-focus-within:text-purple-400 transition-colors" />
+                    <Input
+                      id="email"
+                      type="email"
+                      placeholder="Enter your email"
+                      value={formData.email}
+                      onChange={(e) => updateFormData("email", e.target.value)}
+                      className="pl-12 h-14 bg-white/5 border-white/10 text-white placeholder:text-gray-500 focus:border-purple-500/50 focus:ring-2 focus:ring-purple-500/20 rounded-xl backdrop-blur-xl transition-all duration-300"
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label
+                    htmlFor="company"
+                    className="text-gray-200 font-medium"
+                  >
+                    Company (Optional)
+                  </Label>
                   <div className="relative group">
                     <Building className="absolute left-4 top-4 h-5 w-5 text-gray-400 group-focus-within:text-purple-400 transition-colors" />
                     <Input
@@ -282,22 +328,31 @@ const Register = () => {
                       type="text"
                       placeholder="Enter your company name"
                       value={formData.company}
-                      onChange={(e) => updateFormData('company', e.target.value)}
+                      onChange={(e) =>
+                        updateFormData("company", e.target.value)
+                      }
                       className="pl-12 h-14 bg-white/5 border-white/10 text-white placeholder:text-gray-500 focus:border-purple-500/50 focus:ring-2 focus:ring-purple-500/20 rounded-xl backdrop-blur-xl transition-all duration-300"
                     />
                   </div>
                 </div>
-                
+
                 <div className="space-y-2">
-                  <Label htmlFor="password" className="text-gray-200 font-medium">Password</Label>
+                  <Label
+                    htmlFor="password"
+                    className="text-gray-200 font-medium"
+                  >
+                    Password
+                  </Label>
                   <div className="relative group">
                     <Lock className="absolute left-4 top-4 h-5 w-5 text-gray-400 group-focus-within:text-purple-400 transition-colors" />
                     <Input
                       id="password"
-                      type={showPassword ? 'text' : 'password'}
+                      type={showPassword ? "text" : "password"}
                       placeholder="Create a strong password"
                       value={formData.password}
-                      onChange={(e) => updateFormData('password', e.target.value)}
+                      onChange={(e) =>
+                        updateFormData("password", e.target.value)
+                      }
                       className="pl-12 pr-14 h-14 bg-white/5 border-white/10 text-white placeholder:text-gray-500 focus:border-purple-500/50 focus:ring-2 focus:ring-purple-500/20 rounded-xl backdrop-blur-xl transition-all duration-300"
                       required
                     />
@@ -308,23 +363,38 @@ const Register = () => {
                       whileHover={{ scale: 1.1 }}
                       whileTap={{ scale: 0.9 }}
                     >
-                      {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                      {showPassword ? (
+                        <EyeOff className="h-5 w-5" />
+                      ) : (
+                        <Eye className="h-5 w-5" />
+                      )}
                     </motion.button>
                   </div>
-                  
+
                   {/* Password Requirements */}
                   {formData.password && (
                     <div className="mt-2 p-3 bg-white/5 rounded-lg border border-white/10">
-                      <p className="text-sm text-gray-300 mb-2">Password requirements:</p>
+                      <p className="text-sm text-gray-300 mb-2">
+                        Password requirements:
+                      </p>
                       <div className="space-y-1">
                         {passwordRequirements.map((req, index) => (
-                          <div key={index} className="flex items-center space-x-2">
+                          <div
+                            key={index}
+                            className="flex items-center space-x-2"
+                          >
                             {req.test(formData.password) ? (
                               <CheckCircle className="w-4 h-4 text-green-400" />
                             ) : (
                               <X className="w-4 h-4 text-red-400" />
                             )}
-                            <span className={`text-sm ${req.test(formData.password) ? 'text-green-400' : 'text-gray-400'}`}>
+                            <span
+                              className={`text-sm ${
+                                req.test(formData.password)
+                                  ? "text-green-400"
+                                  : "text-gray-400"
+                              }`}
+                            >
                               {req.text}
                             </span>
                           </div>
@@ -333,43 +403,60 @@ const Register = () => {
                     </div>
                   )}
                 </div>
-                
+
                 <div className="space-y-2">
-                  <Label htmlFor="confirmPassword" className="text-gray-200 font-medium">Confirm Password</Label>
+                  <Label
+                    htmlFor="confirmPassword"
+                    className="text-gray-200 font-medium"
+                  >
+                    Confirm Password
+                  </Label>
                   <div className="relative group">
                     <Lock className="absolute left-4 top-4 h-5 w-5 text-gray-400 group-focus-within:text-purple-400 transition-colors" />
                     <Input
                       id="confirmPassword"
-                      type={showConfirmPassword ? 'text' : 'password'}
+                      type={showConfirmPassword ? "text" : "password"}
                       placeholder="Confirm your password"
                       value={formData.confirmPassword}
-                      onChange={(e) => updateFormData('confirmPassword', e.target.value)}
+                      onChange={(e) =>
+                        updateFormData("confirmPassword", e.target.value)
+                      }
                       className="pl-12 pr-14 h-14 bg-white/5 border-white/10 text-white placeholder:text-gray-500 focus:border-purple-500/50 focus:ring-2 focus:ring-purple-500/20 rounded-xl backdrop-blur-xl transition-all duration-300"
                       required
                     />
                     <motion.button
                       type="button"
-                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                      onClick={() =>
+                        setShowConfirmPassword(!showConfirmPassword)
+                      }
                       className="absolute right-4 top-4 text-gray-400 hover:text-white transition-colors"
                       whileHover={{ scale: 1.1 }}
                       whileTap={{ scale: 0.9 }}
                     >
-                      {showConfirmPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                      {showConfirmPassword ? (
+                        <EyeOff className="h-5 w-5" />
+                      ) : (
+                        <Eye className="h-5 w-5" />
+                      )}
                     </motion.button>
                   </div>
-                  
+
                   {/* Password Match Indicator */}
                   {formData.confirmPassword && (
                     <div className="flex items-center space-x-2 mt-2">
                       {formData.password === formData.confirmPassword ? (
                         <>
                           <CheckCircle className="w-4 h-4 text-green-400" />
-                          <span className="text-sm text-green-400">Passwords match</span>
+                          <span className="text-sm text-green-400">
+                            Passwords match
+                          </span>
                         </>
                       ) : (
                         <>
                           <X className="w-4 h-4 text-red-400" />
-                          <span className="text-sm text-red-400">Passwords do not match</span>
+                          <span className="text-sm text-red-400">
+                            Passwords do not match
+                          </span>
                         </>
                       )}
                     </div>
@@ -377,17 +464,26 @@ const Register = () => {
                 </div>
 
                 <div className="text-sm text-gray-400">
-                  By creating an account, you agree to our{' '}
-                  <Link to="/terms-of-service" className="text-purple-400 hover:text-purple-300 transition-colors">
+                  By creating an account, you agree to our{" "}
+                  <Link
+                    to="/terms-of-service"
+                    className="text-purple-400 hover:text-purple-300 transition-colors"
+                  >
                     Terms of Service
-                  </Link>{' '}
-                  and{' '}
-                  <Link to="/privacy-policy" className="text-purple-400 hover:text-purple-300 transition-colors">
+                  </Link>{" "}
+                  and{" "}
+                  <Link
+                    to="/privacy-policy"
+                    className="text-purple-400 hover:text-purple-300 transition-colors"
+                  >
                     Privacy Policy
                   </Link>
                 </div>
-                
-                <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+
+                <motion.div
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                >
                   <Button
                     type="submit"
                     disabled={isLoading}
@@ -399,7 +495,7 @@ const Register = () => {
                         <span>Creating Account...</span>
                       </div>
                     ) : (
-                      'Create Account'
+                      "Create Account"
                     )}
                     <motion.div
                       className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent"
@@ -410,11 +506,14 @@ const Register = () => {
                   </Button>
                 </motion.div>
               </motion.form>
-              
+
               <div className="text-center mt-8">
                 <p className="text-gray-300">
-                  Already have an account?{' '}
-                  <Link to="/login" className="text-purple-400 hover:text-purple-300 font-semibold transition-colors">
+                  Already have an account?{" "}
+                  <Link
+                    to="/login"
+                    className="text-purple-400 hover:text-purple-300 font-semibold transition-colors"
+                  >
                     Sign in
                   </Link>
                 </p>
@@ -424,60 +523,85 @@ const Register = () => {
         </motion.div>
       </div>
       {/* Trial Modal */}
-      <Dialog open={showTrialModal} onOpenChange={(open) => {
-        setShowTrialModal(open);
-        if (!open) {
-          // If user closes modal without starting trial, send them to billing page with decline flag
-          navigate('/dashboard/billing?trial_declined=true', { replace: true });
-        }
-      }}>
+      <Dialog
+        open={showTrialModal}
+        onOpenChange={(open) => {
+          setShowTrialModal(open);
+          if (!open) {
+            // If user closes modal without starting trial, send them to billing page with decline flag
+            navigate("/dashboard/billing?trial_declined=true", {
+              replace: true,
+            });
+          }
+        }}
+      >
         <DialogContent className="sm:max-w-lg border-white/10 bg-gradient-to-b from-gray-900 to-black text-white">
           <DialogHeader>
-            <DialogTitle className="text-2xl">Start your 30-day free trial</DialogTitle>
+            <DialogTitle className="text-2xl">
+              Start your 5-day free trial
+            </DialogTitle>
             <DialogDescription className="text-gray-300">
-              Enjoy full access to SpareFinder Starter for 30 days. No charge today. £15/month after trial. Cancel anytime.
+              Enjoy full access to SpareFinder Starter for 5 days. No charge
+              today. £15/month after trial. Cancel anytime.
             </DialogDescription>
           </DialogHeader>
           <div className="mt-2">
             <div className="relative overflow-hidden rounded-xl border border-white/10">
-              <img src="/favicon.svg" alt="Starter Trial" className="w-full h-40 object-contain bg-gradient-to-r from-purple-600/10 to-blue-600/10" />
+              <img
+                src="/favicon.svg"
+                alt="Starter Trial"
+                className="w-full h-40 object-contain bg-gradient-to-r from-purple-600/10 to-blue-600/10"
+              />
             </div>
             <ul className="mt-4 space-y-2 text-gray-300 text-sm">
-              <li>• 30-day free trial, then £15/month</li>
+              <li>• 5-day free trial, then £15/month</li>
               <li>• 50 AI identifications/month</li>
               <li>• Basic web scraping and email support</li>
             </ul>
           </div>
           <DialogFooter className="mt-4 flex gap-3">
-            <Button variant="secondary" className="bg-white/10 hover:bg-white/20" onClick={() => {
-              setShowTrialModal(false);
-              navigate('/dashboard/billing?trial_declined=true', { replace: true });
-            }}>Maybe later</Button>
-            <Button disabled={isStartingTrial} onClick={async () => {
-              try {
-                setIsStartingTrial(true);
-                const resp = await api.billing.createCheckoutSession({
-                  plan: 'Starter',
-                  amount: 15,
-                  currency: 'GBP',
-                  billing_cycle: 'monthly',
-                  trial_days: 30,
-                  success_url: `${window.location.origin}/dashboard/billing?payment_success=true`,
-                  cancel_url: `${window.location.origin}/dashboard/billing?payment_cancelled=true`
-                });
-                if (resp.success && resp.data?.checkout_url) {
-                  window.location.href = resp.data.checkout_url;
-                } else {
-                  setShowTrialModal(false);
-                  navigate('/dashboard');
-                }
-              } catch (e) {
+            <Button
+              variant="secondary"
+              className="bg-white/10 hover:bg-white/20"
+              onClick={() => {
                 setShowTrialModal(false);
-                navigate('/dashboard');
-              } finally {
-                setIsStartingTrial(false);
-              }
-            }}>{isStartingTrial ? 'Starting trial...' : 'Start 30-day Free Trial'}</Button>
+                navigate("/dashboard/billing?trial_declined=true", {
+                  replace: true,
+                });
+              }}
+            >
+              Maybe later
+            </Button>
+            <Button
+              disabled={isStartingTrial}
+              onClick={async () => {
+                try {
+                  setIsStartingTrial(true);
+                  const resp = await api.billing.createCheckoutSession({
+                    plan: "Starter",
+                    amount: 15,
+                    currency: "GBP",
+                    billing_cycle: "monthly",
+                    trial_days: 5,
+                    success_url: `${window.location.origin}/dashboard/billing?payment_success=true`,
+                    cancel_url: `${window.location.origin}/dashboard/billing?payment_cancelled=true`,
+                  });
+                  if (resp.success && resp.data?.checkout_url) {
+                    window.location.href = resp.data.checkout_url;
+                  } else {
+                    setShowTrialModal(false);
+                    navigate("/dashboard");
+                  }
+                } catch (e) {
+                  setShowTrialModal(false);
+                  navigate("/dashboard");
+                } finally {
+                  setIsStartingTrial(false);
+                }
+              }}
+            >
+              {isStartingTrial ? "Starting trial..." : "Start 5-day Free Trial"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

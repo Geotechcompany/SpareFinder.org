@@ -98,6 +98,12 @@ export const parseAIResponse = (markdown: string): string => {
     const emoji = cleanTitle.match(/^([^\s]+)/)?.[1] || '';
     const title = cleanTitle.replace(/^[^\s]+\s*/, '').trim();
 
+    // Remove sections we don't want to render
+    const normalized = cleanTitle.toLowerCase();
+    if (normalized.includes('actionable next steps')) {
+      return '';
+    }
+
     // Section-specific parsing
     switch (emoji) {
       case '🛞': // Part Identification
@@ -202,6 +208,124 @@ export const parseAIResponse = (markdown: string): string => {
         `;
 
       default: // Generic section
+        // Special handling for Market Chart Data to render responsive charts using pure HTML/CSS
+        if (/market\s*chart/i.test(cleanTitle) || /market\s*insights/i.test(cleanTitle)) {
+          // Prefer parsing inside fenced code block if provided
+          const fencedMatch = sectionContent.match(/```[\s\S]*?```/m);
+          const contentForParsing = fencedMatch
+            ? fencedMatch[0].replace(/```/g, "").trim()
+            : sectionContent;
+
+          // Extract Price Trend (supports: "Price Trend (USD)" lines like: 2023: $550)
+          const priceBlockMatch = contentForParsing.match(/Price\s*Trend[^\n]*\n([\s\S]*?)(?:\n\n|$)/i);
+          const priceLines = (priceBlockMatch?.[1] || '')
+            .split(/\n+/)
+            .map(l => l.trim())
+            .filter(l => /\d{4}\s*:\s*\$?\d+/i.test(l));
+          const priceTrend = priceLines
+            .map(l => {
+              const m = l.match(/(\d{4})\s*:\s*\$?([\d,.]+)/);
+              if (!m) return null as any;
+              return { year: m[1], price: Number(m[2].replace(/,/g, '')) };
+            })
+            .filter(Boolean) as { year: string; price: number }[];
+
+          // Extract Supplier Distribution ("Region: 60%")
+          const distBlockMatch = contentForParsing.match(/Supplier\s*Distribution[^\n]*\n([\s\S]*?)(?:\n\n|$)/i);
+          const distLines = (distBlockMatch?.[1] || '')
+            .split(/\n+/)
+            .map(l => l.trim())
+            .filter(l => /:\s*\d+%/.test(l));
+          const distribution = distLines
+            .map(l => {
+              const m = l.match(/([^:]+):\s*(\d+)%/);
+              if (!m) return null as any;
+              return { name: m[1].trim(), value: Number(m[2]) };
+            })
+            .filter(Boolean) as { name: string; value: number }[];
+
+          const maxPrice = priceTrend.length ? Math.max(...priceTrend.map(p => p.price)) : 0;
+
+          const priceChartHtml = priceTrend.length
+            ? `
+              <div class="w-full overflow-x-auto">
+                <div class="grid grid-cols-12 gap-2 text-xs text-gray-400 mb-2">
+                  ${priceTrend
+                    .map(p => `<span class="col-span-3 sm:col-span-2">${escapeHtmlButPreserveLinks(p.year)}</span>`)
+                    .join('')}
+                </div>
+                <div class="flex items-end gap-2 h-28 sm:h-32" role="img" aria-label="Price Trend Chart">
+                  ${priceTrend
+                    .map(p => {
+                      const h = maxPrice ? Math.max(8, Math.round((p.price / maxPrice) * 100)) : 8;
+                      return `<div class="flex-1 min-w-[28px] sm:min-w-[36px] bg-purple-500/20 border border-purple-400/40 rounded-t-md relative" style="height:${h}%">
+                        <span class="absolute -top-5 left-1/2 -translate-x-1/2 text-[10px] text-gray-300">$${p.price.toLocaleString()}</span>
+                      </div>`;
+                    })
+                    .join('')}
+                </div>
+              </div>
+            `
+            : '';
+
+          const distBarsHtml = distribution.length
+            ? `
+              <div class="space-y-2">
+                ${distribution
+                  .map(d => `
+                    <div class="w-full">
+                      <div class="flex justify-between text-xs text-gray-300 mb-1">
+                        <span>${escapeHtmlButPreserveLinks(d.name)}</span>
+                        <span>${d.value}%</span>
+                      </div>
+                      <div class="w-full h-2.5 bg-gray-700/70 rounded">
+                        <div class="h-2.5 rounded bg-gradient-to-r from-purple-500 to-blue-500" style="width:${Math.min(
+                          100,
+                          d.value
+                        )}%"></div>
+                      </div>
+                    </div>
+                  `)
+                  .join('')}
+              </div>
+            `
+            : '';
+
+          const anyContent = priceChartHtml || distBarsHtml;
+          if (anyContent) {
+            return `
+              <section class="market-charts">
+                <h2>${escapeHtmlButPreserveLinks(title || 'Market Chart Data')}</h2>
+                <div class="grid gap-6">
+                  ${priceChartHtml ? `<div><h3 class="text-sm text-gray-300 mb-2">Price Trend (USD)</h3>${priceChartHtml}</div>` : ''}
+                  ${distBarsHtml ? `<div><h3 class="text-sm text-gray-300 mb-2">Supplier Distribution</h3>${distBarsHtml}
+                    <div class="flex flex-wrap gap-3 mt-3">
+                      ${distribution
+                        .map((d, i) => `
+                          <div class="relative">
+                            <svg width="140" height="140" viewBox="0 0 36 36" class="block">
+                              <circle cx="18" cy="18" r="15.915" fill="none" stroke="#374151" stroke-width="3"></circle>
+                              <circle cx="18" cy="18" r="15.915" fill="none" stroke="url(#grad-${i})" stroke-width="3" stroke-dasharray="${d.value}, 100" stroke-linecap="round" transform="rotate(-90 18 18)"></circle>
+                              <defs>
+                                <linearGradient id="grad-${i}" x1="0%" y1="0%" x2="100%" y2="0%">
+                                  <stop offset="0%" stop-color="#8b5cf6"/>
+                                  <stop offset="100%" stop-color="#06b6d4"/>
+                                </linearGradient>
+                              </defs>
+                              <text x="18" y="20.5" text-anchor="middle" class="fill-gray-200" font-size="6">${d.value}%</text>
+                            </svg>
+                            <div class="text-center text-xs text-gray-300 mt-1">${escapeHtmlButPreserveLinks(d.name)}</div>
+                          </div>
+                        `)
+                        .join('')}
+                    </div>
+                  </div>` : ''}
+                </div>
+              </section>
+            `;
+          }
+        }
+
         // Convert line breaks and basic formatting for generic sections
         const processedContent = sectionContent
           .split('\n')

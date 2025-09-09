@@ -1,0 +1,46 @@
+{
+  "success": true,
+  "status": "completed",
+  "filename": "8f60c4c3-ba17-43ca-8928-9337bd8f0f73",
+  "mode": "keywords_only",
+  "results": [
+    {
+      "name": "Adjustable Spanner",
+      "category": "Hand Tools",
+      "manufacturer": "Stanley",
+      "price": 15.99,
+      "availability": "In Stock",
+      "part_number": "STAN-ADJSPN-001"
+    },
+    {
+      "name": "Combination Spanner Set",
+      "category": "Hand Tools",
+      "manufacturer": "Craftsman",
+      "price": 29.99,
+      "availability": "In Stock",
+      "part_number": "CRFT-CMBSPN-SET"
+    },
+    {
+      "name": "Ratchet Spanner",
+      "category": "Hand Tools",
+      "manufacturer": "GearWrench",
+      "price": 24.99,
+      "availability": "Out of Stock",
+      "part_number": "GEAR-RATCH-002"
+    },
+    {
+      "name": "Open-End Spanner",
+      "category": "Hand Tools",
+      "manufacturer": "Snap-on",
+      "price": 19.99,
+      "availability": "In Stock",
+      "part_number": "SNAP-OPENSPN-003"
+    }
+  ],
+  "markdown": "",
+  "query": {
+    "keywords": [
+      "spanner"
+    ]
+  }
+}
