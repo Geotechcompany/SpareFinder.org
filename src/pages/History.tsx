@@ -39,6 +39,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/components/ui/use-toast";
 import { dashboardApi, tokenStorage } from "@/lib/api";
 import { PartAnalysisDisplayModal } from "@/components/PartAnalysisDisplay";
+import OnboardingGuide from "@/components/OnboardingGuide";
 import {
   Dialog,
   DialogContent,
@@ -65,7 +66,6 @@ const History = () => {
     avgProcessingTime: "0s",
   });
 
-  const [uploads, setUploads] = useState([]);
   const [pastAnalysis, setpastAnalysis] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -85,9 +85,6 @@ const History = () => {
   const [selectedKeywordJob, setSelectedKeywordJob] = useState<any | null>(
     null
   );
-  const [uploadImageMap, setUploadImageMap] = useState<
-    Record<string, string | undefined>
-  >({});
 
   // Build a robust public URL for Supabase storage
   const buildSupabasePublicUrl = useCallback(
@@ -124,9 +121,10 @@ const History = () => {
   );
   // Delete confirmation state
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
-  const [deleteTarget, setDeleteTarget] = useState<
-    { kind: "analysis"; job: any } | { kind: "upload"; id: string } | null
-  >(null);
+  const [deleteTarget, setDeleteTarget] = useState<{
+    kind: "analysis";
+    job: any;
+  } | null>(null);
 
   // Use refs to prevent multiple simultaneous requests
   const isInitializedRef = useRef(false);
@@ -162,72 +160,35 @@ const History = () => {
 
       console.log("🔄 Starting comprehensive data fetch for user:", user?.id);
 
-      // Fetch uploads and stats in parallel (but controlled)
+      // Fetch stats and jobs in parallel (but controlled)
       const API_BASE =
         (import.meta as any).env?.VITE_AI_SERVICE_URL ||
         "http://localhost:8000";
-      const [
-        uploadsResponse,
-        statsResponse,
-        jobsPrimaryResponse,
-        jobsSecondaryResponse,
-      ] = await Promise.allSettled([
-        dashboardApi.getRecentUploads().catch((err) => {
-          if (signal.aborted) throw new Error("Request aborted");
-          throw err;
-        }),
-        dashboardApi.getStats().catch((err) => {
-          if (signal.aborted) throw new Error("Request aborted");
-          throw err;
-        }),
-        fetch(`${API_BASE}/jobs`)
-          .then((r) => r.json())
-          .catch((err) => {
+      const [statsResponse, jobsPrimaryResponse, jobsSecondaryResponse] =
+        await Promise.allSettled([
+          dashboardApi.getStats().catch((err) => {
             if (signal.aborted) throw new Error("Request aborted");
             throw err;
           }),
-        // Optional: alternate SpareFinder service URL
-        fetch(
-          `${
-            (import.meta as any).env?.VITE_SPAREFINDER_SERVICE_URL || API_BASE
-          }/jobs`
-        )
-          .then((r) => r.json())
-          .catch((err) => {
-            if (signal.aborted) throw new Error("Request aborted");
-            // Do not rethrow to allow fallback
-            return { success: false, results: [] } as any;
-          }),
-      ]);
-
-      // Handle uploads response
-      if (
-        uploadsResponse.status === "fulfilled" &&
-        uploadsResponse.value.success
-      ) {
-        const uploadsData = uploadsResponse.value.data?.uploads || [];
-        setUploads(
-          uploadsData.map((upload) => ({
-            id: upload.id,
-            name: upload.image_name,
-            date: format(new Date(upload.created_at), "PPp"),
-            confidence: Math.round((upload.confidence_score || 0) * 100),
-            image_url:
-              buildSupabasePublicUrl(upload.image_url, upload.image_name) ||
-              upload.image_url,
-          }))
-        );
-        // Build quick lookup for image previews by id
-        const map: Record<string, string | undefined> = {};
-        for (const u of uploadsData) {
-          map[u.id] =
-            buildSupabasePublicUrl(u.image_url, u.image_name) || u.image_url;
-        }
-        setUploadImageMap(map);
-      } else {
-        console.warn("❌ Failed to fetch uploads:", uploadsResponse);
-        setUploads([]);
-      }
+          fetch(`${API_BASE}/jobs`)
+            .then((r) => r.json())
+            .catch((err) => {
+              if (signal.aborted) throw new Error("Request aborted");
+              throw err;
+            }),
+          // Optional: alternate SpareFinder service URL
+          fetch(
+            `${
+              (import.meta as any).env?.VITE_SPAREFINDER_SERVICE_URL || API_BASE
+            }/jobs`
+          )
+            .then((r) => r.json())
+            .catch((err) => {
+              if (signal.aborted) throw new Error("Request aborted");
+              // Do not rethrow to allow fallback
+              return { success: false, results: [] } as any;
+            }),
+        ]);
 
       // Handle stats response
       if (statsResponse.status === "fulfilled" && statsResponse.value.success) {
@@ -249,6 +210,27 @@ const History = () => {
       }
 
       // Handle jobs response (merge all available jobs from both sources)
+      console.log("🔍 Jobs API responses:", {
+        primary: jobsPrimaryResponse.status,
+        primarySuccess:
+          jobsPrimaryResponse.status === "fulfilled"
+            ? jobsPrimaryResponse.value?.success
+            : false,
+        primaryResults:
+          jobsPrimaryResponse.status === "fulfilled"
+            ? jobsPrimaryResponse.value?.results?.length
+            : 0,
+        secondary: jobsSecondaryResponse.status,
+        secondarySuccess:
+          jobsSecondaryResponse.status === "fulfilled"
+            ? jobsSecondaryResponse.value?.success
+            : false,
+        secondaryResults:
+          jobsSecondaryResponse.status === "fulfilled"
+            ? jobsSecondaryResponse.value?.results?.length
+            : 0,
+      });
+
       const primaryJobs =
         jobsPrimaryResponse.status === "fulfilled" &&
         jobsPrimaryResponse.value?.success
@@ -283,6 +265,16 @@ const History = () => {
         return unique;
       })();
 
+      console.log("🔄 Final merged jobs:", mergedJobs.length, "jobs");
+      console.log(
+        "📊 Job details:",
+        mergedJobs.map((j) => ({
+          id: j.id,
+          mode: j.mode,
+          status: j.status,
+          success: j.success,
+        }))
+      );
       setpastAnalysis(mergedJobs);
 
       // Compute accurate stats from merged jobs (image analyses only)
@@ -364,7 +356,7 @@ const History = () => {
       hydrateImages();
 
       // Check if any request failed with auth error
-      const authErrors = [uploadsResponse, statsResponse].filter(
+      const authErrors = [statsResponse].filter(
         (response) =>
           response.status === "rejected" &&
           response.reason?.response?.status === 401
@@ -608,53 +600,16 @@ const History = () => {
     setDeleteTarget({ kind: "analysis", job });
     setIsDeleteOpen(true);
   };
-  const requestDeleteUpload = (id: string) => {
-    setDeleteTarget({ kind: "upload", id });
-    setIsDeleteOpen(true);
-  };
 
   const confirmDelete = async () => {
     try {
       if (!deleteTarget) return;
       if (deleteTarget.kind === "analysis") {
         await handleDeleteAnalysis(deleteTarget.job);
-      } else {
-        await handleDeleteUpload(deleteTarget.id);
       }
     } finally {
       setIsDeleteOpen(false);
       setDeleteTarget(null);
-    }
-  };
-
-  // Delete upload function
-  const handleDeleteUpload = async (uploadId: string) => {
-    try {
-      if (!hasValidToken()) {
-        toast({
-          title: "Authentication Required",
-          description: "Please log in to delete uploads",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      const response = await dashboardApi.deleteUpload(uploadId);
-      if (response.success) {
-        toast({
-          title: "Upload Deleted",
-          description: "Upload successfully removed",
-        });
-        // Refresh data
-        fetchAllData();
-      }
-    } catch (error: any) {
-      console.error("Delete error:", error);
-      toast({
-        title: "Deletion Failed",
-        description: "Unable to delete upload",
-        variant: "destructive",
-      });
     }
   };
 
@@ -703,7 +658,6 @@ const History = () => {
     // Reset initialization flag when user changes
     if (!isAuthenticated || !user?.id) {
       isInitializedRef.current = false;
-      setUploads([]);
       setStats({
         totalUploads: 0,
         completed: 0,
@@ -841,6 +795,19 @@ const History = () => {
           transition={{ duration: 0.5 }}
           className="space-y-4 md:space-y-6 lg:space-y-8"
         >
+          {/* History Page Tour */}
+          <OnboardingGuide
+            storageKey="history_tour_seen_v1"
+            showWelcome={false}
+            steps={[
+              {
+                selector: "#tour-past-jobs-table",
+                title: "Track progress here",
+                description:
+                  "This table shows your past and active jobs. Status updates in real time as the analysis runs.",
+              },
+            ]}
+          />
           {/* Header */}
           <div className="relative">
             <div className="absolute inset-0 bg-gradient-to-r from-purple-600/10 to-blue-600/10 rounded-2xl md:rounded-3xl blur-xl opacity-60" />
@@ -991,7 +958,10 @@ const History = () => {
 
                     {/* Images Tab */}
                     <TabsContent value="images">
-                      <div className="overflow-x-auto">
+                      <div
+                        id="tour-past-jobs-table"
+                        className="overflow-x-auto"
+                      >
                         <table className="min-w-full text-xs md:text-sm">
                           <thead>
                             <tr className="text-left text-gray-400">
@@ -1008,177 +978,105 @@ const History = () => {
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-white/10">
-                            {pastAnalysis
-                              .filter((j: any) => j.mode !== "keywords_only")
-                              .map((j: any) => (
-                                <tr
-                                  key={j.id}
-                                  className="text-gray-200 hover:bg-white/5 transition-colors"
-                                >
-                                  <td className="py-3 pr-4 font-mono truncate max-w-[200px]">
-                                    {j.id}
-                                  </td>
-                                  <td className="py-3 pr-4 capitalize">
-                                    <span
-                                      className={`px-2 py-1 rounded text-xs ${
-                                        String(
-                                          jobStatusMap[j.id]?.status ||
-                                            j.status ||
-                                            ""
-                                        ).toLowerCase() === "completed"
-                                          ? "bg-emerald-600/20 text-emerald-300 border border-emerald-500/30"
-                                          : String(
-                                              jobStatusMap[j.id]?.status ||
-                                                j.status ||
-                                                ""
-                                            ).toLowerCase() === "failed"
-                                          ? "bg-red-600/20 text-red-300 border border-red-500/30"
-                                          : "bg-yellow-600/20 text-yellow-300 border border-yellow-500/30"
-                                      }`}
+                            {(() => {
+                              const imageJobs = pastAnalysis.filter(
+                                (j: any) => j.mode !== "keywords_only"
+                              );
+                              console.log(
+                                "🖼️ Image jobs filtered:",
+                                imageJobs.length,
+                                "out of",
+                                pastAnalysis.length
+                              );
+                              return imageJobs;
+                            })().map((j: any) => (
+                              <tr
+                                key={j.id}
+                                className="text-gray-200 hover:bg-white/5 transition-colors"
+                              >
+                                <td className="py-3 pr-4 font-mono truncate max-w-[200px]">
+                                  {j.id}
+                                </td>
+                                <td className="py-3 pr-4 capitalize">
+                                  <span
+                                    className={`px-2 py-1 rounded text-xs ${
+                                      String(
+                                        jobStatusMap[j.id]?.status ||
+                                          j.status ||
+                                          ""
+                                      ).toLowerCase() === "completed"
+                                        ? "bg-emerald-600/20 text-emerald-300 border border-emerald-500/30"
+                                        : String(
+                                            jobStatusMap[j.id]?.status ||
+                                              j.status ||
+                                              ""
+                                          ).toLowerCase() === "failed"
+                                        ? "bg-red-600/20 text-red-300 border border-red-500/30"
+                                        : "bg-yellow-600/20 text-yellow-300 border border-yellow-500/30"
+                                    }`}
+                                  >
+                                    {jobStatusMap[j.id]?.status || j.status}
+                                  </span>
+                                </td>
+
+                                <td className="py-3 pr-4">
+                                  {jobStatusMap[j.id]?.precise_part_name ||
+                                    j.precise_part_name ||
+                                    j.class_name ||
+                                    "-"}
+                                </td>
+                                <td className="py-3 pr-4">
+                                  {typeof jobStatusMap[j.id]
+                                    ?.confidence_score !== "undefined"
+                                    ? jobStatusMap[j.id]?.confidence_score
+                                    : j.confidence_score ?? "-"}
+                                </td>
+                                <td className="py-3 pr-4">
+                                  {typeof jobStatusMap[j.id]
+                                    ?.processing_time_seconds !== "undefined"
+                                    ? jobStatusMap[j.id]
+                                        ?.processing_time_seconds
+                                    : j.processing_time_seconds ?? "-"}
+                                </td>
+                                <td className="py-3 pr-4">
+                                  <div className="flex items-center gap-2">
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      className="text-xs"
+                                      onClick={() => handleViewJob(j)}
                                     >
-                                      {jobStatusMap[j.id]?.status || j.status}
-                                    </span>
-                                  </td>
-
-                                  <td className="py-3 pr-4">
-                                    {jobStatusMap[j.id]?.precise_part_name ||
-                                      j.precise_part_name ||
-                                      j.class_name ||
-                                      "-"}
-                                  </td>
-                                  <td className="py-3 pr-4">
-                                    {typeof jobStatusMap[j.id]
-                                      ?.confidence_score !== "undefined"
-                                      ? jobStatusMap[j.id]?.confidence_score
-                                      : j.confidence_score ?? "-"}
-                                  </td>
-                                  <td className="py-3 pr-4">
-                                    {typeof jobStatusMap[j.id]
-                                      ?.processing_time_seconds !== "undefined"
-                                      ? jobStatusMap[j.id]
-                                          ?.processing_time_seconds
-                                      : j.processing_time_seconds ?? "-"}
-                                  </td>
-                                  <td className="py-3 pr-4">
-                                    <div className="flex items-center gap-2">
-                                      <Button
-                                        variant="outline"
-                                        size="sm"
-                                        className="text-xs"
-                                        onClick={() => handleViewJob(j)}
-                                      >
-                                        {isAnalysisLoading
-                                          ? "Loading..."
-                                          : "View"}
-                                      </Button>
-                                      {j.success && (
-                                        <Button
-                                          variant="ghost"
-                                          size="sm"
-                                          className="text-xs"
-                                          onClick={() =>
-                                            handleDownloadAnalysisPdf(j)
-                                          }
-                                        >
-                                          Download
-                                        </Button>
-                                      )}
-                                      <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        className="text-xs text-red-300 hover:text-red-200"
-                                        onClick={() => requestDeleteAnalysis(j)}
-                                      >
-                                        Delete
-                                      </Button>
-                                    </div>
-                                  </td>
-                                </tr>
-                              ))}
-                          </tbody>
-                        </table>
-                      </div>
-
-                      {Array.isArray(uploads) && uploads.length > 0 && (
-                        <div className="mt-8 overflow-x-auto">
-                          <div className="text-gray-300 mb-2 text-sm">
-                            Database Uploads
-                          </div>
-                          <table className="min-w-full text-xs md:text-sm">
-                            <thead>
-                              <tr className="text-left text-gray-400">
-                                <th className="py-3 pr-4 font-medium">
-                                  Upload ID
-                                </th>
-                                <th className="py-3 pr-4 font-medium">Name</th>
-                                <th className="py-3 pr-4 font-medium">Date</th>
-                                <th className="py-3 pr-4 font-medium">
-                                  Confidence
-                                </th>
-                                <th className="py-3 pr-4 font-medium">
-                                  Actions
-                                </th>
-                              </tr>
-                            </thead>
-                            <tbody className="divide-y divide-white/10">
-                              {uploads.map((u: any) => (
-                                <tr key={u.id} className="text-gray-200">
-                                  <td className="py-3 pr-4 font-mono truncate max-w-[200px]">
-                                    {u.id}
-                                  </td>
-                                  <td className="py-3 pr-4">{u.name}</td>
-                                  <td className="py-3 pr-4">{u.date}</td>
-                                  <td className="py-3 pr-4">
-                                    {typeof u.confidence !== "undefined"
-                                      ? `${u.confidence}%`
-                                      : "-"}
-                                  </td>
-                                  <td className="py-3 pr-4">
-                                    <div className="flex items-center gap-2">
-                                      <Button
-                                        variant="outline"
-                                        size="sm"
-                                        className="text-xs"
-                                        onClick={() =>
-                                          handleViewJob({
-                                            id: u.id,
-                                            filename: u.id,
-                                          } as any)
-                                        }
-                                      >
-                                        View
-                                      </Button>
+                                      {isAnalysisLoading
+                                        ? "Loading..."
+                                        : "View"}
+                                    </Button>
+                                    {j.success && (
                                       <Button
                                         variant="ghost"
                                         size="sm"
                                         className="text-xs"
                                         onClick={() =>
-                                          handleDownloadAnalysisPdf({
-                                            id: u.id,
-                                            filename: u.id,
-                                          })
+                                          handleDownloadAnalysisPdf(j)
                                         }
                                       >
                                         Download
                                       </Button>
-                                      <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        className="text-xs text-red-300 hover:text-red-200"
-                                        onClick={() =>
-                                          requestDeleteUpload(u.id)
-                                        }
-                                      >
-                                        Delete
-                                      </Button>
-                                    </div>
-                                  </td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
-                      )}
+                                    )}
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="text-xs text-red-300 hover:text-red-200"
+                                      onClick={() => requestDeleteAnalysis(j)}
+                                    >
+                                      Delete
+                                    </Button>
+                                  </div>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
                     </TabsContent>
 
                     {/* Keywords Tab */}
@@ -1395,16 +1293,10 @@ const History = () => {
           <Dialog open={isDeleteOpen} onOpenChange={setIsDeleteOpen}>
             <DialogContent className="max-w-md">
               <DialogHeader>
-                <DialogTitle>
-                  Delete{" "}
-                  {deleteTarget?.kind === "upload" ? "Upload" : "Analysis"}
-                </DialogTitle>
+                <DialogTitle>Delete Analysis</DialogTitle>
                 <DialogDescription>
-                  This action will permanently remove the{" "}
-                  {deleteTarget?.kind === "upload"
-                    ? "database upload"
-                    : "analysis and its files"}
-                  . This cannot be undone.
+                  This action will permanently remove the analysis and its
+                  files. This cannot be undone.
                 </DialogDescription>
               </DialogHeader>
               <div className="flex justify-end gap-2 pt-2">
