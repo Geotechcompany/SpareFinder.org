@@ -3793,19 +3793,19 @@ const Upload = () => {
                   className="mb-6"
                   steps={[
                     {
-                      selector: 'button[onClick] , input[type="file"]',
+                      selector: "#tour-upload-dropzone",
                       title: "Choose a file",
                       description:
                         "Click Choose File to select a clear photo of the part (max 10MB).",
                     },
                     {
-                      selector: 'input[placeholder*="keywords"]',
+                      selector: "#tour-keywords-input",
                       title: "Add precise keywords",
                       description:
                         "Optionally add 3–5 precise terms like part number and vehicle make/model/year.",
                     },
                     {
-                      selector: "button:has(svg.w-5.h-5):not([disabled])",
+                      selector: "#tour-search-keywords-btn",
                       title: "Analyze Part",
                       description:
                         "Press Analyze Part. You will be redirected to History to track progress in real time.",
