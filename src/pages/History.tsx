@@ -39,6 +39,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/components/ui/use-toast";
 import { dashboardApi, tokenStorage } from "@/lib/api";
 import { PartAnalysisDisplayModal } from "@/components/PartAnalysisDisplay";
+import OnboardingGuide from "@/components/OnboardingGuide";
 import {
   Dialog,
   DialogContent,
@@ -841,6 +842,19 @@ const History = () => {
           transition={{ duration: 0.5 }}
           className="space-y-4 md:space-y-6 lg:space-y-8"
         >
+          {/* History Page Tour */}
+          <OnboardingGuide
+            storageKey="history_tour_seen_v1"
+            showWelcome={false}
+            steps={[
+              {
+                selector: "#tour-past-jobs-table",
+                title: "Track progress here",
+                description:
+                  "This table shows your past and active jobs. Status updates in real time as the analysis runs.",
+              },
+            ]}
+          />
           {/* Header */}
           <div className="relative">
             <div className="absolute inset-0 bg-gradient-to-r from-purple-600/10 to-blue-600/10 rounded-2xl md:rounded-3xl blur-xl opacity-60" />
@@ -991,7 +1005,10 @@ const History = () => {
 
                     {/* Images Tab */}
                     <TabsContent value="images">
-                      <div className="overflow-x-auto">
+                      <div
+                        id="tour-past-jobs-table"
+                        className="overflow-x-auto"
+                      >
                         <table className="min-w-full text-xs md:text-sm">
                           <thead>
                             <tr className="text-left text-gray-400">
