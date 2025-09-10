@@ -45,6 +45,7 @@ from .services.email_templates import (
     keyword_completed_html,
 )
 from .services.scraper import scrape_supplier_page
+from .services.enhanced_scraper import scrape_supplier_page as enhanced_scrape_supplier_page, scrape_multiple_suppliers
 from .core.config import settings
 from .services.job_store import save_job_snapshot, load_job_snapshot
 from supabase import create_client
@@ -641,25 +642,70 @@ async def search_by_keywords(payload: KeywordSearchRequest):
 async def _enrich_suppliers(response_data: Dict[str, Any]) -> None:
     try:
         supplier_urls: List[str] = []
+        
+        # Extract URLs from suppliers array
         for s in (response_data.get("suppliers") or [])[:5]:
             if isinstance(s, dict) and s.get("url"):
                 supplier_urls.append(s.get("url"))
+        
+        # Extract URLs from buy_links
         for _, u in (response_data.get("buy_links") or {}).items():
             if isinstance(u, str) and u.startswith("http"):
                 supplier_urls.append(u)
+        
+        # Remove duplicates and limit to 5 URLs
         supplier_urls = list(dict.fromkeys(supplier_urls))[:5]
+        
+        if not supplier_urls:
+            logger.info("No supplier URLs found for enrichment")
+            return
 
-        enriched: List[Dict[str, Any]] = []
-        for u in supplier_urls:
-            try:
-                res = await scrape_supplier_page(u)
-                enriched.append(res)
-            except Exception as e:
-                enriched.append({"success": False, "url": u, "error": str(e)})
-        if enriched:
-            response_data["supplier_enrichment"] = enriched
+        logger.info(f"Enriching {len(supplier_urls)} supplier URLs: {supplier_urls}")
+        
+        # Use enhanced scraper for better contact extraction
+        enriched_results = await scrape_multiple_suppliers(supplier_urls)
+        
+        # Update the suppliers array with enriched contact information
+        if enriched_results:
+            enriched_suppliers = []
+            for i, supplier in enumerate(response_data.get("suppliers", [])):
+                if i < len(enriched_results):
+                    enriched_supplier = supplier.copy() if isinstance(supplier, dict) else {}
+                    enriched_data = enriched_results[i]
+                    
+                    # Add enriched contact information
+                    if enriched_data.get("success"):
+                        enriched_supplier.update({
+                            "contact_info": enriched_data.get("contact", {}),
+                            "company_name": enriched_data.get("company_name"),
+                            "description": enriched_data.get("description"),
+                            "price_info": enriched_data.get("price_info"),
+                            "business_hours": enriched_data.get("contact", {}).get("business_hours"),
+                            "social_media": enriched_data.get("contact", {}).get("social_media", {}),
+                            "contact_links": enriched_data.get("contact", {}).get("contact_links", []),
+                            "scraped_emails": enriched_data.get("contact", {}).get("emails", []),
+                            "scraped_phones": enriched_data.get("contact", {}).get("phones", []),
+                            "scraped_addresses": enriched_data.get("contact", {}).get("addresses", []),
+                            "scraping_success": True
+                        })
+                    else:
+                        enriched_supplier.update({
+                            "scraping_success": False,
+                            "scraping_error": enriched_data.get("error", "Unknown error")
+                        })
+                    
+                    enriched_suppliers.append(enriched_supplier)
+                else:
+                    enriched_suppliers.append(supplier)
+            
+            response_data["suppliers"] = enriched_suppliers
+            response_data["supplier_enrichment"] = enriched_results
+            
+            logger.info(f"Successfully enriched {len(enriched_suppliers)} suppliers with contact information")
+        
     except Exception as e:
-        logger.warning(f"Supplier enrichment failed: {e}")
+        logger.error(f"Supplier enrichment failed: {e}")
+        # Don't fail the entire analysis if supplier enrichment fails
 
 
 async def _run_analysis_job(
@@ -1154,13 +1200,64 @@ async def suppliers_enrich(payload: Dict[str, Any]):
         logger.error(f"/suppliers/enrich error: {e}")
         return JSONResponse(status_code=500, content={"success": False, "error": str(e)})
 
+@app.post("/suppliers/scrape")
+async def scrape_supplier_contact(payload: Dict[str, Any]):
+    """Enhanced scraper endpoint for extracting detailed contact information"""
+    try:
+        url = payload.get("url") if isinstance(payload, dict) else None
+        if not url or not isinstance(url, str) or not url.startswith("http"):
+            return JSONResponse(status_code=400, content={"success": False, "error": "invalid_url"})
+        
+        result = await enhanced_scrape_supplier_page(url)
+        return JSONResponse(status_code=200, content=result)
+    except Exception as e:
+        logger.error(f"/suppliers/scrape error: {e}")
+        return JSONResponse(status_code=500, content={"success": False, "error": str(e)})
+
+@app.post("/suppliers/scrape-multiple")
+async def scrape_multiple_suppliers_contact(payload: Dict[str, Any]):
+    """Enhanced scraper endpoint for multiple supplier URLs"""
+    try:
+        urls = payload.get("urls") if isinstance(payload, dict) else None
+        if not urls or not isinstance(urls, list):
+            return JSONResponse(status_code=400, content={"success": False, "error": "invalid_urls"})
+        
+        # Filter and limit URLs
+        valid_urls = [u for u in urls if isinstance(u, str) and u.startswith("http")][:10]
+        if not valid_urls:
+            return JSONResponse(status_code=400, content={"success": False, "error": "no_valid_urls"})
+        
+        results = await scrape_multiple_suppliers(valid_urls)
+        return JSONResponse(status_code=200, content={"success": True, "results": results})
+    except Exception as e:
+        logger.error(f"/suppliers/scrape-multiple error: {e}")
+        return JSONResponse(status_code=500, content={"success": False, "error": str(e)})
+
 @app.get("/jobs")
 async def list_jobs():
     try:
-        # Merge in-memory with any local snapshots
+        # Load all job snapshots from file system
         jobs = []
+        jobs_dir = os.path.join(os.getcwd(), "uploads", "jobs")
+        
+        # First, add in-memory jobs
         for k, v in analysis_results.items():
             jobs.append({"id": k, **v})
+        
+        # Then, load job snapshots from file system
+        if os.path.exists(jobs_dir):
+            for filename in os.listdir(jobs_dir):
+                if filename.endswith('.json'):
+                    job_id = filename[:-5]  # Remove .json extension
+                    # Skip if already in memory
+                    if job_id not in analysis_results:
+                        try:
+                            job_data = load_job_snapshot(job_id)
+                            if job_data:
+                                jobs.append({"id": job_id, **job_data})
+                        except Exception as e:
+                            logger.warning(f"Failed to load job snapshot {job_id}: {e}")
+        
         return JSONResponse(status_code=200, content={"success": True, "results": jobs})
     except Exception as e:
         logger.error(f"/jobs error: {e}")

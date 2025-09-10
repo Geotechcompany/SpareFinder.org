@@ -11,6 +11,7 @@ import {
 import { Button } from "@/components/ui/button";
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
+import EnhancedSupplierDisplay from "./EnhancedSupplierDisplay";
 
 interface FlatAnalysisData {
   success: boolean;
@@ -103,6 +104,20 @@ export const FlatPartAnalysisDisplay: React.FC<PartAnalysisDisplayProps> = ({
             </div>
           </CardContent>
         </Card>
+      )}
+
+      {/* Enhanced Supplier Display with Contact Scraping */}
+      {(analysisData.suppliers?.length > 0 || analysisData.buy_links) && (
+        <EnhancedSupplierDisplay
+          suppliers={analysisData.suppliers || []}
+          buyLinks={analysisData.buy_links || {}}
+          partName={
+            analysisData.precise_part_name ||
+            analysisData.class_name ||
+            "this part"
+          }
+          showScraper={true}
+        />
       )}
 
       {/* Charts are rendered inside the Market Chart Data markdown section via parser */}
