@@ -251,6 +251,14 @@ export const EnhancedSupplierDisplay: React.FC<
           const isExpanded = expandedSuppliers.has(supplier.name);
           const hasScrapedData = scrapedData[supplier.name];
           const isCurrentlyScraping = isScraping[supplier.name];
+          const serverPhones =
+            (supplier.scraped_phones && supplier.scraped_phones.length > 0
+              ? supplier.scraped_phones
+              : supplier.contact_info?.phones) || [];
+          const serverEmails =
+            (supplier.scraped_emails && supplier.scraped_emails.length > 0
+              ? supplier.scraped_emails
+              : supplier.contact_info?.emails) || [];
 
           return (
             <motion.div
@@ -280,6 +288,14 @@ export const EnhancedSupplierDisplay: React.FC<
                           <MapPin className="w-4 h-4 text-blue-400 mr-1" />
                           <span className="text-blue-300 text-sm">
                             {supplier.shipping_region}
+                          </span>
+                        </div>
+                      )}
+                      {!supplier.contact && serverPhones.length > 0 && (
+                        <div className="flex items-center mt-1">
+                          <Phone className="w-4 h-4 text-gray-400 mr-1" />
+                          <span className="text-gray-300 text-sm">
+                            {serverPhones[0]}
                           </span>
                         </div>
                       )}
@@ -357,6 +373,66 @@ export const EnhancedSupplierDisplay: React.FC<
                               <p className="text-gray-200 text-sm">
                                 {supplier.contact}
                               </p>
+                            </div>
+                          )}
+                          {serverPhones.length > 0 && (
+                            <div>
+                              <Label className="text-gray-300 text-sm flex items-center">
+                                <Phone className="w-3 h-3 mr-1" />
+                                Phone Numbers
+                              </Label>
+                              <div className="space-y-2 mt-1">
+                                {serverPhones.slice(0, 3).map((phone, idx) => (
+                                  <div
+                                    key={idx}
+                                    className="flex items-center justify-between bg-white/5 p-2 rounded text-xs"
+                                  >
+                                    <span className="text-gray-200 font-mono">
+                                      {phone}
+                                    </span>
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      onClick={() =>
+                                        copyToClipboard(phone, "phone")
+                                      }
+                                      className="h-6 w-6 p-0"
+                                    >
+                                      <Copy className="w-3 h-3" />
+                                    </Button>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                          {serverEmails.length > 0 && (
+                            <div>
+                              <Label className="text-gray-300 text-sm flex items-center">
+                                <Mail className="w-3 h-3 mr-1" />
+                                Emails
+                              </Label>
+                              <div className="space-y-2 mt-1">
+                                {serverEmails.slice(0, 3).map((email, idx) => (
+                                  <div
+                                    key={idx}
+                                    className="flex items-center justify-between bg-white/5 p-2 rounded text-xs"
+                                  >
+                                    <span className="text-gray-200 font-mono truncate">
+                                      {email}
+                                    </span>
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      onClick={() =>
+                                        copyToClipboard(email, "email")
+                                      }
+                                      className="h-6 w-6 p-0"
+                                    >
+                                      <Copy className="w-3 h-3" />
+                                    </Button>
+                                  </div>
+                                ))}
+                              </div>
                             </div>
                           )}
                         </div>

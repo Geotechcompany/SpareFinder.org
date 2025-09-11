@@ -421,3 +421,5 @@ async def scrape_multiple_suppliers(urls: List[str]) -> List[Dict[str, Any]]:
             }
             for result in results
         ]
+
+

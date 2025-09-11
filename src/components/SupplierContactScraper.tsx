@@ -173,52 +173,7 @@ export const SupplierContactScraper: React.FC<SupplierContactScraperProps> = ({
 
   return (
     <div className={`space-y-6 ${className}`}>
-      {/* Input Section */}
-      <Card className="bg-black/20 backdrop-blur-xl border-white/10">
-        <CardHeader>
-          <CardTitle className="text-white flex items-center">
-            <Search className="w-5 h-5 mr-2 text-blue-400" />
-            Supplier Contact Scraper
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="supplier-url" className="text-gray-300">
-              Supplier Website URL
-            </Label>
-            <div className="flex gap-2">
-              <Input
-                id="supplier-url"
-                type="url"
-                placeholder="https://example-supplier.com"
-                value={url}
-                onChange={(e) => setUrl(e.target.value)}
-                onKeyPress={handleKeyPress}
-                className="bg-white/5 border-white/20 text-white placeholder:text-gray-400"
-                disabled={isLoading}
-              />
-              <Button
-                onClick={scrapeSupplier}
-                disabled={isLoading || !url.trim()}
-                className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
-              >
-                {isLoading ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <Search className="w-4 h-4" />
-                )}
-                {isLoading ? "Scraping..." : "Scrape"}
-              </Button>
-            </div>
-          </div>
-          <p className="text-sm text-gray-400">
-            Enter a supplier website URL to extract contact information,
-            business details, and pricing data.
-          </p>
-        </CardContent>
-      </Card>
-
-      {/* Results Section */}
+      {/* Results Section only (input removed per requirements) */}
       <AnimatePresence>
         {scrapedData && (
           <motion.div
@@ -241,16 +196,7 @@ export const SupplierContactScraper: React.FC<SupplierContactScraperProps> = ({
                       {scrapedData.url}
                     </p>
                   </div>
-                  <Badge
-                    variant={scrapedData.success ? "default" : "destructive"}
-                    className={
-                      scrapedData.success
-                        ? "bg-green-600/20 text-green-300 border-green-500/30"
-                        : ""
-                    }
-                  >
-                    {scrapedData.success ? "Success" : "Failed"}
-                  </Badge>
+                  {/* Hide explicit failed badge */}
                 </div>
               </CardHeader>
               <CardContent className="space-y-6">
@@ -467,17 +413,7 @@ export const SupplierContactScraper: React.FC<SupplierContactScraperProps> = ({
                       </div>
                     )}
                   </>
-                ) : (
-                  <div className="flex items-center space-x-3 text-red-400">
-                    <AlertCircle className="w-5 h-5" />
-                    <div>
-                      <p className="font-medium">Scraping Failed</p>
-                      <p className="text-sm text-gray-400">
-                        {scrapedData.error}
-                      </p>
-                    </div>
-                  </div>
-                )}
+                ) : null}
               </CardContent>
             </Card>
           </motion.div>

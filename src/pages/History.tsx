@@ -17,9 +17,9 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  FileText,
-  TrendingUp,
+import { 
+  FileText, 
+  TrendingUp, 
   Clock,
   CheckCircle,
   AlertTriangle,
@@ -125,7 +125,7 @@ const History = () => {
     kind: "analysis";
     job: any;
   } | null>(null);
-
+  
   // Use refs to prevent multiple simultaneous requests
   const isInitializedRef = useRef(false);
   const isFetchingRef = useRef(false);
@@ -168,14 +168,14 @@ const History = () => {
         await Promise.allSettled([
           dashboardApi.getStats().catch((err) => {
             if (signal.aborted) throw new Error("Request aborted");
-            throw err;
-          }),
+          throw err;
+        }),
           fetch(`${API_BASE}/jobs`)
             .then((r) => r.json())
             .catch((err) => {
               if (signal.aborted) throw new Error("Request aborted");
-              throw err;
-            }),
+          throw err;
+        }),
           // Optional: alternate SpareFinder service URL
           fetch(
             `${
@@ -359,7 +359,7 @@ const History = () => {
       const authErrors = [statsResponse].filter(
         (response) =>
           response.status === "rejected" &&
-          response.reason?.response?.status === 401
+        response.reason?.response?.status === 401
       );
 
       if (authErrors.length > 0) {
@@ -381,7 +381,7 @@ const History = () => {
       }
 
       console.error("❌ Error in fetchAllData:", error);
-
+      
       // Handle authentication errors
       if (error.response?.status === 401) {
         console.log("🔒 Authentication error, logging out...");
@@ -564,7 +564,7 @@ const History = () => {
       );
     } catch (e) {
       console.error("Download PDF error", e);
-      toast({
+        toast({
         title: "Download failed",
         description: "Could not generate PDF for this analysis.",
         variant: "destructive",
@@ -587,7 +587,7 @@ const History = () => {
       toast({ title: "Deleted", description: "Analysis removed." });
     } catch (e: any) {
       console.error("Delete analysis error", e);
-      toast({
+        toast({
         title: "Deletion failed",
         description: e?.message || "Unable to delete analysis",
         variant: "destructive",
@@ -701,13 +701,13 @@ const History = () => {
             onToggle={handleToggleSidebar}
           />
         </div>
-
+        
         {/* Mobile Sidebar */}
         <MobileSidebar
           isOpen={isMobileMenuOpen}
           onClose={() => setIsMobileMenuOpen(false)}
         />
-
+        
         <motion.div
           initial={false}
           animate={{
@@ -815,7 +815,7 @@ const History = () => {
               <div className="flex flex-col gap-3 md:gap-4">
                 <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 md:gap-4">
                   <div className="flex-1 min-w-0">
-                    <motion.h1
+                    <motion.h1 
                       className="text-2xl md:text-3xl lg:text-4xl font-bold bg-gradient-to-r from-white via-purple-200 to-blue-200 bg-clip-text text-transparent mb-2 md:mb-3"
                       initial={{ opacity: 0, x: -20 }}
                       animate={{ opacity: 1, x: 0 }}
@@ -823,7 +823,7 @@ const History = () => {
                     >
                       Upload History
                     </motion.h1>
-                    <motion.p
+                    <motion.p 
                       className="text-gray-400 text-sm md:text-base lg:text-lg"
                       initial={{ opacity: 0, x: -20 }}
                       animate={{ opacity: 1, x: 0 }}
@@ -838,7 +838,7 @@ const History = () => {
                     transition={{ delay: 0.4 }}
                     className="flex-shrink-0"
                   >
-                    <Button
+                    <Button 
                       onClick={handleExportHistory}
                       className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 shadow-lg shadow-purple-500/25 text-sm md:text-base"
                       size="sm"
@@ -855,31 +855,31 @@ const History = () => {
           {/* Stats Grid */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 lg:gap-6">
             {[
-              {
+              { 
                 title: "Total Uploads",
-                value: stats.totalUploads.toString(),
-                icon: FileText,
+                value: stats.totalUploads.toString(), 
+                icon: FileText, 
                 color: "from-purple-600 to-blue-600",
                 bgColor: "from-purple-600/20 to-blue-600/20",
               },
-              {
+              { 
                 title: "Completed",
-                value: stats.completed.toString(),
-                icon: CheckCircle,
+                value: stats.completed.toString(), 
+                icon: CheckCircle, 
                 color: "from-green-600 to-emerald-600",
                 bgColor: "from-green-600/20 to-emerald-600/20",
               },
-              {
+              { 
                 title: "Avg Confidence",
-                value: `${stats.avgConfidence}%`,
-                icon: TrendingUp,
+                value: `${stats.avgConfidence}%`, 
+                icon: TrendingUp, 
                 color: "from-blue-600 to-cyan-600",
                 bgColor: "from-blue-600/20 to-cyan-600/20",
               },
-              {
+              { 
                 title: "Avg Processing",
-                value: stats.avgProcessingTime,
-                icon: Clock,
+                value: stats.avgProcessingTime, 
+                icon: Clock, 
                 color: "from-orange-600 to-red-600",
                 bgColor: "from-orange-600/20 to-red-600/20",
               },
@@ -1051,40 +1051,40 @@ const History = () => {
                                         : "View"}
                                     </Button>
                                     {j.success && (
-                                      <Button
-                                        variant="ghost"
-                                        size="sm"
+                            <Button
+                              variant="ghost"
+                              size="sm"
                                         className="text-xs"
                                         onClick={() =>
                                           handleDownloadAnalysisPdf(j)
                                         }
-                                      >
+                            >
                                         Download
-                                      </Button>
+                            </Button>
                                     )}
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
+                            <Button
+                              variant="ghost"
+                              size="sm"
                                       className="text-xs text-red-300 hover:text-red-200"
                                       onClick={() => requestDeleteAnalysis(j)}
-                                    >
+                            >
                                       Delete
-                                    </Button>
-                                  </div>
+                            </Button>
+                          </div>
                                 </td>
                               </tr>
-                            ))}
+                    ))}
                           </tbody>
                         </table>
-                      </div>
+                  </div>
                     </TabsContent>
 
                     {/* Keywords Tab */}
                     <TabsContent value="keywords">
-                      <div className="overflow-x-auto">
-                        <table className="min-w-full text-xs md:text-sm">
-                          <thead>
-                            <tr className="text-left text-gray-400">
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full text-xs md:text-sm">
+                      <thead>
+                        <tr className="text-left text-gray-400">
                               <th className="py-3 pr-4 font-medium">Job ID</th>
                               <th className="py-3 pr-4 font-medium">
                                 Keywords
@@ -1098,9 +1098,9 @@ const History = () => {
                                 All Results
                               </th>
                               <th className="py-3 pr-4 font-medium">Actions</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-white/10">
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-white/10">
                             {pastAnalysis
                               .filter((j: any) => j.mode === "keywords_only")
                               .map((j: any) => {
@@ -1190,39 +1190,39 @@ const History = () => {
                                       )}
                                     </td>
                                     <td className="py-3 pr-4">
-                                      <div className="flex items-center gap-2">
-                                        <Button
-                                          variant="outline"
-                                          size="sm"
-                                          className="text-xs"
+                              <div className="flex items-center gap-2">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="text-xs"
                                           onClick={() => {
                                             setSelectedKeywordJob(j);
                                             setIsKeywordOpen(true);
                                           }}
-                                        >
-                                          View
-                                        </Button>
-                                        <Button
-                                          variant="ghost"
-                                          size="sm"
-                                          className="text-xs"
+                                >
+                                  View
+                                </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="text-xs"
                                           onClick={() =>
                                             downloadPdfFromData(
                                               j,
                                               `keyword_job_${j.id}`
                                             )
                                           }
-                                        >
-                                          Download
-                                        </Button>
-                                      </div>
-                                    </td>
-                                  </tr>
+                                  >
+                                    Download
+                                  </Button>
+                              </div>
+                            </td>
+                          </tr>
                                 );
                               })}
-                          </tbody>
-                        </table>
-                      </div>
+                      </tbody>
+                    </table>
+                  </div>
                     </TabsContent>
                   </Tabs>
                 )}

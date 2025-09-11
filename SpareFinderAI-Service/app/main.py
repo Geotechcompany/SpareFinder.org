@@ -642,16 +642,90 @@ async def search_by_keywords(payload: KeywordSearchRequest):
 async def _enrich_suppliers(response_data: Dict[str, Any]) -> None:
     try:
         supplier_urls: List[str] = []
+
+        def _normalize_url(raw: Any) -> Optional[str]:
+            try:
+                if not isinstance(raw, str):
+                    return None
+                u = raw.strip()
+                # Strip markdown/link punctuation
+                if u.startswith('(') and u.endswith(')'):
+                    u = u[1:-1].strip()
+                # Remove trailing punctuation common in prose/markdown
+                while u and u[-1] in ")],.>;":
+                    u = u[:-1]
+                if not u:
+                    return None
+                # If already absolute
+                if u.startswith("http://") or u.startswith("https://"):
+                    return u
+                # Add scheme if it looks like a bare domain or www.* or path-like
+                if u.startswith("www.") or "." in u:
+                    return f"https://{u}"
+                return None
+            except Exception:
+                return None
         
-        # Extract URLs from suppliers array
-        for s in (response_data.get("suppliers") or [])[:5]:
-            if isinstance(s, dict) and s.get("url"):
-                supplier_urls.append(s.get("url"))
+        # Extract URLs from suppliers array, supporting multiple common keys and bare domains
+        url_keys = [
+            "url",
+            "product_page_url",
+            "product_url",
+            "website",
+            "link",
+            "product_page",
+        ]
+        for s in (response_data.get("suppliers") or [])[:10]:
+            if not isinstance(s, dict):
+                continue
+            # Prefer explicit url, else try alternates
+            found: Optional[str] = None
+            for k in url_keys:
+                val = s.get(k)
+                found = _normalize_url(val) or found
+                if found:
+                    break
+            if found:
+                supplier_urls.append(found)
         
-        # Extract URLs from buy_links
+        # Extract URLs from buy_links (accept bare domains too)
         for _, u in (response_data.get("buy_links") or {}).items():
-            if isinstance(u, str) and u.startswith("http"):
-                supplier_urls.append(u)
+            nu = _normalize_url(u)
+            if nu:
+                supplier_urls.append(nu)
+
+        # As a fallback, try to extract from full_analysis markdown lines like 'product_page_url: example.com/...'
+        try:
+            full_md = response_data.get("full_analysis") or ""
+            if isinstance(full_md, str) and full_md:
+                import re
+                # 1) product_page_url: <url or [label](url)>
+                for m in re.findall(r"product_page_url\s*:\s*(?:\[[^\]]+\]\(([^)]+)\)|([^\s\)]+))", full_md, flags=re.IGNORECASE):
+                    cand = m[0] or m[1]
+                    nu = _normalize_url(cand)
+                    if nu:
+                        supplier_urls.append(nu)
+                # 2) Any markdown links in Where to Buy section
+                wb = re.search(r"Where\s+to\s+Buy[\s\S]*?(?=\n#|$)", full_md, flags=re.IGNORECASE)
+                if wb:
+                    block = wb.group(0)
+                    # Markdown links [text](url)
+                    for m in re.findall(r"\]\(([^)]+)\)", block):
+                        nu = _normalize_url(m)
+                        if nu:
+                            supplier_urls.append(nu)
+                    # Bare urls/domains after colon
+                    for m in re.findall(r"(?:https?://|www\.)[^\s)]+", block, flags=re.IGNORECASE):
+                        nu = _normalize_url(m)
+                        if nu:
+                            supplier_urls.append(nu)
+                    # Citations: domain.com
+                    for m in re.findall(r"citations?\s*:\s*([^\s\)]+)", block, flags=re.IGNORECASE):
+                        nu = _normalize_url(m)
+                        if nu:
+                            supplier_urls.append(nu)
+        except Exception:
+            pass
         
         # Remove duplicates and limit to 5 URLs
         supplier_urls = list(dict.fromkeys(supplier_urls))[:5]
@@ -750,6 +824,16 @@ async def _run_analysis_job(
 
         response_data = {"filename": filename, **analysis_result}
 
+        # Update status for UI and persist snapshot before supplier enrichment
+        try:
+            analysis_results[filename] = {
+                **response_data,
+                "status": "Retrieving Supplier Info",
+            }
+            save_job_snapshot(filename, analysis_results[filename])
+        except Exception:
+            pass
+
         # Supplier enrichment
         await _enrich_suppliers(response_data)
 
@@ -763,6 +847,9 @@ async def _run_analysis_job(
             except Exception as e:
                 logger.error(f"Email send failed (job): {e}")
 
+        # Mark as completed and persist enriched result
+        response_data["status"] = "completed"
+        response_data["success"] = True
         analysis_results[filename] = response_data
         save_job_snapshot(filename, response_data)
 

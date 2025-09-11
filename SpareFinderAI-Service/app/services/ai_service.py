@@ -161,9 +161,11 @@ to a JSON field of the same name (snake_case) in the machine-readable output.
        - citation(s)
    - If exact product links are not found, provide representative/global suppliers, distribution hubs,
      or OEM part numbers and instruct how to request quotes.
-   - **Do not invent direct personal contact info.** Do not write vague phrases like "Available on the website".
-     Include an explicit official contact URL (support page or contact form). If none can be verified, leave
-     `contact_channel` empty, set a low `data_confidence`, and add a citation explaining the limitation.
+   - CONTACT POLICY: Do not include direct personal contact info (no emails/phones in the AI output). Provide only
+     product_page_url and, if clearly available, a generic contact channel like `website_support_form`.
+     If no official page is verifiable, leave `contact_channel` blank and add a citation for the supplier site.
+     The server-side scraper will enrich contact details after analysis.
+   - REGIONAL COVERAGE REQUIREMENT: Also include at most one supplier for each region from this set: Africa, Asia, Europe, Australia, China, North America (max 6 entries). Prefer official distributors or large marketplaces that ship within that region. Provide a working product_page_url for each. If a direct product page cannot be verified, use the official supplier website homepage URL as the product_page_url (fallback).
 
 7. **📈 Market Chart Data **
    - Provide compact data for 2 charts (as arrays or small ASCII charts):
@@ -513,7 +515,7 @@ Return a JSON object named `response_json` with the following top-level keys:
                 compatible_vehicles = [v.strip() for v in compatible_vehicles[:5] if v.strip()]
             
             # Extract where to buy information with updated pattern
-            buy_links_match = re.search(r'# 🌍 Where to Buy\n(.*?)(?=\n#|$)', analysis_text, re.DOTALL | re.IGNORECASE)
+            buy_links_match = re.search(r'# 🌍 Where to Buy[\s\S]*?\n(.*?)(?=\n#|$)', analysis_text, re.DOTALL | re.IGNORECASE)
             buy_links_text = buy_links_match.group(1) if buy_links_match else ""
             
             # Parse buy links with enhanced supplier extraction
@@ -560,7 +562,7 @@ Return a JSON object named `response_json` with the following top-level keys:
                 contacts = re.findall(contact_pattern, buy_links_text, re.MULTILINE | re.IGNORECASE)
                 
                 # Build structured supplier information
-                for i, (supplier_name, url) in enumerate(supplier_names[:5]):  # Limit to 5 suppliers
+                for i, (supplier_name, url) in enumerate(supplier_names[:6]):  # Up to 6 suppliers (regions)
                     supplier_info = {
                         "name": supplier_name,
                         "url": url or (product_pages[i] if i < len(product_pages) else ""),
@@ -981,7 +983,10 @@ to a JSON field of the same name (snake_case) in the machine-readable output.
        - citation(s)
    - If exact product links are not found, provide representative/global suppliers, distribution hubs,
      or OEM part numbers and instruct how to request quotes.
-   - **Do not invent direct personal contact info.**
+   - **Do not invent direct personal contact info.** Do not write vague phrases like "Available on the website".
+     Include an explicit official contact URL (support page or contact form). If none can be verified, leave
+     `contact_channel` empty, set a low `data_confidence`, and add a citation explaining the limitation.
+   - REGIONAL COVERAGE REQUIREMENT: Also include at most one supplier for each region from this set: Africa, Asia, Europe, Australia, China, North America (max 6 entries). Prefer official distributors or large marketplaces that ship within that region. Provide a working product_page_url for each.
 
 7. **📈 Market Chart Data **
    - Provide compact data for 2 charts (as arrays or small ASCII charts):
