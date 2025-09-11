@@ -98,6 +98,24 @@ const History = () => {
   const [keywordPage, setKeywordPage] = useState(1);
   const pageSize = 10;
 
+  // Row helpers
+  const getConfidence = useCallback(
+    (job: any): string | number => {
+      const raw =
+        jobStatusMap[job.id]?.confidence_score ??
+        job?.confidence_score ??
+        job?.confidence ??
+        (Array.isArray(job?.predictions)
+          ? job.predictions[0]?.confidence
+          : undefined);
+      if (typeof raw !== "number") return "-";
+      const pct = raw <= 1 ? raw * 100 : raw;
+      const rounded = Math.round(pct * 10) / 10;
+      return Number.isFinite(rounded) ? rounded : "-";
+    },
+    [jobStatusMap]
+  );
+
   // Build a robust public URL for Supabase storage
   const buildSupabasePublicUrl = useCallback(
     (pathOrUrl?: string, fallbackFilename?: string): string | undefined => {
@@ -1069,10 +1087,7 @@ const History = () => {
                                     "-"}
                                 </td>
                                 <td className="py-3 pr-4 hidden lg:table-cell">
-                                  {typeof jobStatusMap[j.id]
-                                    ?.confidence_score !== "undefined"
-                                    ? jobStatusMap[j.id]?.confidence_score
-                                    : j.confidence_score ?? "-"}
+                                  {getConfidence(j)}
                                 </td>
                                 <td className="py-3 pr-4 hidden lg:table-cell">
                                   {typeof jobStatusMap[j.id]
@@ -1175,10 +1190,7 @@ const History = () => {
                                           "-"}
                                       </div>
                                       <div className="text-[11px] text-gray-400 mt-1">
-                                        {typeof jobStatusMap[j.id]
-                                          ?.confidence_score !== "undefined"
-                                          ? jobStatusMap[j.id]?.confidence_score
-                                          : j.confidence_score ?? "-"}
+                                        {getConfidence(j)}
                                         {" • "}
                                         {typeof jobStatusMap[j.id]
                                           ?.processing_time_seconds !==

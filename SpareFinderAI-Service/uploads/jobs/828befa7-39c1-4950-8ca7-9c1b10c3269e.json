@@ -1,0 +1,47 @@
+{
+  "success": true,
+  "status": "completed",
+  "filename": "828befa7-39c1-4950-8ca7-9c1b10c3269e",
+  "mode": "keywords_only",
+  "results": [
+    {
+      "name": "Alternator for Honda Accord",
+      "category": "Electrical",
+      "manufacturer": "Denso",
+      "price": 199.99,
+      "availability": "In Stock",
+      "part_number": "210-0544"
+    },
+    {
+      "name": "High Output Alternator for Honda Civic",
+      "category": "Electrical",
+      "manufacturer": "Bosch",
+      "price": 249.99,
+      "availability": "In Stock",
+      "part_number": "AL0847X"
+    },
+    {
+      "name": "Remanufactured Alternator for Honda CR-V",
+      "category": "Electrical",
+      "manufacturer": "Remy",
+      "price": 159.99,
+      "availability": "Out of Stock",
+      "part_number": "94113"
+    },
+    {
+      "name": "New Alternator for Honda Pilot",
+      "category": "Electrical",
+      "manufacturer": "ACDelco",
+      "price": 229.99,
+      "availability": "In Stock",
+      "part_number": "335-1149"
+    }
+  ],
+  "markdown": "",
+  "query": {
+    "keywords": [
+      "alternator",
+      "honda"
+    ]
+  }
+}

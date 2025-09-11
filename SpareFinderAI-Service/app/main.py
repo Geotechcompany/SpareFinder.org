@@ -140,7 +140,12 @@ analysis_results: Dict[str, Dict[str, Any]] = {}
 
 # Email utilities
 def _email_is_enabled() -> bool:
-    return bool(os.getenv('SMTP_HOST') and os.getenv('SMTP_FROM'))
+    """Enable emails if SMTP host is configured.
+
+    _send_email handles FROM/User defaults and auth; we only guard on host presence
+    to avoid overly-strict gating that blocks valid configs.
+    """
+    return bool(os.getenv('SMTP_HOST'))
 
 def _build_analysis_email_html(result: Dict[str, Any]) -> str:
     part_name = result.get("precise_part_name") or result.get("class_name") or "Identified Part"
@@ -1037,6 +1042,18 @@ async def schedule_keyword_search(payload: KeywordScheduleRequest):
         analysis_results[job_id] = {"success": False, "status": "pending", "filename": job_id, "mode": "keywords_only"}
         save_job_snapshot(job_id, analysis_results[job_id])
 
+        # Proactively send a "started" email if requested to confirm SMTP pipeline
+        if payload.user_email and _email_is_enabled():
+            try:
+                await asyncio.to_thread(
+                    _send_email,
+                    payload.user_email,
+                    keyword_started_subject(payload.keywords or []),
+                    keyword_started_html(payload.keywords or []),
+                )
+            except Exception:
+                pass
+
         asyncio.create_task(_run_keyword_search_job(job_id, payload.keywords or [], payload.user_email))
         return JSONResponse(status_code=202, content={"success": True, "status": "pending", "filename": job_id})
     except Exception as e:
@@ -1360,6 +1377,35 @@ async def list_pending_jobs():
         return JSONResponse(status_code=200, content={"success": True, "results": pending})
     except Exception as e:
         logger.error(f"/jobs/pending error: {e}")
+        return JSONResponse(status_code=500, content={"success": False, "error": str(e)})
+
+# -----------------------------
+# Test utilities
+# -----------------------------
+
+@app.post("/test-email")
+async def test_email(payload: Dict[str, Any]):
+    """Send a simple test email to validate SMTP configuration.
+
+    Request JSON:
+    { "to": "user@example.com", "subject": "optional", "html": "<b>optional</b>" }
+    """
+    try:
+        to_email = str(payload.get("to") or os.getenv("TEST_EMAIL_TO", "")).strip()
+        if not to_email:
+            return JSONResponse(status_code=400, content={
+                "success": False,
+                "error": "missing_to",
+                "message": "Provide 'to' or set TEST_EMAIL_TO"
+            })
+
+        subject = str(payload.get("subject") or "SpareFinderAI – SMTP Test")
+        html = str(payload.get("html") or "<p>✅ This is a test email from SpareFinderAI Service.</p>")
+
+        ok = await asyncio.to_thread(_send_email, to_email, subject, html)
+        return JSONResponse(status_code=200, content={"success": bool(ok), "to": to_email})
+    except Exception as e:
+        logger.error(f"/test-email error: {e}")
         return JSONResponse(status_code=500, content={"success": False, "error": str(e)})
 
 # If running the script directly

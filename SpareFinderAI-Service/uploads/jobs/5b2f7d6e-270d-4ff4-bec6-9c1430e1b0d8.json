@@ -1,0 +1,47 @@
+{
+  "success": true,
+  "status": "completed",
+  "filename": "5b2f7d6e-270d-4ff4-bec6-9c1430e1b0d8",
+  "mode": "keywords_only",
+  "results": [
+    {
+      "name": "Alternator for Honda Civic",
+      "category": "Electrical",
+      "manufacturer": "Denso",
+      "price": 199.99,
+      "availability": "In Stock",
+      "part_number": "210-0580"
+    },
+    {
+      "name": "High Output Alternator for Honda Accord",
+      "category": "Electrical",
+      "manufacturer": "Bosch",
+      "price": 249.99,
+      "availability": "In Stock",
+      "part_number": "AL0843X"
+    },
+    {
+      "name": "Remanufactured Alternator for Honda CR-V",
+      "category": "Electrical",
+      "manufacturer": "Remy",
+      "price": 179.99,
+      "availability": "Limited Stock",
+      "part_number": "94113"
+    },
+    {
+      "name": "Performance Alternator for Honda Fit",
+      "category": "Electrical",
+      "manufacturer": "ACDelco",
+      "price": 229.99,
+      "availability": "Out of Stock",
+      "part_number": "334-2114"
+    }
+  ],
+  "markdown": "Here are some alternator options for various Honda models. Prices and availability may vary.",
+  "query": {
+    "keywords": [
+      "alternator",
+      "honda"
+    ]
+  }
+}

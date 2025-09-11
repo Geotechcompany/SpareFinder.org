@@ -1,4 +1,5 @@
 from typing import Any, Dict, List, Optional
+import os
 
 
 def _esc(value: Any) -> str:
@@ -14,6 +15,8 @@ def analysis_started_subject(filename: str) -> str:
 
 def analysis_started_html(filename: str, keywords: Optional[List[str]] = None) -> str:
     keys = ", ".join(keywords or [])
+    frontend = os.getenv("FRONTEND_URL", "https://app.sparefinder.org").rstrip("/")
+    history_url = f"{frontend}/dashboard/history"
     return f"""
 <html>
   <body style="font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; background:#0b1026; color:#e5e7eb; padding:24px;">
@@ -26,6 +29,9 @@ def analysis_started_html(filename: str, keywords: Optional[List[str]] = None) -
         <p style="margin:0 0 12px;">Filename: <strong>{_esc(filename)}</strong></p>
         {f'<p style="margin:0 0 12px;">Keywords: <strong>{_esc(keys)}</strong></p>' if keys else ''}
         <p style="margin:12px 0 0;color:#9ca3af;">You will receive another email once the analysis completes.</p>
+        <div style="margin-top:18px;">
+          <a href="{history_url}" style="display:inline-block;background:#3b82f6;color:#fff;text-decoration:none;padding:10px 16px;border-radius:8px;font-weight:600;">Open Dashboard</a>
+        </div>
       </div>
     </div>
   </body>
@@ -43,6 +49,8 @@ def analysis_completed_html(result: Dict[str, Any]) -> str:
     cls = result.get("class_name") or "Unknown"
     conf = f"{round(float(result.get('confidence_score', 0)) * 100)}%" if isinstance(result.get("confidence_score"), (int, float)) else str(result.get("confidence_score", "N/A"))
     processing_time = result.get("processing_time_seconds") or result.get("processing_time") or "N/A"
+    frontend = os.getenv("FRONTEND_URL", "https://app.sparefinder.org").rstrip("/")
+    history_url = f"{frontend}/dashboard/history"
     return f"""
 <html>
   <body style="font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; background:#0b1026; color:#e5e7eb; padding:24px;">
@@ -70,6 +78,9 @@ def analysis_completed_html(result: Dict[str, Any]) -> str:
             <td style="padding:8px 0;">{_esc(processing_time)}s</td>
           </tr>
         </table>
+        <div style="margin-top:18px;">
+          <a href="{history_url}" style="display:inline-block;background:#10b981;color:#fff;text-decoration:none;padding:12px 18px;border-radius:8px;font-weight:700;">📊 View Results</a>
+        </div>
       </div>
     </div>
   </body>
@@ -107,6 +118,8 @@ def keyword_started_subject(keywords: List[str]) -> str:
 
 def keyword_started_html(keywords: List[str]) -> str:
     keys = ", ".join(keywords)
+    frontend = os.getenv("FRONTEND_URL", "https://app.sparefinder.org").rstrip("/")
+    history_url = f"{frontend}/dashboard/history"
     return f"""
 <html>
   <body style="font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; background:#0b1026; color:#e5e7eb; padding:24px;">
@@ -117,6 +130,9 @@ def keyword_started_html(keywords: List[str]) -> str:
       </div>
       <div style="padding:20px 24px;">
         <p style="margin:0;">Keywords: <strong>{_esc(keys)}</strong></p>
+        <div style="margin-top:18px;">
+          <a href="{history_url}" style="display:inline-block;background:#3b82f6;color:#fff;text-decoration:none;padding:10px 16px;border-radius:8px;font-weight:600;">Open Dashboard</a>
+        </div>
       </div>
     </div>
   </body>
@@ -131,6 +147,8 @@ def keyword_completed_subject(keywords: List[str], count: int) -> str:
 
 def keyword_completed_html(keywords: List[str], count: int) -> str:
     keys = ", ".join(keywords)
+    frontend = os.getenv("FRONTEND_URL", "https://app.sparefinder.org").rstrip("/")
+    history_url = f"{frontend}/dashboard/history"
     return f"""
 <html>
   <body style="font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; background:#0b1026; color:#e5e7eb; padding:24px;">
@@ -141,6 +159,9 @@ def keyword_completed_html(keywords: List[str], count: int) -> str:
       <div style="padding:20px 24px;">
         <p style="margin:0 0 8px;">Keywords: <strong>{_esc(keys)}</strong></p>
         <p style="margin:8px 0 0;color:#9ca3af;">Total results: <strong>{count}</strong></p>
+        <div style="margin-top:18px;">
+          <a href="{history_url}" style="display:inline-block;background:#10b981;color:#fff;text-decoration:none;padding:12px 18px;border-radius:8px;font-weight:700;">📊 View Results</a>
+        </div>
       </div>
     </div>
   </body>
