@@ -58,7 +58,7 @@ const requireSubscriptionOrTrial = async (req: AuthRequest, res: Response, next:
     }
 
     // User has valid subscription/trial, continue
-    next();
+    return next();
   } catch (error) {
     console.error('Subscription check error:', error);
     return res.status(500).json({
