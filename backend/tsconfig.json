@@ -1,7 +1,7 @@
 {
     "compilerOptions": {
         "target": "ES2022",
-        "module": "commonjs",
+        "module": "NodeNext",
         "lib": [
             "ES2022"
         ],
@@ -23,7 +23,7 @@
         "noUnusedParameters": true,
         "experimentalDecorators": true,
         "emitDecoratorMetadata": true,
-        "moduleResolution": "node",
+        "moduleResolution": "NodeNext",
         "baseUrl": ".",
         "paths": {
             "@/*": [

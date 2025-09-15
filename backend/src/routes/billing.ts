@@ -5,6 +5,28 @@ import { supabase } from '../server';
 import Stripe from 'stripe';
 import { creditService } from '../services/credit-service';
 
+// Type definitions for better type safety
+interface StripeMetadata {
+  user_id?: string;
+  plan?: string;
+  amount?: string;
+  currency?: string;
+  purchase_type?: string;
+  credits?: string;
+  unit_price_gbp?: string;
+}
+
+interface SubscriptionWithAdminOverride {
+  id: string;
+  tier: string;
+  status: string;
+  current_period_start: string;
+  current_period_end: string;
+  cancel_at_period_end: boolean;
+  stripe_customer_id?: string;
+  stripe_subscription_id?: string;
+}
+
 const router = Router();
 
 // Public config: Stripe publishable key
@@ -182,7 +204,7 @@ router.get('/', authenticateToken, async (req: AuthRequest, res: Response) => {
         ...userSubscription,
         tier: 'enterprise',
         status: 'active'
-      } as any;
+      } as SubscriptionWithAdminOverride;
     }
     const userUsage = usage || {
       searches_count: 0,
@@ -462,7 +484,7 @@ router.get('/invoices', authenticateToken, async (req: AuthRequest, res: Respons
         status: inv.status || 'open',
         created_at: new Date((inv.created || 0) * 1000).toISOString(),
         invoice_url: inv.hosted_invoice_url || inv.invoice_pdf || null,
-        raw: inv as any
+        raw: inv as unknown as Record<string, unknown>
       }));
       await supabase.from('invoices').upsert(mapped, { onConflict: 'id' });
       return res.json({ invoices: mapped, pagination: { page, limit, total: mapped.length } });
@@ -798,7 +820,7 @@ router.post('/credits/checkout-session', authenticateToken, async (req: AuthRequ
 });
 
 // Handle Stripe webhooks
-router.post('/stripe-webhook', express.raw({ type: 'application/json' }), async (req: any, res: Response) => {
+router.post('/stripe-webhook', express.raw({ type: 'application/json' }), async (req: express.Request, res: Response) => {
   try {
     const stripe = await getStripeInstance();
     if (!stripe) {
@@ -826,7 +848,7 @@ router.post('/stripe-webhook', express.raw({ type: 'application/json' }), async 
       return res.status(400).json({ error: 'Webhook secret not configured' });
     }
 
-    const signature = req.headers['stripe-signature'];
+    const signature = req.headers['stripe-signature'] as string;
     let event;
 
     try {
@@ -847,7 +869,7 @@ router.post('/stripe-webhook', express.raw({ type: 'application/json' }), async 
       case 'checkout.session.completed': {
         const session = event.data.object as Stripe.Checkout.Session;
         // If this was a credits purchase, grant credits; otherwise handle subscription
-        const purchaseType = (session.metadata as any)?.purchase_type;
+        const purchaseType = (session.metadata as StripeMetadata)?.purchase_type;
         if (purchaseType === 'credits') {
           await handleCreditsCheckoutCompleted(session);
         } else {
@@ -855,16 +877,16 @@ router.post('/stripe-webhook', express.raw({ type: 'application/json' }), async 
         }
         break;
       }
-      case 'invoice.payment_succeeded':
-      case 'invoice.finalized': {
+      case 'invoice.payment_succeeded': {
         const invoice = event.data.object as Stripe.Invoice;
+        await handleInvoicePaymentSucceeded(invoice);
         await storeInvoice(invoice);
         break;
       }
       
-      case 'invoice.payment_succeeded': {
+      case 'invoice.finalized': {
         const invoice = event.data.object as Stripe.Invoice;
-        await handleInvoicePaymentSucceeded(invoice);
+        await storeInvoice(invoice);
         break;
       }
       
@@ -990,8 +1012,8 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
 // Grant credits for completed one-off credits checkout
 async function handleCreditsCheckoutCompleted(session: Stripe.Checkout.Session) {
   try {
-    const userId = (session.metadata as any)?.user_id;
-    const creditsStr = (session.metadata as any)?.credits;
+    const userId = (session.metadata as StripeMetadata)?.user_id;
+    const creditsStr = (session.metadata as StripeMetadata)?.credits;
     const credits = Number(creditsStr);
     if (!userId || !Number.isFinite(credits) || credits <= 0) {
       console.warn('Credits webhook missing data', { userId, creditsStr });
@@ -1093,7 +1115,7 @@ async function storeInvoice(invoice: Stripe.Invoice) {
       status: invoice.status || 'open',
       created_at: new Date((invoice.created || 0) * 1000).toISOString(),
       invoice_url: invoice.hosted_invoice_url || invoice.invoice_pdf || null,
-      raw: invoice as any
+      raw: invoice as unknown as Record<string, unknown>
     };
 
     await supabase.from('invoices').upsert(record, { onConflict: 'id' });

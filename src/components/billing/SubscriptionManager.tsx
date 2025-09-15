@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -125,11 +125,7 @@ export const SubscriptionManager: React.FC = () => {
   } | null>(null);
   const [paymentError, setPaymentError] = useState<string | null>(null);
 
-  useEffect(() => {
-    fetchBillingData();
-  }, [user]);
-
-  const fetchBillingData = async () => {
+  const fetchBillingData = useCallback(async () => {
     if (!user) return;
 
     setIsLoading(true);
@@ -164,7 +160,11 @@ export const SubscriptionManager: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [user]);
+
+  useEffect(() => {
+    fetchBillingData();
+  }, [fetchBillingData]);
 
   const handleUpgradeSubscription = async (
     tier: "free" | "pro" | "enterprise"

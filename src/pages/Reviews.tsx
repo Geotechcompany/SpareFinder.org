@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -7,8 +7,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/components/ui/use-toast";
 import { api } from "@/lib/api";
+import { useAuth } from "@/contexts/AuthContext";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
+import { Link } from "react-router-dom";
 import {
   Star,
   StarHalf,
@@ -25,7 +27,19 @@ import {
   Loader2,
   Mail,
   Building,
+  Lock,
+  CreditCard,
+  ArrowRight
 } from "lucide-react";
+
+interface ApiError {
+  response?: {
+    status: number;
+    data?: {
+      message?: string;
+    };
+  };
+}
 
 interface Review {
   id: string;
@@ -74,13 +88,9 @@ const Reviews = () => {
   });
   const [hoveredRating, setHoveredRating] = useState(0);
   const { toast } = useToast();
+  const { user, isAuthenticated } = useAuth();
 
-  useEffect(() => {
-    fetchReviews();
-    fetchReviewStats();
-  }, []);
-
-  const fetchReviews = async () => {
+  const fetchReviews = useCallback(async () => {
     try {
       setIsLoading(true);
       const response = await api.reviews.getAll();
@@ -133,9 +143,9 @@ const Reviews = () => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [toast]);
 
-  const fetchReviewStats = async () => {
+  const fetchReviewStats = useCallback(async () => {
     try {
       const response = await api.reviews.getStats();
       if (response.data) {
@@ -154,7 +164,17 @@ const Reviews = () => {
         }))
       });
     }
-  };
+  }, [reviews]);
+
+  useEffect(() => {
+    fetchReviews();
+  }, [fetchReviews]);
+
+  useEffect(() => {
+    if (reviews.length > 0) {
+      fetchReviewStats();
+    }
+  }, [reviews, fetchReviewStats]);
 
   const handleSubmitReview = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -210,13 +230,40 @@ const Reviews = () => {
         message: "",
       });
       setShowForm(false);
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Error submitting review:', error);
-      toast({
-        title: "Submission Failed",
-        description: "Please try again later.",
-        variant: "destructive",
-      });
+      
+      const apiError = error as ApiError;
+      
+      // Handle subscription-related errors
+      if (apiError.response?.status === 403) {
+        const errorMessage = apiError.response?.data?.message || "";
+        if (errorMessage.includes("subscription") || errorMessage.includes("trial")) {
+          toast({
+            title: "Subscription Required",
+            description: "You need an active subscription or trial to write reviews. Please upgrade your plan to continue.",
+            variant: "destructive",
+          });
+        } else {
+          toast({
+            title: "Access Denied",
+            description: "Please try again later.",
+            variant: "destructive",
+          });
+        }
+      } else if (apiError.response?.status === 401) {
+        toast({
+          title: "Authentication Required",
+          description: "Please sign in to write a review.",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Submission Failed",
+          description: "Please try again later.",
+          variant: "destructive",
+        });
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -224,7 +271,7 @@ const Reviews = () => {
 
   const renderStars = (rating: number, interactive = false, onHover?: (rating: number) => void, onClick?: (rating: number) => void) => {
     return (
-      <div className="flex items-center space-x-1">
+      <div className="flex items-center space-x-0.5 sm:space-x-1">
         {[1, 2, 3, 4, 5].map((star) => (
           <motion.button
             key={star}
@@ -235,10 +282,10 @@ const Reviews = () => {
             onClick={() => interactive && onClick?.(star)}
             whileHover={interactive ? { scale: 1.1 } : {}}
             whileTap={interactive ? { scale: 0.95 } : {}}
-            className={`${interactive ? 'cursor-pointer' : 'cursor-default'} transition-colors duration-200`}
+            className={`${interactive ? 'cursor-pointer' : 'cursor-default'} transition-colors duration-200 p-1`}
           >
             <Star
-              className={`w-5 h-5 transition-colors duration-200 ${
+              className={`w-4 h-4 sm:w-5 sm:h-5 transition-colors duration-200 ${
                 star <= rating
                   ? 'text-yellow-400 fill-current'
                   : 'text-gray-300'
@@ -275,35 +322,35 @@ const Reviews = () => {
       <Header />
       
       {/* Hero Section */}
-      <section className="relative pt-32 pb-20 px-4 sm:px-6 lg:px-8 overflow-hidden">
+      <section className="relative pt-24 sm:pt-32 pb-12 sm:pb-20 px-4 sm:px-6 lg:px-8 overflow-hidden">
         <div className="absolute inset-0">
-          <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl animate-pulse" />
-          <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }} />
+          <div className="absolute top-1/4 left-1/4 w-48 h-48 sm:w-96 sm:h-96 bg-purple-500/10 rounded-full blur-3xl animate-pulse" />
+          <div className="absolute bottom-1/4 right-1/4 w-48 h-48 sm:w-96 sm:h-96 bg-blue-500/10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }} />
         </div>
 
         <div className="max-w-7xl mx-auto relative z-10">
-          <div className="text-center mb-16">
+          <div className="text-center mb-12 sm:mb-16">
             <motion.div
               initial={{ opacity: 0, scale: 0.5 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ duration: 0.8 }}
-              className="inline-flex items-center px-6 py-3 bg-gradient-to-r from-purple-500/20 to-blue-500/20 rounded-full border border-purple-500/30 backdrop-blur-xl mb-8"
+              className="inline-flex items-center px-4 sm:px-6 py-2 sm:py-3 bg-gradient-to-r from-purple-500/20 to-blue-500/20 rounded-full border border-purple-500/30 backdrop-blur-xl mb-6 sm:mb-8"
             >
               <motion.div
                 animate={{ rotate: 360 }}
                 transition={{ duration: 4, repeat: Infinity, ease: "linear" }}
-                className="mr-3"
+                className="mr-2 sm:mr-3"
               >
-                <Sparkles className="w-5 h-5 text-purple-400" />
+                <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 text-purple-400" />
               </motion.div>
-              <span className="text-purple-300 font-semibold">Customer Reviews</span>
+              <span className="text-sm sm:text-base text-purple-300 font-semibold">Customer Reviews</span>
             </motion.div>
 
             <motion.h1
               initial={{ opacity: 0, y: 30 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.8, delay: 0.2 }}
-              className="text-5xl md:text-7xl lg:text-8xl font-black mb-8 leading-[0.9]"
+              className="text-3xl sm:text-5xl md:text-7xl lg:text-8xl font-black mb-6 sm:mb-8 leading-[0.9] px-2"
             >
               <span className="block bg-gradient-to-r from-white via-purple-200 to-blue-200 bg-clip-text text-transparent">
                 What Our
@@ -317,7 +364,7 @@ const Reviews = () => {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ delay: 0.5, duration: 0.8 }}
-              className="text-xl text-gray-300 mb-12 max-w-3xl mx-auto leading-relaxed"
+              className="text-base sm:text-xl text-gray-300 mb-8 sm:mb-12 max-w-3xl mx-auto leading-relaxed px-4"
             >
               Join thousands of satisfied customers who trust our AI-powered part identification system
             </motion.p>
@@ -327,24 +374,24 @@ const Reviews = () => {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.7, duration: 0.8 }}
-              className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-4xl mx-auto mb-12"
+              className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6 lg:gap-8 max-w-4xl mx-auto mb-8 sm:mb-12"
             >
-              <div className="bg-white/5 backdrop-blur-xl rounded-2xl p-6 border border-white/10">
-                <div className="flex items-center justify-center mb-3">
+              <div className="bg-white/5 backdrop-blur-xl rounded-xl sm:rounded-2xl p-4 sm:p-6 border border-white/10">
+                <div className="flex items-center justify-center mb-2 sm:mb-3">
                   {renderStars(Math.round(getAverageRating()))}
                 </div>
-                <div className="text-3xl font-bold text-white">{getAverageRating().toFixed(1)}</div>
-                <div className="text-gray-400 text-sm">Average Rating</div>
+                <div className="text-2xl sm:text-3xl font-bold text-white">{getAverageRating().toFixed(1)}</div>
+                <div className="text-gray-400 text-xs sm:text-sm">Average Rating</div>
               </div>
-              <div className="bg-white/5 backdrop-blur-xl rounded-2xl p-6 border border-white/10">
-                <TrendingUp className="w-8 h-8 text-green-400 mx-auto mb-3" />
-                <div className="text-3xl font-bold text-white">{getTotalReviews()}</div>
-                <div className="text-gray-400 text-sm">Total Reviews</div>
+              <div className="bg-white/5 backdrop-blur-xl rounded-xl sm:rounded-2xl p-4 sm:p-6 border border-white/10">
+                <TrendingUp className="w-6 h-6 sm:w-8 sm:h-8 text-green-400 mx-auto mb-2 sm:mb-3" />
+                <div className="text-2xl sm:text-3xl font-bold text-white">{getTotalReviews()}</div>
+                <div className="text-gray-400 text-xs sm:text-sm">Total Reviews</div>
               </div>
-              <div className="bg-white/5 backdrop-blur-xl rounded-2xl p-6 border border-white/10">
-                <Award className="w-8 h-8 text-yellow-400 mx-auto mb-3" />
-                <div className="text-3xl font-bold text-white">{getSatisfactionRate()}%</div>
-                <div className="text-gray-400 text-sm">Satisfaction Rate</div>
+              <div className="bg-white/5 backdrop-blur-xl rounded-xl sm:rounded-2xl p-4 sm:p-6 border border-white/10">
+                <Award className="w-6 h-6 sm:w-8 sm:h-8 text-yellow-400 mx-auto mb-2 sm:mb-3" />
+                <div className="text-2xl sm:text-3xl font-bold text-white">{getSatisfactionRate()}%</div>
+                <div className="text-gray-400 text-xs sm:text-sm">Satisfaction Rate</div>
               </div>
             </motion.div>
 
@@ -352,12 +399,13 @@ const Reviews = () => {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.9, duration: 0.8 }}
+              className="px-4"
             >
               <Button
                 onClick={() => setShowForm(true)}
-                className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white text-lg px-8 py-6 rounded-2xl shadow-2xl shadow-purple-500/25 hover:shadow-purple-500/40 transition-all duration-300 transform hover:scale-105"
+                className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white text-base sm:text-lg px-6 sm:px-8 py-4 sm:py-6 rounded-xl sm:rounded-2xl shadow-2xl shadow-purple-500/25 hover:shadow-purple-500/40 transition-all duration-300 transform hover:scale-105 w-full sm:w-auto"
               >
-                <MessageSquare className="w-5 h-5 mr-2" />
+                <MessageSquare className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />
                 Write a Review
               </Button>
             </motion.div>
@@ -380,23 +428,23 @@ const Reviews = () => {
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.9, opacity: 0 }}
               onClick={(e) => e.stopPropagation()}
-              className="bg-gray-900 rounded-3xl p-8 max-w-2xl w-full max-h-[90vh] overflow-y-auto border border-white/10"
+              className="bg-gray-900 rounded-2xl sm:rounded-3xl p-4 sm:p-6 lg:p-8 max-w-2xl w-full max-h-[90vh] overflow-y-auto border border-white/10 mx-4 sm:mx-0"
             >
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-2xl font-bold text-white">Share Your Experience</h2>
+              <div className="flex items-center justify-between mb-4 sm:mb-6">
+                <h2 className="text-xl sm:text-2xl font-bold text-white">Share Your Experience</h2>
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={() => !isSubmitting && setShowForm(false)}
                   disabled={isSubmitting}
-                  className="text-gray-400 hover:text-white"
+                  className="text-gray-400 hover:text-white p-2"
                 >
                   ✕
                 </Button>
               </div>
 
-              <form onSubmit={handleSubmitReview} className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <form onSubmit={handleSubmitReview} className="space-y-4 sm:space-y-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-300 mb-2">
                       Name *
@@ -480,20 +528,20 @@ const Reviews = () => {
                   />
                 </div>
 
-                <div className="flex justify-end space-x-4">
+                <div className="flex flex-col sm:flex-row justify-end space-y-3 sm:space-y-0 sm:space-x-4">
                   <Button
                     type="button"
                     variant="outline"
                     onClick={() => !isSubmitting && setShowForm(false)}
                     disabled={isSubmitting}
-                    className="border-white/10 text-gray-300 hover:bg-white/10"
+                    className="border-white/10 text-gray-300 hover:bg-white/10 w-full sm:w-auto order-2 sm:order-1"
                   >
                     Cancel
                   </Button>
                   <Button
                     type="submit"
                     disabled={isSubmitting}
-                    className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
+                    className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 w-full sm:w-auto order-1 sm:order-2"
                   >
                     {isSubmitting ? (
                       <>
@@ -515,20 +563,20 @@ const Reviews = () => {
       </AnimatePresence>
 
       {/* Reviews Section */}
-      <section className="py-20 px-4 sm:px-6 lg:px-8">
+      <section className="py-12 sm:py-20 px-4 sm:px-6 lg:px-8">
         <div className="max-w-7xl mx-auto">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
-            className="text-center mb-16"
+            className="text-center mb-10 sm:mb-16"
           >
-            <h2 className="text-4xl font-bold text-white mb-4">Customer Reviews</h2>
-            <p className="text-gray-400 text-lg">Real feedback from real customers</p>
+            <h2 className="text-2xl sm:text-4xl font-bold text-white mb-3 sm:mb-4">Customer Reviews</h2>
+            <p className="text-gray-400 text-base sm:text-lg">Real feedback from real customers</p>
           </motion.div>
 
           {isLoading ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 lg:gap-8">
               {[1, 2, 3, 4, 5, 6].map((i) => (
                 <div key={i} className="animate-pulse">
                   <div className="bg-white/5 rounded-2xl p-6 border border-white/10">
@@ -553,46 +601,48 @@ const Reviews = () => {
                 >
                   <div className="absolute -inset-px bg-gradient-to-r from-purple-600/50 to-blue-600/50 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 blur-sm" />
                   <Card className="relative bg-white/5 backdrop-blur-xl border-white/10 hover:bg-white/10 transition-all duration-300">
-                    <CardHeader>
-                      <div className="flex items-start justify-between mb-4">
+                    <CardHeader className="p-4 sm:p-6">
+                      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between mb-3 sm:mb-4 space-y-3 sm:space-y-0">
                         <div className="flex items-center space-x-3">
-                          <div className="w-12 h-12 bg-gradient-to-r from-purple-600 to-blue-600 rounded-full flex items-center justify-center">
-                            <User className="w-6 h-6 text-white" />
+                          <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-r from-purple-600 to-blue-600 rounded-full flex items-center justify-center flex-shrink-0">
+                            <User className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
                           </div>
-                          <div>
-                            <div className="flex items-center space-x-2">
-                              <h3 className="font-semibold text-white">{review.name}</h3>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center space-x-2 flex-wrap">
+                              <h3 className="font-semibold text-white text-sm sm:text-base truncate">{review.name}</h3>
                               {review.verified && (
-                                <Badge className="bg-green-600/20 text-green-400 border-green-500/30 text-xs">
+                                <Badge className="bg-green-600/20 text-green-400 border-green-500/30 text-xs flex-shrink-0">
                                   <CheckCircle className="w-3 h-3 mr-1" />
                                   Verified
                                 </Badge>
                               )}
                             </div>
                             {review.company && (
-                              <p className="text-gray-400 text-sm flex items-center">
-                                <Building className="w-3 h-3 mr-1" />
-                                {review.company}
+                              <p className="text-gray-400 text-xs sm:text-sm flex items-center truncate">
+                                <Building className="w-3 h-3 mr-1 flex-shrink-0" />
+                                <span className="truncate">{review.company}</span>
                               </p>
                             )}
                           </div>
                         </div>
-                        {renderStars(review.rating)}
+                        <div className="flex justify-center sm:justify-start">
+                          {renderStars(review.rating)}
+                        </div>
                       </div>
-                      <CardTitle className="text-white text-lg">{review.title}</CardTitle>
+                      <CardTitle className="text-white text-base sm:text-lg leading-tight">{review.title}</CardTitle>
                     </CardHeader>
-                    <CardContent>
-                      <blockquote className="text-gray-300 leading-relaxed mb-4">
+                    <CardContent className="p-4 sm:p-6 pt-0">
+                      <blockquote className="text-gray-300 leading-relaxed mb-4 text-sm sm:text-base">
                         "{review.message}"
                       </blockquote>
-                      <div className="flex items-center justify-between text-sm text-gray-400">
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between text-xs sm:text-sm text-gray-400 space-y-2 sm:space-y-0">
                         <div className="flex items-center space-x-1">
-                          <Calendar className="w-4 h-4" />
+                          <Calendar className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
                           <span>{new Date(review.created_at).toLocaleDateString()}</span>
                         </div>
                         <div className="flex items-center space-x-2">
                           <button className="flex items-center space-x-1 hover:text-purple-400 transition-colors">
-                            <ThumbsUp className="w-4 h-4" />
+                            <ThumbsUp className="w-3 h-3 sm:w-4 sm:h-4" />
                             <span>Helpful</span>
                           </button>
                         </div>
@@ -608,14 +658,14 @@ const Reviews = () => {
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              className="text-center py-12"
+              className="text-center py-8 sm:py-12 px-4"
             >
-              <MessageSquare className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-xl font-semibold text-white mb-2">No Reviews Yet</h3>
-              <p className="text-gray-400 mb-6">Be the first to share your experience!</p>
+              <MessageSquare className="w-12 h-12 sm:w-16 sm:h-16 text-gray-400 mx-auto mb-3 sm:mb-4" />
+              <h3 className="text-lg sm:text-xl font-semibold text-white mb-2">No Reviews Yet</h3>
+              <p className="text-gray-400 mb-4 sm:mb-6 text-sm sm:text-base">Be the first to share your experience!</p>
               <Button
                 onClick={() => setShowForm(true)}
-                className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
+                className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 w-full sm:w-auto"
               >
                 Write First Review
               </Button>

@@ -255,7 +255,7 @@ const Billing = () => {
       // Starter (free) -> begin 30-day trial at £15/month via Stripe
       if (planId === "free") {
         const starter = plans.find((p) => p.id === "free");
-        const checkoutResponse = await api.billing.createCheckoutSession({
+        const checkoutResponse = (await api.billing.createCheckoutSession({
           plan: "Starter",
           amount: 15,
           currency: "GBP",
@@ -263,7 +263,7 @@ const Billing = () => {
           trial_days: 30,
           success_url: `${window.location.origin}/dashboard/billing?payment_success=true&tier=starter`,
           cancel_url: `${window.location.origin}/dashboard/billing?payment_cancelled=true`,
-        }) as CheckoutResponse;
+        })) as CheckoutResponse;
 
         if (checkoutResponse.success && checkoutResponse.data?.checkout_url) {
           window.location.href = checkoutResponse.data.checkout_url;
@@ -281,14 +281,14 @@ const Billing = () => {
         }
 
         // Create Stripe checkout session
-        const checkoutResponse = await api.billing.createCheckoutSession({
+        const checkoutResponse = (await api.billing.createCheckoutSession({
           plan: selectedPlan.name,
           amount: selectedPlan.price,
           currency: "GBP",
           billing_cycle: "monthly",
           success_url: `${window.location.origin}/dashboard/billing?payment_success=true&session_id={CHECKOUT_SESSION_ID}`,
           cancel_url: `${window.location.origin}/dashboard/billing?payment_cancelled=true`,
-        }) as CheckoutResponse;
+        })) as CheckoutResponse;
 
         if (checkoutResponse.data?.checkout_url) {
           // Redirect to Stripe checkout

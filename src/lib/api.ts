@@ -90,28 +90,33 @@ apiClient.interceptors.request.use(
     const token = tokenStorage.getToken();
     const hasToken = !!token;
     
-    // Check if this is an auth endpoint that doesn't require a token
-    const isPublicAuthEndpoint = config.url && (
+    // Check if this is a public endpoint that doesn't require a token
+    const isPublicEndpoint = config.url && (
       config.url.includes('/auth/register') ||
       config.url.includes('/auth/login') ||
       config.url.includes('/auth/refresh') ||
-      config.url.includes('/auth/reset-password')
+      config.url.includes('/auth/reset-password') ||
+      (config.url.includes('/reviews') && config.method?.toLowerCase() === 'get') ||
+      config.url.includes('/health')
     );
     
-    console.log('🔍 Request interceptor:', {
-      url: config.url,
-      hasToken,
-      tokenPreview: token ? token.substring(0, 20) + '...' : 'NO TOKEN',
-      timestamp: new Date().toISOString()
-    });
+    // Only log detailed info for debugging when needed
+    if (!isPublicEndpoint) {
+      console.log('🔍 Request interceptor:', {
+        url: config.url,
+        hasToken,
+        tokenPreview: token ? token.substring(0, 20) + '...' : 'NO TOKEN',
+        timestamp: new Date().toISOString()
+      });
+    }
     
     if (token) {
       config.headers['Authorization'] = `Bearer ${token}`;
-      console.log('✅ Authorization header added');
-    } else if (!isPublicAuthEndpoint) {
+      if (!isPublicEndpoint) {
+        console.log('✅ Authorization header added');
+      }
+    } else if (!isPublicEndpoint) {
       console.log('❌ No token found - request will be unauthorized');
-    } else {
-      console.log('ℹ️ Public auth endpoint - no token required');
     }
     return config;
   },
