@@ -1,7 +1,9 @@
-import { Router, Request, Response } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
 import { body, validationResult } from 'express-validator';
 import { supabase } from '../server';
 import { emailService } from '../services/email-service';
+import { authenticateToken } from '../middleware/auth';
+import { AuthRequest } from '../types/auth';
 
 const router = Router();
 
@@ -13,6 +15,58 @@ interface ReviewRequest {
   title: string;
   message: string;
 }
+
+// Middleware to check if user has active subscription or trial
+const requireSubscriptionOrTrial = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.user!.userId;
+    
+    // Check user's subscription status
+    const { data: subscription, error } = await supabase
+      .from('subscriptions')
+      .select('tier, status, current_period_end')
+      .eq('user_id', userId)
+      .single();
+
+    if (error && error.code !== 'PGRST116') {
+      console.error('Error fetching subscription:', error);
+      return res.status(500).json({
+        success: false,
+        error: 'Unable to verify subscription status'
+      });
+    }
+
+    // If no subscription exists, deny access
+    if (!subscription) {
+      return res.status(403).json({
+        success: false,
+        error: 'Subscription required',
+        message: 'You need an active subscription or trial to write reviews. Please upgrade your plan to continue.'
+      });
+    }
+
+    // Check if subscription is active or in trial
+    const isActive = subscription.status === 'active' || subscription.status === 'trialing';
+    const isNotExpired = new Date(subscription.current_period_end) > new Date();
+
+    if (!isActive || !isNotExpired) {
+      return res.status(403).json({
+        success: false,
+        error: 'Subscription expired',
+        message: 'Your subscription has expired. Please renew your subscription to write reviews.'
+      });
+    }
+
+    // User has valid subscription/trial, continue
+    next();
+  } catch (error) {
+    console.error('Subscription check error:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'Unable to verify subscription status'
+    });
+  }
+};
 
 // Validation middleware for review submission
 const reviewValidation = [
@@ -101,8 +155,8 @@ router.get('/', async (req: Request, res: Response) => {
   }
 });
 
-// Submit a new review
-router.post('/', reviewValidation, async (req: Request, res: Response) => {
+// Submit a new review (requires authentication and active subscription/trial)
+router.post('/', authenticateToken, requireSubscriptionOrTrial, reviewValidation, async (req: AuthRequest, res: Response) => {
   try {
     // Check validation errors
     const errors = validationResult(req);
@@ -402,7 +456,7 @@ Your Review Summary:
 
 Your review will be published on our website shortly. We truly appreciate customers like you who help us build trust and credibility in the AI-powered part identification space.
 
-View all reviews: ${process.env.FRONTEND_URL || 'https://app.sparefinder.org'}/reviews
+View all reviews: ${process.env.FRONTEND_URL || 'https://sparefinder.org'}/reviews
 
 Best regards,
 Part Finder AI Team
@@ -447,7 +501,7 @@ sales@tpsinternational.co.uk
 });
 
 // Get review statistics (public endpoint)
-router.get('/stats', async (req: Request, res: Response) => {
+router.get('/stats', async (_req: Request, res: Response) => {
   try {
     // Get review statistics
     const { data: reviews, error } = await supabase

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { motion } from 'framer-motion'
 import {
   LineChart,
@@ -92,15 +92,7 @@ const PerformanceMonitor: React.FC = () => {
   const [autoRefresh, setAutoRefresh] = useState(true)
   const [activeTab, setActiveTab] = useState('overview')
 
-  useEffect(() => {
-    fetchPerformanceData()
-    const interval = autoRefresh ? setInterval(fetchPerformanceData, 30000) : null
-    return () => {
-      if (interval) clearInterval(interval)
-    }
-  }, [timeRange, autoRefresh])
-
-  const fetchPerformanceData = async () => {
+  const fetchPerformanceData = useCallback(async () => {
     setLoading(true)
     try {
       // Mock real-time data - in production, this would come from monitoring services
@@ -165,7 +157,15 @@ const PerformanceMonitor: React.FC = () => {
     } finally {
       setLoading(false)
     }
-  }
+  }, [timeRange])
+
+  useEffect(() => {
+    fetchPerformanceData()
+    const interval = autoRefresh ? setInterval(fetchPerformanceData, 30000) : null
+    return () => {
+      if (interval) clearInterval(interval)
+    }
+  }, [timeRange, autoRefresh, fetchPerformanceData])
 
   const getHealthStatus = (value: number, thresholds: { good: number; warning: number }): { status: 'good' | 'warning' | 'critical'; color: string } => {
     if (value <= thresholds.good) return { status: 'good', color: 'text-green-400' }

@@ -50,7 +50,11 @@ import {
 } from "@/components/ui/dialog";
 import { useToast } from "@/components/ui/use-toast";
 import { api } from "@/lib/api";
-import { getAllPlans, formatPriceWithPeriod, type PlanFeature } from '@/lib/plans';
+import {
+  getAllPlans,
+  formatPriceWithPeriod,
+  type PlanFeature,
+} from "@/lib/plans";
 
 interface FeatureItem {
   title: string;
@@ -165,7 +169,9 @@ const Landing = () => {
         cancel_url: `${window.location.origin}/dashboard/billing?payment_cancelled=true`,
       };
 
-      const response = await api.billing.createCheckoutSession(checkoutData) as CheckoutResponse;
+      const response = (await api.billing.createCheckoutSession(
+        checkoutData
+      )) as CheckoutResponse;
 
       if (response.success && response.data?.checkout_url) {
         // Redirect to Stripe Checkout
@@ -362,15 +368,20 @@ const Landing = () => {
     },
   ];
 
-  const pricing: PricingPlan[] = getAllPlans().map(plan => ({
+  const pricing: PricingPlan[] = getAllPlans().map((plan) => ({
     name: plan.name,
-    price: { 
-      monthly: plan.price.toString(), 
-      annual: plan.price.toString() 
+    price: {
+      monthly: plan.price.toString(),
+      annual: plan.price.toString(),
     },
     features: plan.features,
-    cta: plan.id === 'enterprise' ? 'Contact Sales' : plan.popular ? 'Go Professional' : 'Get Started',
-    featured: plan.popular
+    cta:
+      plan.id === "enterprise"
+        ? "Contact Sales"
+        : plan.popular
+        ? "Go Professional"
+        : "Get Started",
+    featured: plan.popular,
   }));
 
   const coreValues = [
@@ -431,7 +442,7 @@ const Landing = () => {
         })
       )
     ).catch(console.error);
-  }, []);
+  }, [features, useCases]);
 
   function Step({
     title,
