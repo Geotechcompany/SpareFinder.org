@@ -37,6 +37,8 @@ import TermsOfService from "@/pages/TermsOfService";
 import Trial from "@/pages/Trial";
 import Unauthorized from "@/pages/Unauthorized";
 import ForgotPassword from "@/pages/ForgotPassword";
+import Contact from "@/pages/Contact";
+import Reviews from "@/pages/Reviews";
 import DashboardLayout from "@/components/DashboardLayout";
 
 const queryClient = new QueryClient();
@@ -176,6 +178,8 @@ const App = () => (
               <Route path="/admin/login" element={<AdminLogin />} />
               <Route path="/privacy-policy" element={<PrivacyPolicy />} />
               <Route path="/terms-of-service" element={<TermsOfService />} />
+              <Route path="/contact" element={<Contact />} />
+              <Route path="/reviews" element={<Reviews />} />
               <Route path="/unauthorized" element={<Unauthorized />} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />

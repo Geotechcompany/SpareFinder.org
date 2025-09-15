@@ -34,6 +34,7 @@ import {
   Loader2,
   CheckCircle,
   AlertCircle,
+  LucideIcon,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useState, useEffect, useRef } from "react";
@@ -49,6 +50,39 @@ import {
 } from "@/components/ui/dialog";
 import { useToast } from "@/components/ui/use-toast";
 import { api } from "@/lib/api";
+import { getAllPlans, formatPriceWithPeriod, type PlanFeature } from '@/lib/plans';
+
+interface FeatureItem {
+  title: string;
+  description: string;
+  icon: LucideIcon;
+}
+
+interface BenefitItem {
+  title: string;
+  description: string;
+  icon: LucideIcon;
+}
+
+interface CheckoutResponse {
+  success: boolean;
+  data?: {
+    checkout_url: string;
+    session_id: string;
+  };
+  error?: string;
+}
+
+interface PricingPlan {
+  name: string;
+  price: {
+    monthly: string;
+    annual: string;
+  };
+  features: string[];
+  cta: string;
+  featured: boolean;
+}
 
 // Cookie consent component
 const CookieConsent = () => {
@@ -111,13 +145,13 @@ const Landing = () => {
 
   // Payment modal state
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
-  const [selectedPlan, setSelectedPlan] = useState<any>(null);
+  const [selectedPlan, setSelectedPlan] = useState<PricingPlan | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
 
   const { toast } = useToast();
 
   // Stripe Checkout function
-  const processStripePayment = async (plan: any) => {
+  const processStripePayment = async (plan: PricingPlan) => {
     try {
       setIsProcessing(true);
 
@@ -131,7 +165,7 @@ const Landing = () => {
         cancel_url: `${window.location.origin}/dashboard/billing?payment_cancelled=true`,
       };
 
-      const response = await api.billing.createCheckoutSession(checkoutData);
+      const response = await api.billing.createCheckoutSession(checkoutData) as CheckoutResponse;
 
       if (response.success && response.data?.checkout_url) {
         // Redirect to Stripe Checkout
@@ -154,7 +188,7 @@ const Landing = () => {
   };
 
   // Handle plan selection with Stripe integration
-  const handlePlanSelect = async (plan: any) => {
+  const handlePlanSelect = async (plan: PricingPlan) => {
     if (
       typeof plan.name === "string" &&
       plan.name.toLowerCase().includes("enterprise")
@@ -328,42 +362,16 @@ const Landing = () => {
     },
   ];
 
-  const pricing = [
-    {
-      name: "Starter / Basic",
-      price: { monthly: "12.99", annual: "12.99" },
-      features: [
-        "20 image recognitions per month",
-        "Basic search & match results",
-        "Access via web portal only",
-      ],
-      cta: "Get Started",
+  const pricing: PricingPlan[] = getAllPlans().map(plan => ({
+    name: plan.name,
+    price: { 
+      monthly: plan.price.toString(), 
+      annual: plan.price.toString() 
     },
-    {
-      name: "Professional / Business",
-      price: { monthly: "69.99", annual: "69.99" },
-      features: [
-        "500 recognitions per month",
-        "Catalogue storage (part lists, drawings)",
-        "API access for ERP/CMMS",
-        "Analytics dashboard",
-      ],
-      cta: "Go Professional",
-      featured: true,
-    },
-    {
-      name: "Enterprise",
-      price: { monthly: "460", annual: "460" },
-      features: [
-        "Unlimited recognition",
-        "Advanced AI customisation (train on your data)",
-        "ERP/CMMS full integration",
-        "Predictive demand analytics",
-        "Dedicated support & SLA",
-      ],
-      cta: "Contact Sales",
-    },
-  ];
+    features: plan.features,
+    cta: plan.id === 'enterprise' ? 'Contact Sales' : plan.popular ? 'Go Professional' : 'Get Started',
+    featured: plan.popular
+  }));
 
   const coreValues = [
     {
@@ -433,7 +441,7 @@ const Landing = () => {
   }: {
     title: string;
     description: string;
-    icon: any;
+    icon: LucideIcon;
     index: number;
   }) {
     const ref = useRef(null);
@@ -466,7 +474,7 @@ const Landing = () => {
     gradient,
     index,
   }: {
-    icon: any;
+    icon: LucideIcon;
     title: string;
     description: string;
     gradient: string;

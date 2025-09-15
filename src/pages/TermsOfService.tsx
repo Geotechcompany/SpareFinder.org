@@ -45,7 +45,7 @@ const TermsOfService = () => {
       icon: CreditCard,
       content: [
         "Subscription fees are billed monthly or annually in advance",
-        "Free tier includes 5 part identifications per month",
+        "Free tier includes 20 part identifications per month",
         "Enterprise plans include custom pricing and SLA agreements",
         "Refunds available within 30 days of initial subscription",
         "Price changes will be communicated 30 days in advance"

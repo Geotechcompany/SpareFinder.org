@@ -1,12 +1,18 @@
 import axios, { AxiosInstance, AxiosResponse } from 'axios';
 
 // Define a generic API response type
-export type ApiResponse<T = any> = {
+export type ApiResponse<T = unknown> = {
   success: boolean;
   data?: T;
   error?: string;
   message?: string;
-  user?: any;
+  user?: {
+    id: string;
+    email: string;
+    full_name: string;
+    role: string;
+    [key: string]: unknown;
+  };
   token?: string;
   refresh_token?: string;
 };
@@ -56,15 +62,17 @@ const apiClient: AxiosInstance = axios.create({
   },
 });
 
+interface QueueItem {
+  resolve: (value: unknown) => void;
+  reject: (error: unknown) => void;
+}
+
 // Token refresh state
 let isRefreshing = false;
 let refreshPromise: Promise<string> | null = null;
-let failedQueue: Array<{
-  resolve: (value: any) => void;
-  reject: (error: any) => void;
-}> = [];
+let failedQueue: QueueItem[] = [];
 
-const processQueue = (error: any, token: string | null = null) => {
+const processQueue = (error: unknown, token: string | null = null) => {
   failedQueue.forEach(({ resolve, reject }) => {
     if (error) {
       reject(error);
@@ -310,9 +318,9 @@ export const dashboardApi = {
     return response.data;
   },
   scheduleKeywordSearch: async (keywords: string[] | string, userEmail?: string): Promise<ApiResponse> => {
-    const payload: any = { keywords: Array.isArray(keywords) ? keywords : [keywords] };
+    const payload: { keywords: string[]; user_email?: string } = { keywords: Array.isArray(keywords) ? keywords : [keywords] };
     if (userEmail) payload.user_email = userEmail;
-    const AI_BASE = (import.meta as any).env?.VITE_AI_SERVICE_URL || 'http://localhost:8000';
+    const AI_BASE = (import.meta as { env?: { VITE_AI_SERVICE_URL?: string } }).env?.VITE_AI_SERVICE_URL || 'http://localhost:8000';
     const res = await axios.post(`${AI_BASE}/search/keywords/schedule`, payload, {
       headers: { 'Content-Type': 'application/json' }
     });
@@ -706,7 +714,12 @@ export const uploadApi = {
       part_number?: string;
       compatibility?: string[];
     }>;
-    similar_images?: any[];
+    similar_images?: Array<{
+      id: string;
+      url: string;
+      similarity: number;
+      [key: string]: unknown;
+    }>;
     model_version: string;
     processing_time: number;
     image_metadata: {
@@ -935,6 +948,109 @@ export const creditsApi = {
   }
 };
 
+// Contact API
+export const contactApi = {
+  submitForm: async (formData: {
+    name: string;
+    email: string;
+    company: string;
+    subject: string;
+    message: string;
+    inquiryType: 'support' | 'sales' | 'billing' | 'technical' | 'general';
+  }): Promise<ApiResponse> => {
+    try {
+      const response = await apiClient.post('/contact', formData);
+      return response.data;
+    } catch (error) {
+      console.error('Contact form submission error:', error);
+      throw error;
+    }
+  }
+};
+
+// Reviews API
+export const reviewsApi = {
+  getAll: async (params?: {
+    page?: number;
+    limit?: number;
+  }): Promise<ApiResponse<{
+    reviews: Array<{
+      id: string;
+      name: string;
+      email: string;
+      company?: string;
+      rating: number;
+      title: string;
+      message: string;
+      created_at: string;
+      verified: boolean;
+    }>;
+    pagination: {
+      page: number;
+      limit: number;
+      total: number;
+      totalPages: number;
+    };
+    stats: {
+      averageRating: number;
+      totalReviews: number;
+    };
+  }>> => {
+    try {
+      const response = await apiClient.get('/reviews', { params });
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching reviews:', error);
+      throw error;
+    }
+  },
+
+  create: async (reviewData: {
+    name: string;
+    email: string;
+    company?: string;
+    rating: number;
+    title: string;
+    message: string;
+  }): Promise<ApiResponse<{
+    review: {
+      id: string;
+      rating: number;
+      title: string;
+      submittedAt: string;
+    };
+    emailSent: boolean;
+  }>> => {
+    try {
+      console.log('📤 Submitting review:', reviewData);
+      const response = await apiClient.post('/reviews', reviewData);
+      console.log('✅ Review submitted successfully:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('❌ Review submission error:', error);
+      throw error;
+    }
+  },
+
+  getStats: async (): Promise<ApiResponse<{
+    totalReviews: number;
+    averageRating: number;
+    ratingDistribution: Array<{
+      rating: number;
+      count: number;
+      percentage: number;
+    }>;
+  }>> => {
+    try {
+      const response = await apiClient.get('/reviews/stats');
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching review stats:', error);
+      throw error;
+    }
+  }
+};
+
 // Export combined API
 export const api = {
   auth: authApi,
@@ -1026,7 +1142,9 @@ export const api = {
   notifications: notificationsApi,
   billing: billingApi,
   statistics: statisticsApi,
-  credits: creditsApi
+  credits: creditsApi,
+  contact: contactApi,
+  reviews: reviewsApi
 };
 
 // Export individual APIs for backward compatibility

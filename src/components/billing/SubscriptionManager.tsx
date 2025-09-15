@@ -5,6 +5,8 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
 import { api } from "@/lib/api";
+import { PLAN_CONFIG, getPlan, PlanTier } from '@/lib/plans';
+import SubscriptionTrialModal from "./SubscriptionTrialModal";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import {
@@ -57,47 +59,44 @@ interface BillingData {
   }>;
 }
 
-const PLAN_FEATURES = {
-  free: {
-    name: "Starter / Basic",
-    price: 12.99,
-    currency: "GBP",
-    color: "from-gray-600 to-gray-700",
-    icon: Shield,
-    features: [
-      "20 image recognitions per month",
-      "Basic search & match results",
-      "Access via web portal only",
-    ],
-  },
-  pro: {
-    name: "Professional / Business",
-    price: 69.99,
-    currency: "GBP",
-    color: "from-blue-600 to-cyan-600",
-    icon: Zap,
-    features: [
-      "500 recognitions per month",
-      "Catalogue storage (part lists, drawings)",
-      "API access for ERP/CMMS",
-      "Analytics dashboard",
-    ],
-  },
-  enterprise: {
-    name: "Enterprise",
-    price: 460,
-    currency: "GBP",
-    color: "from-purple-600 to-pink-600",
-    icon: Crown,
-    features: [
-      "Unlimited recognition",
-      "Advanced AI customisation",
-      "ERP/CMMS full integration",
-      "Predictive demand analytics",
-      "Dedicated support & SLA",
-    ],
-  },
-};
+interface BillingResponse {
+  subscription: Subscription;
+  usage: Usage;
+  invoices?: Array<{
+    id: string;
+    amount?: number;
+    total?: number;
+    currency?: string;
+    status: string;
+    created_at?: string;
+    created?: string;
+    invoice_url?: string;
+    hosted_invoice_url?: string;
+  }>;
+}
+
+interface CheckoutResponse {
+  success: boolean;
+  data?: {
+    checkout_url: string;
+  };
+  error?: string;
+}
+
+// Use centralized plan configuration
+const PLAN_FEATURES = Object.fromEntries(
+  Object.entries(PLAN_CONFIG).map(([tier, plan]) => [
+    tier,
+    {
+      name: plan.name,
+      price: plan.price,
+      currency: plan.currency,
+      color: plan.color,
+      icon: plan.icon,
+      features: plan.features,
+    },
+  ])
+);
 
 export const SubscriptionManager: React.FC = () => {
   const [billingData, setBillingData] = useState<BillingData | null>(null);
@@ -114,6 +113,17 @@ export const SubscriptionManager: React.FC = () => {
     }>
   >([]);
   const { user } = useAuth();
+  const [trialOpen, setTrialOpen] = useState(false);
+  const [trialPlan, setTrialPlan] = useState<{
+    tier: "free" | "pro" | "enterprise";
+    name: string;
+    price: string;
+    trialDays: number;
+    nextCharge: string;
+    features: string[];
+    colorClass: string;
+  } | null>(null);
+  const [paymentError, setPaymentError] = useState<string | null>(null);
 
   useEffect(() => {
     fetchBillingData();
@@ -127,12 +137,12 @@ export const SubscriptionManager: React.FC = () => {
       const response = await api.billing.getBillingInfo();
 
       if (response.success && response.data) {
-        setBillingData(response.data);
+        setBillingData(response.data as BillingData);
 
         // Use invoices returned by the billing endpoint
-        const preloaded = (response.data as any).invoices as any[] | undefined;
+        const preloaded = (response.data as BillingData).invoices as BillingResponse['invoices'];
         if (Array.isArray(preloaded)) {
-          const normalized = preloaded.map((inv: any) => ({
+          const normalized = preloaded.map((inv) => ({
             id: inv.id,
             amount: Number(inv.amount ?? inv.total ?? 0),
             currency: String(inv.currency || "GBP").toUpperCase(),
@@ -180,11 +190,25 @@ export const SubscriptionManager: React.FC = () => {
         };
         const checkoutResponse = await api.billing.createCheckoutSession(
           checkoutData
-        );
+        ) as { success: boolean; data?: { checkout_url: string }; error?: string };
         if (checkoutResponse.success && checkoutResponse.data?.checkout_url) {
           window.location.href = checkoutResponse.data.checkout_url;
         } else {
-          toast.error("Failed to start Starter trial.");
+          setPaymentError(
+            "We couldn’t start your trial with this payment method."
+          );
+          setTrialPlan({
+            tier: "free",
+            name: plan.name,
+            price: "£15 / month",
+            trialDays: 5,
+            nextCharge: new Date(
+              Date.now() + 5 * 86400000
+            ).toLocaleDateString(),
+            features: plan.features,
+            colorClass: plan.color,
+          });
+          setTrialOpen(true);
         }
         return;
       }
@@ -202,15 +226,26 @@ export const SubscriptionManager: React.FC = () => {
 
       const checkoutResponse = await api.billing.createCheckoutSession(
         checkoutData
-      );
+      ) as { success: boolean; data?: { checkout_url: string }; error?: string };
 
       if (checkoutResponse.success && checkoutResponse.data?.checkout_url) {
         // Redirect to Stripe checkout
         window.location.href = checkoutResponse.data.checkout_url;
       } else {
-        toast.error(
-          "Failed to create checkout session. Please check if Stripe is configured."
+        const p = PLAN_FEATURES[tier];
+        setPaymentError(
+          "We couldn’t start your trial with this payment method."
         );
+        setTrialPlan({
+          tier,
+          name: p.name,
+          price: `£${p.price} / month`,
+          trialDays: 7,
+          nextCharge: new Date(Date.now() + 7 * 86400000).toLocaleDateString(),
+          features: p.features,
+          colorClass: p.color,
+        });
+        setTrialOpen(true);
       }
     } catch (error) {
       console.error("Subscription update error:", error);
@@ -292,9 +327,9 @@ export const SubscriptionManager: React.FC = () => {
         credits,
         success_url: `${window.location.origin}/dashboard/billing?payment_success=true`,
         cancel_url: `${window.location.origin}/dashboard/billing?payment_cancelled=true`,
-      });
-      if (resp.success && (resp.data as any)?.checkout_url) {
-        window.location.href = (resp.data as any).checkout_url as string;
+      }) as { success: boolean; data?: { checkout_url: string } };
+      if (resp.success && resp.data?.checkout_url) {
+        window.location.href = resp.data.checkout_url;
       } else {
         toast.error("Failed to start credits checkout");
       }
@@ -347,6 +382,16 @@ export const SubscriptionManager: React.FC = () => {
 
   return (
     <div className="space-y-6">
+      {trialPlan && (
+        <SubscriptionTrialModal
+          open={trialOpen}
+          onOpenChange={setTrialOpen}
+          plan={trialPlan}
+          isProcessing={!!isUpdating}
+          paymentError={paymentError}
+          onStartTrial={(tier) => handleUpgradeSubscription(tier)}
+        />
+      )}
       {/* Current Subscription */}
       <Card>
         <CardHeader>

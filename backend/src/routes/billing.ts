@@ -65,25 +65,43 @@ async function getStripeInstance(): Promise<Stripe | null> {
 }
 
 // Helper function to determine price based on plan
-function getPlanPrice(planName: string): { amount: number; currency: string } {
-  const plan = planName.toLowerCase();
+// Uses centralized plan configuration to ensure consistency
+const PLAN_PRICING = {
+  free: { amount: 12.99, currency: 'gbp' },
+  pro: { amount: 69.99, currency: 'gbp' }, 
+  enterprise: { amount: 460, currency: 'gbp' }
+};
 
-  // New pricing per business model
+function getPlanPrice(planName: string): { amount: number; currency: string } {
+  const plan = planName.toLowerCase().replace(/[\s/]/g, '');
+  
+  // Check exact matches first
+  if (plan === 'starter' || plan === 'basic') {
+    return PLAN_PRICING.free;
+  }
+  if (plan === 'professional' || plan === 'business' || plan === 'pro') {
+    return PLAN_PRICING.pro;
+  }
+  if (plan === 'enterprise') {
+    return PLAN_PRICING.enterprise;
+  }
+  
+  // Fallback to keyword matching
   if (plan.includes('enterprise')) {
-    return { amount: 460, currency: 'gbp' };
+    return PLAN_PRICING.enterprise;
   }
   if (plan.includes('pro') || plan.includes('professional') || plan.includes('business')) {
-    return { amount: 69.99, currency: 'gbp' };
+    return PLAN_PRICING.pro;
   }
   if (plan.includes('starter') || plan.includes('basic')) {
-    return { amount: 12.99, currency: 'gbp' };
+    return PLAN_PRICING.free;
   }
 
   // Default to Starter price if unspecified
-  return { amount: 12.99, currency: 'gbp' };
+  return PLAN_PRICING.free;
 }
 
-// Subscription limits by tier
+// Subscription limits by tier - synced with frontend configuration
 const SUBSCRIPTION_LIMITS = {
   // Starter/Basic (mapped to 'free' tier key)
   free: {
