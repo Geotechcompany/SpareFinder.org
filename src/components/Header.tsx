@@ -65,7 +65,8 @@ const Header = () => {
                     { name: 'AI CAPABILITIES', href: '/#capabilities' },
                     { name: 'INDUSTRIES', href: '/#industries' },
                     { name: 'PRICING', href: '/#pricing' },
-                    { name: 'SECURITY', href: '/security' }
+                    { name: 'REVIEWS', href: '/reviews' },
+                    { name: 'CONTACT', href: '/contact' }
                   ].map((item) => (
                     <a
                       key={item.name}
@@ -147,7 +148,8 @@ const Header = () => {
                 { name: 'AI CAPABILITIES', href: '/#capabilities' },
                 { name: 'INDUSTRIES', href: '/#industries' },
                 { name: 'PRICING', href: '/#pricing' },
-                { name: 'SECURITY', href: '/security' }
+                { name: 'REVIEWS', href: '/reviews' },
+                { name: 'CONTACT', href: '/contact' }
               ].map((item, index) => (
                 <motion.a
                   key={item.name}

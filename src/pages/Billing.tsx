@@ -12,6 +12,13 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/components/ui/use-toast";
 import { api } from "@/lib/api";
+import {
+  getAllPlans,
+  getPlan,
+  formatPrice,
+  PlanTier,
+  isUnlimited,
+} from "@/lib/plans";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import {
   CreditCard,
@@ -41,13 +48,56 @@ import MobileSidebar from "@/components/MobileSidebar";
 import { useDashboardLayout } from "@/contexts/DashboardLayoutContext";
 import DashboardSkeleton from "@/components/DashboardSkeleton";
 
+interface BillingData {
+  subscription?: {
+    tier: string;
+    status: string;
+    current_period_end: string;
+    stripe_subscription_id?: string;
+    stripe_customer_id?: string;
+    cancel_at_period_end?: boolean;
+  };
+  invoices?: Invoice[];
+  usage?: {
+    uploads_count?: number;
+    searches_count?: number;
+    api_calls_count?: number;
+    storage_used?: number;
+  };
+}
+
+interface Invoice {
+  id: string;
+  date?: string;
+  amount?: number;
+  total?: number;
+  status: string;
+  currency?: string;
+  created_at?: string;
+  created?: string;
+  invoice_url?: string;
+  hosted_invoice_url?: string;
+  description?: string;
+  invoice?: string;
+  raw?: Record<string, unknown>;
+}
+
+interface CheckoutResponse {
+  success: boolean;
+  data?: {
+    checkout_url: string;
+    session_id: string;
+  };
+  error?: string;
+}
+
 const Billing = () => {
   const [currentPlan, setCurrentPlan] = useState("free");
   const { inLayout } = useDashboardLayout();
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [billingData, setBillingData] = useState<any>(null);
-  const [invoices, setInvoices] = useState<any[]>([]);
+  const [billingData, setBillingData] = useState<BillingData | null>(null);
+  const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchParams] = useSearchParams();
@@ -127,15 +177,17 @@ const Billing = () => {
         });
 
         if (isMounted && billingResponse) {
-          setBillingData(billingResponse as any);
-          setCurrentPlan((billingResponse as any).subscription?.tier || "free");
+          setBillingData(billingResponse as BillingData);
+          setCurrentPlan(
+            (billingResponse as BillingData).subscription?.tier || "free"
+          );
 
           // If the billing info already contains invoices, use them first
-          const preloaded = (billingResponse as any).invoices as
-            | any[]
+          const preloaded = (billingResponse as BillingData).invoices as
+            | Invoice[]
             | undefined;
           if (preloaded && preloaded.length > 0) {
-            const normalized = preloaded.map((inv: any) => ({
+            const normalized = preloaded.map((inv: Invoice) => ({
               id: inv.id,
               amount: Number(inv.amount ?? inv.total ?? 0),
               currency: String(inv.currency || "GBP").toUpperCase(),
@@ -153,9 +205,10 @@ const Billing = () => {
           signal: controller.signal,
         });
 
-        if (isMounted && (invoicesResponse as any)) {
-          const raw = (invoicesResponse as any).invoices || [];
-          const normalized = raw.map((inv: any) => ({
+        if (isMounted && (invoicesResponse as { invoices?: Invoice[] })) {
+          const raw =
+            (invoicesResponse as { invoices?: Invoice[] }).invoices || [];
+          const normalized = raw.map((inv: Invoice) => ({
             id: inv.id,
             amount: Number(inv.amount ?? inv.total ?? 0),
             currency: String(inv.currency || "GBP").toUpperCase(),
@@ -210,7 +263,7 @@ const Billing = () => {
           trial_days: 30,
           success_url: `${window.location.origin}/dashboard/billing?payment_success=true&tier=starter`,
           cancel_url: `${window.location.origin}/dashboard/billing?payment_cancelled=true`,
-        });
+        }) as CheckoutResponse;
 
         if (checkoutResponse.success && checkoutResponse.data?.checkout_url) {
           window.location.href = checkoutResponse.data.checkout_url;
@@ -235,7 +288,7 @@ const Billing = () => {
           billing_cycle: "monthly",
           success_url: `${window.location.origin}/dashboard/billing?payment_success=true&session_id={CHECKOUT_SESSION_ID}`,
           cancel_url: `${window.location.origin}/dashboard/billing?payment_cancelled=true`,
-        });
+        }) as CheckoutResponse;
 
         if (checkoutResponse.data?.checkout_url) {
           // Redirect to Stripe checkout
@@ -295,59 +348,26 @@ const Billing = () => {
     }
   };
 
-  const plans = [
-    {
-      id: "free",
-      name: "Starter / Basic",
-      price: 12.99,
-      period: "month",
-      description: "For small users testing the service",
-      features: [
-        "20 image recognitions per month",
-        "Basic search & match results",
-        "Access via web portal only",
-      ],
-      popular: false,
-      icon: Zap,
-      color: "from-gray-600 to-gray-700",
-      limit: "20 recognitions/month",
-    },
-    {
-      id: "pro",
-      name: "Professional / Business",
-      price: 69.99,
-      period: "month",
-      description: "For SMEs managing spare parts more actively",
-      features: [
-        "500 recognitions per month",
-        "Catalogue storage (part lists, drawings)",
-        "API access for ERP/CMMS",
-        "Analytics dashboard",
-      ],
-      popular: true,
-      icon: Crown,
-      color: "from-purple-600 to-blue-600",
-      limit: "500 recognitions/month",
-    },
-    {
-      id: "enterprise",
-      name: "Enterprise",
-      price: 460,
-      period: "month",
-      description: "For OEMs, large factories, distributors",
-      features: [
-        "Unlimited recognition",
-        "Advanced AI customisation (train on their data)",
-        "ERP/CMMS full integration",
-        "Predictive demand analytics",
-        "Dedicated support & SLA",
-      ],
-      popular: false,
-      icon: Building,
-      color: "from-green-600 to-emerald-600",
-      limit: "Enterprise scale",
-    },
-  ];
+  const plans = getAllPlans().map((plan) => ({
+    id:
+      plan.id === "starter"
+        ? "free"
+        : plan.id === "professional"
+        ? "pro"
+        : ("enterprise" as PlanTier),
+    name: plan.name,
+    price: plan.price,
+    period: plan.period,
+    description: plan.description,
+    features: plan.features,
+    popular: plan.popular || false,
+    icon: plan.icon,
+    color: plan.color,
+    limit:
+      plan.limits.searches === -1
+        ? "Enterprise scale"
+        : `${plan.limits.searches} recognitions/month`,
+  }));
 
   // Get current subscription data from API response
   const currentSubscription = billingData?.subscription
@@ -360,12 +380,7 @@ const Billing = () => {
             : "Enterprise",
         status: billingData.subscription.status,
         nextBilling: billingData.subscription.current_period_end,
-        amount:
-          billingData.subscription.tier === "free"
-            ? 12.99
-            : billingData.subscription.tier === "pro"
-            ? 69.99
-            : 460,
+        amount: getPlan(billingData.subscription.tier as PlanTier).price,
         daysLeft: Math.ceil(
           (new Date(billingData.subscription.current_period_end).getTime() -
             new Date().getTime()) /
@@ -385,13 +400,18 @@ const Billing = () => {
   const usageStats = billingData?.usage
     ? {
         uploadsThisMonth: billingData.usage.uploads_count || 0,
-        uploadsLimit: currentPlan === "free" ? "10/month" : "Unlimited",
+        uploadsLimit:
+          currentPlan === "free"
+            ? `${getPlan("free").limits.searches}/month`
+            : isUnlimited(getPlan(currentPlan as PlanTier).limits.searches)
+            ? "Unlimited"
+            : `${getPlan(currentPlan as PlanTier).limits.searches}/month`,
         accuracyRate: 96.8, // This would come from analytics
         avgProcessingTime: "0.3s", // This would come from analytics
       }
     : {
         uploadsThisMonth: 0,
-        uploadsLimit: "10/month",
+        uploadsLimit: `${getPlan("free").limits.searches}/month`,
         accuracyRate: 0,
         avgProcessingTime: "0s",
       };

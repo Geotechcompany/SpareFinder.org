@@ -25,6 +25,8 @@ import billingRoutes from './routes/billing';
 import statisticsRoutes from './routes/statistics';
 import creditsRoutes from './routes/credits';
 import healthRoutes from './routes/health';
+import contactRoutes from './routes/contact';
+import reviewsRoutes from './routes/reviews';
 
 // Initialize Supabase client
 export const supabase = createClient(
@@ -102,6 +104,8 @@ app.use('/api/notifications', notificationsRoutes);
 app.use('/api/billing', billingRoutes);
 app.use('/api/statistics', statisticsRoutes);
 app.use('/api/credits', creditsRoutes);
+app.use('/api/contact', contactRoutes);
+app.use('/api/reviews', reviewsRoutes);
 
 // 404 handler
 app.use('*', (req, res) => {
@@ -113,10 +117,16 @@ app.use('*', (req, res) => {
 });
 
 // Global error handler
-app.use((error: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+interface ErrorWithStatus extends Error {
+  status?: number;
+}
+
+app.use((error: ErrorWithStatus, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
   console.error('Global error handler:', error);
   
-  res.status(error.status || 500).json({
+  const status = error.status || 500;
+  
+  res.status(status).json({
     error: error.name || 'Internal Server Error',
     message: error.message || 'Something went wrong',
     ...(process.env.NODE_ENV === 'development' && { stack: error.stack })

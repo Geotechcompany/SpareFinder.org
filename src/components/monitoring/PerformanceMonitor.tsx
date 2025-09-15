@@ -167,7 +167,7 @@ const PerformanceMonitor: React.FC = () => {
     }
   }
 
-  const getHealthStatus = (value: number, thresholds: { good: number; warning: number }) => {
+  const getHealthStatus = (value: number, thresholds: { good: number; warning: number }): { status: 'good' | 'warning' | 'critical'; color: string } => {
     if (value <= thresholds.good) return { status: 'good', color: 'text-green-400' }
     if (value <= thresholds.warning) return { status: 'warning', color: 'text-orange-400' }
     return { status: 'critical', color: 'text-red-400' }
@@ -193,7 +193,19 @@ const PerformanceMonitor: React.FC = () => {
     return <Badge variant="outline" className={config[level as keyof typeof config]}>{level}</Badge>
   }
 
-  const MetricCard = ({ title, value, unit, icon: Icon, trend, status }: any) => (
+interface MetricCardProps {
+  title: string;
+  value: number | string;
+  unit: string;
+  icon: React.ComponentType<{ className?: string }>;
+  trend?: number;
+  status?: {
+    status: 'good' | 'warning' | 'critical';
+    color: string;
+  };
+}
+
+  const MetricCard = ({ title, value, unit, icon: Icon, trend, status }: MetricCardProps) => (
     <Card className="bg-black/20 backdrop-blur-xl border-white/10">
       <CardContent className="p-6">
         <div className="flex items-center justify-between">

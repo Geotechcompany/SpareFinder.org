@@ -34,7 +34,9 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Link } from "react-router-dom";
+import { useState, useEffect } from "react";
 import ThemeToggle from "@/components/ThemeToggle";
+import { getAllPlans, formatPrice, type PlanFeature } from '@/lib/plans';
 import { Calendar } from "@/components/ui/calendar";
 import {
   Dialog,
@@ -55,7 +57,7 @@ const Index = () => {
   const [activeTestimonial, setActiveTestimonial] = useState(0);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
-  const [selectedPlan, setSelectedPlan] = useState<any>(null);
+  const [selectedPlan, setSelectedPlan] = useState<PlanFeature | null>(null);
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   const [paymentStep, setPaymentStep] = useState<
     "details" | "processing" | "success" | "error"
@@ -136,62 +138,23 @@ const Index = () => {
     { label: "Time Saved", value: "5M+ hrs", icon: TrendingUp },
   ];
 
-  const plans = [
-    {
-      id: "starter",
-      name: "Starter / Basic",
-      price: "£12.99",
-      priceValue: 12.99,
-      period: "/month",
-      description: "For small users testing the service",
-      features: [
-        "20 image recognitions per month",
-        "Basic search & match results",
-        "Access via web portal only",
-      ],
-      popular: false,
-      color: "from-gray-600 to-gray-700",
-      billingCycle: "monthly",
-    },
-    {
-      id: "professional",
-      name: "Professional / Business",
-      price: "£69.99",
-      priceValue: 69.99,
-      period: "/month",
-      description: "For SMEs managing spare parts more actively",
-      features: [
-        "500 recognitions per month",
-        "Catalogue storage (part lists, drawings)",
-        "API access for ERP/CMMS integration",
-        "Analytics dashboard",
-      ],
-      popular: true,
-      color: "from-purple-600 to-blue-600",
-      billingCycle: "monthly",
-    },
-    {
-      id: "enterprise",
-      name: "Enterprise",
-      price: "£460",
-      priceValue: 460,
-      period: "/month",
-      description: "For OEMs, large factories, distributors",
-      features: [
-        "Unlimited AI identifications",
-        "Advanced AI customisation (train on their data)",
-        "ERP/CMMS full integration",
-        "Predictive demand analytics",
-        "Dedicated support & SLA",
-      ],
-      popular: false,
-      color: "from-amber-500 to-orange-600",
-      billingCycle: "monthly",
-    },
-  ];
+  // ... existing code ...
+
+  const plans = getAllPlans().map(plan => ({
+    id: plan.id,
+    name: plan.name,
+    price: formatPrice(plan),
+    priceValue: plan.price,
+    period: `/${plan.period}`,
+    description: plan.description,
+    features: plan.features,
+    popular: plan.popular || false,
+    color: plan.color,
+    billingCycle: 'monthly' as const
+  }));
 
   // Payment processing functions
-  const handlePlanSelect = (plan: any) => {
+  const handlePlanSelect = (plan: PlanFeature) => {
     setSelectedPlan(plan);
     setPaymentStep("details");
     setIsPaymentModalOpen(true);
