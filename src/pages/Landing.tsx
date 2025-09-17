@@ -36,7 +36,7 @@ import {
   AlertCircle,
   LucideIcon,
 } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useState, useEffect, useRef } from "react";
 import { useInView } from "framer-motion";
 import Header from "@/components/Header";
@@ -55,6 +55,7 @@ import {
   formatPriceWithPeriod,
   type PlanFeature,
 } from "@/lib/plans";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface FeatureItem {
   title: string;
@@ -128,14 +129,158 @@ const CookieConsent = () => {
   );
 };
 
+// Load image utility function
 const loadImage = (url: string) => {
   return new Promise((resolve, reject) => {
     const img = new Image();
     img.src = url;
     img.onload = () => resolve(url);
-    img.onerror = (err) => reject(err);
+    img.onerror = (err) => {
+      // Handle image load errors gracefully without logging the event object
+      reject(new Error(`Failed to load image: ${url}`));
+    };
   });
 };
+
+// Static data arrays moved outside component to prevent recreation on every render
+const aiInterfaceImage =
+  "https://images.unsplash.com/photo-1639322537228-f710d8465a4d?auto=format&fit=crop&w=1920";
+
+const FEATURES = [
+  {
+    icon: Cpu,
+    title: "AI-Powered Recognition",
+    description:
+      "Advanced computer vision models identify parts with 99.9% accuracy across 50+ industrial categories",
+    image:
+      "https://images.unsplash.com/photo-1639322537228-f710d8465a4d?auto=format&fit=crop&w=800",
+  },
+  {
+    icon: Database,
+    title: "Comprehensive Database",
+    description:
+      "Over 10 million parts from 1000+ manufacturers with detailed specifications and pricing",
+    image:
+      "https://images.unsplash.com/photo-1558494949-ef010cbdcc31?auto=format&fit=crop&w=800",
+  },
+  {
+    icon: Zap,
+    title: "Instant Results",
+    description:
+      "Get complete part information, specifications, and supplier contacts in milliseconds",
+    image:
+      "https://images.unsplash.com/photo-1460925895917-afdab827c52f?auto=format&fit=crop&w=800",
+  },
+  {
+    icon: Cloud,
+    title: "Multi-Format Support",
+    description:
+      "Upload images, PDFs, CAD files, or even capture photos directly from your mobile device",
+    image:
+      "https://images.unsplash.com/photo-1573164713712-03790a178651?auto=format&fit=crop&w=800",
+  },
+  {
+    icon: Server,
+    title: "Enterprise Integration",
+    description:
+      "REST APIs, webhook support, and seamless integration with ERP systems and inventory management",
+    image:
+      "https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&w=800",
+  },
+  {
+    icon: ShieldCheck,
+    title: "Quality Assurance",
+    description:
+      "Verified suppliers, authentic parts, and comprehensive warranty information to ensure reliability",
+    image:
+      "https://images.unsplash.com/photo-1587614382340-3ec188b4e842?auto=format&fit=crop&w=800",
+  },
+];
+
+const USE_CASES = [
+  {
+    title: "Industrial Manufacturing",
+    icon: Factory,
+    description: "Automated part identification for assembly lines",
+    image:
+      "https://images.unsplash.com/photo-1456735190827-d1262f71b8a3?auto=format&fit=crop&w=800",
+  },
+  {
+    title: "AI Processing",
+    icon: Cpu,
+    description: "Neural network-powered recognition systems",
+    image:
+      "https://images.unsplash.com/photo-1573164713712-03790a178651?auto=format&fit=crop&w=800",
+  },
+  {
+    title: "Quality Control",
+    icon: TestTube2,
+    description: "Automated defect detection systems",
+    image:
+      "https://images.unsplash.com/photo-1581092580497-e0d23cbdf1dc?auto=format&fit=crop&w=800",
+  },
+];
+
+const TESTIMONIALS = [
+  {
+    name: "Marcus Johnson",
+    role: "CTO, AutoParts Pro",
+    text: "Reduced part identification time by 70% while improving accuracy. This AI system has revolutionized our entire supply chain management process.",
+    avatar:
+      "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=150&h=150",
+    company: "AutoParts Pro",
+    rating: 5,
+  },
+  {
+    name: "Sarah Chen",
+    role: "Lead Manufacturing Engineer",
+    text: "The AI recognition system transformed our maintenance workflows. We've seen a 40% reduction in downtime and significant cost savings.",
+    avatar:
+      "https://images.unsplash.com/photo-1494790108755-2616b332c3cc?auto=format&fit=crop&w=150&h=150",
+    company: "Industrial Solutions Ltd",
+    rating: 5,
+  },
+  {
+    name: "David Rodriguez",
+    role: "Operations Director",
+    text: "Integration was seamless and the accuracy is incredible. Our team can now identify complex automotive parts in seconds instead of hours.",
+    avatar:
+      "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=150&h=150",
+    company: "MechTech Industries",
+    rating: 5,
+  },
+];
+
+const FAQS = [
+  {
+    question: "How accurate is the part identification?",
+    answer:
+      "Our AI models achieve 99.3% accuracy across 50+ industrial categories",
+  },
+  {
+    question: "What file formats are supported?",
+    answer:
+      "We support JPG, PNG, PDF, and CAD files with automatic conversion",
+  },
+];
+
+const HOW_IT_WORKS = [
+  {
+    title: "Upload Image",
+    description: "Drag & drop or capture photo of any industrial part",
+    icon: Upload,
+  },
+  {
+    title: "AI Analysis",
+    description: "Neural networks process image in milliseconds",
+    icon: Cpu,
+  },
+  {
+    title: "Get Results",
+    description: "Detailed specs, suppliers, and replacement options",
+    icon: Check,
+  },
+];
 
 const Landing = () => {
   const [loadedImages, setLoadedImages] = useState<Set<string>>(new Set());
@@ -146,6 +291,11 @@ const Landing = () => {
   const y2 = useTransform(scrollY, [0, 300], [0, -50]);
   const opacity = useTransform(scrollY, [0, 300], [1, 0]);
   const scaleX = useTransform(scrollYProgress, [0, 1], [0, 1]);
+
+  const { user, isAuthenticated, isLoading } = useAuth();
+  const navigate = useNavigate();
+
+  // Don't auto-redirect authenticated users - let them choose to go to dashboard
 
   // Payment modal state
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
@@ -229,145 +379,6 @@ const Landing = () => {
     setIsProcessing(false);
   };
 
-  const features = [
-    {
-      icon: Cpu,
-      title: "AI-Powered Recognition",
-      description:
-        "Advanced computer vision models identify parts with 99.9% accuracy across 50+ industrial categories",
-      image:
-        "https://images.unsplash.com/photo-1639322537228-f710d8465a4d?auto=format&fit=crop&w=800",
-    },
-    {
-      icon: Database,
-      title: "Comprehensive Database",
-      description:
-        "Over 10 million parts from 1000+ manufacturers with detailed specifications and pricing",
-      image:
-        "https://images.unsplash.com/photo-1558494949-ef010cbdcc31?auto=format&fit=crop&w=800",
-    },
-    {
-      icon: Zap,
-      title: "Instant Results",
-      description:
-        "Get complete part information, specifications, and supplier contacts in milliseconds",
-      image:
-        "https://images.unsplash.com/photo-1460925895917-afdab827c52f?auto=format&fit=crop&w=800",
-    },
-    {
-      icon: Cloud,
-      title: "Multi-Format Support",
-      description:
-        "Upload images, PDFs, CAD files, or even capture photos directly from your mobile device",
-      image:
-        "https://images.unsplash.com/photo-1573164713712-03790a178651?auto=format&fit=crop&w=800",
-    },
-    {
-      icon: Server,
-      title: "Enterprise Integration",
-      description:
-        "REST APIs, webhook support, and seamless integration with ERP systems and inventory management",
-      image:
-        "https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&w=800",
-    },
-    {
-      icon: ShieldCheck,
-      title: "Quality Assurance",
-      description:
-        "Verified suppliers, authentic parts, and comprehensive warranty information to ensure reliability",
-      image:
-        "https://images.unsplash.com/photo-1587614382340-3ec188b4e842?auto=format&fit=crop&w=800",
-    },
-  ];
-
-  const useCases = [
-    {
-      title: "Industrial Manufacturing",
-      icon: Factory,
-      description: "Automated part identification for assembly lines",
-      image:
-        "https://images.unsplash.com/photo-1456735190827-d1262f71b8a3?auto=format&fit=crop&w=800",
-    },
-    {
-      title: "AI Processing",
-      icon: Cpu,
-      description: "Neural network-powered recognition systems",
-      image:
-        "https://images.unsplash.com/photo-1573164713712-03790a178651?auto=format&fit=crop&w=800",
-    },
-    {
-      title: "Quality Control",
-      icon: TestTube2,
-      description: "Automated defect detection systems",
-      image:
-        "https://images.unsplash.com/photo-1581092580497-e0d23cbdf1dc?auto=format&fit=crop&w=800",
-    },
-  ];
-
-  const testimonials = [
-    {
-      name: "Marcus Johnson",
-      role: "CTO, AutoParts Pro",
-      text: "Reduced part identification time by 70% while improving accuracy. This AI system has revolutionized our entire supply chain management process.",
-      avatar:
-        "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=150&h=150",
-      company: "AutoParts Pro",
-      rating: 5,
-    },
-    {
-      name: "Sarah Chen",
-      role: "Lead Manufacturing Engineer",
-      text: "The AI recognition system transformed our maintenance workflows. We've seen a 40% reduction in downtime and significant cost savings.",
-      avatar:
-        "https://images.unsplash.com/photo-1494790108755-2616b332c3cc?auto=format&fit=crop&w=150&h=150",
-      company: "Industrial Solutions Ltd",
-      rating: 5,
-    },
-    {
-      name: "David Rodriguez",
-      role: "Operations Director",
-      text: "Integration was seamless and the accuracy is incredible. Our team can now identify complex automotive parts in seconds instead of hours.",
-      avatar:
-        "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=150&h=150",
-      company: "MechTech Industries",
-      rating: 5,
-    },
-  ];
-
-  const faqs = [
-    {
-      question: "How accurate is the part identification?",
-      answer:
-        "Our AI models achieve 99.3% accuracy across 50+ industrial categories",
-    },
-    {
-      question: "What file formats are supported?",
-      answer:
-        "We support JPG, PNG, PDF, and CAD files with automatic conversion",
-    },
-  ];
-
-  const aiInterfaceImage =
-    "https://images.unsplash.com/photo-1639322537228-f710d8465a4d?auto=format&fit=crop&w=1920";
-
-  const howItWorks = [
-    {
-      title: "Upload Image",
-      description: "Drag & drop or capture photo of any industrial part",
-      icon: Upload,
-    },
-    {
-      title: "AI Analysis",
-      description: "Neural networks process image in milliseconds",
-      icon: Cpu,
-    },
-    {
-      title: "Get Results",
-      description: "Detailed specs, suppliers, and replacement options",
-      icon: Check,
-    },
-  ];
-
   const pricing: PricingPlan[] = getAllPlans().map((plan) => ({
     name: plan.name,
     price: {
@@ -431,18 +442,25 @@ const Landing = () => {
   useEffect(() => {
     const allImages = [
       aiInterfaceImage,
-      ...features.map((f) => f.image),
-      ...useCases.map((u) => u.image),
+      ...FEATURES.map((f) => f.image),
+      ...USE_CASES.map((u) => u.image),
     ];
 
     Promise.all(
       allImages.map((url) =>
-        loadImage(url).then(() => {
-          setLoadedImages((prev) => new Set([...prev, url]));
-        })
+        loadImage(url)
+          .then(() => {
+            setLoadedImages((prev) => new Set([...prev, url]));
+          })
+          .catch((error) => {
+            // Silently handle individual image load failures to prevent endless loops
+            console.warn(`Failed to load image: ${url}`, error.message || error);
+          })
       )
-    ).catch(console.error);
-  }, [features, useCases]);
+    ).catch((error) => {
+      console.error('Failed to load some images:', error.message || error);
+    });
+  }, []); // Empty dependency array since all arrays are now static constants
 
   function Step({
     title,
@@ -597,29 +615,57 @@ const Landing = () => {
               transition={{ delay: 0.7, duration: 0.8 }}
               className="flex flex-col sm:flex-row justify-center gap-6 items-center mb-16"
             >
-              <Button
-                asChild
-                className="group relative overflow-hidden bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white text-xl px-10 py-8 rounded-2xl shadow-2xl shadow-purple-500/25 hover:shadow-purple-500/40 transform hover:scale-105 transition-all duration-300 w-full sm:w-auto"
-              >
-                <Link
-                  to="/register"
-                  className="flex items-center justify-center gap-3"
+              {isAuthenticated && user ? (
+                // Show Dashboard button for authenticated users
+                <Button
+                  asChild
+                  className="group relative overflow-hidden bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white text-xl px-10 py-8 rounded-2xl shadow-2xl shadow-green-500/25 hover:shadow-green-500/40 transform hover:scale-105 transition-all duration-300 w-full sm:w-auto"
                 >
-                  <span className="font-semibold">Start Free Trial</span>
-                  <motion.div
-                    animate={{ x: [0, 4, 0] }}
-                    transition={{ duration: 1.5, repeat: Infinity }}
+                  <Link
+                    to="/dashboard"
+                    className="flex items-center justify-center gap-3"
                   >
-                    <Rocket className="w-6 h-6" />
-                  </motion.div>
-                  <motion.div
-                    className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent"
-                    initial={{ x: "-100%" }}
-                    whileHover={{ x: "100%" }}
-                    transition={{ duration: 0.6 }}
-                  />
-                </Link>
-              </Button>
+                    <span className="font-semibold">Go to Dashboard</span>
+                    <motion.div
+                      animate={{ x: [0, 4, 0] }}
+                      transition={{ duration: 1.5, repeat: Infinity }}
+                    >
+                      <Rocket className="w-6 h-6" />
+                    </motion.div>
+                    <motion.div
+                      className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent"
+                      initial={{ x: "-100%" }}
+                      whileHover={{ x: "100%" }}
+                      transition={{ duration: 0.6 }}
+                    />
+                  </Link>
+                </Button>
+              ) : (
+                // Show Start Free Trial for non-authenticated users
+                <Button
+                  asChild
+                  className="group relative overflow-hidden bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white text-xl px-10 py-8 rounded-2xl shadow-2xl shadow-purple-500/25 hover:shadow-purple-500/40 transform hover:scale-105 transition-all duration-300 w-full sm:w-auto"
+                >
+                  <Link
+                    to="/register"
+                    className="flex items-center justify-center gap-3"
+                  >
+                    <span className="font-semibold">Start Free Trial</span>
+                    <motion.div
+                      animate={{ x: [0, 4, 0] }}
+                      transition={{ duration: 1.5, repeat: Infinity }}
+                    >
+                      <Rocket className="w-6 h-6" />
+                    </motion.div>
+                    <motion.div
+                      className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent"
+                      initial={{ x: "-100%" }}
+                      whileHover={{ x: "100%" }}
+                      transition={{ duration: 0.6 }}
+                    />
+                  </Link>
+                </Button>
+              )}
 
               <Button
                 variant="outline"
@@ -819,7 +865,7 @@ const Landing = () => {
           </motion.div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {features.map((feature, index) => (
+            {FEATURES.map((feature, index) => (
               <motion.div
                 key={feature.title}
                 initial={{ opacity: 0, y: 30 }}
@@ -888,7 +934,7 @@ const Landing = () => {
             Industrial Applications
           </h2>
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            {useCases.map((useCase, index) => (
+            {USE_CASES.map((useCase, index) => (
               <motion.div
                 key={useCase.title}
                 initial={{ opacity: 0, scale: 0.9 }}
@@ -991,7 +1037,7 @@ const Landing = () => {
           </motion.div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {testimonials.map((testimonial, index) => (
+            {TESTIMONIALS.map((testimonial, index) => (
               <motion.div
                 key={testimonial.name}
                 initial={{ opacity: 0, y: 30 }}
@@ -1080,7 +1126,7 @@ const Landing = () => {
             Frequently Asked Questions
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {faqs.map((faq, index) => (
+            {FAQS.map((faq, index) => (
               <motion.div
                 key={faq.question}
                 initial={{ opacity: 0, y: 20 }}
@@ -1110,12 +1156,23 @@ const Landing = () => {
               platform
             </p>
             <div className="flex justify-center gap-4">
-              <Button
-                asChild
-                className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-lg px-8 py-6"
-              >
-                <Link to="/register">Start Free Trial</Link>
-              </Button>
+              {isAuthenticated && user ? (
+                // Show Dashboard button for authenticated users
+                <Button
+                  asChild
+                  className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-lg px-8 py-6"
+                >
+                  <Link to="/dashboard">Go to Dashboard</Link>
+                </Button>
+              ) : (
+                // Show Start Free Trial for non-authenticated users
+                <Button
+                  asChild
+                  className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-lg px-8 py-6"
+                >
+                  <Link to="/register">Start Free Trial</Link>
+                </Button>
+              )}
               <Button
                 variant="outline"
                 className="text-white border-gray-600 hover:bg-white/10 text-lg px-8 py-6"
@@ -1139,7 +1196,7 @@ const Landing = () => {
           </motion.h2>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-12">
-            {howItWorks.map((step, index) => (
+            {HOW_IT_WORKS.map((step, index) => (
               <Step key={step.title} {...step} index={index} />
             ))}
           </div>

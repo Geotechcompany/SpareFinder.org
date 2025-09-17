@@ -739,7 +739,7 @@ const Dashboard = () => {
                     </motion.p>
                   </div>
                   <motion.div
-                    className="flex space-x-3"
+                    className="flex flex-col sm:flex-row sm:space-x-3 space-y-2 sm:space-y-0 w-full sm:w-auto"
                     initial={{ opacity: 0, scale: 0.8 }}
                     animate={{ opacity: 1, scale: 1 }}
                     transition={{ delay: 0.4 }}
@@ -752,7 +752,7 @@ const Dashboard = () => {
                       <Button
                         onClick={handleRefreshData}
                         variant="outline"
-                        className="w-full sm:w-auto bg-slate-800/50 border-slate-600 text-slate-200 hover:bg-slate-700/60 focus:ring-2 focus:ring-blue-400/30 mr-2"
+                        className="w-full sm:w-auto bg-slate-800/50 border-slate-600 text-slate-200 hover:bg-slate-700/60 focus:ring-2 focus:ring-blue-400/30"
                       >
                         <Loader2 className="w-4 h-4 mr-2" />
                         Refresh Data

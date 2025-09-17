@@ -8,7 +8,6 @@ import { ThemeProvider } from "@/contexts/ThemeContext";
 import { AuthProvider } from "@/contexts/AuthContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import DebugEnv from "@/components/DebugEnv";
-import Index from "./pages/Index";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Dashboard from "./pages/Dashboard";
@@ -53,7 +52,14 @@ const App = () => (
           <Sonner />
           <BrowserRouter>
             <Routes>
-              <Route path="/" element={<Landing />} />
+              <Route 
+                path="/" 
+                element={
+                  <ProtectedRoute requireAuth={false}>
+                    <Landing />
+                  </ProtectedRoute>
+                } 
+              />
               <Route
                 path="/login"
                 element={

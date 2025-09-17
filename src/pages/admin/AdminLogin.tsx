@@ -48,7 +48,7 @@ const AdminLogin = () => {
       console.log("🔐 Checking existing admin session...");
 
       // Check if we have a token
-      const token = sessionStorage.getItem("auth_token");
+      const token = localStorage.getItem("auth_token");
       if (!token) {
         console.log("🔐 No auth token found");
         setIsCheckingSession(false);
@@ -81,7 +81,9 @@ const AdminLogin = () => {
       });
 
       if (response.success && response.data) {
-        const user = response.data.user;
+        const user = response.data && typeof response.data === 'object' && 'user' in response.data 
+          ? (response.data as { user: { id: string; email: string; role: string; full_name?: string } }).user 
+          : null;
         console.log("🔐 User Profile:", {
           id: user.id,
           email: user.email,
@@ -99,22 +101,22 @@ const AdminLogin = () => {
           console.log("🔐 User does not have admin role");
           // Clear invalid session
           localStorage.removeItem("admin_session");
-          sessionStorage.removeItem("auth_token");
-          sessionStorage.removeItem("refresh_token");
+          localStorage.removeItem("auth_token");
+          localStorage.removeItem("auth_refresh_token");
         }
       } else {
         console.log("🔐 Invalid token or profile");
         // Clear invalid session
         localStorage.removeItem("admin_session");
-        sessionStorage.removeItem("auth_token");
-        sessionStorage.removeItem("refresh_token");
+        localStorage.removeItem("auth_token");
+        localStorage.removeItem("auth_refresh_token");
       }
     } catch (err) {
       console.error("🔐 Session check error:", err);
       // Clear invalid session
       localStorage.removeItem("admin_session");
-      sessionStorage.removeItem("auth_token");
-      sessionStorage.removeItem("refresh_token");
+      localStorage.removeItem("auth_token");
+      localStorage.removeItem("auth_refresh_token");
     } finally {
       setIsCheckingSession(false);
     }
@@ -159,9 +161,11 @@ const AdminLogin = () => {
           "❌ Admin login failed:",
           response.error || response.message
         );
-        const backendCode = (response as any)?.code;
+        const backendCode = response && typeof response === 'object' && 'code' in response ? (response as { code: string }).code : undefined;
         const backendMessage =
-          (response as any)?.message || (response as any)?.error || "";
+          response && typeof response === 'object' && ('message' in response || 'error' in response)
+            ? (response as { message?: string; error?: string }).message || (response as { message?: string; error?: string }).error || ""
+            : "";
         const isInvalidCredentials =
           backendCode === "invalid_credentials" ||
           (/invalid/i.test(backendMessage) &&
@@ -176,11 +180,18 @@ const AdminLogin = () => {
           variant: "destructive",
         });
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("❌ Admin Login Error:", err);
-      const status = err?.response?.status;
-      const backendCode = err?.response?.data?.code;
-      const backendMessage = err?.response?.data?.message || err?.message || "";
+      
+      // Type guard to safely access error properties
+      const isAxiosError = (error: unknown): error is { response?: { status?: number; data?: { code?: string; message?: string } }; message?: string } => {
+        return typeof error === 'object' && error !== null;
+      };
+      
+      const axiosErr = isAxiosError(err) ? err : null;
+      const status = axiosErr?.response?.status;
+      const backendCode = axiosErr?.response?.data?.code;
+      const backendMessage = axiosErr?.response?.data?.message || axiosErr?.message || "";
       const isInvalidCredentials =
         status === 401 ||
         backendCode === "invalid_credentials" ||

@@ -1,0 +1,157 @@
+{
+  "name": "SpareFinder AI - POST Image Analysis",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "analyze-part",
+        "options": {
+          "rawBody": true
+        }
+      },
+      "id": "post-webhook",
+      "name": "POST Image Upload",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Extract image from POST request body\nconst body = JSON.parse($input.first().json.body);\nconst imageBase64 = body.image || body.file || body.imageData;\nconst metadata = body.metadata || {};\n\n// Generate standardized filename: [InspectionType]_[Timestamp]_[RandomSuffix]\nconst timestamp = new Date().toISOString().replace(/[-:]/g, '').replace(/\\./g, '').slice(0, 15);\nconst randomSuffix = Math.random().toString(36).substring(2, 8);\nconst inspectionType = metadata.inspectionType || 'PARTANALYSIS';\nconst standardFilename = `${inspectionType.toUpperCase()}_${timestamp}_${randomSuffix}`;\n\nreturn {\n  json: {\n    imageData: imageBase64,\n    filename: standardFilename,\n    metadata: {\n      ...metadata,\n      standardFilename,\n      uploadTimestamp: new Date().toISOString()\n    }\n  }\n};"
+      },
+      "id": "process-request",
+      "name": "Process POST Request",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "contents",
+              "value": "=[{\"parts\": [{\"text\": \"You are an expert, production-grade automotive parts analyst and technical documentation AI. When given an image of an automotive component, you must analyze the part visually and generate a comprehensive, structured response.\n\n======== MANDATORY BEHAVIOR ========\n1. Always produce BOTH a human-friendly Markdown report and a machine-friendly JSON object.\n2. If uncertain about any identification, state the uncertainty explicitly with a numeric confidence score.\n3. Never fabricate personal contact information.\n\n======== OUTPUT STRUCTURE ========\n1. **🛞 Part Identification** - Precise Part Name, Confidence Level (0-100%), Alternate Names, Short Reasoning\n2. **📘 Technical Description** - Function, applications, key differences vs similar components\n3. **📊 Technical Data Sheet** - Part type, materials, sizes, specifications (as markdown table)\n4. **🚗 Compatible Vehicles** - OEM makes/models and years, aftermarket compatibility\n5. **💰 Pricing & Availability** - New/used/refurbished prices (USD), lead times, fitment tips\n6. **🌍 Where to Buy** - Up to 5 suppliers with verified links, regions, contact channels\n7. **📈 Market Chart Data** - Price trends, supplier distribution by region\n8. **📉 Failure Modes & Installation** - Common failures, diagnostics, installation notes\n9. **📈 Confidence Breakdown** - Overall, visual, dimensional, supplier data confidence scores\n10. **📤 Next Steps** - Recommended actions for better identification\n\n======== JSON SCHEMA ========\nReturn JSON with: part_identification, technical_description, technical_data_sheet, compatible_vehicles, pricing_availability, suppliers, market_chart_data, diagnostics_installation, confidence_breakdown, recommended_next_steps\n\nAlways include: 'One-line ID summary — [part name] (Confidence: XX%)'\n\nAnalyze this automotive part image:\"}, {\"inline_data\": {\"mime_type\": \"image/jpeg\", \"data\": \"={{ $json.imageData }}\"}}]}]"
+            },
+            {
+              "name": "generationConfig",
+              "value": "{\"temperature\": 0.2, \"topK\": 40, \"topP\": 0.95, \"maxOutputTokens\": 8192, \"responseMimeType\": \"application/json\"}"
+            }
+          ]
+        }
+      },
+      "id": "ai-analysis",
+      "name": "AI Analysis (Gemini)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Process AI response and analyze existing JSON files\nconst fs = require('fs');\nconst path = require('path');\n\nconst aiResponse = $input.first().json;\nlet currentAnalysis;\n\n// Parse AI response\ntry {\n  if (aiResponse.candidates && aiResponse.candidates[0]) {\n    currentAnalysis = JSON.parse(aiResponse.candidates[0].content.parts[0].text);\n  } else {\n    currentAnalysis = aiResponse;\n  }\n} catch (error) {\n  currentAnalysis = {\n    part_identification: {\n      precise_name: 'Unknown Part',\n      confidence: 0\n    },\n    success: false,\n    error: error.message\n  };\n}\n\n// Load existing JSON files for comparison\nconst jobsDir = path.join(process.cwd(), 'SpareFinderAI-Service', 'uploads', 'jobs');\nlet existingAnalyses = [];\n\ntry {\n  const files = fs.readdirSync(jobsDir).filter(file => file.endsWith('.json'));\n  existingAnalyses = files.slice(0, 50).map(file => {\n    try {\n      const data = JSON.parse(fs.readFileSync(path.join(jobsDir, file), 'utf8'));\n      return { filename: file, data };\n    } catch (e) {\n      return null;\n    }\n  }).filter(Boolean);\n} catch (error) {\n  console.log('Error loading existing analyses:', error.message);\n}\n\n// Enhanced analysis with comparative data\nconst enhancedAnalysis = {\n  ...currentAnalysis,\n  filename: $('process-request').first().json.filename,\n  processing_time_seconds: 0,\n  model_version: \"SpareFinder AI with Gemini v2.0\",\n  success: true,\n  status: \"completed\",\n  comparative_analysis: {\n    total_analyses_in_db: existingAnalyses.length,\n    similar_parts_found: 0\n  },\n  metadata: {\n    ...($('process-request').first().json.metadata || {}),\n    analysis_timestamp: new Date().toISOString(),\n    ai_model: \"gemini-1.5-pro\"\n  }\n};\n\nreturn { json: enhancedAnalysis };"
+      },
+      "id": "analyze-json",
+      "name": "Analyze JSON Files",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [900, 300]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Save analysis result as JSON file\nconst fs = require('fs');\nconst path = require('path');\n\nconst analysisData = $input.first().json;\nconst filename = analysisData.filename;\n\n// Ensure directory exists\nconst jobsDir = path.join(process.cwd(), 'SpareFinderAI-Service', 'uploads', 'jobs');\nif (!fs.existsSync(jobsDir)) {\n  fs.mkdirSync(jobsDir, { recursive: true });\n}\n\n// Save JSON file\nconst jsonFilePath = path.join(jobsDir, `${filename}.json`);\nfs.writeFileSync(jsonFilePath, JSON.stringify(analysisData, null, 2));\n\nreturn {\n  json: {\n    success: true,\n    analysis_id: filename,\n    part_name: analysisData.part_identification?.precise_name || 'Unknown',\n    confidence: analysisData.part_identification?.confidence || 0,\n    file_saved: `${filename}.json`,\n    timestamp: new Date().toISOString()\n  }\n};"
+      },
+      "id": "save-json",
+      "name": "Save JSON File",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [1120, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\"success\": true, \"analysis_id\": \"{{ $json.analysis_id }}\", \"part_name\": \"{{ $json.part_name }}\", \"confidence\": {{ $json.confidence }}, \"file_saved\": \"{{ $json.file_saved }}\", \"timestamp\": \"{{ $json.timestamp }}\", \"message\": \"Part analysis completed successfully using SpareFinder AI with Gemini\"}"
+      },
+      "id": "response",
+      "name": "Send Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1340, 300]
+    }
+  ],
+  "connections": {
+    "POST Image Upload": {
+      "main": [
+        [
+          {
+            "node": "Process POST Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process POST Request": {
+      "main": [
+        [
+          {
+            "node": "AI Analysis (Gemini)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Analysis (Gemini)": {
+      "main": [
+        [
+          {
+            "node": "Analyze JSON Files",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Analyze JSON Files": {
+      "main": [
+        [
+          {
+            "node": "Save JSON File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save JSON File": {
+      "main": [
+        [
+          {
+            "node": "Send Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": ["SpareFinder", "AI", "Automotive", "Gemini"],
+  "updatedAt": "2025-01-16T02:51:49.000Z",
+  "versionId": "sparefinder-post-v1.0"
+}

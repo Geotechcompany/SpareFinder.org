@@ -3,11 +3,13 @@ import { Button } from '@/components/ui/button';
 import { Zap, Menu, X, ArrowRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useState } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
 
 const Header = () => {
   const { scrollYProgress } = useScroll();
   const scaleX = useTransform(scrollYProgress, [0, 1], [0, 1]);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const { user, isAuthenticated, isLoading } = useAuth();
 
   return (
     <>
@@ -81,24 +83,43 @@ const Header = () => {
 
                 {/* Action Buttons */}
                 <div className="space-y-4">
-                  <Link to="/login" className="block">
-                    <Button 
-                      variant="ghost" 
-                      className="w-full text-white hover:bg-white/10 rounded-xl justify-start"
-                      onClick={() => setIsMobileMenuOpen(false)}
-                    >
-                      Sign In
-                    </Button>
-                  </Link>
-                  <Link to="/register" className="block">
-                    <Button 
-                      className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white shadow-lg shadow-purple-500/25 rounded-xl"
-                      onClick={() => setIsMobileMenuOpen(false)}
-                    >
-                      Get SpareFinder
-                      <ArrowRight className="ml-2 w-4 h-4" />
-                    </Button>
-                  </Link>
+                  {!isLoading && (
+                    <>
+                      {!isAuthenticated ? (
+                        // Show Sign In and Get SpareFinder buttons for non-authenticated users
+                        <>
+                          <Link to="/login" className="block">
+                            <Button 
+                              variant="ghost" 
+                              className="w-full text-white hover:bg-white/10 rounded-xl justify-start"
+                              onClick={() => setIsMobileMenuOpen(false)}
+                            >
+                              Sign In
+                            </Button>
+                          </Link>
+                          <Link to="/register" className="block">
+                            <Button 
+                              className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white shadow-lg shadow-purple-500/25 rounded-xl"
+                              onClick={() => setIsMobileMenuOpen(false)}
+                            >
+                              Get SpareFinder
+                              <ArrowRight className="ml-2 w-4 h-4" />
+                            </Button>
+                          </Link>
+                        </>
+                      ) : (
+                        // Show Dashboard button for authenticated users
+                        <Link to="/dashboard" className="block">
+                          <Button 
+                            className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white shadow-lg shadow-purple-500/25 rounded-xl justify-start"
+                            onClick={() => setIsMobileMenuOpen(false)}
+                          >
+                            Dashboard
+                          </Button>
+                        </Link>
+                      )}
+                    </>
+                  )}
                 </div>
               </div>
             </motion.div>
@@ -173,34 +194,61 @@ const Header = () => {
             <div className="flex items-center space-x-3">
               {/* Desktop Buttons */}
               <div className="hidden lg:flex items-center space-x-3">
-                <motion.div
-                  initial={{ opacity: 0, scale: 0.9 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={{ delay: 0.3 }}
-                >
-                  <Button 
-                    variant="ghost" 
-                    className="text-gray-400 hover:text-white hover:bg-white/10 font-medium rounded-xl"
-                    asChild
-                  >
-                    <Link to="/login">Sign In</Link>
-                  </Button>
-                </motion.div>
-                
-                <motion.div
-                  initial={{ opacity: 0, scale: 0.9 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={{ delay: 0.4 }}
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                >
-                  <Button 
-                    className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-semibold px-6 py-2 shadow-lg shadow-purple-500/25 hover:shadow-purple-500/40 transition-all duration-300 rounded-xl"
-                    asChild
-                  >
-                    <Link to="/register">Get SpareFinder</Link>
-                  </Button>
-                </motion.div>
+                {!isLoading && (
+                  <>
+                    {!isAuthenticated ? (
+                      // Show Sign In and Get SpareFinder buttons for non-authenticated users
+                      <>
+                        <motion.div
+                          initial={{ opacity: 0, scale: 0.9 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          transition={{ delay: 0.3 }}
+                        >
+                          <Button 
+                            variant="ghost" 
+                            className="text-gray-400 hover:text-white hover:bg-white/10 font-medium rounded-xl"
+                            asChild
+                          >
+                            <Link to="/login">Sign In</Link>
+                          </Button>
+                        </motion.div>
+                        
+                        <motion.div
+                          initial={{ opacity: 0, scale: 0.9 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          transition={{ delay: 0.4 }}
+                          whileHover={{ scale: 1.05 }}
+                          whileTap={{ scale: 0.95 }}
+                        >
+                          <Button 
+                            className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-semibold px-6 py-2 shadow-lg shadow-purple-500/25 hover:shadow-purple-500/40 transition-all duration-300 rounded-xl"
+                            asChild
+                          >
+                            <Link to="/register">Get SpareFinder</Link>
+                          </Button>
+                        </motion.div>
+                      </>
+                    ) : (
+                      // Show Dashboard button for authenticated users
+                      <motion.div
+                        initial={{ opacity: 0, scale: 0.9 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        transition={{ delay: 0.3 }}
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                      >
+                        <Button 
+                          className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-semibold px-6 py-2 shadow-lg shadow-purple-500/25 hover:shadow-purple-500/40 transition-all duration-300 rounded-xl"
+                          asChild
+                        >
+                          <Link to="/dashboard">
+                            Dashboard
+                          </Link>
+                        </Button>
+                      </motion.div>
+                    )}
+                  </>
+                )}
               </div>
 
               {/* Mobile Menu Button */}

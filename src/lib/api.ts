@@ -39,17 +39,17 @@ const TOKEN_KEY = 'auth_token';
 const REFRESH_TOKEN_KEY = 'auth_refresh_token';
 
 const tokenStorage = {
-  getToken: () => sessionStorage.getItem(TOKEN_KEY),
-  setToken: (token: string) => sessionStorage.setItem(TOKEN_KEY, token),
-  removeToken: () => sessionStorage.removeItem(TOKEN_KEY),
+  getToken: () => localStorage.getItem(TOKEN_KEY),
+  setToken: (token: string) => localStorage.setItem(TOKEN_KEY, token),
+  removeToken: () => localStorage.removeItem(TOKEN_KEY),
   
-  getRefreshToken: () => sessionStorage.getItem(REFRESH_TOKEN_KEY),
-  setRefreshToken: (token: string) => sessionStorage.setItem(REFRESH_TOKEN_KEY, token),
-  removeRefreshToken: () => sessionStorage.removeItem(REFRESH_TOKEN_KEY),
+  getRefreshToken: () => localStorage.getItem(REFRESH_TOKEN_KEY),
+  setRefreshToken: (token: string) => localStorage.setItem(REFRESH_TOKEN_KEY, token),
+  removeRefreshToken: () => localStorage.removeItem(REFRESH_TOKEN_KEY),
   
   clearAll: () => {
-    sessionStorage.removeItem(TOKEN_KEY);
-    sessionStorage.removeItem(REFRESH_TOKEN_KEY);
+    localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(REFRESH_TOKEN_KEY);
   }
 };
 

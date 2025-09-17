@@ -5,7 +5,7 @@ import React, {
   useEffect,
   ReactNode,
 } from "react";
-import { api, tokenStorage } from "@/lib/api";
+import { api, tokenStorage, type ApiResponse } from "@/lib/api";
 
 interface User {
   id: string;
@@ -14,13 +14,15 @@ interface User {
   company?: string;
   role: string;
   avatar_url?: string;
-  created_at: string;
+  created_at?: string;
 }
 
 interface AuthContextType {
   user: User | null;
   isLoading: boolean;
   isAuthenticated: boolean;
+  isAdmin: boolean;
+  isSuperAdmin: boolean;
   login: (
     email: string,
     password: string
@@ -61,7 +63,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
       const token = tokenStorage.getToken();
       if (!token) {
-        console.log("🔍 No token found in sessionStorage");
+        console.log("🔍 No token found in localStorage");
         setUser(null);
         setIsAuthenticated(false);
         return;
@@ -70,11 +72,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       console.log("🔍 Token found, verifying with backend...");
 
       // Verify token with backend
-      const response = await api.auth.getCurrentUser();
+      const response = await api.auth.getCurrentUser() as ApiResponse<{ user: User }>;
 
       if (response.success && response.data?.user) {
         console.log("✅ User authenticated successfully:", response.data.user);
-        setUser(response.data.user);
+        const userData = response.data.user;
+        setUser(userData);
         setIsAuthenticated(true);
       } else {
         console.warn("❌ Token verification failed:", response.error);
@@ -107,16 +110,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
       if (response.success && response.user) {
         console.log("✅ Login successful:", response.user);
-        setUser(response.user);
+        const userData = response.user;
+        setUser(userData);
         setIsAuthenticated(true);
         return { success: true };
       } else {
         console.error("❌ Login failed:", response.error || response.message);
-        const backendCode = (response as any)?.code;
-        const backendMessage =
-          (response as any)?.message || (response as any)?.error || "";
+        const backendMessage = response.message || response.error || "";
         const isInvalidCredentials =
-          backendCode === "invalid_credentials" ||
           (/invalid/i.test(backendMessage) &&
             /(credential|password|email)/i.test(backendMessage));
         return {
@@ -126,15 +127,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             : backendMessage || "Login failed",
         };
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("❌ Login error:", error);
-      const status = error?.response?.status;
-      const backendCode = error?.response?.data?.code;
+      const status = (error as { response?: { status?: number } })?.response?.status;
       const backendMessage =
-        error?.response?.data?.message || error?.message || "";
+        (error as { response?: { data?: { message?: string } }; message?: string })?.response?.data?.message ||
+        (error as { message?: string })?.message ||
+        "";
       const isInvalidCredentials =
         status === 401 ||
-        backendCode === "invalid_credentials" ||
         (/invalid/i.test(backendMessage) &&
           /(credential|password|email|login)/i.test(backendMessage));
       const errorMessage = isInvalidCredentials
@@ -161,7 +162,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
       if (response.success && response.user) {
         console.log("✅ Signup successful:", response.user);
-        setUser(response.user);
+        const userDataResult = response.user;
+        setUser(userDataResult);
         setIsAuthenticated(true);
         return { success: true };
       } else {
@@ -171,10 +173,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           error: response.message || response.error || "Registration failed",
         };
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("❌ Signup error:", error);
       const errorMessage =
-        error.response?.data?.message || error.message || "Registration failed";
+        (error as { response?: { data?: { message?: string } }; message?: string })?.response?.data?.message ||
+        (error as { message?: string })?.message ||
+        "Registration failed";
       return { success: false, error: errorMessage };
     } finally {
       setIsLoading(false);
@@ -206,25 +210,47 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     checkAuth();
   }, []);
 
-  // Listen for storage changes (logout in other tabs) - Note: sessionStorage doesn't sync across tabs
+  // Listen for storage changes (login/logout in other tabs)
   useEffect(() => {
     const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === "auth_token" && !e.newValue) {
-        // Token was removed in another tab (this won't work with sessionStorage but keeping for localStorage compatibility)
-        console.log("🔄 Token removed in another tab, logging out...");
-        setUser(null);
-        setIsAuthenticated(false);
+      // Handle token changes
+      if (e.key === "auth_token") {
+        if (e.newValue) {
+          // Token was added/updated in another tab - verify it
+          console.log("🔄 Token updated in another tab, checking auth...");
+          checkAuth();
+        } else {
+          // Token was removed in another tab
+          console.log("🔄 Token removed in another tab, logging out...");
+          setUser(null);
+          setIsAuthenticated(false);
+        }
+      }
+    };
+
+    const handleVisibilityChange = () => {
+      // Check auth when tab becomes visible (handles browser tab switching)
+      if (!document.hidden && tokenStorage.getToken()) {
+        console.log("🔄 Tab became visible, checking auth...");
+        checkAuth();
       }
     };
 
     window.addEventListener("storage", handleStorageChange);
-    return () => window.removeEventListener("storage", handleStorageChange);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    
+    return () => {
+      window.removeEventListener("storage", handleStorageChange);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
   }, []);
 
   const value: AuthContextType = {
     user,
     isLoading,
     isAuthenticated,
+    isAdmin: user?.role === 'admin' || user?.role === 'super_admin',
+    isSuperAdmin: user?.role === 'super_admin',
     login,
     signup,
     logout,
