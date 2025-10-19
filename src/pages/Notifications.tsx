@@ -334,6 +334,7 @@ const Notifications = () => {
           transition={{ duration: 0.5 }}
           className="space-y-4 sm:space-y-6 lg:space-y-8 max-w-6xl mx-auto"
         >
+
           {/* Header */}
           <div className="relative">
             <div className="absolute inset-0 bg-gradient-to-r from-purple-600/10 to-blue-600/10 rounded-3xl blur-xl opacity-60" />

@@ -8,6 +8,7 @@ import {
   requireSuperAdmin,
 } from "../middleware/auth";
 import { AuthRequest } from "../types/auth";
+import { emailService } from "../services/email-service";
 
 // Create a separate Supabase client for admin operations that bypasses RLS
 const adminSupabase = createClient(
@@ -857,6 +858,94 @@ router.delete(
   }
 );
 
+// Get SMTP Configuration for AI Service
+router.get(
+  "/smtp-config",
+  [authenticateToken, requireAdmin],
+  async (_req: AuthRequest, res: Response) => {
+    try {
+      // Get SMTP settings from database
+      const { data: smtpSettings, error } = await supabase
+        .from("system_settings")
+        .select("setting_key, setting_value")
+        .eq("category", "email");
+
+      if (error) {
+        console.error("Failed to fetch SMTP settings:", error);
+        return res.status(500).json({
+          error: "Failed to fetch SMTP settings",
+          message: "Could not retrieve SMTP configuration",
+        });
+      }
+
+      // Convert settings to object
+      const settings: Record<string, any> = {};
+      smtpSettings?.forEach((setting) => {
+        settings[setting.setting_key] = setting.setting_value;
+      });
+
+      // Check if email notifications are enabled
+      const { data: notificationSettings } = await supabase
+        .from("system_settings")
+        .select("setting_value")
+        .eq("category", "notifications")
+        .eq("setting_key", "email_enabled")
+        .single();
+
+      const emailEnabled =
+        notificationSettings?.setting_value === true ||
+        notificationSettings?.setting_value === "true" ||
+        process.env.EMAIL_ENABLED === "true";
+
+      if (!emailEnabled) {
+        return res.json({
+          success: false,
+          message: "Email notifications are disabled",
+          enabled: false,
+        });
+      }
+
+      // Return SMTP configuration
+      const smtpConfig = {
+        host: settings.smtp_host || process.env.SMTP_HOST || "smtp.gmail.com",
+        port:
+          parseInt(settings.smtp_port) ||
+          parseInt(process.env.SMTP_PORT || "587"),
+        secure:
+          settings.smtp_secure === "true" || process.env.SMTP_SECURE === "true",
+        user: settings.smtp_user || process.env.SMTP_USER,
+        password:
+          settings.smtp_password ||
+          process.env.SMTP_PASS ||
+          process.env.SMTP_PASSWORD,
+        from_name: settings.smtp_from_name || "SpareFinder",
+        from_email: settings.smtp_user || process.env.SMTP_USER,
+      };
+
+      // Validate required settings
+      if (!smtpConfig.user || !smtpConfig.password) {
+        return res.json({
+          success: false,
+          message: "SMTP credentials not configured",
+          enabled: false,
+        });
+      }
+
+      return res.json({
+        success: true,
+        enabled: true,
+        config: smtpConfig,
+      });
+    } catch (error) {
+      console.error("Get SMTP config error:", error);
+      return res.status(500).json({
+        error: "Internal server error",
+        message: "Failed to get SMTP configuration",
+      });
+    }
+  }
+);
+
 // Email Templates Management
 router.get(
   "/email-templates",
@@ -876,12 +965,507 @@ router.get(
         });
       }
 
-      return res.json({ templates: templates || [] });
+      return res.json({
+        success: true,
+        templates: templates || [],
+      });
     } catch (error) {
       console.error("Get email templates error:", error);
       return res.status(500).json({
         error: "Internal server error",
         message: "An unexpected error occurred while fetching email templates",
+      });
+    }
+  }
+);
+
+// Create new email template
+router.post(
+  "/email-templates",
+  [authenticateToken, requireSuperAdmin],
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const {
+        name,
+        subject,
+        html_content,
+        text_content,
+        status,
+        description,
+        variables,
+      } = req.body;
+
+      if (!name || !subject) {
+        return res.status(400).json({
+          error: "Invalid template data",
+          message: "Name and subject are required",
+        });
+      }
+
+      const { data: template, error } = await supabase
+        .from("email_templates")
+        .insert([
+          {
+            name,
+            subject,
+            html_content: html_content || null,
+            text_content: text_content || null,
+            status: status || "draft",
+            description: description || null,
+            variables: variables || [],
+            created_by: req.user!.userId,
+            updated_by: req.user!.userId,
+          },
+        ])
+        .select()
+        .single();
+
+      if (error) {
+        console.error("Create template error:", error);
+        return res.status(500).json({
+          error: "Failed to create template",
+          message: "Failed to create email template",
+        });
+      }
+
+      return res.status(201).json({
+        success: true,
+        message: "Email template created successfully",
+        data: template,
+      });
+    } catch (error) {
+      console.error("Create email template error:", error);
+      return res.status(500).json({
+        error: "Internal server error",
+        message: "Failed to create email template",
+      });
+    }
+  }
+);
+
+// Update email template
+router.put(
+  "/email-templates/:id",
+  [authenticateToken, requireSuperAdmin],
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const { id } = req.params;
+      const {
+        name,
+        subject,
+        html_content,
+        text_content,
+        status,
+        description,
+        variables,
+      } = req.body;
+
+      if (!name || !subject) {
+        return res.status(400).json({
+          error: "Invalid template data",
+          message: "Name and subject are required",
+        });
+      }
+
+      const { data: template, error } = await supabase
+        .from("email_templates")
+        .update({
+          name,
+          subject,
+          html_content: html_content || null,
+          text_content: text_content || null,
+          status: status || "draft",
+          description: description || null,
+          variables: variables || [],
+          updated_by: req.user!.userId,
+        })
+        .eq("id", id)
+        .select()
+        .single();
+
+      if (error) {
+        console.error("Update template error:", error);
+        return res.status(500).json({
+          error: "Failed to update template",
+          message: "Failed to update email template",
+        });
+      }
+
+      if (!template) {
+        return res.status(404).json({
+          error: "Template not found",
+          message: "Email template not found",
+        });
+      }
+
+      return res.json({
+        success: true,
+        message: "Email template updated successfully",
+        data: template,
+      });
+    } catch (error) {
+      console.error("Update email template error:", error);
+      return res.status(500).json({
+        error: "Internal server error",
+        message: "Failed to update email template",
+      });
+    }
+  }
+);
+
+// Delete email template
+router.delete(
+  "/email-templates/:id",
+  [authenticateToken, requireSuperAdmin],
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const { id } = req.params;
+
+      const { error } = await supabase
+        .from("email_templates")
+        .delete()
+        .eq("id", id);
+
+      if (error) {
+        console.error("Delete template error:", error);
+        return res.status(500).json({
+          error: "Failed to delete template",
+          message: "Failed to delete email template",
+        });
+      }
+
+      return res.json({
+        success: true,
+        message: "Email template deleted successfully",
+      });
+    } catch (error) {
+      console.error("Delete email template error:", error);
+      return res.status(500).json({
+        error: "Internal server error",
+        message: "Failed to delete email template",
+      });
+    }
+  }
+);
+
+// Test email template
+router.post(
+  "/email-templates/:id/test",
+  [authenticateToken, requireAdmin],
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { test_email, variables } = req.body;
+
+      if (!test_email) {
+        return res.status(400).json({
+          error: "Invalid test data",
+          message: "Test email address is required",
+        });
+      }
+
+      // Get template
+      const { data: template, error: templateError } = await supabase
+        .from("email_templates")
+        .select("*")
+        .eq("id", id)
+        .single();
+
+      if (templateError || !template) {
+        return res.status(404).json({
+          error: "Template not found",
+          message: "Email template not found",
+        });
+      }
+
+      // Replace variables in content
+      let htmlContent = template.html_content || "";
+      let textContent = template.text_content || "";
+      let subject = template.subject;
+
+      if (variables) {
+        Object.entries(variables).forEach(([key, value]) => {
+          const placeholder = `{{${key}}}`;
+          htmlContent = htmlContent.replace(
+            new RegExp(placeholder, "g"),
+            String(value)
+          );
+          textContent = textContent.replace(
+            new RegExp(placeholder, "g"),
+            String(value)
+          );
+          subject = subject.replace(
+            new RegExp(placeholder, "g"),
+            String(value)
+          );
+        });
+      }
+
+      // Import nodemailer dynamically
+      const nodemailer = require("nodemailer");
+
+      // Get SMTP settings
+      const { data: smtpSettings } = await supabase
+        .from("system_settings")
+        .select("setting_key, setting_value")
+        .eq("category", "email");
+
+      const settings: Record<string, any> = {};
+      smtpSettings?.forEach((setting) => {
+        settings[setting.setting_key] = setting.setting_value;
+      });
+
+      if (
+        !settings.smtp_host ||
+        !settings.smtp_user ||
+        !settings.smtp_password
+      ) {
+        return res.status(500).json({
+          error: "SMTP not configured",
+          message: "SMTP settings are not properly configured",
+        });
+      }
+
+      // Create transporter
+      const transporter = nodemailer.createTransport({
+        host: settings.smtp_host,
+        port: parseInt(settings.smtp_port) || 587,
+        secure: settings.smtp_secure === "true",
+        auth: {
+          user: settings.smtp_user,
+          pass: settings.smtp_password,
+        },
+      });
+
+      // Send test email
+      const testEmailResult = await transporter.sendMail({
+        from: `"${settings.smtp_from_name || "SpareFinder"}" <${
+          settings.smtp_user
+        }>`,
+        to: test_email,
+        subject: `[TEST] ${subject}`,
+        html: htmlContent,
+        text: textContent,
+      });
+
+      return res.json({
+        success: true,
+        message: "Test email sent successfully",
+        data: {
+          messageId: testEmailResult.messageId,
+          template: template.name,
+        },
+      });
+    } catch (error) {
+      console.error("Test email template error:", error);
+      return res.status(500).json({
+        error: "Failed to send test email",
+        message:
+          error instanceof Error ? error.message : "Failed to send test email",
+      });
+    }
+  }
+);
+
+// Test SMTP Connection
+router.post(
+  "/test-smtp",
+  [authenticateToken, requireAdmin],
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const { smtpConfig } = req.body;
+
+      if (
+        !smtpConfig ||
+        !smtpConfig.host ||
+        !smtpConfig.username ||
+        !smtpConfig.password
+      ) {
+        return res.status(400).json({
+          error: "Invalid SMTP configuration",
+          message: "Host, username, and password are required",
+        });
+      }
+
+      // Import nodemailer dynamically to avoid circular dependency
+      const nodemailer = require("nodemailer");
+
+      // Create transporter with provided config
+      const transporter = nodemailer.createTransport({
+        host: smtpConfig.host,
+        port: parseInt(smtpConfig.port) || 587,
+        secure: smtpConfig.encryption === "SSL" || smtpConfig.port === 465,
+        auth: {
+          user: smtpConfig.username,
+          pass: smtpConfig.password,
+        },
+      });
+
+      // Test connection
+      await transporter.verify();
+
+      // Send test email
+      const testEmailResult = await transporter.sendMail({
+        from: `"${smtpConfig.fromName || "SpareFinder"}" <${
+          smtpConfig.username
+        }>`,
+        to: smtpConfig.username, // Send to self for testing
+        subject: "SMTP Test - SpareFinder Configuration",
+        html: `
+          <h2>SMTP Configuration Test</h2>
+          <p>This is a test email to verify your SMTP configuration is working correctly.</p>
+          <p><strong>Configuration Details:</strong></p>
+          <ul>
+            <li>Host: ${smtpConfig.host}</li>
+            <li>Port: ${smtpConfig.port}</li>
+            <li>Encryption: ${smtpConfig.encryption}</li>
+            <li>From Name: ${smtpConfig.fromName}</li>
+          </ul>
+          <p>If you received this email, your SMTP configuration is working properly!</p>
+        `,
+        text: `
+          SMTP Configuration Test
+          
+          This is a test email to verify your SMTP configuration is working correctly.
+          
+          Configuration Details:
+          - Host: ${smtpConfig.host}
+          - Port: ${smtpConfig.port}
+          - Encryption: ${smtpConfig.encryption}
+          - From Name: ${smtpConfig.fromName}
+          
+          If you received this email, your SMTP configuration is working properly!
+        `,
+      });
+
+      return res.json({
+        success: true,
+        message: "SMTP test successful",
+        data: {
+          connectionVerified: true,
+          testEmailSent: true,
+          messageId: testEmailResult.messageId,
+        },
+      });
+    } catch (error) {
+      console.error("SMTP test error:", error);
+      return res.status(500).json({
+        error: "SMTP test failed",
+        message:
+          error instanceof Error
+            ? error.message
+            : "Failed to test SMTP configuration",
+      });
+    }
+  }
+);
+
+// Save SMTP Settings
+router.post(
+  "/smtp-settings",
+  [authenticateToken, requireSuperAdmin],
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const { smtpConfig } = req.body;
+
+      if (
+        !smtpConfig ||
+        !smtpConfig.host ||
+        !smtpConfig.username ||
+        !smtpConfig.password
+      ) {
+        return res.status(400).json({
+          error: "Invalid SMTP configuration",
+          message: "Host, username, and password are required",
+        });
+      }
+
+      // Update SMTP settings in database
+      const settingsToUpdate = [
+        {
+          category: "email",
+          setting_key: "smtp_host",
+          setting_value: smtpConfig.host,
+        },
+        {
+          category: "email",
+          setting_key: "smtp_port",
+          setting_value: smtpConfig.port.toString(),
+        },
+        {
+          category: "email",
+          setting_key: "smtp_user",
+          setting_value: smtpConfig.username,
+        },
+        {
+          category: "email",
+          setting_key: "smtp_password",
+          setting_value: smtpConfig.password,
+        },
+        {
+          category: "email",
+          setting_key: "smtp_secure",
+          setting_value: smtpConfig.encryption === "SSL",
+        },
+        {
+          category: "email",
+          setting_key: "smtp_from_name",
+          setting_value: smtpConfig.fromName || "SpareFinder",
+        },
+      ];
+
+      for (const setting of settingsToUpdate) {
+        const { error } = await supabase.from("system_settings").upsert(
+          {
+            category: setting.category,
+            setting_key: setting.setting_key,
+            setting_value: setting.setting_value,
+            description: `SMTP ${setting.setting_key.replace(
+              "smtp_",
+              ""
+            )} setting`,
+            updated_at: new Date().toISOString(),
+          },
+          {
+            onConflict: "category,setting_key",
+          }
+        );
+
+        if (error) {
+          console.error("Error updating SMTP setting:", error);
+          return res.status(500).json({
+            error: "Failed to save SMTP settings",
+            message: `Failed to update ${setting.setting_key}`,
+          });
+        }
+      }
+
+      // Refresh email service configuration with new settings
+      try {
+        const refreshSuccess = await emailService.refreshSmtpConfiguration();
+        if (refreshSuccess) {
+          console.log("✅ Email service configuration refreshed successfully");
+        } else {
+          console.warn("⚠️ Email service configuration refresh failed");
+        }
+      } catch (refreshError) {
+        console.error(
+          "Error refreshing email service configuration:",
+          refreshError
+        );
+        // Don't fail the request if refresh fails
+      }
+
+      return res.json({
+        success: true,
+        message: "SMTP settings saved successfully",
+        data: smtpConfig,
+      });
+    } catch (error) {
+      console.error("Save SMTP settings error:", error);
+      return res.status(500).json({
+        error: "Internal server error",
+        message: "Failed to save SMTP settings",
       });
     }
   }

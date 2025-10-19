@@ -12,6 +12,7 @@ import ssl
 import base64
 import io
 import time
+import requests
 
 import uvicorn
 from fastapi import (
@@ -250,26 +251,75 @@ def _build_analysis_email_html(result: Dict[str, Any]) -> str:
 </html>
 """
 
+def _get_smtp_config() -> Optional[Dict[str, Any]]:
+    """Fetch SMTP configuration from backend API"""
+    try:
+        backend_url = os.getenv('BACKEND_URL', 'http://localhost:4000')
+        api_key = os.getenv('AI_SERVICE_API_KEY', '')
+        
+        if not api_key:
+            logger.warning("AI_SERVICE_API_KEY not configured, falling back to environment variables")
+            return None
+            
+        headers = {
+            'Authorization': f'Bearer {api_key}',
+            'Content-Type': 'application/json'
+        }
+        
+        response = requests.get(f'{backend_url}/api/admin/smtp-config', headers=headers, timeout=10)
+        
+        if response.status_code == 200:
+            data = response.json()
+            if data.get('success') and data.get('enabled'):
+                logger.info("Using database-configured SMTP settings")
+                return data.get('config')
+            else:
+                logger.warning(f"SMTP not enabled or configured: {data.get('message', 'Unknown error')}")
+                return None
+        else:
+            logger.warning(f"Failed to fetch SMTP config from backend: {response.status_code}")
+            return None
+            
+    except Exception as e:
+        logger.warning(f"Error fetching SMTP config from backend: {e}")
+        return None
+
 def _send_email(to_email: str, subject: str, html_body: str) -> bool:
     try:
-        host = os.getenv('SMTP_HOST', '')
-        port = int(os.getenv('SMTP_PORT', '587'))
-        user = os.getenv('SMTP_USER', '')
-        password = os.getenv('SMTP_PASS') or os.getenv('SMTP_PASSWORD', '')
-        sender = os.getenv('SMTP_FROM', user or 'noreply.tpsinternational@gmail.com')
-        secure = os.getenv('SMTP_SECURE', 'starttls').lower()
+        # Try to get SMTP config from backend API first
+        smtp_config = _get_smtp_config()
+        
+        if smtp_config:
+            # Use database-configured SMTP settings
+            host = smtp_config.get('host', '')
+            port = smtp_config.get('port', 587)
+            user = smtp_config.get('user', '')
+            password = smtp_config.get('password', '')
+            sender_name = smtp_config.get('from_name', 'SpareFinder')
+            sender_email = smtp_config.get('from_email', user)
+            secure = smtp_config.get('secure', False)
+        else:
+            # Fallback to environment variables
+            host = os.getenv('SMTP_HOST', '')
+            port = int(os.getenv('SMTP_PORT', '587'))
+            user = os.getenv('SMTP_USER', '')
+            password = os.getenv('SMTP_PASS') or os.getenv('SMTP_PASSWORD', '')
+            sender_name = 'SpareFinder'
+            sender_email = os.getenv('SMTP_FROM', user or 'noreply.tpsinternational@gmail.com')
+            secure = os.getenv('SMTP_SECURE', 'starttls').lower() == 'ssl'
 
-        if not host or not sender:
+        if not host or not sender_email:
+            logger.warning("SMTP configuration incomplete")
             return False
 
         msg = EmailMessage()
         msg['Subject'] = subject
-        msg['From'] = sender
+        msg['From'] = f'"{sender_name}" <{sender_email}>'
         msg['To'] = to_email
         msg.set_content('Your SpareFinder AI analysis is complete.')
         msg.add_alternative(html_body, subtype='html')
 
-        if secure == 'ssl':
+        if secure:
             context = ssl.create_default_context()
             with smtplib.SMTP_SSL(host, port, context=context) as server:
                 if user and password:

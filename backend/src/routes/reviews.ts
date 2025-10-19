@@ -1,9 +1,15 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { body, validationResult } from 'express-validator';
-import { supabase } from '../server';
+import { createClient } from '@supabase/supabase-js';
 import { emailService } from '../services/email-service';
 import { authenticateToken } from '../middleware/auth';
 import { AuthRequest } from '../types/auth';
+
+// Initialize Supabase client directly to avoid circular dependency
+const supabase = createClient(
+  process.env.SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_KEY!
+);
 
 const router = Router();
 
@@ -156,7 +162,7 @@ router.get('/', async (req: Request, res: Response) => {
 });
 
 // Submit a new review (requires authentication and active subscription/trial)
-router.post('/', authenticateToken, requireSubscriptionOrTrial, reviewValidation, async (req: AuthRequest, res: Response) => {
+router.post('/', authenticateToken, requireSubscriptionOrTrial, ...reviewValidation, async (req: AuthRequest, res: Response) => {
   try {
     // Check validation errors
     const errors = validationResult(req);

@@ -4,6 +4,7 @@ import axios, { AxiosInstance, AxiosResponse } from "axios";
 export type ApiResponse<T = unknown> = {
   success: boolean;
   data?: T;
+  templates?: any[];
   error?: string;
   message?: string;
   user?: {
@@ -512,7 +513,7 @@ export const adminApi = {
 
   getEmailTemplates: async (): Promise<ApiResponse> => {
     const response = await apiClient.get("/admin/email-templates");
-    return { success: true, data: response.data };
+    return response.data;
   },
 
   getSystemSettings: async (): Promise<ApiResponse> => {
@@ -579,6 +580,92 @@ export const adminApi = {
       console.error("📊 Failed to fetch subscribers:", error);
       throw error;
     }
+  },
+
+  // SMTP Configuration
+  getSmtpSettings: async (): Promise<ApiResponse> => {
+    const response = await apiClient.get("/admin/system-settings");
+    return { success: true, data: response.data };
+  },
+
+  saveSmtpSettings: async (smtpConfig: {
+    host: string;
+    port: number;
+    username: string;
+    password: string;
+    encryption: string;
+    fromName: string;
+  }): Promise<ApiResponse> => {
+    const response = await apiClient.post("/admin/smtp-settings", {
+      smtpConfig,
+    });
+    return response.data;
+  },
+
+  testSmtpConnection: async (smtpConfig: {
+    host: string;
+    port: number;
+    username: string;
+    password: string;
+    encryption: string;
+    fromName: string;
+  }): Promise<ApiResponse> => {
+    const response = await apiClient.post("/admin/test-smtp", { smtpConfig });
+    return response.data;
+  },
+
+  createEmailTemplate: async (templateData: {
+    name: string;
+    subject: string;
+    html_content?: string;
+    text_content?: string;
+    status?: string;
+    description?: string;
+    variables?: string[];
+  }): Promise<ApiResponse> => {
+    const response = await apiClient.post(
+      "/admin/email-templates",
+      templateData
+    );
+    return response.data;
+  },
+
+  updateEmailTemplate: async (
+    id: string,
+    templateData: {
+      name: string;
+      subject: string;
+      html_content?: string;
+      text_content?: string;
+      status?: string;
+      description?: string;
+      variables?: string[];
+    }
+  ): Promise<ApiResponse> => {
+    const response = await apiClient.put(
+      `/admin/email-templates/${id}`,
+      templateData
+    );
+    return response.data;
+  },
+
+  deleteEmailTemplate: async (id: string): Promise<ApiResponse> => {
+    const response = await apiClient.delete(`/admin/email-templates/${id}`);
+    return response.data;
+  },
+
+  testEmailTemplate: async (
+    id: string,
+    testData: {
+      test_email: string;
+      variables?: Record<string, any>;
+    }
+  ): Promise<ApiResponse> => {
+    const response = await apiClient.post(
+      `/admin/email-templates/${id}/test`,
+      testData
+    );
+    return response.data;
   },
 };
 
