@@ -1057,180 +1057,36 @@ const Upload = () => {
       setSelectedPrediction(null);
       setOriginalAiResponse(null);
 
-      // Schedule keyword-only job with AI service via backend proxy
-      const schedule = (await dashboardApi.scheduleKeywordSearch(
+      // Schedule the keyword search for background processing
+      const response = (await dashboardApi.scheduleKeywordSearch(
         savedKeywords
       )) as any;
-      if (!schedule.success || !schedule.filename) {
-        throw new Error(
-          schedule.message || "Failed to schedule keyword search"
-        );
-      }
 
-      const jobId = (schedule as any).filename;
-
-      // Redirect to history immediately so user sees real-time status
-      navigate("/dashboard/history");
-
-      // Poll AI service status until completed
-      const API_BASE =
-        (import.meta as any).env?.VITE_AI_SERVICE_URL ||
-        "http://localhost:8000";
-      let statusResp: any = null;
-      for (let i = 0; i < 60; i++) {
-        const res = await fetch(
-          `${API_BASE}/search/keywords/status/${encodeURIComponent(jobId)}`
-        );
-        statusResp = await res.json();
-        if (statusResp?.status === "completed" || statusResp?.success === true)
-          break;
-        if (statusResp?.status === "failed")
-          throw new Error(statusResp?.error || "Keyword job failed");
-        await new Promise((r) => setTimeout(r, 1500));
-      }
-
-      const response = statusResp?.results
-        ? {
-            success: true,
-            results: statusResp.results,
-            markdown: statusResp.markdown,
-            model_version: "Keyword AI v1.0",
-            elapsed_ms: 0,
-          }
-        : ({ success: false } as any);
       if (!response.success) {
-        throw new Error("Keyword search failed");
+        throw new Error(response.message || "Keyword search scheduling failed");
       }
 
-      const results = (response as any).results || [];
-      let keywordMarkdown: string = (response as any).markdown || "";
-      // Normalize markdown to help the parser (handle CRLF and leading spaces)
-      if (keywordMarkdown) {
-        keywordMarkdown = keywordMarkdown
-          .replace(/\r\n/g, "\n")
-          .replace(/\t/g, "  ")
-          .trimStart();
-      }
-
-      // If backend didn't return markdown, synthesize an 8-section markdown for the first result
-      if (!keywordMarkdown && results.length > 0) {
-        const first = results[0] || {};
-        const compactOthers = results
-          .slice(1)
-          .map(
-            (r: any) =>
-              `- **${r.name || "Unknown"} — ${r.category || "Unspecified"}${
-                r.manufacturer ? ` — ${r.manufacturer}` : ""
-              }**`
-          )
-          .join("\n");
-        const techTable = `| Specification | Details |\n|---|---|\n| Material | ${
-          first.material || "N/A"
-        } |\n| Warranty | ${first.warranty || "N/A"} |`;
-        keywordMarkdown = `# 🛞 Part Identification\n- **Name:** ${
-          first.name || "Automotive Component"
-        }\n- **Category:** ${
-          first.category || "Unspecified"
-        }\n- **Manufacturer:** ${
-          first.manufacturer || "Unknown"
-        }\n- **Part Number:** ${
-          first.part_number || "N/A"
-        }\n\n# 📘 Technical Description\n- ${
-          first.description || "Keyword-based part suggestion."
-        }\n\n# 📊 Technical Data Sheet\n${techTable}\n\n# 🚗 Compatible Vehicles\n- ${
-          first.compatibility?.[0] || "Not specified"
-        }\n\n# 💰 Pricing & Availability\n- **Price:** ${
-          first.price || "Not available"
-        }\n- **Availability:** ${
-          first.availability || "Unknown"
-        }\n\n# 🌍 Where to Buy\n- ${
-          first.buy_link || "Check major retailers or OEM suppliers."
-        }\n\n# 📈 Confidence Score\n- **Score:** ${Math.round(
-          75
-        )}% (keyword match)\n\n# 📤 Additional Instructions\n- Review specifications and confirm fitment before purchase.\n\n${compactOthers}`;
-      }
-
-      // Map keyword results to AnalysisResponse shape for display reuse
-      const predictions = results.map((r: any, idx: number) => ({
-        class_name: r.name || "Automotive Component",
-        confidence: 0.75,
-        description:
-          idx === 0 && keywordMarkdown
-            ? keywordMarkdown
-            : `${r.category || "Category"} by ${
-                r.manufacturer || "Unknown"
-              }\nPrice: ${
-                typeof r.price === "number" ? `$${r.price}` : r.price || "N/A"
-              }\nAvailability: ${r.availability || "Unknown"}\nPart No: ${
-                r.part_number || "N/A"
-              }`,
-        category: r.category || "Unspecified",
-        manufacturer: r.manufacturer || "Unknown",
-        estimated_price:
-          typeof r.price === "number"
-            ? `$${r.price}`
-            : r.price || "Price not available",
-        part_number: r.part_number || null,
-        compatibility: [],
-      }));
-
-      const analysis: AnalysisResponse = {
-        success: true,
-        predictions: predictions.length
-          ? predictions
-          : [
-              {
-                class_name: "No Results",
-                confidence: 0,
-                description:
-                  "No parts matched your keywords. Try different terms.",
-                category: "N/A",
-                manufacturer: "N/A",
-                estimated_price: "N/A",
-                part_number: null,
-                compatibility: [],
-              },
-            ],
-        similar_images: [],
-        model_version: (response as any).model_version || "Keyword Search",
-        processing_time: (response as any).elapsed_ms
-          ? Math.round((response as any).elapsed_ms / 1000)
-          : 0,
-        image_metadata: {
-          content_type: "text/keywords",
-          size_bytes: 0,
-        },
-        additional_details: {
-          full_analysis:
-            keywordMarkdown ||
-            (predictions.length
-              ? `Found ${
-                  predictions.length
-                } results for keywords: ${savedKeywords.join(", ")}`
-              : `No results for keywords: ${savedKeywords.join(", ")}`),
-          technical_specifications: "",
-          market_information: "",
-          confidence_reasoning: "",
-        },
-      };
-
-      setAnalysisResults(analysis);
-      if (analysis.predictions.length > 0)
-        setSelectedPrediction(analysis.predictions[0]);
+      // Show scheduling confirmation
       toast({
-        title: "Keyword Search Complete",
-        description: `Found ${predictions.length} result(s).`,
+        title: "Keyword analysis scheduled",
+        description: `Your keyword search has been queued. Job ID: ${response.filename}`,
       });
-    } catch (err: any) {
-      console.error("Keyword search error:", err);
+
+      // Auto-redirect to history page to track the job
+      setTimeout(() => {
+        navigate("/dashboard/history");
+      }, 1500);
+
+      return; // Exit early since we're scheduling, not processing immediately
+    } catch (error: any) {
+      console.error("Keyword search error:", error);
       toast({
-        title: "Search Failed",
-        description: err.message || "Unable to search by keywords",
+        title: "Keyword search failed",
+        description: error.message || "Please try again",
         variant: "destructive",
       });
     } finally {
       setIsKeywordSearching(false);
-      setConfirmKeywordSearchOpen(false);
     }
   };
 
@@ -1791,6 +1647,11 @@ const Upload = () => {
         title: "Success",
         description: `Part identified: ${firstPrediction.class_name}`,
       });
+
+      // Auto-redirect to history page to show the results
+      setTimeout(() => {
+        navigate("/dashboard/history");
+      }, 1500); // Small delay to let user see the success message
 
       // If analysis is successful, store the results
       if (result.success && result.data && result.data.length > 0) {

@@ -1,6 +1,7 @@
 import os
 import json
 import logging
+import time
 from typing import Optional, Dict, Any
 
 from dotenv import load_dotenv
@@ -8,6 +9,11 @@ from dotenv import load_dotenv
 load_dotenv()
 
 logger = logging.getLogger(__name__)
+
+# Circuit breaker for failed downloads
+_failed_downloads = {}
+_max_failures = 3
+_failure_window = 300  # 5 minutes
 
 
 # Local filesystem snapshot directory
@@ -59,6 +65,18 @@ def load_job_snapshot(filename: str) -> Optional[Dict[str, Any]]:
     except Exception as e:
         logger.warning(f"Failed to read local job snapshot for {filename}: {e}")
 
+    # Circuit breaker check for Supabase Storage
+    now = time.time()
+    if filename in _failed_downloads:
+        failures = _failed_downloads[filename]
+        # Clean old failures outside the window
+        failures = [f for f in failures if now - f < _failure_window]
+        _failed_downloads[filename] = failures
+        
+        if len(failures) >= _max_failures:
+            logger.debug(f"Circuit breaker open for {filename}, skipping Supabase Storage download")
+            return None
+
     # Supabase Storage fallback
     try:
         supabase_url = os.getenv("SUPABASE_URL", "").strip()
@@ -72,11 +90,23 @@ def load_job_snapshot(filename: str) -> Optional[Dict[str, Any]]:
             res = client.storage.from_(bucket).download(storage_path)
             if res:
                 try:
+                    # Reset circuit breaker on success
+                    if filename in _failed_downloads:
+                        del _failed_downloads[filename]
                     return json.loads(res.decode("utf-8"))
                 except Exception:
                     return None
     except Exception as e:
-        logger.warning(f"Supabase Storage download failed for {filename}: {e}")
+        # Record failure for circuit breaker
+        if filename not in _failed_downloads:
+            _failed_downloads[filename] = []
+        _failed_downloads[filename].append(now)
+        
+        # Only log warning if not too many failures
+        if len(_failed_downloads[filename]) <= _max_failures:
+            logger.warning(f"Supabase Storage download failed for {filename}: {e}")
+        else:
+            logger.debug(f"Supabase Storage download failed for {filename} (circuit breaker): {e}")
 
     return None
 

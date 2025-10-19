@@ -417,4 +417,81 @@ router.get("/stats", async (req: AuthRequest, res: Response) => {
   }
 });
 
+// Get individual job data from database
+router.get(
+  "/jobs/:jobId",
+  authenticateToken,
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const { jobId } = req.params;
+
+      if (!jobId) {
+        return res.status(400).json({
+          success: false,
+          error: "Job ID is required",
+        });
+      }
+
+      // Get job data from jobs table
+      const { data: jobData, error: jobError } = await supabase
+        .from("jobs")
+        .select("*")
+        .eq("id", jobId)
+        .single();
+
+      if (jobError) {
+        logger.error(`Failed to fetch job ${jobId}:`, jobError);
+        return res.status(404).json({
+          success: false,
+          error: "Job not found",
+        });
+      }
+
+      // Get comprehensive data from part_searches table
+      const { data: partData } = await supabase
+        .from("part_searches")
+        .select("*")
+        .eq("id", jobId)
+        .single();
+
+      // Combine job data with comprehensive analysis data
+      const combinedData = {
+        ...jobData,
+        // Override with comprehensive data if available
+        ...(partData && {
+          precise_part_name: partData.part_name,
+          manufacturer: partData.manufacturer,
+          category: partData.category,
+          confidence_score: partData.confidence_score,
+          description: partData.description,
+          technical_data_sheet: partData.technical_data_sheet,
+          compatible_vehicles: partData.compatible_vehicles,
+          engine_types: partData.engine_types,
+          suppliers: partData.suppliers,
+          fitment_tips: partData.fitment_tips,
+          additional_instructions: partData.additional_instructions,
+          full_analysis: partData.full_analysis,
+          processing_time_seconds: partData.processing_time,
+          model_version: partData.model_version,
+          predictions: partData.predictions || [],
+          metadata: partData.metadata,
+        }),
+      };
+
+      logger.info(`Successfully fetched job ${jobId} from database`);
+
+      return res.status(200).json({
+        success: true,
+        data: combinedData,
+      });
+    } catch (error) {
+      logger.error("Error fetching job data:", error);
+      return res.status(500).json({
+        success: false,
+        error: "Internal server error",
+      });
+    }
+  }
+);
+
 export default router;

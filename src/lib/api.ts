@@ -339,6 +339,20 @@ export const dashboardApi = {
     const response = await apiClient.post("/search/keywords", payload);
     return response.data;
   },
+  // Direct keyword search with comprehensive analysis
+  searchKeywords: async (keywords: string[] | string): Promise<ApiResponse> => {
+    const payload: { keywords: string[] } = {
+      keywords: Array.isArray(keywords) ? keywords : [keywords],
+    };
+    const AI_BASE =
+      (import.meta as { env?: { VITE_AI_SERVICE_URL?: string } }).env
+        ?.VITE_AI_SERVICE_URL || "http://localhost:8000";
+    const res = await axios.post(`${AI_BASE}/search/keywords`, payload, {
+      headers: { "Content-Type": "application/json" },
+    });
+    return res.data;
+  },
+
   scheduleKeywordSearch: async (
     keywords: string[] | string,
     userEmail?: string
@@ -411,6 +425,19 @@ export const dashboardApi = {
   deleteUpload: async (uploadId: string): Promise<ApiResponse> => {
     const response = await apiClient.delete(`/dashboard/uploads/${uploadId}`);
     return response.data;
+  },
+
+  // Get individual job data from database
+  getJobData: async (jobId: string): Promise<ApiResponse> => {
+    console.log(`🔍 Fetching job data for: ${jobId}`);
+    try {
+      const response = await apiClient.get(`/dashboard/jobs/${jobId}`);
+      console.log(`🔍 Job data response:`, response.data);
+      return response.data;
+    } catch (error) {
+      console.error(`🔍 Failed to fetch job data for ${jobId}:`, error);
+      throw error;
+    }
   },
 };
 

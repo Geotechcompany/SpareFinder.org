@@ -78,7 +78,25 @@ class SupabaseJobStore:
     def save_job(job_id: str, job_data: Dict[str, Any]) -> bool:
         """Save job to Supabase database"""
         try:
-            # Prepare data for database
+            # Prepare data for database with proper type conversion
+            def safe_int(value):
+                """Convert value to int, handling None and float values"""
+                if value is None:
+                    return None
+                try:
+                    return int(float(value))
+                except (ValueError, TypeError):
+                    return None
+            
+            def safe_float(value):
+                """Convert value to float, handling None values"""
+                if value is None:
+                    return None
+                try:
+                    return float(value)
+                except (ValueError, TypeError):
+                    return None
+            
             insert_data = {
                 'id': job_id,
                 'filename': job_data.get('filename', job_id),
@@ -89,7 +107,7 @@ class SupabaseJobStore:
                 'precise_part_name': job_data.get('precise_part_name'),
                 'material_composition': job_data.get('material_composition'),
                 'manufacturer': job_data.get('manufacturer'),
-                'confidence_score': job_data.get('confidence_score'),
+                'confidence_score': safe_int(job_data.get('confidence_score')),  # Convert to int
                 'confidence_explanation': job_data.get('confidence_explanation'),
                 'estimated_price': job_data.get('estimated_price', {}),
                 'description': job_data.get('description'),
@@ -101,7 +119,7 @@ class SupabaseJobStore:
                 'fitment_tips': job_data.get('fitment_tips'),
                 'additional_instructions': job_data.get('additional_instructions'),
                 'full_analysis': job_data.get('full_analysis'),
-                'processing_time_seconds': job_data.get('processing_time_seconds'),
+                'processing_time_seconds': safe_int(job_data.get('processing_time_seconds')),  # Convert to int
                 'model_version': job_data.get('model_version'),
                 'supplier_enrichment': job_data.get('supplier_enrichment', []),
                 'mode': job_data.get('mode'),
@@ -110,15 +128,27 @@ class SupabaseJobStore:
                 'query': job_data.get('query', {}),
             }
             
-            # Insert into Supabase
+            # Use Supabase REST API with upsert
+            logger.info(f"🔄 Attempting to upsert job {job_id} to Supabase")
+            logger.info(f"📊 Job data keys: {list(insert_data.keys())}")
+            
+            # Insert/Update into Supabase using REST API
             url = f"{SUPABASE_URL}/rest/v1/jobs"
-            response = requests.post(url, headers=SUPABASE_HEADERS, json=insert_data)
+            headers = {
+                **SUPABASE_HEADERS,
+                "Prefer": "resolution=merge-duplicates"
+            }
+            
+            logger.info(f"📝 Upserting job data: {insert_data}")
+            response = requests.post(url, headers=headers, json=insert_data)
+            logger.info(f"📊 Upsert response status: {response.status_code}")
+            logger.info(f"📊 Upsert response text: {response.text}")
             
             if response.status_code in [200, 201]:
-                logger.info(f"Job {job_id} saved to Supabase database")
+                logger.info(f"✅ Job {job_id} upserted to Supabase database successfully")
                 return True
             else:
-                logger.error(f"Failed to save job {job_id}: {response.status_code} - {response.text}")
+                logger.error(f"❌ Failed to upsert job {job_id}: {response.status_code} - {response.text}")
                 return False
                 
         except Exception as e:
@@ -127,8 +157,17 @@ class SupabaseJobStore:
     
     @staticmethod
     def list_jobs(limit: int = 1000) -> List[Dict[str, Any]]:
-        """List all jobs from Supabase database"""
+        """List all jobs from Supabase database with caching"""
         try:
+            # Check cache first (cache for 30 seconds)
+            cache_key = f"jobs_list_{limit}"
+            cached_data = getattr(SupabaseJobStore, '_cache', {}).get(cache_key)
+            cache_time = getattr(SupabaseJobStore, '_cache_time', {}).get(cache_key, 0)
+            
+            if cached_data and (time.time() - cache_time) < 30:  # 30 second cache
+                logger.debug(f"Using cached jobs data ({len(cached_data)} jobs)")
+                return cached_data
+            
             url = f"{SUPABASE_URL}/rest/v1/jobs"
             params = {
                 "order": "created_at.desc",
@@ -140,6 +179,14 @@ class SupabaseJobStore:
             if response.status_code == 200:
                 jobs = response.json()
                 logger.info(f"Retrieved {len(jobs)} jobs from Supabase database")
+                
+                # Cache the results
+                if not hasattr(SupabaseJobStore, '_cache'):
+                    SupabaseJobStore._cache = {}
+                    SupabaseJobStore._cache_time = {}
+                SupabaseJobStore._cache[cache_key] = jobs
+                SupabaseJobStore._cache_time[cache_key] = time.time()
+                
                 return jobs
             else:
                 logger.error(f"Failed to list jobs: {response.status_code} - {response.text}")
@@ -679,6 +726,86 @@ async def shutdown_event():
         # Ensure logging is flushed
         logging.shutdown()
 
+async def _analyze_part_by_name(part_name: str, category: str, confidence: float) -> Dict[str, Any]:
+    """
+    Analyze a part by name using AI to generate detailed information
+    """
+    try:
+        api_key = os.getenv('OPENAI_API_KEY')
+        if not api_key:
+            return {"success": False, "error": "OpenAI API key not configured"}
+
+        client = OpenAI(api_key=api_key)
+        
+        # Create a comprehensive analysis prompt for the identified part
+        system_prompt = (
+            "You are an expert automotive parts analyst. Given a specific part name and category, "
+            "provide a comprehensive analysis in JSON format. Return ONLY valid JSON with this exact structure: "
+            '{"precise_part_name": "exact name", "class_name": "technical name", "category": "category", '
+            '"manufacturer": "common manufacturer", "confidence_score": 0.95, "confidence_explanation": "explanation", '
+            '"estimated_price": {"new": "$X-Y", "used": "$X-Y", "refurbished": "$X-Y"}, '
+            '"description": "detailed description", "material_composition": "materials", '
+            '"technical_data_sheet": {"part_type": "type", "material": "material", "common_specs": "specs", '
+            '"load_rating": "rating", "weight": "weight", "reusability": "reusability", "finish": "finish", '
+            '"temperature_tolerance": "tolerance"}, "compatible_vehicles": ["vehicle1", "vehicle2"], '
+            '"engine_types": ["engine1", "engine2"], "buy_links": {"supplier1": "url1", "supplier2": "url2"}, '
+            '"suppliers": [{"name": "supplier", "url": "url", "price_range": "$X-Y", "shipping_region": "region"}], '
+            '"fitment_tips": "installation tips", "additional_instructions": "additional info", '
+            '"full_analysis": "comprehensive markdown analysis", "processing_time_seconds": 2.5}'
+        )
+
+        user_prompt = f"Analyze this automotive part: {part_name} (Category: {category})"
+
+        def call_openai() -> Dict[str, Any]:
+            resp = client.chat.completions.create(
+                model="gpt-4o",
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt}
+                ],
+                temperature=0.2,
+                max_tokens=2000
+            )
+            content = resp.choices[0].message.content or "{}"
+            try:
+                return json.loads(content)
+            except Exception:
+                # Fallback: extract JSON from response
+                import re
+                match = re.search(r"\{[\s\S]*\}", content)
+                if match:
+                    try:
+                        return json.loads(match.group(0))
+                    except Exception:
+                        pass
+                return {"success": False, "error": "Failed to parse AI response"}
+
+        # Run the analysis with timeout
+        try:
+            result = await asyncio.wait_for(asyncio.to_thread(call_openai), timeout=30.0)
+        except asyncio.TimeoutError:
+            return {"success": False, "error": "Analysis timed out"}
+
+        # Ensure success flag and add processing time
+        result["success"] = True
+        result["status"] = "completed"
+        result["processing_time_seconds"] = result.get("processing_time_seconds", 2.5)
+        result["model_version"] = "Keyword Analysis v1.0"
+        
+        # Add predictions array for compatibility
+        result["predictions"] = [{
+            "class_name": result.get("class_name", part_name),
+            "category": result.get("category", category),
+            "manufacturer": result.get("manufacturer", "Unknown"),
+            "confidence": result.get("confidence_score", confidence)
+        }]
+
+        return result
+
+    except Exception as e:
+        logger.error(f"Part analysis by name failed: {e}")
+        return {"success": False, "error": str(e)}
+
 @app.post("/search/keywords")
 async def search_by_keywords(payload: KeywordSearchRequest):
     try:
@@ -708,77 +835,138 @@ async def search_by_keywords(payload: KeywordSearchRequest):
                 }
             )
 
-        # Build prompt to request structured JSON results
-        system_prompt = (
-            "You are an expert automotive parts search assistant. Given a list of keywords, "
-            "return a JSON object containing: (1) an array named 'results' of relevant parts where each result has: "
-            "name, category, manufacturer (optional), part_number (optional), price (string, optional), availability (optional); "
-            "and (2) a 'markdown' string. The 'markdown' must be formatted as follows: \n\n"
-            "- For the FIRST (most relevant) part: expand with the following 8 sections using markdown headings and lists: \n"
-            "  1. 🛞 Part Identification\n  2. 📘 Technical Description\n  3. 📊 Technical Data Sheet (as a markdown table)\n  4. 🚗 Compatible Vehicles\n  5. 💰 Pricing & Availability\n  6. 🌍 Where to Buy\n  7. 📈 Confidence Score\n  8. 📤 Additional Instructions\n"
-            "- For REMAINING parts: provide a compact bullet list with: Name — Category — Manufacturer (if known).\n"
-            "Do NOT include prose outside of the JSON. Respond ONLY with valid JSON containing 'results' and 'markdown'."
+        # Step 1: Identify the most likely part name from keywords
+        part_identification_prompt = (
+            "You are an expert automotive parts identification assistant. Given keywords, "
+            "identify the SINGLE most likely automotive part the user is looking for. "
+            "Return ONLY a JSON object with this exact structure: "
+            '{"part_name": "exact part name", "category": "part category", "confidence": 0.95}'
         )
 
-        user_prompt = (
-            "Keywords: " + ", ".join(normalized) + "\n\n" +
-            "Return strictly this JSON schema: {\n  \"results\": [\n    { \"name\": string, \"category\": string, \"manufacturer\": string?, \"part_number\": string?, \"price\": string?, \"availability\": string? }\n  ],\n  \"markdown\": string\n}"
-        )
+        user_prompt = f"Keywords: {', '.join(normalized)}\n\nIdentify the most likely automotive part:"
 
         client = OpenAI(api_key=api_key)
 
-        def call_openai() -> Dict[str, Any]:
+        def identify_part() -> Dict[str, Any]:
             resp = client.chat.completions.create(
                 model="gpt-4o",
                 messages=[
-                    {"role": "system", "content": system_prompt},
+                    {"role": "system", "content": part_identification_prompt},
                     {"role": "user", "content": user_prompt}
                 ],
-                temperature=0.2,
-                max_tokens=600
+                temperature=0.1,
+                max_tokens=200
             )
             content = resp.choices[0].message.content or "{}"
-            # Attempt to parse JSON; fallback: extract JSON block
             try:
                 return json.loads(content)
             except Exception:
+                # Fallback: extract JSON from response
                 import re
                 match = re.search(r"\{[\s\S]*\}", content)
                 if match:
                     try:
                         return json.loads(match.group(0))
                     except Exception:
-                        return {"results": []}
-                return {"results": []}
+                        pass
+                return {"part_name": "Unknown Part", "category": "General", "confidence": 0.0}
 
-        # Run blocking OpenAI call in a thread with timeout
+        # Step 2: Get part identification
         try:
-            ai_result = await asyncio.wait_for(asyncio.to_thread(call_openai), timeout=15.0)
+            part_info = await asyncio.wait_for(asyncio.to_thread(identify_part), timeout=10.0)
         except asyncio.TimeoutError:
-            logger.warning("Keyword AI search timed out")
+            logger.warning("Part identification timed out")
             return JSONResponse(
                 status_code=504,
                 content={
                     "success": False,
                     "error": "timeout",
-                    "message": "Keyword AI search timed out"
+                    "message": "Part identification timed out"
                 }
             )
 
-        results = ai_result.get("results", [])
-        if not isinstance(results, list):
-            results = []
-        markdown = ai_result.get("markdown", "")
+        part_name = part_info.get("part_name", "Unknown Part")
+        category = part_info.get("category", "General")
+        confidence = part_info.get("confidence", 0.0)
 
+        logger.info(f"Identified part: {part_name} (category: {category}, confidence: {confidence})")
+
+        # Step 3: Perform detailed analysis using the identified part name
+        analysis_result = await _analyze_part_by_name(part_name, category, confidence)
+
+        if not analysis_result.get("success"):
+            return JSONResponse(
+                status_code=500,
+                content={
+                    "success": False,
+                    "error": "Analysis failed",
+                    "message": "Failed to analyze identified part"
+                }
+            )
+
+        # Step 4: Store results in database
+        filename = f"keyword_{uuid.uuid4().hex[:8]}"
+        try:
+            supabase_url = os.getenv("SUPABASE_URL", "").strip()
+            service_key = (
+                os.getenv("SUPABASE_SERVICE_KEY")
+                or os.getenv("SUPABASE_ANON_KEY", "")
+            ).strip()
+            if supabase_url and service_key:
+                client = create_client(supabase_url, service_key)
+                
+                # Prepare comprehensive data for storage
+                response_data = {
+                    "success": True,
+                    "status": "completed",
+                    "filename": filename,
+                    "mode": "keywords_only",
+                    "query": {"keywords": normalized},
+                    "identified_part": {
+                        "name": part_name,
+                        "category": category,
+                        "confidence": confidence
+                    },
+                    **analysis_result  # Include all the detailed analysis results
+                }
+                
+                # Store in part_searches table
+                client.from_("part_searches").upsert(
+                    {
+                        "id": filename,
+                        "part_name": analysis_result.get("precise_part_name") or analysis_result.get("class_name"),
+                        "manufacturer": analysis_result.get("manufacturer"),
+                        "category": analysis_result.get("category"),
+                        "part_number": analysis_result.get("part_number"),
+                        "predictions": analysis_result.get("predictions", []),
+                        "confidence_score": analysis_result.get("confidence_score"),
+                        "processing_time": analysis_result.get("processing_time_seconds"),
+                        "processing_time_ms": analysis_result.get("processing_time_seconds"),
+                        "model_version": analysis_result.get("model_version"),
+                        "analysis_status": "completed",
+                        "metadata": {"analysis": response_data},
+                    },
+                    on_conflict="id",
+                ).execute()
+                logger.info(f"Keyword search results stored in database: {filename}")
+        except Exception as e:
+            logger.warning(f"Failed to store keyword search results in database: {e}")
+
+        # Step 5: Return the same format as image analysis
         return JSONResponse(
             status_code=200,
             content={
                 "success": True,
-                "results": results,
-                "total": len(results),
+                "status": "completed",
+                "filename": filename,
+                "mode": "keywords_only",
                 "query": {"keywords": normalized},
-                "model_version": "Keyword AI v1.0",
-                "markdown": markdown
+                "identified_part": {
+                    "name": part_name,
+                    "category": category,
+                    "confidence": confidence
+                },
+                **analysis_result  # Include all the detailed analysis results
             }
         )
     except Exception as e:
@@ -1090,6 +1278,36 @@ async def _run_keyword_search_job(job_id: str, keyword_list: List[str], user_ema
         }
         save_job_to_database(job_id, analysis_results[job_id])
 
+        # Add timeout to prevent jobs from getting stuck
+        async def process_keyword_job():
+            return await _process_keyword_job_internal(job_id, keyword_list, user_email)
+        
+        # Run with 3 minute timeout
+        await asyncio.wait_for(process_keyword_job(), timeout=180.0)
+        
+    except asyncio.TimeoutError:
+        logger.error(f"Keyword job {job_id} timed out after 3 minutes")
+        analysis_results[job_id] = {
+            "success": False,
+            "status": "failed",
+            "error": "Job timed out - processing took too long",
+            "filename": job_id,
+            "mode": "keywords_only",
+        }
+        save_job_to_database(job_id, analysis_results[job_id])
+    except Exception as e:
+        logger.error(f"Keyword job error for {job_id}: {e}")
+        analysis_results[job_id] = {
+            "success": False,
+            "status": "failed",
+            "error": str(e),
+            "filename": job_id,
+            "mode": "keywords_only",
+        }
+        save_job_to_database(job_id, analysis_results[job_id])
+
+async def _process_keyword_job_internal(job_id: str, keyword_list: List[str], user_email: Optional[str]) -> None:
+    try:
         # Email start
         if user_email and _email_is_enabled():
             try:
@@ -1102,61 +1320,113 @@ async def _run_keyword_search_job(job_id: str, keyword_list: List[str], user_ema
             except Exception:
                 pass
 
-        # Reuse the inline logic from the /search/keywords endpoint
+        # Use the same comprehensive analysis logic as /search/keywords endpoint
+        normalized = [str(k).strip().lower() for k in (keyword_list or []) if str(k).strip()]
+        
+        # Step 1: Identify the most likely part name using GPT-4o
         api_key = os.getenv('OPENAI_API_KEY')
         if not api_key:
             raise RuntimeError("OPENAI_API_KEY is not set")
 
-        normalized = [str(k).strip().lower() for k in (keyword_list or []) if str(k).strip()]
-
-        system_prompt = (
-            "You are SpareFinder AI. Given automotive keywords, return a concise JSON with 'results'[] and optional 'markdown' string."
-        )
-        user_prompt = (
-            f"Find automotive parts related to: {', '.join(normalized)}. Return fields: name, category, manufacturer, price, availability, part_number."
-        )
-
         from openai import OpenAI as _OpenAI
         client = _OpenAI(api_key=api_key)
 
-        def _call_openai() -> Dict[str, Any]:
+        # Part identification prompt
+        identification_prompt = (
+            "You are an expert automotive parts identifier. Given keywords, identify the SINGLE most likely automotive part the user is looking for. "
+            "Return ONLY a JSON object with this exact structure: "
+            '{"part_name": "exact part name", "category": "part category", "confidence": 0.95}'
+        )
+
+        def call_openai_identification() -> Dict[str, Any]:
             resp = client.chat.completions.create(
                 model="gpt-4o",
                 messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_prompt},
+                    {"role": "system", "content": identification_prompt},
+                    {"role": "user", "content": f"Keywords: {', '.join(normalized)}"}
                 ],
-                temperature=0.2,
-                max_tokens=600,
+                temperature=0.1,
+                max_tokens=200
             )
             content = resp.choices[0].message.content or "{}"
             try:
                 return json.loads(content)
             except Exception:
+                # Fallback: extract JSON from response
                 import re
                 match = re.search(r"\{[\s\S]*\}", content)
                 if match:
                     try:
                         return json.loads(match.group(0))
                     except Exception:
-                        return {"results": []}
-                return {"results": []}
+                        pass
+                return {"part_name": "Unknown Part", "category": "General", "confidence": 0.5}
 
-        ai_result = await asyncio.wait_for(asyncio.to_thread(_call_openai), timeout=20.0)
-        results = ai_result.get("results", [])
-        if not isinstance(results, list):
-            results = []
-        markdown = ai_result.get("markdown", "")
+        # Get part identification
+        identification_result = await asyncio.wait_for(
+            asyncio.to_thread(call_openai_identification), 
+            timeout=15.0
+        )
+        
+        part_name = identification_result.get("part_name", "Unknown Part")
+        category = identification_result.get("category", "General")
+        confidence = identification_result.get("confidence", 0.75)
 
+        # Step 2: Get comprehensive analysis using the identified part name
+        analysis_result = await _analyze_part_by_name(part_name, category, confidence)
+
+        if not analysis_result.get("success"):
+            raise RuntimeError(f"Analysis failed: {analysis_result.get('error', 'Unknown error')}")
+
+        # Step 3: Prepare comprehensive data for storage
         response_data = {
             "success": True,
             "status": "completed",
             "filename": job_id,
             "mode": "keywords_only",
-            "results": results,
-            "markdown": markdown,
             "query": {"keywords": normalized},
+            "identified_part": {
+                "name": part_name,
+                "category": category,
+                "confidence": confidence
+            },
+            **analysis_result  # Include all the detailed analysis results
         }
+        
+        # Step 4: Store results in database
+        try:
+            supabase_url = os.getenv("SUPABASE_URL", "").strip()
+            service_key = (
+                os.getenv("SUPABASE_SERVICE_KEY")
+                or os.getenv("SUPABASE_ANON_KEY", "")
+            ).strip()
+            if supabase_url and service_key:
+                supabase_client = create_client(supabase_url, service_key)
+                
+                # Store in part_searches table
+                supabase_client.from_("part_searches").upsert(
+                    {
+                        "id": job_id,
+                        "part_name": analysis_result.get("precise_part_name") or analysis_result.get("class_name"),
+                        "manufacturer": analysis_result.get("manufacturer"),
+                        "category": analysis_result.get("category"),
+                        "part_number": analysis_result.get("part_number"),
+                        "predictions": analysis_result.get("predictions", []),
+                        "confidence_score": analysis_result.get("confidence_score"),
+                        "processing_time": analysis_result.get("processing_time_seconds"),
+                        "processing_time_ms": analysis_result.get("processing_time_seconds"),
+                        "model_version": analysis_result.get("model_version"),
+                        "analysis_status": "completed",
+                        "metadata": {"analysis": response_data},
+                    },
+                    on_conflict="id",
+                ).execute()
+                logger.info(f"Keyword search results stored in database: {job_id}")
+        except Exception as e:
+            logger.warning(f"Failed to store keyword search results in database: {e}")
+
+        # Step 5: Store the final response data in memory
+        analysis_results[job_id] = response_data
 
         # Optional email notification (completed)
         if user_email and _email_is_enabled():
@@ -1164,24 +1434,75 @@ async def _run_keyword_search_job(job_id: str, keyword_list: List[str], user_ema
                 await asyncio.to_thread(
                     _send_email,
                     user_email,
-                    keyword_completed_subject(normalized, len(results)),
-                    keyword_completed_html(normalized, len(results)),
+                    keyword_completed_subject(normalized, 1),  # 1 comprehensive result
+                    keyword_completed_html(normalized, 1),
                 )
             except Exception as e:
                 logger.warning(f"Keyword email send failed: {e}")
 
         analysis_results[job_id] = response_data
-        save_job_to_database(job_id, response_data)
+        logger.info(f"🔄 Saving keyword job {job_id} to database with status: {response_data.get('status')}")
+        
+        # Step 1: Save to jobs table (same as image analysis)
+        max_retries = 3
+        for attempt in range(max_retries):
+            db_success = save_job_to_database(job_id, response_data)
+            if db_success:
+                logger.info(f"✅ Successfully saved keyword job {job_id} to jobs table (attempt {attempt + 1})")
+                break
+            else:
+                logger.warning(f"⚠️ Failed to save keyword job {job_id} to jobs table (attempt {attempt + 1})")
+                if attempt < max_retries - 1:
+                    await asyncio.sleep(1)  # Wait 1 second before retry
+                else:
+                    logger.error(f"❌ Failed to save keyword job {job_id} to jobs table after {max_retries} attempts")
+
+        # Step 2: Save comprehensive data to part_searches table (same as image analysis)
+        try:
+            supabase_url = os.getenv("SUPABASE_URL", "").strip()
+            service_key = (
+                os.getenv("SUPABASE_SERVICE_KEY")
+                or os.getenv("SUPABASE_ANON_KEY", "")
+            ).strip()
+            if supabase_url and service_key:
+                client = create_client(supabase_url, service_key)
+                
+                # Store comprehensive data in part_searches table (same format as image analysis)
+                def safe_int(value):
+                    """Convert value to int, handling None and float values"""
+                    if value is None:
+                        return None
+                    try:
+                        return int(float(value))
+                    except (ValueError, TypeError):
+                        return None
+                
+                client.from_("part_searches").upsert(
+                    {
+                        "id": job_id,
+                        "search_term": ", ".join(response_data.get("query", {}).get("keywords", [])),  # Required field
+                        "part_name": response_data.get("precise_part_name") or response_data.get("class_name"),
+                        "manufacturer": response_data.get("manufacturer"),
+                        "category": response_data.get("category"),
+                        "part_number": response_data.get("part_number"),
+                        "predictions": response_data.get("predictions", []),
+                        "confidence_score": safe_int(response_data.get("confidence_score")),  # Convert to int
+                        "processing_time": safe_int(response_data.get("processing_time_seconds")),  # Convert to int
+                        "processing_time_ms": safe_int(response_data.get("processing_time_seconds")),  # Convert to int
+                        "model_version": response_data.get("model_version"),
+                        "analysis_status": "completed" if response_data.get("success") else "failed",
+                        "metadata": {"analysis": response_data},
+                    },
+                    on_conflict="id",
+                ).execute()
+                logger.info(f"✅ Successfully saved keyword job {job_id} comprehensive data to part_searches table")
+            else:
+                logger.warning("Supabase credentials not configured for part_searches table")
+        except Exception as e:
+            logger.error(f"❌ Failed to save keyword job {job_id} to part_searches table: {e}")
     except Exception as e:
-        logger.error(f"Keyword job error for {job_id}: {e}")
-        analysis_results[job_id] = {
-            "success": False,
-            "status": "failed",
-            "error": str(e),
-            "filename": job_id,
-            "mode": "keywords_only",
-        }
-        save_job_to_database(job_id, analysis_results[job_id])
+        logger.error(f"Keyword job internal error for {job_id}: {e}")
+        raise e  # Re-raise to be caught by the outer timeout handler
 
 @app.post("/search/keywords/schedule")
 async def schedule_keyword_search(payload: KeywordScheduleRequest):
@@ -1238,6 +1559,28 @@ async def keyword_search_status(job_id: str):
         return JSONResponse(status_code=code, content=result)
     except Exception as e:
         return JSONResponse(status_code=500, content={"success": False, "status": "failed", "error": str(e)})
+
+@app.post("/jobs/sync/{job_id}")
+async def sync_job_to_database(job_id: str):
+    """Manually sync a completed job to the database"""
+    try:
+        if job_id not in analysis_results:
+            return JSONResponse(status_code=404, content={"success": False, "error": "Job not found in memory"})
+        
+        job_data = analysis_results[job_id]
+        logger.info(f"🔄 Manually syncing job {job_id} to database")
+        
+        # Use the same upsert logic
+        success = save_job_to_database(job_id, job_data)
+        
+        if success:
+            return JSONResponse(status_code=200, content={"success": True, "message": f"Job {job_id} synced to database"})
+        else:
+            return JSONResponse(status_code=500, content={"success": False, "error": "Failed to sync job to database"})
+            
+    except Exception as e:
+        logger.error(f"Sync job error: {e}")
+        return JSONResponse(status_code=500, content={"success": False, "error": str(e)})
 
 @app.post("/analyze-part/")
 async def analyze_part(

@@ -92,6 +92,11 @@ const History = () => {
   const [selectedKeywordJob, setSelectedKeywordJob] = useState<any | null>(
     null
   );
+  const [isPolling, setIsPolling] = useState(false);
+  const [loadingKeywordJobs, setLoadingKeywordJobs] = useState<Set<string>>(
+    new Set()
+  );
+  const [lastPollTime, setLastPollTime] = useState(0);
 
   // Pagination state
   const [imagePage, setImagePage] = useState(1);
@@ -353,34 +358,111 @@ const History = () => {
             (j: any) => !j.image_url && (j.filename || j.id)
           );
           if (!toFetch.length) return;
+
+          // First check if AI service is available
+          try {
+            const healthRes = await fetch(`${API_BASE}/health`, {
+              method: "GET",
+              signal: AbortSignal.timeout(3000),
+            });
+            if (!healthRes.ok) {
+              console.log(
+                `❌ AI service health check failed: ${healthRes.status}`
+              );
+              return; // Skip image fetching if service is down
+            }
+            console.log(`✅ AI service is healthy`);
+          } catch (healthError) {
+            console.log(`❌ AI service health check failed:`, healthError);
+            return; // Skip image fetching if service is unreachable
+          }
+
+          console.log(
+            `🖼️ Attempting to fetch images for ${toFetch.length} jobs`
+          );
+
           const results = await Promise.all(
             toFetch.map(async (j: any) => {
               try {
+                const filename = j.filename || j.id;
+                console.log(`🔍 Fetching image for job: ${filename}`);
+
                 const res = await fetch(
                   `${API_BASE}/analyze-part/status/${encodeURIComponent(
-                    j.filename || j.id
-                  )}`
+                    filename
+                  )}`,
+                  {
+                    method: "GET",
+                    headers: {
+                      Accept: "application/json",
+                    },
+                    // Add timeout to prevent hanging
+                    signal: AbortSignal.timeout(5000),
+                  }
                 );
+
+                if (!res.ok) {
+                  console.log(
+                    `❌ Status ${res.status} for job ${filename}: ${res.statusText}`
+                  );
+                  return {
+                    id: j.id,
+                    url: undefined,
+                    error: `${res.status} ${res.statusText}`,
+                  };
+                }
+
                 const data = await res.json();
-                return { id: j.id, url: data?.image_url } as {
+                console.log(
+                  `✅ Got response for ${filename}:`,
+                  data?.image_url ? "has image" : "no image"
+                );
+
+                return {
+                  id: j.id,
+                  url: data?.image_url,
+                  error: undefined,
+                } as {
                   id: string;
                   url?: string;
+                  error?: string;
                 };
-              } catch {
-                return { id: j.id, url: undefined } as {
+              } catch (error: any) {
+                console.log(
+                  `❌ Error fetching image for job ${j.id}:`,
+                  error.message
+                );
+                return {
+                  id: j.id,
+                  url: undefined,
+                  error: error.message,
+                } as {
                   id: string;
                   url?: string;
+                  error?: string;
                 };
               }
             })
           );
+
+          // Log results summary
+          const successful = results.filter((r) => r.url).length;
+          const failed = results.filter((r) => r.error).length;
+          console.log(
+            `📊 Image fetch results: ${successful} successful, ${failed} failed`
+          );
+
           setJobImages((prev) => {
             const copy = { ...prev };
-            results.forEach((r) => (copy[r.id] = r.url || copy[r.id]));
+            results.forEach((r) => {
+              if (r.url) {
+                copy[r.id] = r.url;
+              }
+            });
             return copy;
           });
-        } catch {
-          // ignore – non-fatal UI enhancement
+        } catch (error) {
+          console.error("Failed to hydrate images:", error);
         }
       };
       hydrateImages();
@@ -437,15 +519,65 @@ const History = () => {
     }
   }, [hasValidToken, user?.id, toast, logout]);
 
-  // Lightweight polling for statuses only (no page-level loading state)
+  // Real-time polling for job statuses and data updates
   const pollJobStatuses = useCallback(async () => {
     try {
+      // Prevent duplicate requests within 1 second
+      const now = Date.now();
+      if (now - lastPollTime < 1000) {
+        console.log("🔄 Skipping duplicate poll request");
+        return;
+      }
+      setLastPollTime(now);
+
+      setIsPolling(true);
       const API_BASE =
         (import.meta as any).env?.VITE_AI_SERVICE_URL ||
         "http://localhost:8000";
       const res = await fetch(`${API_BASE}/jobs`);
       const data = await res.json();
       if (data?.success && Array.isArray(data.results)) {
+        console.log(
+          "🔄 Polling: Updating jobs data with",
+          data.results.length,
+          "jobs"
+        );
+
+        // Check for stuck jobs (processing for more than 5 minutes)
+        const now = Date.now();
+        const stuckJobs = data.results.filter((job: any) => {
+          if (job.status !== "processing" && job.status !== "pending")
+            return false;
+          const createdAt = new Date(
+            job.created_at || job.updated_at
+          ).getTime();
+          const ageMinutes = (now - createdAt) / (1000 * 60);
+          return ageMinutes > 5; // More than 5 minutes old
+        });
+
+        if (stuckJobs.length > 0) {
+          console.log(
+            "⚠️ Found stuck jobs:",
+            stuckJobs.map((j: any) => j.id)
+          );
+          // Mark stuck jobs as failed
+          const updatedJobs = data.results.map((job: any) => {
+            if (stuckJobs.some((stuck: any) => stuck.id === job.id)) {
+              return {
+                ...job,
+                status: "failed",
+                success: false,
+                error: "Job timed out - processing took too long",
+              };
+            }
+            return job;
+          });
+          setpastAnalysis(updatedJobs);
+        } else {
+          // Update the main jobs data for real-time display
+          setpastAnalysis(data.results);
+        }
+
         const nextMap: Record<string, any> = {};
         const nextImages: Record<string, string | undefined> = {};
         for (const j of data.results) {
@@ -511,16 +643,75 @@ const History = () => {
           });
         } catch {}
       }
-    } catch {
+    } catch (error) {
+      console.log("❌ Polling error:", error);
       // ignore transient polling errors
+    } finally {
+      setIsPolling(false);
     }
-  }, []);
+  }, [lastPollTime]);
 
   useEffect(() => {
     if (authLoading || !isAuthenticated || !user?.id) return;
-    const id = setInterval(pollJobStatuses, 5000);
+    const id = setInterval(pollJobStatuses, 5000); // Poll every 5 seconds for real-time updates
     return () => clearInterval(id);
   }, [authLoading, isAuthenticated, user?.id, pollJobStatuses]);
+
+  // Intelligent polling with exponential backoff for processing jobs
+  useEffect(() => {
+    if (authLoading || !isAuthenticated || !user?.id) return;
+
+    const hasProcessingJobs = pastAnalysis.some(
+      (job: any) => job.status === "processing" || job.status === "pending"
+    );
+
+    if (hasProcessingJobs) {
+      console.log("🔄 Processing jobs detected, starting intelligent polling");
+
+      let pollCount = 0;
+      const maxPolls = 20; // Maximum 20 polls before giving up
+
+      const intelligentPoll = () => {
+        pollCount++;
+
+        // Exponential backoff: 2s, 4s, 8s, 16s, then 30s intervals
+        let nextInterval = 2000;
+        if (pollCount > 1)
+          nextInterval = Math.min(2000 * Math.pow(2, pollCount - 1), 30000);
+
+        console.log(
+          `🔄 Polling attempt ${pollCount}/${maxPolls}, next in ${nextInterval}ms`
+        );
+
+        pollJobStatuses()
+          .then(() => {
+            // Check if still have processing jobs after this poll
+            const stillProcessing = pastAnalysis.some(
+              (job: any) =>
+                job.status === "processing" || job.status === "pending"
+            );
+
+            if (stillProcessing && pollCount < maxPolls) {
+              setTimeout(intelligentPoll, nextInterval);
+            } else if (pollCount >= maxPolls) {
+              console.log(
+                "⏰ Max polling attempts reached, switching to standard polling"
+              );
+            }
+          })
+          .catch((error) => {
+            console.error("❌ Polling error:", error);
+            // On error, wait longer before retrying
+            if (pollCount < maxPolls) {
+              setTimeout(intelligentPoll, Math.min(nextInterval * 2, 60000));
+            }
+          });
+      };
+
+      // Start intelligent polling
+      intelligentPoll();
+    }
+  }, [authLoading, isAuthenticated, user?.id, pollJobStatuses, pastAnalysis]);
 
   // Export history function
   const handleExportHistory = async () => {
@@ -958,10 +1149,30 @@ const History = () => {
             <div className="absolute inset-0 bg-gradient-to-r from-emerald-600/10 to-cyan-600/10 rounded-2xl md:rounded-3xl blur-xl opacity-60" />
             <Card className="relative bg-black/20 backdrop-blur-xl border-white/10">
               <CardHeader className="p-4 md:p-6">
-                <CardTitle className="text-white flex items-center space-x-2 text-base md:text-lg">
-                  <Database className="w-4 h-4 md:w-5 md:h-5 text-emerald-400" />
-                  <span>Past Analysis</span>
-                </CardTitle>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-white flex items-center space-x-2 text-base md:text-lg">
+                    <Database className="w-4 h-4 md:w-5 md:h-5 text-emerald-400" />
+                    <span>Past Analysis</span>
+                    {isPolling && (
+                      <div className="flex items-center space-x-1 text-xs text-emerald-400">
+                        <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse" />
+                        <span>Live</span>
+                      </div>
+                    )}
+                  </CardTitle>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      // Force refresh jobs data
+                      pollJobStatuses();
+                    }}
+                    className="text-xs bg-transparent border-white/20 hover:bg-white/10"
+                  >
+                    <Activity className="w-3 h-3 mr-1" />
+                    Refresh
+                  </Button>
+                </div>
                 <CardDescription className="text-gray-400 text-xs md:text-sm">
                   Completed and queued analyses from the AI service
                 </CardDescription>
@@ -1362,10 +1573,56 @@ const History = () => {
                               return listSorted
                                 .slice(start, start + pageSize)
                                 .map((j: any) => {
-                                  const list = Array.isArray(j.results)
-                                    ? j.results
-                                    : [];
-                                  const top = list[0] || {};
+                                  // Handle both old format (with results array) and new comprehensive format
+                                  let list: any[] = [];
+                                  let top: any = {};
+
+                                  if (Array.isArray(j.results)) {
+                                    // Old format with results array
+                                    list = j.results;
+                                    top = list[0] || {};
+                                  } else if (
+                                    j.precise_part_name ||
+                                    j.class_name
+                                  ) {
+                                    // New comprehensive format - create a single result from the comprehensive data
+                                    top = {
+                                      name:
+                                        j.precise_part_name ||
+                                        j.class_name ||
+                                        "Unknown Part",
+                                      manufacturer: j.manufacturer || "Unknown",
+                                      category: j.category || "General",
+                                      price:
+                                        j.estimated_price?.new ||
+                                        j.estimated_price ||
+                                        "Price not available",
+                                      part_number: j.part_number || null,
+                                      confidence: j.confidence_score || 0.75,
+                                      description:
+                                        j.description ||
+                                        j.full_analysis ||
+                                        "Comprehensive part analysis",
+                                      // Include all comprehensive data
+                                      precise_part_name: j.precise_part_name,
+                                      confidence_explanation:
+                                        j.confidence_explanation,
+                                      material_composition:
+                                        j.material_composition,
+                                      technical_data_sheet:
+                                        j.technical_data_sheet,
+                                      compatible_vehicles:
+                                        j.compatible_vehicles,
+                                      engine_types: j.engine_types,
+                                      buy_links: j.buy_links,
+                                      suppliers: j.suppliers,
+                                      fitment_tips: j.fitment_tips,
+                                      additional_instructions:
+                                        j.additional_instructions,
+                                    };
+                                    list = [top]; // Create a single-item array for consistency
+                                  }
+
                                   const keys = Array.isArray(j.query?.keywords)
                                     ? j.query.keywords.join(", ")
                                     : "-";
@@ -1421,37 +1678,172 @@ const History = () => {
                                       <td className="py-3 pr-4">
                                         {list.length ? (
                                           <div className="max-h-32 overflow-auto pr-2">
-                                            <ul className="list-disc pl-5 space-y-1">
-                                              {list.map(
-                                                (r: any, idx: number) => (
-                                                  <li
-                                                    key={idx}
-                                                    className="text-gray-300"
-                                                  >
-                                                    <span className="font-medium">
+                                            {(() => {
+                                              // Check if this is the new comprehensive format
+                                              const isComprehensive =
+                                                list[0]?.precise_part_name ||
+                                                list[0]
+                                                  ?.confidence_explanation ||
+                                                list[0]?.technical_data_sheet ||
+                                                list[0]?.compatible_vehicles;
+
+                                              if (isComprehensive) {
+                                                // Display comprehensive analysis data
+                                                const r = list[0];
+                                                return (
+                                                  <div className="space-y-2 text-xs">
+                                                    <div className="font-medium text-white">
                                                       {r.name || "Result"}
-                                                    </span>
-                                                    {" – "}
-                                                    <span className="text-gray-400 text-[11px]">
-                                                      {r.manufacturer ||
-                                                        "Unknown"}{" "}
-                                                      •{" "}
-                                                      {r.category ||
-                                                        "Unspecified"}
-                                                      {typeof r.price !==
-                                                      "undefined"
-                                                        ? ` • ${String(
-                                                            r.price
-                                                          )}`
-                                                        : ""}
-                                                      {r.part_number
-                                                        ? ` • ${r.part_number}`
-                                                        : ""}
-                                                    </span>
-                                                  </li>
-                                                )
-                                              )}
-                                            </ul>
+                                                    </div>
+
+                                                    {/* Basic Info */}
+                                                    <div className="text-gray-400">
+                                                      <div>
+                                                        {r.manufacturer ||
+                                                          "Unknown"}{" "}
+                                                        •{" "}
+                                                        {r.category ||
+                                                          "Unspecified"}
+                                                      </div>
+                                                      {r.price && (
+                                                        <div>
+                                                          Price:{" "}
+                                                          {String(r.price)}
+                                                        </div>
+                                                      )}
+                                                      {r.part_number && (
+                                                        <div>
+                                                          Part #:{" "}
+                                                          {r.part_number}
+                                                        </div>
+                                                      )}
+                                                    </div>
+
+                                                    {/* Confidence */}
+                                                    {r.confidence_explanation && (
+                                                      <div className="text-blue-300">
+                                                        Confidence:{" "}
+                                                        {Math.round(
+                                                          (r.confidence ||
+                                                            0.75) * 100
+                                                        )}
+                                                        %
+                                                      </div>
+                                                    )}
+
+                                                    {/* Description */}
+                                                    {r.description && (
+                                                      <div className="text-gray-300 text-[10px] line-clamp-2">
+                                                        {r.description}
+                                                      </div>
+                                                    )}
+
+                                                    {/* Technical Specs */}
+                                                    {r.technical_data_sheet && (
+                                                      <div className="text-gray-400 text-[10px]">
+                                                        {r.technical_data_sheet
+                                                          .part_type && (
+                                                          <div>
+                                                            Type:{" "}
+                                                            {
+                                                              r
+                                                                .technical_data_sheet
+                                                                .part_type
+                                                            }
+                                                          </div>
+                                                        )}
+                                                        {r.technical_data_sheet
+                                                          .material && (
+                                                          <div>
+                                                            Material:{" "}
+                                                            {
+                                                              r
+                                                                .technical_data_sheet
+                                                                .material
+                                                            }
+                                                          </div>
+                                                        )}
+                                                      </div>
+                                                    )}
+
+                                                    {/* Compatible Vehicles */}
+                                                    {r.compatible_vehicles &&
+                                                      r.compatible_vehicles
+                                                        .length > 0 && (
+                                                        <div className="text-green-300 text-[10px]">
+                                                          Compatible:{" "}
+                                                          {r.compatible_vehicles
+                                                            .slice(0, 2)
+                                                            .join(", ")}
+                                                          {r.compatible_vehicles
+                                                            .length > 2 &&
+                                                            ` +${
+                                                              r
+                                                                .compatible_vehicles
+                                                                .length - 2
+                                                            } more`}
+                                                        </div>
+                                                      )}
+
+                                                    {/* Suppliers */}
+                                                    {r.suppliers &&
+                                                      r.suppliers.length >
+                                                        0 && (
+                                                        <div className="text-purple-300 text-[10px]">
+                                                          Suppliers:{" "}
+                                                          {r.suppliers
+                                                            .slice(0, 2)
+                                                            .map(
+                                                              (s: any) => s.name
+                                                            )
+                                                            .join(", ")}
+                                                          {r.suppliers.length >
+                                                            2 &&
+                                                            ` +${
+                                                              r.suppliers
+                                                                .length - 2
+                                                            } more`}
+                                                        </div>
+                                                      )}
+                                                  </div>
+                                                );
+                                              } else {
+                                                // Display old format as bullet list
+                                                return (
+                                                  <ul className="list-disc pl-5 space-y-1">
+                                                    {list.map(
+                                                      (r: any, idx: number) => (
+                                                        <li
+                                                          key={idx}
+                                                          className="text-gray-300"
+                                                        >
+                                                          <span className="font-medium">
+                                                            {r.name || "Result"}
+                                                          </span>
+                                                          {" – "}
+                                                          <span className="text-gray-400 text-[11px]">
+                                                            {r.manufacturer ||
+                                                              "Unknown"}{" "}
+                                                            •{" "}
+                                                            {r.category ||
+                                                              "Unspecified"}
+                                                            {typeof r.price !==
+                                                            "undefined"
+                                                              ? ` • ${String(
+                                                                  r.price
+                                                                )}`
+                                                              : ""}
+                                                            {r.part_number
+                                                              ? ` • ${r.part_number}`
+                                                              : ""}
+                                                          </span>
+                                                        </li>
+                                                      )
+                                                    )}
+                                                  </ul>
+                                                );
+                                              }
+                                            })()}
                                           </div>
                                         ) : (
                                           "-"
@@ -1463,12 +1855,132 @@ const History = () => {
                                             variant="outline"
                                             size="sm"
                                             className="text-xs"
-                                            onClick={() => {
-                                              setSelectedKeywordJob(j);
-                                              setIsKeywordOpen(true);
+                                            disabled={loadingKeywordJobs.has(
+                                              j.id || j.filename
+                                            )}
+                                            onClick={async () => {
+                                              const jobId = j.id || j.filename;
+                                              try {
+                                                setLoadingKeywordJobs((prev) =>
+                                                  new Set(prev).add(jobId)
+                                                );
+
+                                                // Primary: Fetch comprehensive job data from database
+                                                try {
+                                                  const dbResponse =
+                                                    await dashboardApi.getJobData(
+                                                      jobId
+                                                    );
+                                                  if (
+                                                    dbResponse.success &&
+                                                    dbResponse.data
+                                                  ) {
+                                                    console.log(
+                                                      "✅ Fetched comprehensive data from database"
+                                                    );
+                                                    setSelectedKeywordJob(
+                                                      dbResponse.data
+                                                    );
+                                                    setLoadingKeywordJobs(
+                                                      (prev) => {
+                                                        const newSet = new Set(
+                                                          prev
+                                                        );
+                                                        newSet.delete(jobId);
+                                                        return newSet;
+                                                      }
+                                                    );
+                                                    setIsKeywordOpen(true);
+                                                    return;
+                                                  }
+                                                } catch (dbError) {
+                                                  console.log(
+                                                    "❌ Database fetch failed, trying AI service:",
+                                                    dbError
+                                                  );
+                                                }
+
+                                                // Fallback: Try AI service if database fails
+                                                const API_BASE =
+                                                  (import.meta as any).env
+                                                    ?.VITE_AI_SERVICE_URL ||
+                                                  "http://localhost:8000";
+
+                                                try {
+                                                  const response = await fetch(
+                                                    `${API_BASE}/analyze-part/status/${jobId}`,
+                                                    {
+                                                      method: "GET",
+                                                      signal:
+                                                        AbortSignal.timeout(
+                                                          3000
+                                                        ), // 3 second timeout
+                                                    }
+                                                  );
+
+                                                  if (response.ok) {
+                                                    const comprehensiveData =
+                                                      await response.json();
+                                                    if (
+                                                      comprehensiveData.success &&
+                                                      comprehensiveData.status ===
+                                                        "completed"
+                                                    ) {
+                                                      console.log(
+                                                        "✅ Fetched comprehensive data from AI service"
+                                                      );
+                                                      setSelectedKeywordJob(
+                                                        comprehensiveData
+                                                      );
+                                                      setLoadingKeywordJobs(
+                                                        (prev) => {
+                                                          const newSet =
+                                                            new Set(prev);
+                                                          newSet.delete(jobId);
+                                                          return newSet;
+                                                        }
+                                                      );
+                                                      setIsKeywordOpen(true);
+                                                      return;
+                                                    }
+                                                  }
+                                                } catch (aiError) {
+                                                  console.log(
+                                                    "❌ AI service fetch failed:",
+                                                    aiError
+                                                  );
+                                                }
+
+                                                // Final fallback: Use basic job data
+                                                console.log(
+                                                  "⚠️ Using basic job data as final fallback"
+                                                );
+                                                setSelectedKeywordJob(j);
+                                              } catch (error) {
+                                                console.error(
+                                                  "Failed to fetch job data:",
+                                                  error
+                                                );
+                                                setSelectedKeywordJob(j);
+                                              } finally {
+                                                setLoadingKeywordJobs(
+                                                  (prev) => {
+                                                    const newSet = new Set(
+                                                      prev
+                                                    );
+                                                    newSet.delete(jobId);
+                                                    return newSet;
+                                                  }
+                                                );
+                                                setIsKeywordOpen(true);
+                                              }
                                             }}
                                           >
-                                            View
+                                            {loadingKeywordJobs.has(
+                                              j.id || j.filename
+                                            )
+                                              ? "Loading..."
+                                              : "View"}
                                           </Button>
                                           <Button
                                             variant="ghost"
@@ -1570,9 +2082,418 @@ const History = () => {
                 </DialogDescription>
               </DialogHeader>
               <div className="max-h-[60vh] overflow-auto space-y-3">
-                {Array.isArray((selectedKeywordJob as any)?.results) &&
-                  (selectedKeywordJob as any).results.map(
-                    (r: any, idx: number) => (
+                {(() => {
+                  const job = selectedKeywordJob as any;
+
+                  // Debug logging
+                  console.log("🔍 Modal rendering - selectedKeywordJob:", job);
+                  console.log("🔍 Job keys:", job ? Object.keys(job) : "null");
+                  console.log(
+                    "🔍 Has results array:",
+                    Array.isArray(job?.results)
+                  );
+                  console.log(
+                    "🔍 Has precise_part_name:",
+                    !!job?.precise_part_name
+                  );
+                  console.log("🔍 Has class_name:", !!job?.class_name);
+                  console.log("🔍 Has manufacturer:", !!job?.manufacturer);
+                  console.log(
+                    "🔍 Has metadata.analysis:",
+                    !!job?.metadata?.analysis
+                  );
+                  console.log(
+                    "🔍 Condition check:",
+                    !!(
+                      job?.precise_part_name ||
+                      job?.class_name ||
+                      job?.metadata?.analysis ||
+                      job?.manufacturer
+                    )
+                  );
+
+                  // TEMPORARY: Force comprehensive format for testing
+                  if (
+                    job &&
+                    (job.precise_part_name ||
+                      job.class_name ||
+                      job.manufacturer ||
+                      job.metadata?.analysis)
+                  ) {
+                    console.log("🔍 Using comprehensive format");
+                    return (
+                      <div className="space-y-4">
+                        {/* Part Identification */}
+                        <div className="p-4 rounded-lg bg-white/5 border border-white/10">
+                          <h3 className="font-semibold text-white mb-2">
+                            🛞 Part Identification
+                          </h3>
+                          <div className="space-y-1 text-sm">
+                            <div>
+                              <span className="text-gray-400">Name:</span>{" "}
+                              <span className="text-white">
+                                {job.precise_part_name ||
+                                  job.class_name ||
+                                  job.metadata?.analysis?.precise_part_name ||
+                                  job.metadata?.analysis?.class_name}
+                              </span>
+                            </div>
+                            <div>
+                              <span className="text-gray-400">Category:</span>{" "}
+                              <span className="text-white">
+                                {job.category ||
+                                  job.metadata?.analysis?.category}
+                              </span>
+                            </div>
+                            <div>
+                              <span className="text-gray-400">
+                                Manufacturer:
+                              </span>{" "}
+                              <span className="text-white">
+                                {job.manufacturer ||
+                                  job.metadata?.analysis?.manufacturer}
+                              </span>
+                            </div>
+                            <div>
+                              <span className="text-gray-400">Confidence:</span>{" "}
+                              <span className="text-white">
+                                {Math.round(
+                                  (job.confidence_score ||
+                                    job.metadata?.analysis?.confidence_score ||
+                                    0.75) * 100
+                                )}
+                                %
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Technical Description */}
+                        {(job.description ||
+                          job.metadata?.analysis?.description) && (
+                          <div className="p-4 rounded-lg bg-white/5 border border-white/10">
+                            <h3 className="font-semibold text-white mb-2">
+                              📘 Technical Description
+                            </h3>
+                            <p className="text-gray-300 text-sm">
+                              {job.description ||
+                                job.metadata?.analysis?.description}
+                            </p>
+                          </div>
+                        )}
+
+                        {/* Full Analysis */}
+                        {job.metadata?.analysis?.full_analysis && (
+                          <div className="p-4 rounded-lg bg-white/5 border border-white/10">
+                            <h3 className="font-semibold text-white mb-2">
+                              📋 Complete Analysis
+                            </h3>
+                            <div className="text-gray-300 text-sm whitespace-pre-wrap">
+                              {job.metadata.analysis.full_analysis}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Pricing */}
+                        {(job.estimated_price ||
+                          job.metadata?.analysis?.estimated_price) && (
+                          <div className="p-4 rounded-lg bg-white/5 border border-white/10">
+                            <h3 className="font-semibold text-white mb-2">
+                              💰 Pricing
+                            </h3>
+                            <div className="space-y-1 text-sm">
+                              {(
+                                job.estimated_price ||
+                                job.metadata?.analysis?.estimated_price
+                              )?.new && (
+                                <div>
+                                  <span className="text-gray-400">New:</span>{" "}
+                                  <span className="text-white">
+                                    {
+                                      (
+                                        job.estimated_price ||
+                                        job.metadata?.analysis?.estimated_price
+                                      ).new
+                                    }
+                                  </span>
+                                </div>
+                              )}
+                              {(
+                                job.estimated_price ||
+                                job.metadata?.analysis?.estimated_price
+                              )?.used && (
+                                <div>
+                                  <span className="text-gray-400">Used:</span>{" "}
+                                  <span className="text-white">
+                                    {
+                                      (
+                                        job.estimated_price ||
+                                        job.metadata?.analysis?.estimated_price
+                                      ).used
+                                    }
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Material Composition */}
+                        {(job.material_composition ||
+                          job.metadata?.analysis?.material_composition) && (
+                          <div className="p-4 rounded-lg bg-white/5 border border-white/10">
+                            <h3 className="font-semibold text-white mb-2">
+                              🔧 Material Composition
+                            </h3>
+                            <p className="text-gray-300 text-sm">
+                              {job.material_composition ||
+                                job.metadata?.analysis?.material_composition}
+                            </p>
+                          </div>
+                        )}
+
+                        {/* Technical Data Sheet */}
+                        {(job.technical_data_sheet ||
+                          job.metadata?.analysis?.technical_data_sheet) && (
+                          <div className="p-4 rounded-lg bg-white/5 border border-white/10">
+                            <h3 className="font-semibold text-white mb-2">
+                              📊 Technical Specifications
+                            </h3>
+                            <div className="space-y-1 text-sm">
+                              {(
+                                job.technical_data_sheet ||
+                                job.metadata?.analysis?.technical_data_sheet
+                              )?.part_type && (
+                                <div>
+                                  <span className="text-gray-400">
+                                    Part Type:
+                                  </span>{" "}
+                                  <span className="text-white">
+                                    {
+                                      (
+                                        job.technical_data_sheet ||
+                                        job.metadata?.analysis
+                                          ?.technical_data_sheet
+                                      ).part_type
+                                    }
+                                  </span>
+                                </div>
+                              )}
+                              {(
+                                job.technical_data_sheet ||
+                                job.metadata?.analysis?.technical_data_sheet
+                              )?.material && (
+                                <div>
+                                  <span className="text-gray-400">
+                                    Material:
+                                  </span>{" "}
+                                  <span className="text-white">
+                                    {
+                                      (
+                                        job.technical_data_sheet ||
+                                        job.metadata?.analysis
+                                          ?.technical_data_sheet
+                                      ).material
+                                    }
+                                  </span>
+                                </div>
+                              )}
+                              {(
+                                job.technical_data_sheet ||
+                                job.metadata?.analysis?.technical_data_sheet
+                              )?.weight && (
+                                <div>
+                                  <span className="text-gray-400">Weight:</span>{" "}
+                                  <span className="text-white">
+                                    {
+                                      (
+                                        job.technical_data_sheet ||
+                                        job.metadata?.analysis
+                                          ?.technical_data_sheet
+                                      ).weight
+                                    }
+                                  </span>
+                                </div>
+                              )}
+                              {(
+                                job.technical_data_sheet ||
+                                job.metadata?.analysis?.technical_data_sheet
+                              )?.temperature_tolerance && (
+                                <div>
+                                  <span className="text-gray-400">
+                                    Temperature Tolerance:
+                                  </span>{" "}
+                                  <span className="text-white">
+                                    {
+                                      (
+                                        job.technical_data_sheet ||
+                                        job.metadata?.analysis
+                                          ?.technical_data_sheet
+                                      ).temperature_tolerance
+                                    }
+                                  </span>
+                                </div>
+                              )}
+                              {(
+                                job.technical_data_sheet ||
+                                job.metadata?.analysis?.technical_data_sheet
+                              )?.common_specs && (
+                                <div>
+                                  <span className="text-gray-400">
+                                    Common Specs:
+                                  </span>{" "}
+                                  <span className="text-white">
+                                    {
+                                      (
+                                        job.technical_data_sheet ||
+                                        job.metadata?.analysis
+                                          ?.technical_data_sheet
+                                      ).common_specs
+                                    }
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Compatible Vehicles */}
+                        {(job.compatible_vehicles ||
+                          job.metadata?.analysis?.compatible_vehicles) && (
+                          <div className="p-4 rounded-lg bg-white/5 border border-white/10">
+                            <h3 className="font-semibold text-white mb-2">
+                              🚗 Compatible Vehicles
+                            </h3>
+                            <div className="text-gray-300 text-sm">
+                              {(
+                                job.compatible_vehicles ||
+                                job.metadata?.analysis?.compatible_vehicles
+                              ).join(", ")}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Engine Types */}
+                        {(job.engine_types ||
+                          job.metadata?.analysis?.engine_types) && (
+                          <div className="p-4 rounded-lg bg-white/5 border border-white/10">
+                            <h3 className="font-semibold text-white mb-2">
+                              ⚙️ Engine Types
+                            </h3>
+                            <div className="text-gray-300 text-sm">
+                              {(
+                                job.engine_types ||
+                                job.metadata?.analysis?.engine_types
+                              ).join(", ")}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Suppliers */}
+                        {(job.suppliers ||
+                          job.metadata?.analysis?.suppliers) && (
+                          <div className="p-4 rounded-lg bg-white/5 border border-white/10">
+                            <h3 className="font-semibold text-white mb-2">
+                              🌍 Where to Buy
+                            </h3>
+                            <div className="space-y-2 text-sm">
+                              {(
+                                job.suppliers ||
+                                job.metadata?.analysis?.suppliers
+                              ).map((supplier: any, idx: number) => (
+                                <div
+                                  key={idx}
+                                  className="flex justify-between items-center"
+                                >
+                                  <div>
+                                    <span className="text-white font-medium">
+                                      {supplier.name}
+                                    </span>
+                                    <div className="text-gray-400 text-xs">
+                                      {supplier.shipping_region}
+                                    </div>
+                                  </div>
+                                  <div className="text-right">
+                                    <div className="text-white">
+                                      {supplier.price_range}
+                                    </div>
+                                    <a
+                                      href={supplier.url}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="text-blue-400 hover:text-blue-300 text-xs"
+                                    >
+                                      Visit Store
+                                    </a>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Fitment Tips */}
+                        {(job.fitment_tips ||
+                          job.metadata?.analysis?.fitment_tips) && (
+                          <div className="p-4 rounded-lg bg-white/5 border border-white/10">
+                            <h3 className="font-semibold text-white mb-2">
+                              🔧 Installation Tips
+                            </h3>
+                            <p className="text-gray-300 text-sm">
+                              {job.fitment_tips ||
+                                job.metadata?.analysis?.fitment_tips}
+                            </p>
+                          </div>
+                        )}
+
+                        {/* Additional Instructions */}
+                        {(job.additional_instructions ||
+                          job.metadata?.analysis?.additional_instructions) && (
+                          <div className="p-4 rounded-lg bg-white/5 border border-white/10">
+                            <h3 className="font-semibold text-white mb-2">
+                              📝 Additional Instructions
+                            </h3>
+                            <p className="text-gray-300 text-sm">
+                              {job.additional_instructions ||
+                                job.metadata?.analysis?.additional_instructions}
+                            </p>
+                          </div>
+                        )}
+
+                        {/* Buy Links */}
+                        {(job.buy_links ||
+                          job.metadata?.analysis?.buy_links) && (
+                          <div className="p-4 rounded-lg bg-white/5 border border-white/10">
+                            <h3 className="font-semibold text-white mb-2">
+                              🔗 Quick Links
+                            </h3>
+                            <div className="space-y-2 text-sm">
+                              {Object.entries(
+                                job.buy_links ||
+                                  job.metadata?.analysis?.buy_links
+                              ).map(([key, url]: [string, any]) => (
+                                <div key={key}>
+                                  <a
+                                    href={url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-blue-400 hover:text-blue-300"
+                                  >
+                                    {key.replace("supplier", "Supplier ")} →
+                                  </a>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  }
+
+                  // Handle both old format (with results array) and new comprehensive format
+                  if (Array.isArray(job?.results)) {
+                    // Old format with results array
+                    return job.results.map((r: any, idx: number) => (
                       <div
                         key={idx}
                         className="p-3 rounded-lg bg-white/5 border border-white/10"
@@ -1590,11 +2511,310 @@ const History = () => {
                           {r.part_number ? ` • ${r.part_number}` : ""}
                         </div>
                       </div>
-                    )
-                  )}
-                {!Array.isArray((selectedKeywordJob as any)?.results) && (
-                  <div className="text-gray-400">No results available.</div>
-                )}
+                    ));
+                  } else if (
+                    job?.precise_part_name ||
+                    job?.class_name ||
+                    job?.metadata?.analysis ||
+                    job?.manufacturer
+                  ) {
+                    // New comprehensive format - display comprehensive analysis
+                    return (
+                      <div className="space-y-4">
+                        {/* Part Identification */}
+                        <div className="p-4 rounded-lg bg-white/5 border border-white/10">
+                          <h3 className="font-semibold text-white mb-2">
+                            🛞 Part Identification
+                          </h3>
+                          <div className="space-y-1 text-sm">
+                            <div>
+                              <span className="text-gray-400">Name:</span>{" "}
+                              <span className="text-white">
+                                {job.precise_part_name || job.class_name}
+                              </span>
+                            </div>
+                            <div>
+                              <span className="text-gray-400">Category:</span>{" "}
+                              <span className="text-white">{job.category}</span>
+                            </div>
+                            <div>
+                              <span className="text-gray-400">
+                                Manufacturer:
+                              </span>{" "}
+                              <span className="text-white">
+                                {job.manufacturer}
+                              </span>
+                            </div>
+                            <div>
+                              <span className="text-gray-400">Confidence:</span>{" "}
+                              <span className="text-white">
+                                {Math.round(
+                                  (job.confidence_score || 0.75) * 100
+                                )}
+                                %
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Technical Description */}
+                        {job.description && (
+                          <div className="p-4 rounded-lg bg-white/5 border border-white/10">
+                            <h3 className="font-semibold text-white mb-2">
+                              📘 Technical Description
+                            </h3>
+                            <p className="text-gray-300 text-sm">
+                              {job.description}
+                            </p>
+                          </div>
+                        )}
+
+                        {/* Pricing & Availability */}
+                        {job.estimated_price && (
+                          <div className="p-4 rounded-lg bg-white/5 border border-white/10">
+                            <h3 className="font-semibold text-white mb-2">
+                              💰 Pricing & Availability
+                            </h3>
+                            <div className="space-y-1 text-sm">
+                              {job.estimated_price.new && (
+                                <div>
+                                  <span className="text-gray-400">New:</span>{" "}
+                                  <span className="text-white">
+                                    {job.estimated_price.new}
+                                  </span>
+                                </div>
+                              )}
+                              {job.estimated_price.used && (
+                                <div>
+                                  <span className="text-gray-400">Used:</span>{" "}
+                                  <span className="text-white">
+                                    {job.estimated_price.used}
+                                  </span>
+                                </div>
+                              )}
+                              {job.estimated_price.refurbished && (
+                                <div>
+                                  <span className="text-gray-400">
+                                    Refurbished:
+                                  </span>{" "}
+                                  <span className="text-white">
+                                    {job.estimated_price.refurbished}
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Technical Data Sheet */}
+                        {job.technical_data_sheet && (
+                          <div className="p-4 rounded-lg bg-white/5 border border-white/10">
+                            <h3 className="font-semibold text-white mb-2">
+                              📊 Technical Data Sheet
+                            </h3>
+                            <div className="space-y-1 text-sm">
+                              {job.technical_data_sheet.part_type && (
+                                <div>
+                                  <span className="text-gray-400">
+                                    Part Type:
+                                  </span>{" "}
+                                  <span className="text-white">
+                                    {job.technical_data_sheet.part_type}
+                                  </span>
+                                </div>
+                              )}
+                              {job.technical_data_sheet.material && (
+                                <div>
+                                  <span className="text-gray-400">
+                                    Material:
+                                  </span>{" "}
+                                  <span className="text-white">
+                                    {job.technical_data_sheet.material}
+                                  </span>
+                                </div>
+                              )}
+                              {job.technical_data_sheet.common_specs && (
+                                <div>
+                                  <span className="text-gray-400">Specs:</span>{" "}
+                                  <span className="text-white">
+                                    {job.technical_data_sheet.common_specs}
+                                  </span>
+                                </div>
+                              )}
+                              {job.technical_data_sheet
+                                .temperature_tolerance && (
+                                <div>
+                                  <span className="text-gray-400">
+                                    Temperature Tolerance:
+                                  </span>{" "}
+                                  <span className="text-white">
+                                    {
+                                      job.technical_data_sheet
+                                        .temperature_tolerance
+                                    }
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Compatible Vehicles */}
+                        {job.compatible_vehicles &&
+                          job.compatible_vehicles.length > 0 && (
+                            <div className="p-4 rounded-lg bg-white/5 border border-white/10">
+                              <h3 className="font-semibold text-white mb-2">
+                                🚗 Compatible Vehicles
+                              </h3>
+                              <div className="text-gray-300 text-sm">
+                                {job.compatible_vehicles.join(", ")}
+                              </div>
+                            </div>
+                          )}
+
+                        {/* Suppliers */}
+                        {job.suppliers && job.suppliers.length > 0 && (
+                          <div className="p-4 rounded-lg bg-white/5 border border-white/10">
+                            <h3 className="font-semibold text-white mb-2">
+                              🌍 Where to Buy
+                            </h3>
+                            <div className="space-y-2 text-sm">
+                              {job.suppliers.map(
+                                (supplier: any, idx: number) => (
+                                  <div
+                                    key={idx}
+                                    className="flex justify-between items-center"
+                                  >
+                                    <span className="text-white">
+                                      {supplier.name}
+                                    </span>
+                                    <span className="text-gray-400">
+                                      {supplier.price_range}
+                                    </span>
+                                  </div>
+                                )
+                              )}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Fitment Tips */}
+                        {job.fitment_tips && (
+                          <div className="p-4 rounded-lg bg-white/5 border border-white/10">
+                            <h3 className="font-semibold text-white mb-2">
+                              🔧 Fitment Tips
+                            </h3>
+                            <p className="text-gray-300 text-sm">
+                              {job.fitment_tips}
+                            </p>
+                          </div>
+                        )}
+
+                        {/* Full Analysis from Metadata */}
+                        {job.metadata?.analysis?.full_analysis && (
+                          <div className="p-4 rounded-lg bg-white/5 border border-white/10">
+                            <h3 className="font-semibold text-white mb-2">
+                              📋 Complete Analysis
+                            </h3>
+                            <div className="text-gray-300 text-sm whitespace-pre-wrap">
+                              {job.metadata.analysis.full_analysis}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  } else {
+                    // Fallback: Try to display any available data
+                    console.log(
+                      "🔍 Falling back to display any available data"
+                    );
+                    return (
+                      <div className="space-y-4">
+                        <div className="p-4 rounded-lg bg-white/5 border border-white/10">
+                          <h3 className="font-semibold text-white mb-2">
+                            🔍 Raw Data Debug
+                          </h3>
+                          <pre className="text-xs text-gray-300 overflow-auto max-h-40">
+                            {JSON.stringify(job, null, 2)}
+                          </pre>
+                        </div>
+
+                        {/* Try to display any available fields */}
+                        {job && (
+                          <div className="p-4 rounded-lg bg-white/5 border border-white/10">
+                            <h3 className="font-semibold text-white mb-2">
+                              📋 Available Data
+                            </h3>
+                            <div className="space-y-1 text-sm">
+                              {job.precise_part_name && (
+                                <div>
+                                  <span className="text-gray-400">
+                                    Part Name:
+                                  </span>{" "}
+                                  <span className="text-white">
+                                    {job.precise_part_name}
+                                  </span>
+                                </div>
+                              )}
+                              {job.class_name && (
+                                <div>
+                                  <span className="text-gray-400">Class:</span>{" "}
+                                  <span className="text-white">
+                                    {job.class_name}
+                                  </span>
+                                </div>
+                              )}
+                              {job.manufacturer && (
+                                <div>
+                                  <span className="text-gray-400">
+                                    Manufacturer:
+                                  </span>{" "}
+                                  <span className="text-white">
+                                    {job.manufacturer}
+                                  </span>
+                                </div>
+                              )}
+                              {job.category && (
+                                <div>
+                                  <span className="text-gray-400">
+                                    Category:
+                                  </span>{" "}
+                                  <span className="text-white">
+                                    {job.category}
+                                  </span>
+                                </div>
+                              )}
+                              {job.description && (
+                                <div>
+                                  <span className="text-gray-400">
+                                    Description:
+                                  </span>{" "}
+                                  <span className="text-white">
+                                    {job.description}
+                                  </span>
+                                </div>
+                              )}
+                              {job.full_analysis && (
+                                <div>
+                                  <span className="text-gray-400">
+                                    Analysis:
+                                  </span>{" "}
+                                  <span className="text-white">
+                                    {job.full_analysis}
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
+
+                        <div className="text-gray-400 text-center">
+                          Debug mode - showing raw data structure
+                        </div>
+                      </div>
+                    );
+                  }
+                })()}
               </div>
             </DialogContent>
           </Dialog>

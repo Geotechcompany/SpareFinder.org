@@ -10,8 +10,6 @@ import {
   ShoppingCart,
   Search,
   Loader2,
-  ChevronDown,
-  ChevronUp,
   Mail,
   Clock,
   Users,
@@ -22,7 +20,7 @@ import {
 } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { toast } from "@/hooks/use-toast";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import SupplierContactScraper from "./SupplierContactScraper";
 
 interface Supplier {
@@ -92,8 +90,9 @@ export const EnhancedSupplierDisplay: React.FC<
     Record<string, ScrapedContactData>
   >({});
   const [isScraping, setIsScraping] = useState<Record<string, boolean>>({});
+  // Always show all suppliers expanded by default
   const [expandedSuppliers, setExpandedSuppliers] = useState<Set<string>>(
-    new Set()
+    new Set(suppliers.map((s) => s.name))
   );
 
   const handleSupplierClick = (url: string, supplierName: string) => {
@@ -161,18 +160,6 @@ export const EnhancedSupplierDisplay: React.FC<
       setIsScraping((prev) => ({ ...prev, [supplier.name]: false }));
     }
   }, []);
-
-  const toggleSupplierExpansion = (supplierName: string) => {
-    setExpandedSuppliers((prev) => {
-      const newSet = new Set(prev);
-      if (newSet.has(supplierName)) {
-        newSet.delete(supplierName);
-      } else {
-        newSet.add(supplierName);
-      }
-      return newSet;
-    });
-  };
 
   const copyToClipboard = async (text: string, type: string) => {
     try {
@@ -248,7 +235,6 @@ export const EnhancedSupplierDisplay: React.FC<
       {/* Suppliers List */}
       <div className="space-y-4">
         {allSuppliers.map((supplier, index) => {
-          const isExpanded = expandedSuppliers.has(supplier.name);
           const hasScrapedData = scrapedData[supplier.name];
           const isCurrentlyScraping = isScraping[supplier.name];
           const serverPhones =
@@ -330,318 +316,282 @@ export const EnhancedSupplierDisplay: React.FC<
                         <ExternalLink className="w-4 h-4 mr-1" />
                         Visit
                       </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => toggleSupplierExpansion(supplier.name)}
-                        className="border-white/20 text-gray-300 hover:bg-white/10"
-                      >
-                        {isExpanded ? (
-                          <ChevronUp className="w-4 h-4" />
-                        ) : (
-                          <ChevronDown className="w-4 h-4" />
-                        )}
-                      </Button>
                     </div>
                   </div>
                 </CardHeader>
 
-                <AnimatePresence>
-                  {isExpanded && (
-                    <motion.div
-                      initial={{ height: 0, opacity: 0 }}
-                      animate={{ height: "auto", opacity: 1 }}
-                      exit={{ height: 0, opacity: 0 }}
-                      transition={{ duration: 0.3 }}
-                    >
-                      <CardContent className="pt-0 space-y-4">
-                        {/* Basic Info */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <div>
-                            <Label className="text-gray-300 text-sm">
-                              Website
-                            </Label>
-                            <p className="text-gray-200 text-sm font-mono break-all">
-                              {supplier.url}
-                            </p>
-                          </div>
-                          {supplier.contact && (
-                            <div>
-                              <Label className="text-gray-300 text-sm">
-                                Contact
-                              </Label>
-                              <p className="text-gray-200 text-sm">
-                                {supplier.contact}
-                              </p>
+                <CardContent className="pt-0 space-y-4">
+                  {/* Basic Info */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <Label className="text-gray-300 text-sm">Website</Label>
+                      <p className="text-gray-200 text-sm font-mono break-all">
+                        {supplier.url}
+                      </p>
+                    </div>
+                    {supplier.contact && (
+                      <div>
+                        <Label className="text-gray-300 text-sm">Contact</Label>
+                        <p className="text-gray-200 text-sm">
+                          {supplier.contact}
+                        </p>
+                      </div>
+                    )}
+                    {serverPhones.length > 0 && (
+                      <div>
+                        <Label className="text-gray-300 text-sm flex items-center">
+                          <Phone className="w-3 h-3 mr-1" />
+                          Phone Numbers
+                        </Label>
+                        <div className="space-y-2 mt-1">
+                          {serverPhones.slice(0, 3).map((phone, idx) => (
+                            <div
+                              key={idx}
+                              className="flex items-center justify-between bg-white/5 p-2 rounded text-xs"
+                            >
+                              <span className="text-gray-200 font-mono">
+                                {phone}
+                              </span>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => copyToClipboard(phone, "phone")}
+                                className="h-6 w-6 p-0"
+                              >
+                                <Copy className="w-3 h-3" />
+                              </Button>
                             </div>
-                          )}
-                          {serverPhones.length > 0 && (
-                            <div>
-                              <Label className="text-gray-300 text-sm flex items-center">
-                                <Phone className="w-3 h-3 mr-1" />
-                                Phone Numbers
-                              </Label>
-                              <div className="space-y-2 mt-1">
-                                {serverPhones.slice(0, 3).map((phone, idx) => (
-                                  <div
-                                    key={idx}
-                                    className="flex items-center justify-between bg-white/5 p-2 rounded text-xs"
-                                  >
-                                    <span className="text-gray-200 font-mono">
-                                      {phone}
-                                    </span>
-                                    <Button
-                                      size="sm"
-                                      variant="ghost"
-                                      onClick={() =>
-                                        copyToClipboard(phone, "phone")
-                                      }
-                                      className="h-6 w-6 p-0"
-                                    >
-                                      <Copy className="w-3 h-3" />
-                                    </Button>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-                          {serverEmails.length > 0 && (
-                            <div>
-                              <Label className="text-gray-300 text-sm flex items-center">
-                                <Mail className="w-3 h-3 mr-1" />
-                                Emails
-                              </Label>
-                              <div className="space-y-2 mt-1">
-                                {serverEmails.slice(0, 3).map((email, idx) => (
-                                  <div
-                                    key={idx}
-                                    className="flex items-center justify-between bg-white/5 p-2 rounded text-xs"
-                                  >
-                                    <span className="text-gray-200 font-mono truncate">
-                                      {email}
-                                    </span>
-                                    <Button
-                                      size="sm"
-                                      variant="ghost"
-                                      onClick={() =>
-                                        copyToClipboard(email, "email")
-                                      }
-                                      className="h-6 w-6 p-0"
-                                    >
-                                      <Copy className="w-3 h-3" />
-                                    </Button>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          )}
+                          ))}
                         </div>
-
-                        {/* Scraping Section */}
-                        <div className="border-t border-white/10 pt-4">
-                          <div className="flex items-center justify-between mb-3">
-                            <Label className="text-gray-300">
-                              Contact Information
-                            </Label>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => scrapeSupplierContact(supplier)}
-                              disabled={
-                                isCurrentlyScraping ||
-                                !supplier.url.startsWith("http")
-                              }
-                              className="border-white/20 text-gray-300 hover:bg-white/10"
+                      </div>
+                    )}
+                    {serverEmails.length > 0 && (
+                      <div>
+                        <Label className="text-gray-300 text-sm flex items-center">
+                          <Mail className="w-3 h-3 mr-1" />
+                          Emails
+                        </Label>
+                        <div className="space-y-2 mt-1">
+                          {serverEmails.slice(0, 3).map((email, idx) => (
+                            <div
+                              key={idx}
+                              className="flex items-center justify-between bg-white/5 p-2 rounded text-xs"
                             >
-                              {isCurrentlyScraping ? (
-                                <Loader2 className="w-4 h-4 mr-1 animate-spin" />
-                              ) : (
-                                <Search className="w-4 h-4 mr-1" />
+                              <span className="text-gray-200 font-mono truncate">
+                                {email}
+                              </span>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => copyToClipboard(email, "email")}
+                                className="h-6 w-6 p-0"
+                              >
+                                <Copy className="w-3 h-3" />
+                              </Button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Contact Information Section - Always Show Available Data */}
+                  <div className="border-t border-white/10 pt-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <Label className="text-gray-300">
+                        Contact Information
+                      </Label>
+                      {/* Only show extract button if no data is available */}
+                      {!hasScrapedData &&
+                        !serverPhones.length &&
+                        !serverEmails.length && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => scrapeSupplierContact(supplier)}
+                            disabled={
+                              isCurrentlyScraping ||
+                              !supplier.url.startsWith("http")
+                            }
+                            className="border-white/20 text-gray-300 hover:bg-white/10"
+                          >
+                            {isCurrentlyScraping ? (
+                              <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+                            ) : (
+                              <Search className="w-4 h-4 mr-1" />
+                            )}
+                            {isCurrentlyScraping
+                              ? "Scraping..."
+                              : "Extract Contact Info"}
+                          </Button>
+                        )}
+                    </div>
+
+                    {/* Always show available contact data */}
+                    {(hasScrapedData ||
+                      serverPhones.length > 0 ||
+                      serverEmails.length > 0) && (
+                      <motion.div
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="space-y-3"
+                      >
+                        {hasScrapedData.success ? (
+                          <>
+                            {/* Company Info */}
+                            {hasScrapedData.company_name && (
+                              <div className="bg-white/5 p-3 rounded-lg">
+                                <Label className="text-gray-300 text-sm">
+                                  Company
+                                </Label>
+                                <p className="text-gray-200 text-sm">
+                                  {hasScrapedData.company_name}
+                                </p>
+                              </div>
+                            )}
+
+                            {/* Contact Details Grid */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                              {/* Emails */}
+                              {hasScrapedData.contact.emails.length > 0 && (
+                                <div className="space-y-2">
+                                  <Label className="text-gray-300 text-sm flex items-center">
+                                    <Mail className="w-3 h-3 mr-1" />
+                                    Emails
+                                  </Label>
+                                  {hasScrapedData.contact.emails
+                                    .slice(0, 3)
+                                    .map((email, idx) => (
+                                      <div
+                                        key={idx}
+                                        className="flex items-center justify-between bg-white/5 p-2 rounded text-xs"
+                                      >
+                                        <span className="text-gray-200 font-mono truncate">
+                                          {email}
+                                        </span>
+                                        <Button
+                                          size="sm"
+                                          variant="ghost"
+                                          onClick={() =>
+                                            copyToClipboard(email, "email")
+                                          }
+                                          className="h-6 w-6 p-0"
+                                        >
+                                          <Copy className="w-3 h-3" />
+                                        </Button>
+                                      </div>
+                                    ))}
+                                </div>
                               )}
-                              {isCurrentlyScraping
-                                ? "Scraping..."
-                                : "Extract Contact Info"}
-                            </Button>
-                          </div>
 
-                          {/* Scraped Data Display */}
-                          {hasScrapedData && (
-                            <motion.div
-                              initial={{ opacity: 0, y: 10 }}
-                              animate={{ opacity: 1, y: 0 }}
-                              className="space-y-3"
-                            >
-                              {hasScrapedData.success ? (
-                                <>
-                                  {/* Company Info */}
-                                  {hasScrapedData.company_name && (
-                                    <div className="bg-white/5 p-3 rounded-lg">
-                                      <Label className="text-gray-300 text-sm">
-                                        Company
-                                      </Label>
-                                      <p className="text-gray-200 text-sm">
-                                        {hasScrapedData.company_name}
-                                      </p>
-                                    </div>
-                                  )}
-
-                                  {/* Contact Details Grid */}
-                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                    {/* Emails */}
-                                    {hasScrapedData.contact.emails.length >
-                                      0 && (
-                                      <div className="space-y-2">
-                                        <Label className="text-gray-300 text-sm flex items-center">
-                                          <Mail className="w-3 h-3 mr-1" />
-                                          Emails
-                                        </Label>
-                                        {hasScrapedData.contact.emails
-                                          .slice(0, 3)
-                                          .map((email, idx) => (
-                                            <div
-                                              key={idx}
-                                              className="flex items-center justify-between bg-white/5 p-2 rounded text-xs"
-                                            >
-                                              <span className="text-gray-200 font-mono truncate">
-                                                {email}
-                                              </span>
-                                              <Button
-                                                size="sm"
-                                                variant="ghost"
-                                                onClick={() =>
-                                                  copyToClipboard(
-                                                    email,
-                                                    "email"
-                                                  )
-                                                }
-                                                className="h-6 w-6 p-0"
-                                              >
-                                                <Copy className="w-3 h-3" />
-                                              </Button>
-                                            </div>
-                                          ))}
+                              {/* Phones */}
+                              {hasScrapedData.contact.phones.length > 0 && (
+                                <div className="space-y-2">
+                                  <Label className="text-gray-300 text-sm flex items-center">
+                                    <Phone className="w-3 h-3 mr-1" />
+                                    Phones
+                                  </Label>
+                                  {hasScrapedData.contact.phones
+                                    .slice(0, 3)
+                                    .map((phone, idx) => (
+                                      <div
+                                        key={idx}
+                                        className="flex items-center justify-between bg-white/5 p-2 rounded text-xs"
+                                      >
+                                        <span className="text-gray-200 font-mono">
+                                          {phone}
+                                        </span>
+                                        <Button
+                                          size="sm"
+                                          variant="ghost"
+                                          onClick={() =>
+                                            copyToClipboard(phone, "phone")
+                                          }
+                                          className="h-6 w-6 p-0"
+                                        >
+                                          <Copy className="w-3 h-3" />
+                                        </Button>
                                       </div>
-                                    )}
+                                    ))}
+                                </div>
+                              )}
 
-                                    {/* Phones */}
-                                    {hasScrapedData.contact.phones.length >
-                                      0 && (
-                                      <div className="space-y-2">
-                                        <Label className="text-gray-300 text-sm flex items-center">
-                                          <Phone className="w-3 h-3 mr-1" />
-                                          Phones
-                                        </Label>
-                                        {hasScrapedData.contact.phones
-                                          .slice(0, 3)
-                                          .map((phone, idx) => (
-                                            <div
-                                              key={idx}
-                                              className="flex items-center justify-between bg-white/5 p-2 rounded text-xs"
-                                            >
-                                              <span className="text-gray-200 font-mono">
-                                                {phone}
-                                              </span>
-                                              <Button
-                                                size="sm"
-                                                variant="ghost"
-                                                onClick={() =>
-                                                  copyToClipboard(
-                                                    phone,
-                                                    "phone"
-                                                  )
-                                                }
-                                                className="h-6 w-6 p-0"
-                                              >
-                                                <Copy className="w-3 h-3" />
-                                              </Button>
-                                            </div>
-                                          ))}
-                                      </div>
-                                    )}
-
-                                    {/* Business Hours */}
-                                    {hasScrapedData.contact.business_hours && (
-                                      <div className="space-y-2">
-                                        <Label className="text-gray-300 text-sm flex items-center">
-                                          <Clock className="w-3 h-3 mr-1" />
-                                          Business Hours
-                                        </Label>
-                                        <div className="bg-white/5 p-2 rounded text-xs">
-                                          <span className="text-gray-200">
-                                            {
-                                              hasScrapedData.contact
-                                                .business_hours
-                                            }
-                                          </span>
-                                        </div>
-                                      </div>
-                                    )}
-
-                                    {/* Social Media */}
-                                    {Object.keys(
-                                      hasScrapedData.contact.social_media
-                                    ).length > 0 && (
-                                      <div className="space-y-2">
-                                        <Label className="text-gray-300 text-sm flex items-center">
-                                          <Users className="w-3 h-3 mr-1" />
-                                          Social Media
-                                        </Label>
-                                        <div className="flex flex-wrap gap-1">
-                                          {Object.entries(
-                                            hasScrapedData.contact.social_media
-                                          )
-                                            .slice(0, 3)
-                                            .map(([platform, link]) => (
-                                              <Button
-                                                key={platform}
-                                                variant="outline"
-                                                size="sm"
-                                                onClick={() =>
-                                                  window.open(link, "_blank")
-                                                }
-                                                className="h-6 text-xs border-white/20 text-gray-300 hover:bg-white/10"
-                                              >
-                                                {platform}
-                                              </Button>
-                                            ))}
-                                        </div>
-                                      </div>
-                                    )}
-                                  </div>
-
-                                  {/* Price Info */}
-                                  {hasScrapedData.price_info && (
-                                    <div className="bg-white/5 p-3 rounded-lg">
-                                      <Label className="text-gray-300 text-sm flex items-center">
-                                        <DollarSign className="w-3 h-3 mr-1" />
-                                        Price Information
-                                      </Label>
-                                      <p className="text-gray-200 text-sm mt-1">
-                                        {hasScrapedData.price_info}
-                                      </p>
-                                    </div>
-                                  )}
-                                </>
-                              ) : (
-                                <div className="flex items-center space-x-2 text-red-400 bg-red-600/10 p-3 rounded-lg">
-                                  <AlertCircle className="w-4 h-4" />
-                                  <div>
-                                    <p className="text-sm font-medium">
-                                      Scraping Failed
-                                    </p>
-                                    <p className="text-xs text-gray-400">
-                                      {hasScrapedData.error}
-                                    </p>
+                              {/* Business Hours */}
+                              {hasScrapedData.contact.business_hours && (
+                                <div className="space-y-2">
+                                  <Label className="text-gray-300 text-sm flex items-center">
+                                    <Clock className="w-3 h-3 mr-1" />
+                                    Business Hours
+                                  </Label>
+                                  <div className="bg-white/5 p-2 rounded text-xs">
+                                    <span className="text-gray-200">
+                                      {hasScrapedData.contact.business_hours}
+                                    </span>
                                   </div>
                                 </div>
                               )}
-                            </motion.div>
-                          )}
-                        </div>
-                      </CardContent>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
+
+                              {/* Social Media */}
+                              {Object.keys(hasScrapedData.contact.social_media)
+                                .length > 0 && (
+                                <div className="space-y-2">
+                                  <Label className="text-gray-300 text-sm flex items-center">
+                                    <Users className="w-3 h-3 mr-1" />
+                                    Social Media
+                                  </Label>
+                                  <div className="flex flex-wrap gap-1">
+                                    {Object.entries(
+                                      hasScrapedData.contact.social_media
+                                    )
+                                      .slice(0, 3)
+                                      .map(([platform, link]) => (
+                                        <Button
+                                          key={platform}
+                                          variant="outline"
+                                          size="sm"
+                                          onClick={() =>
+                                            window.open(link, "_blank")
+                                          }
+                                          className="h-6 text-xs border-white/20 text-gray-300 hover:bg-white/10"
+                                        >
+                                          {platform}
+                                        </Button>
+                                      ))}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Price Info */}
+                            {hasScrapedData.price_info && (
+                              <div className="bg-white/5 p-3 rounded-lg">
+                                <Label className="text-gray-300 text-sm flex items-center">
+                                  <DollarSign className="w-3 h-3 mr-1" />
+                                  Price Information
+                                </Label>
+                                <p className="text-gray-200 text-sm mt-1">
+                                  {hasScrapedData.price_info}
+                                </p>
+                              </div>
+                            )}
+                          </>
+                        ) : (
+                          <div className="flex items-center space-x-2 text-red-400 bg-red-600/10 p-3 rounded-lg">
+                            <AlertCircle className="w-4 h-4" />
+                            <div>
+                              <p className="text-sm font-medium">
+                                Scraping Failed
+                              </p>
+                              <p className="text-xs text-gray-400">
+                                {hasScrapedData.error}
+                              </p>
+                            </div>
+                          </div>
+                        )}
+                      </motion.div>
+                    )}
+                  </div>
+                </CardContent>
               </Card>
             </motion.div>
           );
