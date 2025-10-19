@@ -222,7 +222,7 @@ const History = () => {
 
       // Handle stats response
       if (statsResponse.status === "fulfilled" && statsResponse.value.success) {
-        const data = statsResponse.value.data;
+        const data = statsResponse.value.data as any;
         setStats({
           totalUploads: data.totalUploads || 0,
           completed: data.successfulUploads || 0,

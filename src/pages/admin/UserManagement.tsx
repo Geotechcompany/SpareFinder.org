@@ -1,13 +1,20 @@
-import React, { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
-import { useToast } from '@/components/ui/use-toast';
-import { api } from '@/lib/api';
-import AdminDesktopSidebar from '@/components/AdminDesktopSidebar';
-import MobileSidebar from '@/components/MobileSidebar';
+import React, { useState, useEffect } from "react";
+import { motion } from "framer-motion";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { useToast } from "@/components/ui/use-toast";
+import { api } from "@/lib/api";
+import AdminDesktopSidebar from "@/components/AdminDesktopSidebar";
+import MobileSidebar from "@/components/MobileSidebar";
+import { TableSkeleton } from "@/components/skeletons";
 import {
   Table,
   TableBody,
@@ -15,14 +22,14 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table';
+} from "@/components/ui/table";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select';
+} from "@/components/ui/select";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -33,29 +40,29 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
   AlertDialogTrigger,
-} from '@/components/ui/alert-dialog';
-import { 
-  Loader2, 
-  Users, 
-  Search, 
-  Filter, 
-  MoreHorizontal, 
-  Edit, 
-  Trash2, 
-  Crown, 
-  Shield, 
+} from "@/components/ui/alert-dialog";
+import {
+  Loader2,
+  Users,
+  Search,
+  Filter,
+  MoreHorizontal,
+  Edit,
+  Trash2,
+  Crown,
+  Shield,
   User,
   Menu,
   ChevronLeft,
-  ChevronRight
-} from 'lucide-react';
+  ChevronRight,
+} from "lucide-react";
 
 interface UserData {
   id: string;
   email: string;
   full_name: string;
   company?: string;
-  role: 'user' | 'admin' | 'super_admin';
+  role: "user" | "admin" | "super_admin";
   created_at: string;
   updated_at: string;
   last_sign_in_at?: string;
@@ -81,11 +88,11 @@ const UserManagement = () => {
     page: 1,
     limit: 20,
     total: 0,
-    pages: 0
+    pages: 0,
   });
   const [isLoading, setIsLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [roleFilter, setRoleFilter] = useState<string>('all');
+  const [searchTerm, setSearchTerm] = useState("");
+  const [roleFilter, setRoleFilter] = useState<string>("all");
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const { toast } = useToast();
@@ -94,8 +101,8 @@ const UserManagement = () => {
   useEffect(() => {
     const debounceTimer = setTimeout(() => {
       // Reset to page 1 when search or filter changes
-      if (searchTerm || roleFilter !== 'all') {
-        setPagination(prev => ({ ...prev, page: 1 }));
+      if (searchTerm || roleFilter !== "all") {
+        setPagination((prev) => ({ ...prev, page: 1 }));
       }
       fetchUsers();
     }, 500); // 500ms debounce
@@ -111,40 +118,44 @@ const UserManagement = () => {
   const fetchUsers = async () => {
     try {
       setIsLoading(true);
-      console.log('🔍 Fetching users with filters:', { searchTerm, roleFilter, page: pagination.page });
-      
+      console.log("🔍 Fetching users with filters:", {
+        searchTerm,
+        roleFilter,
+        page: pagination.page,
+      });
+
       const response = await api.admin.getUsers(
-        pagination.page, 
-        pagination.limit, 
-        searchTerm, 
+        pagination.page,
+        pagination.limit,
+        searchTerm,
         roleFilter
       );
-      
-      console.log('📋 User fetch response:', response);
-      
+
+      console.log("📋 User fetch response:", response);
+
       if (response.success && response.data) {
         const fetchedUsers = response.data.users || [];
-        
-        console.log('📋 Fetched users from API:', fetchedUsers);
-        
+
+        console.log("📋 Fetched users from API:", fetchedUsers);
+
         setUsers(fetchedUsers);
-        setPagination(prev => ({
+        setPagination((prev) => ({
           ...prev,
           total: response.data.pagination?.total || 0,
-          pages: response.data.pagination?.pages || 0
+          pages: response.data.pagination?.pages || 0,
         }));
       } else {
-        console.warn('❌ Invalid response format:', response);
+        console.warn("❌ Invalid response format:", response);
         // Set empty users array if response is invalid
         setUsers([]);
-        setPagination(prev => ({
+        setPagination((prev) => ({
           ...prev,
           total: 0,
-          pages: 0
+          pages: 0,
         }));
       }
     } catch (error) {
-      console.error('Error fetching users:', error);
+      console.error("Error fetching users:", error);
       toast({
         variant: "destructive",
         title: "Error",
@@ -152,20 +163,23 @@ const UserManagement = () => {
       });
       // Set empty users array on error
       setUsers([]);
-      setPagination(prev => ({
+      setPagination((prev) => ({
         ...prev,
         total: 0,
-        pages: 0
+        pages: 0,
       }));
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleRoleUpdate = async (userId: string, newRole: 'user' | 'admin' | 'super_admin') => {
+  const handleRoleUpdate = async (
+    userId: string,
+    newRole: "user" | "admin" | "super_admin"
+  ) => {
     try {
       const response = await api.admin.updateUserRole(userId, newRole);
-      
+
       if (response.success) {
         toast({
           title: "Role Updated",
@@ -173,10 +187,10 @@ const UserManagement = () => {
         });
         fetchUsers(); // Refresh the list
       } else {
-        throw new Error(response.error || 'Failed to update role');
+        throw new Error(response.error || "Failed to update role");
       }
     } catch (error) {
-      console.error('Error updating user role:', error);
+      console.error("Error updating user role:", error);
       toast({
         variant: "destructive",
         title: "Error",
@@ -188,7 +202,7 @@ const UserManagement = () => {
   const handleDeleteUser = async (userId: string) => {
     try {
       const response = await api.admin.deleteUser(userId);
-      
+
       if (response.success) {
         toast({
           title: "User Deleted",
@@ -196,10 +210,10 @@ const UserManagement = () => {
         });
         fetchUsers(); // Refresh the list
       } else {
-        throw new Error(response.error || 'Failed to delete user');
+        throw new Error(response.error || "Failed to delete user");
       }
     } catch (error) {
-      console.error('Error deleting user:', error);
+      console.error("Error deleting user:", error);
       toast({
         variant: "destructive",
         title: "Error",
@@ -210,17 +224,23 @@ const UserManagement = () => {
 
   const getRoleIcon = (role: string) => {
     switch (role) {
-      case 'super_admin': return Crown;
-      case 'admin': return Shield;
-      default: return User;
+      case "super_admin":
+        return Crown;
+      case "admin":
+        return Shield;
+      default:
+        return User;
     }
   };
 
   const getRoleColor = (role: string) => {
     switch (role) {
-      case 'super_admin': return 'bg-yellow-600/20 text-yellow-400 border-yellow-500/30';
-      case 'admin': return 'bg-purple-600/20 text-purple-400 border-purple-500/30';
-      default: return 'bg-blue-600/20 text-blue-400 border-blue-500/30';
+      case "super_admin":
+        return "bg-yellow-600/20 text-yellow-400 border-yellow-500/30";
+      case "admin":
+        return "bg-purple-600/20 text-purple-400 border-purple-500/30";
+      default:
+        return "bg-blue-600/20 text-blue-400 border-blue-500/30";
     }
   };
 
@@ -245,7 +265,7 @@ const UserManagement = () => {
           transition={{
             duration: 20,
             repeat: Infinity,
-            ease: "linear"
+            ease: "linear",
           }}
         />
         <motion.div
@@ -258,18 +278,24 @@ const UserManagement = () => {
           transition={{
             duration: 25,
             repeat: Infinity,
-            ease: "easeInOut"
+            ease: "easeInOut",
           }}
         />
       </div>
 
-      <AdminDesktopSidebar isCollapsed={isCollapsed} onToggle={handleToggleSidebar} />
-      
+      <AdminDesktopSidebar
+        isCollapsed={isCollapsed}
+        onToggle={handleToggleSidebar}
+      />
+
       {/* Mobile Sidebar */}
-      <MobileSidebar isOpen={isMobileMenuOpen} onClose={() => setIsMobileMenuOpen(false)} />
+      <MobileSidebar
+        isOpen={isMobileMenuOpen}
+        onClose={() => setIsMobileMenuOpen(false)}
+      />
 
       {/* Mobile Menu Button */}
-      <button 
+      <button
         onClick={handleToggleMobileMenu}
         className="fixed top-4 right-4 z-50 p-2 rounded-lg bg-black/20 backdrop-blur-xl border border-white/10 md:hidden"
       >
@@ -279,9 +305,9 @@ const UserManagement = () => {
       {/* Main Content */}
       <motion.div
         initial={false}
-        animate={{ 
-          marginLeft: isCollapsed ? '80px' : '320px',
-          width: isCollapsed ? 'calc(100% - 80px)' : 'calc(100% - 320px)'
+        animate={{
+          marginLeft: isCollapsed ? "80px" : "320px",
+          width: isCollapsed ? "calc(100% - 80px)" : "calc(100% - 320px)",
         }}
         transition={{ duration: 0.3, ease: "easeInOut" }}
         className="flex-1 p-2 sm:p-4 lg:p-8 relative z-10 overflow-x-hidden md:overflow-x-visible"
@@ -303,7 +329,10 @@ const UserManagement = () => {
               </p>
             </div>
             <div className="flex items-center space-x-2">
-              <Badge variant="secondary" className="bg-purple-600/20 text-purple-400 border-purple-500/30">
+              <Badge
+                variant="secondary"
+                className="bg-purple-600/20 text-purple-400 border-purple-500/30"
+              >
                 <Users className="w-3 h-3 mr-1" />
                 {pagination.total} Total Users
               </Badge>
@@ -356,9 +385,7 @@ const UserManagement = () => {
             </CardHeader>
             <CardContent>
               {isLoading ? (
-                <div className="flex items-center justify-center py-12">
-                  <Loader2 className="w-8 h-8 animate-spin text-purple-600" />
-                </div>
+                <TableSkeleton variant="detailed" rows={5} />
               ) : (
                 <>
                   <div className="overflow-x-auto">
@@ -366,11 +393,19 @@ const UserManagement = () => {
                       <TableHeader>
                         <TableRow className="border-white/10">
                           <TableHead className="text-gray-300">User</TableHead>
-                          <TableHead className="text-gray-300">Company</TableHead>
+                          <TableHead className="text-gray-300">
+                            Company
+                          </TableHead>
                           <TableHead className="text-gray-300">Role</TableHead>
-                          <TableHead className="text-gray-300">Activity</TableHead>
-                          <TableHead className="text-gray-300">Joined</TableHead>
-                          <TableHead className="text-gray-300">Actions</TableHead>
+                          <TableHead className="text-gray-300">
+                            Activity
+                          </TableHead>
+                          <TableHead className="text-gray-300">
+                            Joined
+                          </TableHead>
+                          <TableHead className="text-gray-300">
+                            Actions
+                          </TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -378,11 +413,15 @@ const UserManagement = () => {
                           <TableRow>
                             <TableCell colSpan={6} className="text-center py-8">
                               <div className="text-gray-400">
-                                {searchTerm || roleFilter !== 'all' ? (
+                                {searchTerm || roleFilter !== "all" ? (
                                   <div>
                                     <Users className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                                    <p>No users found matching your criteria.</p>
-                                    <p className="text-sm mt-1">Try adjusting your search or filters.</p>
+                                    <p>
+                                      No users found matching your criteria.
+                                    </p>
+                                    <p className="text-sm mt-1">
+                                      Try adjusting your search or filters.
+                                    </p>
                                   </div>
                                 ) : (
                                   <div>
@@ -397,40 +436,63 @@ const UserManagement = () => {
                           users.map((user) => {
                             const RoleIcon = getRoleIcon(user.role);
                             return (
-                              <TableRow key={user.id} className="border-white/10 hover:bg-white/5">
+                              <TableRow
+                                key={user.id}
+                                className="border-white/10 hover:bg-white/5"
+                              >
                                 <TableCell>
                                   <div>
-                                    <div className="font-medium text-white">{user.full_name}</div>
-                                    <div className="text-sm text-gray-400">{user.email}</div>
+                                    <div className="font-medium text-white">
+                                      {user.full_name}
+                                    </div>
+                                    <div className="text-sm text-gray-400">
+                                      {user.email}
+                                    </div>
                                   </div>
                                 </TableCell>
                                 <TableCell className="text-gray-300">
-                                  {user.company || 'N/A'}
+                                  {user.company || "N/A"}
                                 </TableCell>
                                 <TableCell>
-                                  <Badge variant="secondary" className={getRoleColor(user.role)}>
+                                  <Badge
+                                    variant="secondary"
+                                    className={getRoleColor(user.role)}
+                                  >
                                     <RoleIcon className="w-3 h-3 mr-1" />
-                                    {user.role.replace('_', ' ').toUpperCase()}
+                                    {user.role.replace("_", " ").toUpperCase()}
                                   </Badge>
                                 </TableCell>
                                 <TableCell className="text-gray-300">
                                   <div className="text-sm">
                                     <div className="flex items-center space-x-2">
-                                      <span className="text-blue-400">{user.search_count || 0}</span>
-                                      <span className="text-gray-500">searches</span>
+                                      <span className="text-blue-400">
+                                        {user.search_count || 0}
+                                      </span>
+                                      <span className="text-gray-500">
+                                        searches
+                                      </span>
                                     </div>
                                     {user.last_sign_in_at && (
                                       <div className="text-xs text-gray-500 mt-1">
-                                        Last seen: {new Date(user.last_sign_in_at).toLocaleDateString()}
+                                        Last seen:{" "}
+                                        {new Date(
+                                          user.last_sign_in_at
+                                        ).toLocaleDateString()}
                                       </div>
                                     )}
                                   </div>
                                 </TableCell>
                                 <TableCell className="text-gray-300">
                                   <div className="text-sm">
-                                    <div>{new Date(user.created_at).toLocaleDateString()}</div>
+                                    <div>
+                                      {new Date(
+                                        user.created_at
+                                      ).toLocaleDateString()}
+                                    </div>
                                     {user.is_verified && (
-                                      <div className="text-xs text-green-400 mt-1">✓ Verified</div>
+                                      <div className="text-xs text-green-400 mt-1">
+                                        ✓ Verified
+                                      </div>
                                     )}
                                   </div>
                                 </TableCell>
@@ -438,18 +500,29 @@ const UserManagement = () => {
                                   <div className="flex items-center space-x-2">
                                     <Select
                                       value={user.role}
-                                      onValueChange={(newRole) => handleRoleUpdate(user.id, newRole as any)}
+                                      onValueChange={(newRole) =>
+                                        handleRoleUpdate(
+                                          user.id,
+                                          newRole as any
+                                        )
+                                      }
                                     >
                                       <SelectTrigger className="w-32 h-8 bg-white/5 border-white/10 text-white text-xs">
                                         <SelectValue />
                                       </SelectTrigger>
                                       <SelectContent>
-                                        <SelectItem value="user">User</SelectItem>
-                                        <SelectItem value="admin">Admin</SelectItem>
-                                        <SelectItem value="super_admin">Super Admin</SelectItem>
+                                        <SelectItem value="user">
+                                          User
+                                        </SelectItem>
+                                        <SelectItem value="admin">
+                                          Admin
+                                        </SelectItem>
+                                        <SelectItem value="super_admin">
+                                          Super Admin
+                                        </SelectItem>
                                       </SelectContent>
                                     </Select>
-                                    
+
                                     <AlertDialog>
                                       <AlertDialogTrigger asChild>
                                         <Button
@@ -462,9 +535,13 @@ const UserManagement = () => {
                                       </AlertDialogTrigger>
                                       <AlertDialogContent className="bg-gray-900 border-white/10">
                                         <AlertDialogHeader>
-                                          <AlertDialogTitle className="text-white">Delete User</AlertDialogTitle>
+                                          <AlertDialogTitle className="text-white">
+                                            Delete User
+                                          </AlertDialogTitle>
                                           <AlertDialogDescription className="text-gray-400">
-                                            Are you sure you want to delete {user.full_name}? This action cannot be undone.
+                                            Are you sure you want to delete{" "}
+                                            {user.full_name}? This action cannot
+                                            be undone.
                                           </AlertDialogDescription>
                                         </AlertDialogHeader>
                                         <AlertDialogFooter>
@@ -472,7 +549,9 @@ const UserManagement = () => {
                                             Cancel
                                           </AlertDialogCancel>
                                           <AlertDialogAction
-                                            onClick={() => handleDeleteUser(user.id)}
+                                            onClick={() =>
+                                              handleDeleteUser(user.id)
+                                            }
                                             className="bg-red-600 hover:bg-red-700"
                                           >
                                             Delete
@@ -494,13 +573,24 @@ const UserManagement = () => {
                   {pagination.pages > 1 && (
                     <div className="flex items-center justify-between mt-6">
                       <div className="text-sm text-gray-400">
-                        Showing {((pagination.page - 1) * pagination.limit) + 1} to {Math.min(pagination.page * pagination.limit, pagination.total)} of {pagination.total} users
+                        Showing {(pagination.page - 1) * pagination.limit + 1}{" "}
+                        to{" "}
+                        {Math.min(
+                          pagination.page * pagination.limit,
+                          pagination.total
+                        )}{" "}
+                        of {pagination.total} users
                       </div>
                       <div className="flex items-center space-x-2">
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => setPagination(prev => ({ ...prev, page: prev.page - 1 }))}
+                          onClick={() =>
+                            setPagination((prev) => ({
+                              ...prev,
+                              page: prev.page - 1,
+                            }))
+                          }
                           disabled={pagination.page <= 1}
                           className="bg-white/5 border-white/10 text-white hover:bg-white/10"
                         >
@@ -513,7 +603,12 @@ const UserManagement = () => {
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => setPagination(prev => ({ ...prev, page: prev.page + 1 }))}
+                          onClick={() =>
+                            setPagination((prev) => ({
+                              ...prev,
+                              page: prev.page + 1,
+                            }))
+                          }
                           disabled={pagination.page >= pagination.pages}
                           className="bg-white/5 border-white/10 text-white hover:bg-white/10"
                         >
@@ -533,4 +628,4 @@ const UserManagement = () => {
   );
 };
 
-export default UserManagement; 
+export default UserManagement;

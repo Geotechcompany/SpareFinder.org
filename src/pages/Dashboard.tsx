@@ -153,9 +153,30 @@ const Dashboard = () => {
             const API_BASE =
               (import.meta as any).env?.VITE_AI_SERVICE_URL ||
               "http://localhost:8000";
-            const r = await fetch(`${API_BASE}/jobs`);
+
+            console.log("🔄 Starting AI jobs request...");
+            const startTime = Date.now();
+
+            // Add timeout to prevent blocking
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => {
+              console.warn("⏰ AI jobs request timed out after 3 seconds");
+              controller.abort();
+            }, 3000); // 3 second timeout
+
+            const r = await fetch(`${API_BASE}/jobs`, {
+              signal: controller.signal,
+            });
+            clearTimeout(timeoutId);
+
+            const endTime = Date.now();
+            console.log(
+              `✅ AI jobs request completed in ${endTime - startTime}ms`
+            );
+
             return await r.json();
           } catch (e) {
+            console.warn("⚠️ AI jobs endpoint failed or timed out:", e);
             return { success: false, results: [] } as any;
           }
         })(),
@@ -168,7 +189,7 @@ const Dashboard = () => {
 
       // Handle stats response with fallback calculation from uploads data
       if (statsResponse.status === "fulfilled" && statsResponse.value.success) {
-        const data = statsResponse.value.data;
+        const data = statsResponse.value.data as any;
 
         // Map the API response to dashboard state
         // Backend returns: totalSearches, avgConfidence, matchRate, avgProcessTime
@@ -198,7 +219,8 @@ const Dashboard = () => {
           uploadsResponse.status === "fulfilled" &&
           uploadsResponse.value.success
         ) {
-          const uploadsData = uploadsResponse.value.data?.uploads || [];
+          const uploadsData =
+            (uploadsResponse.value.data as any)?.uploads || [];
 
           const totalUploads = uploadsData.length;
           const successfulUploads = uploadsData.filter(
@@ -235,7 +257,7 @@ const Dashboard = () => {
         uploadsResponse.status === "fulfilled" &&
         uploadsResponse.value.success
       ) {
-        const uploadsData = uploadsResponse.value.data?.uploads || [];
+        const uploadsData = (uploadsResponse.value.data as any)?.uploads || [];
         setRecentUploads(
           uploadsData.map((upload) => ({
             id: upload.id,
@@ -257,7 +279,7 @@ const Dashboard = () => {
           activitiesResponse.value.success
         ) {
           const activitiesData =
-            activitiesResponse.value.data?.activities || [];
+            (activitiesResponse.value.data as any)?.activities || [];
           return activitiesData.map((activity) => ({
             id: activity.id,
             type: activity.resource_type,
@@ -385,7 +407,7 @@ const Dashboard = () => {
         metricsResponse.status === "fulfilled" &&
         metricsResponse.value.success
       ) {
-        const data = metricsResponse.value.data;
+        const data = metricsResponse.value.data as any;
 
         // If stats endpoint failed but performance metrics has the data, use it as fallback
         if (

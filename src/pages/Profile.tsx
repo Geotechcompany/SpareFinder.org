@@ -12,7 +12,18 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Skeleton,
+  SkeletonCard,
+  SkeletonAvatar,
+  SkeletonText,
+  SkeletonButton,
+} from "@/components/ui/skeleton";
+import {
+  CardSkeleton,
+  ListSkeleton,
+  FormSkeleton,
+} from "@/components/skeletons";
 import { useToast } from "@/components/ui/use-toast";
 import { api } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
@@ -522,20 +533,12 @@ const Profile = () => {
                   <div className="space-y-4">
                     {profileDataLoading ? (
                       // Loading skeletons
-                      Array.from({ length: 4 }).map((_, index) => (
-                        <div
-                          key={index}
-                          className="p-4 rounded-xl bg-gray-500/5 border border-gray-500/10"
-                        >
-                          <div className="flex items-center space-x-4">
-                            <Skeleton className="w-12 h-12 rounded-xl bg-gray-600/30" />
-                            <div className="flex-1 space-y-2">
-                              <Skeleton className="h-4 w-32 bg-gray-600/30" />
-                              <Skeleton className="h-3 w-48 bg-gray-600/30" />
-                            </div>
-                          </div>
-                        </div>
-                      ))
+                      <ListSkeleton
+                        variant="activity"
+                        items={4}
+                        showHeader={false}
+                        className="space-y-4"
+                      />
                     ) : profileDataError ? (
                       <div className="text-center py-8">
                         <AlertCircle className="w-8 h-8 text-red-400 mx-auto mb-2" />

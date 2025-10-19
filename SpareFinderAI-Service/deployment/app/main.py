@@ -46,8 +46,8 @@ from .services.email_templates import (
 )
 from .services.scraper import scrape_supplier_page
 from .services.enhanced_scraper import scrape_supplier_page as enhanced_scrape_supplier_page, scrape_multiple_suppliers
+from .services.job_store import load_job_snapshot, save_job_snapshot
 from .core.config import settings
-from .services.job_store import save_job_snapshot, load_job_snapshot
 from supabase import create_client
 
 class KeywordSearchRequest(BaseModel):

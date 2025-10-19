@@ -1,17 +1,29 @@
-import React, { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
-import AdminDesktopSidebar from '@/components/AdminDesktopSidebar';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { useToast } from '@/components/ui/use-toast';
-import { api } from '@/lib/api';
-import { 
-  BarChart3, 
-  Activity, 
-  Server, 
-  Database, 
+import React, { useState, useEffect } from "react";
+import { motion } from "framer-motion";
+import AdminDesktopSidebar from "@/components/AdminDesktopSidebar";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { useToast } from "@/components/ui/use-toast";
+import { api } from "@/lib/api";
+import {
+  BarChart3,
+  Activity,
+  Server,
+  Database,
   Cpu,
   Users,
   Upload,
@@ -26,8 +38,13 @@ import {
   CheckCircle,
   MemoryStick,
   RefreshCw,
-  Loader2
-} from 'lucide-react';
+  Loader2,
+} from "lucide-react";
+import {
+  CardSkeleton,
+  ChartSkeleton,
+  ListSkeleton,
+} from "@/components/skeletons";
 
 interface SystemMetrics {
   cpu_usage: number;
@@ -41,7 +58,7 @@ interface SystemMetrics {
   searches_today: number;
   new_users_today: number;
   searches_this_week: number;
-  system_health: 'healthy' | 'warning' | 'critical';
+  system_health: "healthy" | "warning" | "critical";
 }
 
 interface AnalyticsData {
@@ -52,13 +69,13 @@ interface AnalyticsData {
 
 const SystemAnalytics = () => {
   const [isCollapsed, setIsCollapsed] = useState(false);
-  const [timeRange, setTimeRange] = useState('30d');
+  const [timeRange, setTimeRange] = useState("30d");
   const [metrics, setMetrics] = useState<SystemMetrics | null>(null);
   const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
-  
+
   const { toast } = useToast();
 
   const handleToggleSidebar = () => {
@@ -77,17 +94,19 @@ const SystemAnalytics = () => {
       // Fetch system metrics and analytics in parallel
       const [metricsResponse, analyticsResponse] = await Promise.all([
         api.admin.getAdminStats(),
-        api.admin.getAnalytics(timeRange)
+        api.admin.getAnalytics(timeRange),
       ]);
 
-      console.log('📊 System metrics response:', metricsResponse);
-      console.log('📈 Analytics response:', analyticsResponse);
+      console.log("📊 System metrics response:", metricsResponse);
+      console.log("📈 Analytics response:", analyticsResponse);
 
       if (metricsResponse.success && metricsResponse.data?.statistics) {
         const stats = metricsResponse.data.statistics;
         setMetrics({
           ...stats,
-          system_health: (stats.system_health as 'healthy' | 'warning' | 'critical') || 'healthy'
+          system_health:
+            (stats.system_health as "healthy" | "warning" | "critical") ||
+            "healthy",
         });
       }
 
@@ -97,21 +116,23 @@ const SystemAnalytics = () => {
         setAnalytics({
           searches_by_day: analyticsData.searches_by_day || {},
           registrations_by_day: analyticsData.registrations_by_day || {},
-          time_range: analyticsData.time_range || timeRange
+          time_range: analyticsData.time_range || timeRange,
         });
       } else {
         // Fallback to empty analytics if API fails
         setAnalytics({
           searches_by_day: {},
           registrations_by_day: {},
-          time_range: timeRange
+          time_range: timeRange,
         });
       }
 
       setLastUpdated(new Date());
     } catch (err) {
-      console.error('Error fetching system data:', err);
-      setError(err instanceof Error ? err.message : 'Failed to fetch system data');
+      console.error("Error fetching system data:", err);
+      setError(
+        err instanceof Error ? err.message : "Failed to fetch system data"
+      );
       toast({
         variant: "destructive",
         title: "Error",
@@ -127,129 +148,193 @@ const SystemAnalytics = () => {
   };
 
   const systemMetrics = {
-    uptime: '47d 12h 34m',
+    uptime: "47d 12h 34m",
     totalUsers: metrics?.total_users || 0,
     activeUsers: metrics?.active_users || 0,
     totalUploads: metrics?.total_searches || 0,
-    avgResponseTime: metrics?.avg_response_time ? `${metrics.avg_response_time}ms` : '0ms',
+    avgResponseTime: metrics?.avg_response_time
+      ? `${metrics.avg_response_time}ms`
+      : "0ms",
     successRate: metrics?.success_rate || 0,
-    errorRate: metrics?.success_rate ? (100 - metrics.success_rate) : 0,
-    dataProcessed: '2.4TB'
+    errorRate: metrics?.success_rate ? 100 - metrics.success_rate : 0,
+    dataProcessed: "2.4TB",
   };
 
   const performanceData = [
-    { 
-      label: 'CPU Usage', 
-      value: metrics?.cpu_usage || 0, 
-      unit: '%', 
-      status: (metrics?.cpu_usage || 0) > 80 ? 'critical' : (metrics?.cpu_usage || 0) > 60 ? 'warning' : 'good', 
-      icon: Cpu, 
-      color: 'from-blue-600 to-cyan-600' 
+    {
+      label: "CPU Usage",
+      value: metrics?.cpu_usage || 0,
+      unit: "%",
+      status:
+        (metrics?.cpu_usage || 0) > 80
+          ? "critical"
+          : (metrics?.cpu_usage || 0) > 60
+          ? "warning"
+          : "good",
+      icon: Cpu,
+      color: "from-blue-600 to-cyan-600",
     },
-    { 
-      label: 'Memory Usage', 
-      value: metrics?.memory_usage || 0, 
-      unit: '%', 
-      status: (metrics?.memory_usage || 0) > 80 ? 'critical' : (metrics?.memory_usage || 0) > 60 ? 'warning' : 'good', 
-      icon: MemoryStick, 
-      color: 'from-yellow-600 to-orange-600' 
+    {
+      label: "Memory Usage",
+      value: metrics?.memory_usage || 0,
+      unit: "%",
+      status:
+        (metrics?.memory_usage || 0) > 80
+          ? "critical"
+          : (metrics?.memory_usage || 0) > 60
+          ? "warning"
+          : "good",
+      icon: MemoryStick,
+      color: "from-yellow-600 to-orange-600",
     },
-    { 
-      label: 'Disk Usage', 
-      value: metrics?.disk_usage || 0, 
-      unit: '%', 
-      status: (metrics?.disk_usage || 0) > 80 ? 'critical' : (metrics?.disk_usage || 0) > 60 ? 'warning' : 'good', 
-      icon: HardDrive, 
-      color: 'from-green-600 to-emerald-600' 
+    {
+      label: "Disk Usage",
+      value: metrics?.disk_usage || 0,
+      unit: "%",
+      status:
+        (metrics?.disk_usage || 0) > 80
+          ? "critical"
+          : (metrics?.disk_usage || 0) > 60
+          ? "warning"
+          : "good",
+      icon: HardDrive,
+      color: "from-green-600 to-emerald-600",
     },
-    { 
-      label: 'Avg Response Time', 
-      value: metrics?.avg_response_time || 0, 
-      unit: 'ms', 
-      status: (metrics?.avg_response_time || 0) > 1000 ? 'critical' : (metrics?.avg_response_time || 0) > 500 ? 'warning' : 'good', 
-      icon: Wifi, 
-      color: 'from-purple-600 to-violet-600' 
-    }
+    {
+      label: "Avg Response Time",
+      value: metrics?.avg_response_time || 0,
+      unit: "ms",
+      status:
+        (metrics?.avg_response_time || 0) > 1000
+          ? "critical"
+          : (metrics?.avg_response_time || 0) > 500
+          ? "warning"
+          : "good",
+      icon: Wifi,
+      color: "from-purple-600 to-violet-600",
+    },
   ];
 
   const trafficStats = [
-    { 
-      label: 'Total Searches', 
-      value: metrics?.total_searches ? metrics.total_searches.toLocaleString() : '0', 
-      change: metrics?.searches_this_week && metrics?.searches_today ? 
-        `+${Math.round(((metrics.searches_today / Math.max(metrics.searches_this_week, 1)) * 100))}%` : '+0%', 
-      trend: metrics?.searches_today && metrics?.searches_this_week && metrics.searches_today > 0 ? 'up' : 'down' 
+    {
+      label: "Total Searches",
+      value: metrics?.total_searches
+        ? metrics.total_searches.toLocaleString()
+        : "0",
+      change:
+        metrics?.searches_this_week && metrics?.searches_today
+          ? `+${Math.round(
+              (metrics.searches_today /
+                Math.max(metrics.searches_this_week, 1)) *
+                100
+            )}%`
+          : "+0%",
+      trend:
+        metrics?.searches_today &&
+        metrics?.searches_this_week &&
+        metrics.searches_today > 0
+          ? "up"
+          : "down",
     },
-    { 
-      label: 'Active Users', 
-      value: metrics?.active_users ? metrics.active_users.toLocaleString() : '0', 
-      change: metrics?.new_users_today ? `+${metrics.new_users_today}%` : '+0%', 
-      trend: metrics?.new_users_today && metrics.new_users_today > 0 ? 'up' : 'down' 
+    {
+      label: "Active Users",
+      value: metrics?.active_users
+        ? metrics.active_users.toLocaleString()
+        : "0",
+      change: metrics?.new_users_today ? `+${metrics.new_users_today}%` : "+0%",
+      trend:
+        metrics?.new_users_today && metrics.new_users_today > 0 ? "up" : "down",
     },
-    { 
-      label: 'Success Rate', 
-      value: metrics?.success_rate ? `${metrics.success_rate.toFixed(1)}%` : '0%', 
-      change: metrics?.success_rate ? `+${(metrics.success_rate - 90).toFixed(1)}%` : '+0%', 
-      trend: metrics?.success_rate && metrics.success_rate > 90 ? 'up' : 'down' 
+    {
+      label: "Success Rate",
+      value: metrics?.success_rate
+        ? `${metrics.success_rate.toFixed(1)}%`
+        : "0%",
+      change: metrics?.success_rate
+        ? `+${(metrics.success_rate - 90).toFixed(1)}%`
+        : "+0%",
+      trend: metrics?.success_rate && metrics.success_rate > 90 ? "up" : "down",
     },
-    { 
-      label: 'New Users Today', 
-      value: metrics?.new_users_today ? metrics.new_users_today.toLocaleString() : '0', 
-      change: metrics?.new_users_today ? `+${metrics.new_users_today}` : '+0', 
-      trend: metrics?.new_users_today && metrics.new_users_today > 0 ? 'up' : 'down' 
-    }
+    {
+      label: "New Users Today",
+      value: metrics?.new_users_today
+        ? metrics.new_users_today.toLocaleString()
+        : "0",
+      change: metrics?.new_users_today ? `+${metrics.new_users_today}` : "+0",
+      trend:
+        metrics?.new_users_today && metrics.new_users_today > 0 ? "up" : "down",
+    },
   ];
 
   const generateRecentActivity = () => {
     const activity = [];
     const now = new Date();
-    
+
     if (metrics?.system_health) {
       activity.push({
-        time: now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+        time: now.toLocaleTimeString("en-US", {
+          hour: "2-digit",
+          minute: "2-digit",
+        }),
         action: `System health check: ${metrics.system_health}`,
-        status: metrics.system_health === 'healthy' ? 'success' : 
-               metrics.system_health === 'warning' ? 'warning' : 'error',
-        icon: metrics.system_health === 'healthy' ? CheckCircle : AlertTriangle
+        status:
+          metrics.system_health === "healthy"
+            ? "success"
+            : metrics.system_health === "warning"
+            ? "warning"
+            : "error",
+        icon: metrics.system_health === "healthy" ? CheckCircle : AlertTriangle,
       });
     }
-    
+
     if (metrics?.cpu_usage && metrics.cpu_usage > 80) {
       activity.push({
-        time: new Date(now.getTime() - 5 * 60 * 1000).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+        time: new Date(now.getTime() - 5 * 60 * 1000).toLocaleTimeString(
+          "en-US",
+          { hour: "2-digit", minute: "2-digit" }
+        ),
         action: `High CPU usage detected: ${metrics.cpu_usage}%`,
-        status: 'warning',
-        icon: AlertTriangle
+        status: "warning",
+        icon: AlertTriangle,
       });
     }
-    
+
     if (metrics?.new_users_today && metrics.new_users_today > 0) {
       activity.push({
-        time: new Date(now.getTime() - 15 * 60 * 1000).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+        time: new Date(now.getTime() - 15 * 60 * 1000).toLocaleTimeString(
+          "en-US",
+          { hour: "2-digit", minute: "2-digit" }
+        ),
         action: `${metrics.new_users_today} new users registered today`,
-        status: 'info',
-        icon: Users
+        status: "info",
+        icon: Users,
       });
     }
-    
+
     if (metrics?.searches_today && metrics.searches_today > 0) {
       activity.push({
-        time: new Date(now.getTime() - 30 * 60 * 1000).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+        time: new Date(now.getTime() - 30 * 60 * 1000).toLocaleTimeString(
+          "en-US",
+          { hour: "2-digit", minute: "2-digit" }
+        ),
         action: `${metrics.searches_today} searches completed today`,
-        status: 'success',
-        icon: Database
+        status: "success",
+        icon: Database,
       });
     }
-    
+
     if (metrics?.avg_response_time && metrics.avg_response_time < 500) {
       activity.push({
-        time: new Date(now.getTime() - 45 * 60 * 1000).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+        time: new Date(now.getTime() - 45 * 60 * 1000).toLocaleTimeString(
+          "en-US",
+          { hour: "2-digit", minute: "2-digit" }
+        ),
         action: `API response time optimized: ${metrics.avg_response_time}ms`,
-        status: 'success',
-        icon: Zap
+        status: "success",
+        icon: Zap,
       });
     }
-    
+
     return activity.slice(0, 5);
   };
 
@@ -257,27 +342,27 @@ const SystemAnalytics = () => {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'good':
-        return 'text-green-400';
-      case 'warning':
-        return 'text-yellow-400';
-      case 'critical':
-        return 'text-red-400';
+      case "good":
+        return "text-green-400";
+      case "warning":
+        return "text-yellow-400";
+      case "critical":
+        return "text-red-400";
       default:
-        return 'text-gray-400';
+        return "text-gray-400";
     }
   };
 
   const getActivityStatusColor = (status: string) => {
     switch (status) {
-      case 'success':
-        return 'bg-green-600/20 text-green-300 border-green-500/30';
-      case 'warning':
-        return 'bg-yellow-600/20 text-yellow-300 border-yellow-500/30';
-      case 'error':
-        return 'bg-red-600/20 text-red-300 border-red-500/30';
+      case "success":
+        return "bg-green-600/20 text-green-300 border-green-500/30";
+      case "warning":
+        return "bg-yellow-600/20 text-yellow-300 border-yellow-500/30";
+      case "error":
+        return "bg-red-600/20 text-red-300 border-red-500/30";
       default:
-        return 'bg-blue-600/20 text-blue-300 border-blue-500/30';
+        return "bg-blue-600/20 text-blue-300 border-blue-500/30";
     }
   };
 
@@ -294,7 +379,7 @@ const SystemAnalytics = () => {
           transition={{
             duration: 20,
             repeat: Infinity,
-            ease: "linear"
+            ease: "linear",
           }}
         />
         <motion.div
@@ -307,13 +392,16 @@ const SystemAnalytics = () => {
           transition={{
             duration: 25,
             repeat: Infinity,
-            ease: "easeInOut"
+            ease: "easeInOut",
           }}
         />
       </div>
 
-      <AdminDesktopSidebar isCollapsed={isCollapsed} onToggle={handleToggleSidebar} />
-      
+      <AdminDesktopSidebar
+        isCollapsed={isCollapsed}
+        onToggle={handleToggleSidebar}
+      />
+
       <motion.div
         initial={false}
         animate={{ marginLeft: isCollapsed ? 80 : 320 }}
@@ -340,14 +428,20 @@ const SystemAnalytics = () => {
                   >
                     <motion.div
                       animate={{ rotate: [0, 360] }}
-                      transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
+                      transition={{
+                        duration: 3,
+                        repeat: Infinity,
+                        ease: "linear",
+                      }}
                       className="mr-2"
                     >
                       <BarChart3 className="w-4 h-4 text-blue-400" />
                     </motion.div>
-                    <span className="text-blue-300 text-sm font-semibold">System Analytics</span>
+                    <span className="text-blue-300 text-sm font-semibold">
+                      System Analytics
+                    </span>
                   </motion.div>
-                  <motion.h1 
+                  <motion.h1
                     className="text-3xl lg:text-4xl font-bold bg-gradient-to-r from-white via-blue-100 to-purple-100 bg-clip-text text-transparent mb-3"
                     initial={{ opacity: 0, x: -20 }}
                     animate={{ opacity: 1, x: 0 }}
@@ -355,7 +449,7 @@ const SystemAnalytics = () => {
                   >
                     System Analytics
                   </motion.h1>
-                  <motion.p 
+                  <motion.p
                     className="text-gray-400 text-lg"
                     initial={{ opacity: 0, x: -20 }}
                     animate={{ opacity: 1, x: 0 }}
@@ -363,7 +457,7 @@ const SystemAnalytics = () => {
                   >
                     Real-time system performance monitoring
                   </motion.p>
-                  <motion.p 
+                  <motion.p
                     className="text-gray-500 text-sm"
                     initial={{ opacity: 0, x: -20 }}
                     animate={{ opacity: 1, x: 0 }}
@@ -429,7 +523,9 @@ const SystemAnalytics = () => {
                   <div className="flex items-center space-x-3 text-red-400">
                     <AlertTriangle className="w-6 h-6" />
                     <div>
-                      <h3 className="text-lg font-semibold">Error Loading System Data</h3>
+                      <h3 className="text-lg font-semibold">
+                        Error Loading System Data
+                      </h3>
                       <p className="text-sm text-red-300">{error}</p>
                     </div>
                   </div>
@@ -445,60 +541,76 @@ const SystemAnalytics = () => {
             transition={{ delay: 0.6 }}
             className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6"
           >
-            {isLoading ? (
-              Array.from({ length: 4 }, (_, index) => (
-                <motion.div
-                  key={`loading-${index}`}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.7 + index * 0.1 }}
-                  className="relative"
-                >
-                  <Card className="relative bg-black/20 backdrop-blur-xl border-white/10">
-                    <CardContent className="p-6">
-                      <div className="flex items-center justify-between">
-                        <div className="space-y-2">
-                          <div className="h-4 bg-gray-700 rounded animate-pulse"></div>
-                          <div className="h-8 bg-gray-700 rounded animate-pulse"></div>
+            {isLoading
+              ? Array.from({ length: 4 }, (_, index) => (
+                  <motion.div
+                    key={`loading-${index}`}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.7 + index * 0.1 }}
+                    className="relative"
+                  >
+                    <CardSkeleton variant="stats" />
+                  </motion.div>
+                ))
+              : [
+                  {
+                    label: "Total Users",
+                    value: systemMetrics.totalUsers.toLocaleString(),
+                    icon: Users,
+                    color: "from-blue-600 to-cyan-600",
+                  },
+                  {
+                    label: "Active Users",
+                    value: systemMetrics.activeUsers.toLocaleString(),
+                    icon: Activity,
+                    color: "from-green-600 to-emerald-600",
+                  },
+                  {
+                    label: "Total Uploads",
+                    value: systemMetrics.totalUploads.toLocaleString(),
+                    icon: Upload,
+                    color: "from-purple-600 to-violet-600",
+                  },
+                  {
+                    label: "Success Rate",
+                    value: `${systemMetrics.successRate}%`,
+                    icon: CheckCircle,
+                    color: "from-emerald-600 to-teal-600",
+                  },
+                ].map((metric, index) => (
+                  <motion.div
+                    key={metric.label}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.7 + index * 0.1 }}
+                    whileHover={{ scale: 1.02, y: -2 }}
+                    className="relative"
+                  >
+                    <div
+                      className={`absolute inset-0 bg-gradient-to-r ${metric.color} opacity-10 rounded-2xl blur-xl`}
+                    />
+                    <Card className="relative bg-black/20 backdrop-blur-xl border-white/10 hover:border-white/20 transition-all duration-300">
+                      <CardContent className="p-6">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-gray-400 text-sm">
+                              {metric.label}
+                            </p>
+                            <p className="text-2xl font-bold text-white">
+                              {metric.value}
+                            </p>
+                          </div>
+                          <div
+                            className={`w-12 h-12 rounded-xl bg-gradient-to-r ${metric.color} flex items-center justify-center`}
+                          >
+                            <metric.icon className="w-6 h-6 text-white" />
+                          </div>
                         </div>
-                        <div className="w-12 h-12 bg-gray-700 rounded-xl animate-pulse"></div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </motion.div>
-              ))
-            ) : (
-              [
-                { label: 'Total Users', value: systemMetrics.totalUsers.toLocaleString(), icon: Users, color: 'from-blue-600 to-cyan-600' },
-                { label: 'Active Users', value: systemMetrics.activeUsers.toLocaleString(), icon: Activity, color: 'from-green-600 to-emerald-600' },
-                { label: 'Total Uploads', value: systemMetrics.totalUploads.toLocaleString(), icon: Upload, color: 'from-purple-600 to-violet-600' },
-                { label: 'Success Rate', value: `${systemMetrics.successRate}%`, icon: CheckCircle, color: 'from-emerald-600 to-teal-600' }
-              ].map((metric, index) => (
-                <motion.div
-                  key={metric.label}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.7 + index * 0.1 }}
-                  whileHover={{ scale: 1.02, y: -2 }}
-                  className="relative"
-                >
-                  <div className={`absolute inset-0 bg-gradient-to-r ${metric.color} opacity-10 rounded-2xl blur-xl`} />
-                  <Card className="relative bg-black/20 backdrop-blur-xl border-white/10 hover:border-white/20 transition-all duration-300">
-                    <CardContent className="p-6">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-gray-400 text-sm">{metric.label}</p>
-                          <p className="text-2xl font-bold text-white">{metric.value}</p>
-                        </div>
-                        <div className={`w-12 h-12 rounded-xl bg-gradient-to-r ${metric.color} flex items-center justify-center`}>
-                          <metric.icon className="w-6 h-6 text-white" />
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </motion.div>
-              ))
-            )}
+                      </CardContent>
+                    </Card>
+                  </motion.div>
+                ))}
           </motion.div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
@@ -534,19 +646,36 @@ const SystemAnalytics = () => {
                         >
                           <div className="flex items-center justify-between mb-3">
                             <div className="flex items-center space-x-3">
-                              <div className={`w-10 h-10 rounded-lg bg-gradient-to-r ${item.color} flex items-center justify-center`}>
+                              <div
+                                className={`w-10 h-10 rounded-lg bg-gradient-to-r ${item.color} flex items-center justify-center`}
+                              >
                                 <item.icon className="w-5 h-5 text-white" />
                               </div>
                               <div>
-                                <div className="font-medium text-white">{item.label}</div>
-                                <div className={`text-sm ${getStatusColor(item.status)}`}>
-                                  {item.status === 'good' ? 'Normal' : item.status === 'warning' ? 'High' : 'Critical'}
+                                <div className="font-medium text-white">
+                                  {item.label}
+                                </div>
+                                <div
+                                  className={`text-sm ${getStatusColor(
+                                    item.status
+                                  )}`}
+                                >
+                                  {item.status === "good"
+                                    ? "Normal"
+                                    : item.status === "warning"
+                                    ? "High"
+                                    : "Critical"}
                                 </div>
                               </div>
                             </div>
                             <div className="text-right">
-                              <div className={`text-xl font-bold ${getStatusColor(item.status)}`}>
-                                {item.value}{item.unit}
+                              <div
+                                className={`text-xl font-bold ${getStatusColor(
+                                  item.status
+                                )}`}
+                              >
+                                {item.value}
+                                {item.unit}
                               </div>
                             </div>
                           </div>
@@ -554,8 +683,17 @@ const SystemAnalytics = () => {
                             <motion.div
                               className={`h-2 rounded-full bg-gradient-to-r ${item.color}`}
                               initial={{ width: 0 }}
-                              animate={{ width: `${typeof item.value === 'number' ? item.value : 0}%` }}
-                              transition={{ delay: 1 + index * 0.1, duration: 1 }}
+                              animate={{
+                                width: `${
+                                  typeof item.value === "number"
+                                    ? item.value
+                                    : 0
+                                }%`,
+                              }}
+                              transition={{
+                                delay: 1 + index * 0.1,
+                                duration: 1,
+                              }}
                             />
                           </div>
                         </motion.div>
@@ -590,18 +728,26 @@ const SystemAnalytics = () => {
                         >
                           <div className="flex items-center justify-between">
                             <div>
-                              <div className="text-gray-400 text-sm">{stat.label}</div>
-                              <div className="text-xl font-bold text-white">{stat.value}</div>
+                              <div className="text-gray-400 text-sm">
+                                {stat.label}
+                              </div>
+                              <div className="text-xl font-bold text-white">
+                                {stat.value}
+                              </div>
                             </div>
                             <div className="flex items-center space-x-2">
-                              {stat.trend === 'up' ? (
+                              {stat.trend === "up" ? (
                                 <TrendingUp className="w-5 h-5 text-green-400" />
                               ) : (
                                 <TrendingDown className="w-5 h-5 text-red-400" />
                               )}
-                              <span className={`text-sm font-medium ${
-                                stat.trend === 'up' ? 'text-green-400' : 'text-red-400'
-                              }`}>
+                              <span
+                                className={`text-sm font-medium ${
+                                  stat.trend === "up"
+                                    ? "text-green-400"
+                                    : "text-red-400"
+                                }`}
+                              >
                                 {stat.change}
                               </span>
                             </div>
@@ -643,13 +789,21 @@ const SystemAnalytics = () => {
                         className="flex items-start space-x-3 p-3 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-colors"
                       >
                         <div className="flex-shrink-0">
-                          <Badge className={`${getActivityStatusColor(activity.status)} p-1`}>
+                          <Badge
+                            className={`${getActivityStatusColor(
+                              activity.status
+                            )} p-1`}
+                          >
                             <activity.icon className="w-3 h-3" />
                           </Badge>
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="text-white text-sm font-medium">{activity.action}</p>
-                          <p className="text-gray-400 text-xs">{activity.time}</p>
+                          <p className="text-white text-sm font-medium">
+                            {activity.action}
+                          </p>
+                          <p className="text-gray-400 text-xs">
+                            {activity.time}
+                          </p>
                         </div>
                       </motion.div>
                     ))}
@@ -664,4 +818,4 @@ const SystemAnalytics = () => {
   );
 };
 
-export default SystemAnalytics; 
+export default SystemAnalytics;

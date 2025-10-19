@@ -1,7 +1,19 @@
 import React from "react";
 import { motion } from "framer-motion";
-import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Skeleton,
+  SkeletonCard,
+  SkeletonAvatar,
+  SkeletonText,
+  SkeletonButton,
+} from "@/components/ui/skeleton";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import {
+  CardSkeleton,
+  TableSkeleton,
+  ListSkeleton,
+  ChartSkeleton,
+} from "@/components/skeletons";
 
 interface DashboardSkeletonProps {
   variant?: "admin" | "user";
@@ -48,38 +60,40 @@ const DashboardSkeleton: React.FC<DashboardSkeletonProps> = ({
   };
 
   const StatCardSkeleton = () => (
-    <Card className="relative overflow-hidden">
+    <Card className="relative overflow-hidden group">
+      <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000 ease-out" />
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between">
-          <Skeleton className="h-4 w-24 bg-gray-200 dark:bg-gray-800" />
-          <Skeleton className="h-8 w-8 rounded-full bg-gray-200 dark:bg-gray-800" />
+          <Skeleton className="h-4 w-24 bg-gradient-to-r from-gray-200 via-gray-300 to-gray-200 dark:from-gray-700 dark:via-gray-600 dark:to-gray-700 skeleton-shimmer" />
+          <Skeleton className="h-8 w-8 rounded-full bg-gradient-to-r from-gray-200 via-gray-300 to-gray-200 dark:from-gray-700 dark:via-gray-600 dark:to-gray-700 skeleton-pulse-glow" />
         </div>
       </CardHeader>
       <CardContent>
-        <Skeleton className="h-8 w-16 mb-2 bg-gray-200 dark:bg-gray-800" />
-        <Skeleton className="h-3 w-20 bg-gray-200 dark:bg-gray-800" />
+        <Skeleton className="h-8 w-16 mb-2 bg-gradient-to-r from-gray-200 via-gray-300 to-gray-200 dark:from-gray-700 dark:via-gray-600 dark:to-gray-700 skeleton-shimmer" />
+        <Skeleton className="h-3 w-20 bg-gradient-to-r from-gray-200 via-gray-300 to-gray-200 dark:from-gray-700 dark:via-gray-600 dark:to-gray-700 skeleton-shimmer" />
       </CardContent>
     </Card>
   );
 
   const ChartCardSkeleton = () => (
-    <Card>
+    <Card className="relative overflow-hidden group">
+      <div className="absolute inset-0 bg-gradient-to-r from-transparent via-blue-500/5 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1200 ease-out" />
       <CardHeader>
         <div className="flex items-center justify-between">
-          <Skeleton className="h-5 w-32 bg-gray-200 dark:bg-gray-800" />
-          <Skeleton className="h-8 w-20 bg-gray-200 dark:bg-gray-800" />
+          <Skeleton className="h-5 w-32 bg-gradient-to-r from-gray-200 via-gray-300 to-gray-200 dark:from-gray-700 dark:via-gray-600 dark:to-gray-700 skeleton-shimmer" />
+          <Skeleton className="h-8 w-20 bg-gradient-to-r from-gray-200 via-gray-300 to-gray-200 dark:from-gray-700 dark:via-gray-600 dark:to-gray-700 skeleton-pulse-glow" />
         </div>
       </CardHeader>
       <CardContent>
         <div className="space-y-3">
-          <Skeleton className="h-4 w-full bg-gray-200 dark:bg-gray-800" />
-          <Skeleton className="h-4 w-3/4 bg-gray-200 dark:bg-gray-800" />
-          <Skeleton className="h-4 w-1/2 bg-gray-200 dark:bg-gray-800" />
+          <Skeleton className="h-4 w-full bg-gradient-to-r from-gray-200 via-gray-300 to-gray-200 dark:from-gray-700 dark:via-gray-600 dark:to-gray-700 skeleton-shimmer" />
+          <Skeleton className="h-4 w-3/4 bg-gradient-to-r from-gray-200 via-gray-300 to-gray-200 dark:from-gray-700 dark:via-gray-600 dark:to-gray-700 skeleton-shimmer" />
+          <Skeleton className="h-4 w-1/2 bg-gradient-to-r from-gray-200 via-gray-300 to-gray-200 dark:from-gray-700 dark:via-gray-600 dark:to-gray-700 skeleton-shimmer" />
           <div className="flex space-x-2 mt-4">
-            <Skeleton className="h-2 w-8 rounded-full bg-gray-200 dark:bg-gray-800" />
-            <Skeleton className="h-2 w-12 rounded-full bg-gray-200 dark:bg-gray-800" />
-            <Skeleton className="h-2 w-6 rounded-full bg-gray-200 dark:bg-gray-800" />
-            <Skeleton className="h-2 w-10 rounded-full bg-gray-200 dark:bg-gray-800" />
+            <Skeleton className="h-2 w-8 rounded-full bg-gradient-to-r from-gray-200 via-gray-300 to-gray-200 dark:from-gray-700 dark:via-gray-600 dark:to-gray-700 skeleton-wave" />
+            <Skeleton className="h-2 w-12 rounded-full bg-gradient-to-r from-gray-200 via-gray-300 to-gray-200 dark:from-gray-700 dark:via-gray-600 dark:to-gray-700 skeleton-wave" />
+            <Skeleton className="h-2 w-6 rounded-full bg-gradient-to-r from-gray-200 via-gray-300 to-gray-200 dark:from-gray-700 dark:via-gray-600 dark:to-gray-700 skeleton-wave" />
+            <Skeleton className="h-2 w-10 rounded-full bg-gradient-to-r from-gray-200 via-gray-300 to-gray-200 dark:from-gray-700 dark:via-gray-600 dark:to-gray-700 skeleton-wave" />
           </div>
         </div>
       </CardContent>
@@ -87,29 +101,33 @@ const DashboardSkeleton: React.FC<DashboardSkeletonProps> = ({
   );
 
   const TableSkeleton = () => (
-    <Card>
+    <Card className="relative overflow-hidden group">
+      <div className="absolute inset-0 bg-gradient-to-r from-transparent via-green-500/5 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1400 ease-out" />
       <CardHeader>
         <div className="flex items-center justify-between">
-          <Skeleton className="h-5 w-32 bg-gray-200 dark:bg-gray-800" />
-          <Skeleton className="h-8 w-24 bg-gray-200 dark:bg-gray-800" />
+          <Skeleton className="h-5 w-32 bg-gradient-to-r from-gray-200 via-gray-300 to-gray-200 dark:from-gray-700 dark:via-gray-600 dark:to-gray-700 skeleton-shimmer" />
+          <Skeleton className="h-8 w-24 bg-gradient-to-r from-gray-200 via-gray-300 to-gray-200 dark:from-gray-700 dark:via-gray-600 dark:to-gray-700 skeleton-pulse-glow" />
         </div>
       </CardHeader>
       <CardContent>
         <div className="space-y-3">
           {/* Table header */}
-          <div className="flex space-x-4 py-2 border-b">
-            <Skeleton className="h-4 w-20 bg-gray-200 dark:bg-gray-800" />
-            <Skeleton className="h-4 w-32 bg-gray-200 dark:bg-gray-800" />
-            <Skeleton className="h-4 w-24 bg-gray-200 dark:bg-gray-800" />
-            <Skeleton className="h-4 w-16 bg-gray-200 dark:bg-gray-800" />
+          <div className="flex space-x-4 py-2 border-b border-gray-200/50 dark:border-gray-700/50">
+            <Skeleton className="h-4 w-20 bg-gradient-to-r from-gray-200 via-gray-300 to-gray-200 dark:from-gray-700 dark:via-gray-600 dark:to-gray-700 skeleton-shimmer" />
+            <Skeleton className="h-4 w-32 bg-gradient-to-r from-gray-200 via-gray-300 to-gray-200 dark:from-gray-700 dark:via-gray-600 dark:to-gray-700 skeleton-shimmer" />
+            <Skeleton className="h-4 w-24 bg-gradient-to-r from-gray-200 via-gray-300 to-gray-200 dark:from-gray-700 dark:via-gray-600 dark:to-gray-700 skeleton-shimmer" />
+            <Skeleton className="h-4 w-16 bg-gradient-to-r from-gray-200 via-gray-300 to-gray-200 dark:from-gray-700 dark:via-gray-600 dark:to-gray-700 skeleton-shimmer" />
           </div>
           {/* Table rows */}
           {[...Array(5)].map((_, i) => (
-            <div key={i} className="flex space-x-4 py-2">
-              <Skeleton className="h-4 w-20 bg-gray-200 dark:bg-gray-800" />
-              <Skeleton className="h-4 w-32 bg-gray-200 dark:bg-gray-800" />
-              <Skeleton className="h-4 w-24 bg-gray-200 dark:bg-gray-800" />
-              <Skeleton className="h-4 w-16 bg-gray-200 dark:bg-gray-800" />
+            <div
+              key={i}
+              className="flex space-x-4 py-2 hover:bg-gray-50/50 dark:hover:bg-gray-800/50 transition-colors duration-200"
+            >
+              <Skeleton className="h-4 w-20 bg-gradient-to-r from-gray-200 via-gray-300 to-gray-200 dark:from-gray-700 dark:via-gray-600 dark:to-gray-700 skeleton-shimmer" />
+              <Skeleton className="h-4 w-32 bg-gradient-to-r from-gray-200 via-gray-300 to-gray-200 dark:from-gray-700 dark:via-gray-600 dark:to-gray-700 skeleton-shimmer" />
+              <Skeleton className="h-4 w-24 bg-gradient-to-r from-gray-200 via-gray-300 to-gray-200 dark:from-gray-700 dark:via-gray-600 dark:to-gray-700 skeleton-shimmer" />
+              <Skeleton className="h-4 w-16 bg-gradient-to-r from-gray-200 via-gray-300 to-gray-200 dark:from-gray-700 dark:via-gray-600 dark:to-gray-700 skeleton-shimmer" />
             </div>
           ))}
         </div>
@@ -118,20 +136,24 @@ const DashboardSkeleton: React.FC<DashboardSkeletonProps> = ({
   );
 
   const ActivitySkeleton = () => (
-    <Card>
+    <Card className="relative overflow-hidden group">
+      <div className="absolute inset-0 bg-gradient-to-r from-transparent via-purple-500/5 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1600 ease-out" />
       <CardHeader>
-        <Skeleton className="h-5 w-32 bg-gray-200 dark:bg-gray-800" />
+        <Skeleton className="h-5 w-32 bg-gradient-to-r from-gray-200 via-gray-300 to-gray-200 dark:from-gray-700 dark:via-gray-600 dark:to-gray-700 skeleton-shimmer" />
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
           {[...Array(4)].map((_, i) => (
-            <div key={i} className="flex items-start space-x-3">
-              <Skeleton className="h-8 w-8 rounded-full flex-shrink-0 bg-gray-200 dark:bg-gray-800" />
+            <div
+              key={i}
+              className="flex items-start space-x-3 p-2 rounded-lg hover:bg-gray-50/50 dark:hover:bg-gray-800/50 transition-colors duration-200"
+            >
+              <Skeleton className="h-8 w-8 rounded-full flex-shrink-0 bg-gradient-to-r from-gray-200 via-gray-300 to-gray-200 dark:from-gray-700 dark:via-gray-600 dark:to-gray-700 skeleton-pulse-glow" />
               <div className="flex-1 space-y-2">
-                <Skeleton className="h-4 w-3/4 bg-gray-200 dark:bg-gray-800" />
-                <Skeleton className="h-3 w-1/2 bg-gray-200 dark:bg-gray-800" />
+                <Skeleton className="h-4 w-3/4 bg-gradient-to-r from-gray-200 via-gray-300 to-gray-200 dark:from-gray-700 dark:via-gray-600 dark:to-gray-700 skeleton-shimmer" />
+                <Skeleton className="h-3 w-1/2 bg-gradient-to-r from-gray-200 via-gray-300 to-gray-200 dark:from-gray-700 dark:via-gray-600 dark:to-gray-700 skeleton-shimmer" />
               </div>
-              <Skeleton className="h-3 w-16 bg-gray-200 dark:bg-gray-800" />
+              <Skeleton className="h-3 w-16 bg-gradient-to-r from-gray-200 via-gray-300 to-gray-200 dark:from-gray-700 dark:via-gray-600 dark:to-gray-700 skeleton-shimmer" />
             </div>
           ))}
         </div>
@@ -143,16 +165,16 @@ const DashboardSkeleton: React.FC<DashboardSkeletonProps> = ({
     <div className="hidden lg:flex lg:w-64 lg:flex-col lg:fixed lg:inset-y-0 lg:z-50 lg:bg-white dark:lg:bg-gray-900">
       <div className="flex flex-col flex-grow bg-white dark:bg-gray-900 pt-5 pb-4 overflow-y-auto">
         <div className="flex items-center flex-shrink-0 px-4">
-          <Skeleton className="h-8 w-32 bg-gray-300 dark:bg-gray-800" />
+          <Skeleton className="h-8 w-32 bg-gradient-to-r from-gray-300 via-gray-400 to-gray-300 dark:from-gray-700 dark:via-gray-600 dark:to-gray-700 skeleton-shimmer" />
         </div>
         <nav className="mt-5 flex-1 px-2 space-y-1">
           {[...Array(6)].map((_, i) => (
             <div
               key={i}
-              className="flex items-center px-2 py-2 text-sm font-medium rounded-md"
+              className="flex items-center px-2 py-2 text-sm font-medium rounded-md hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors duration-200"
             >
-              <Skeleton className="h-4 w-4 mr-3 bg-gray-300 dark:bg-gray-800" />
-              <Skeleton className="h-4 w-20 bg-gray-300 dark:bg-gray-800" />
+              <Skeleton className="h-4 w-4 mr-3 bg-gradient-to-r from-gray-300 via-gray-400 to-gray-300 dark:from-gray-700 dark:via-gray-600 dark:to-gray-700 skeleton-pulse-glow" />
+              <Skeleton className="h-4 w-20 bg-gradient-to-r from-gray-300 via-gray-400 to-gray-300 dark:from-gray-700 dark:via-gray-600 dark:to-gray-700 skeleton-shimmer" />
             </div>
           ))}
         </nav>
@@ -164,12 +186,12 @@ const DashboardSkeleton: React.FC<DashboardSkeletonProps> = ({
     <div className="sticky top-0 z-40 flex h-16 shrink-0 items-center gap-x-4 border-b border-gray-200 dark:border-white/10 bg-white dark:bg-black/30 px-4 shadow-sm sm:gap-x-6 sm:px-6 lg:px-8">
       <div className="flex flex-1 gap-x-4 self-stretch lg:gap-x-6">
         <div className="flex flex-1">
-          <Skeleton className="h-8 w-64 bg-gray-200 dark:bg-gray-800" />
+          <Skeleton className="h-8 w-64 bg-gradient-to-r from-gray-200 via-gray-300 to-gray-200 dark:from-gray-700 dark:via-gray-600 dark:to-gray-700 skeleton-shimmer" />
         </div>
         <div className="flex items-center gap-x-4 lg:gap-x-6">
-          <Skeleton className="h-8 w-8 rounded-full bg-gray-200 dark:bg-gray-800" />
-          <Skeleton className="h-8 w-8 rounded-full bg-gray-200 dark:bg-gray-800" />
-          <Skeleton className="h-8 w-32 bg-gray-200 dark:bg-gray-800" />
+          <Skeleton className="h-8 w-8 rounded-full bg-gradient-to-r from-gray-200 via-gray-300 to-gray-200 dark:from-gray-700 dark:via-gray-600 dark:to-gray-700 skeleton-pulse-glow" />
+          <Skeleton className="h-8 w-8 rounded-full bg-gradient-to-r from-gray-200 via-gray-300 to-gray-200 dark:from-gray-700 dark:via-gray-600 dark:to-gray-700 skeleton-pulse-glow" />
+          <Skeleton className="h-8 w-32 bg-gradient-to-r from-gray-200 via-gray-300 to-gray-200 dark:from-gray-700 dark:via-gray-600 dark:to-gray-700 skeleton-shimmer" />
         </div>
       </div>
     </div>
@@ -196,8 +218,8 @@ const DashboardSkeleton: React.FC<DashboardSkeletonProps> = ({
             <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
               {/* Page Header */}
               <motion.div variants={itemVariants} className="mb-8">
-                <Skeleton className="h-8 w-48 mb-2" />
-                <Skeleton className="h-4 w-64" />
+                <Skeleton className="h-8 w-48 mb-2 skeleton-shimmer" />
+                <Skeleton className="h-4 w-64 skeleton-shimmer" />
               </motion.div>
 
               {/* Stats Grid */}

@@ -1,4 +1,4 @@
-import axios, { AxiosInstance, AxiosResponse } from 'axios';
+import axios, { AxiosInstance, AxiosResponse } from "axios";
 
 // Define a generic API response type
 export type ApiResponse<T = unknown> = {
@@ -20,37 +20,39 @@ export type ApiResponse<T = unknown> = {
 // Remove the Axios module declaration and the duplicate interface
 // Type assertions will be used in the code instead
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 
-                      import.meta.env.VITE_API_URL || 
-                      'https://api-sparefinder-org.onrender.com';
+const API_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL ||
+  import.meta.env.VITE_API_URL ||
+  "https://api-sparefinder-org.onrender.com";
 
-console.log('🔧 API Client Config:', {
+console.log("🔧 API Client Config:", {
   baseURL: API_BASE_URL,
   environment: import.meta.env.MODE,
   envVars: {
     VITE_API_BASE_URL: import.meta.env.VITE_API_BASE_URL,
     VITE_API_URL: import.meta.env.VITE_API_URL,
-    MODE: import.meta.env.MODE
-  }
+    MODE: import.meta.env.MODE,
+  },
 });
 
 // Token storage utilities
-const TOKEN_KEY = 'auth_token';
-const REFRESH_TOKEN_KEY = 'auth_refresh_token';
+const TOKEN_KEY = "auth_token";
+const REFRESH_TOKEN_KEY = "auth_refresh_token";
 
 const tokenStorage = {
   getToken: () => sessionStorage.getItem(TOKEN_KEY),
   setToken: (token: string) => sessionStorage.setItem(TOKEN_KEY, token),
   removeToken: () => sessionStorage.removeItem(TOKEN_KEY),
-  
+
   getRefreshToken: () => sessionStorage.getItem(REFRESH_TOKEN_KEY),
-  setRefreshToken: (token: string) => sessionStorage.setItem(REFRESH_TOKEN_KEY, token),
+  setRefreshToken: (token: string) =>
+    sessionStorage.setItem(REFRESH_TOKEN_KEY, token),
   removeRefreshToken: () => sessionStorage.removeItem(REFRESH_TOKEN_KEY),
-  
+
   clearAll: () => {
     sessionStorage.removeItem(TOKEN_KEY);
     sessionStorage.removeItem(REFRESH_TOKEN_KEY);
-  }
+  },
 };
 
 // Create axios instance
@@ -58,7 +60,7 @@ const apiClient: AxiosInstance = axios.create({
   baseURL: `${API_BASE_URL}/api`,
   timeout: 30000,
   headers: {
-    'Content-Type': 'application/json',
+    "Content-Type": "application/json",
   },
 });
 
@@ -80,7 +82,7 @@ const processQueue = (error: unknown, token: string | null = null) => {
       resolve(token);
     }
   });
-  
+
   failedQueue = [];
 };
 
@@ -89,34 +91,35 @@ apiClient.interceptors.request.use(
   (config) => {
     const token = tokenStorage.getToken();
     const hasToken = !!token;
-    
+
     // Check if this is a public endpoint that doesn't require a token
-    const isPublicEndpoint = config.url && (
-      config.url.includes('/auth/register') ||
-      config.url.includes('/auth/login') ||
-      config.url.includes('/auth/refresh') ||
-      config.url.includes('/auth/reset-password') ||
-      (config.url.includes('/reviews') && config.method?.toLowerCase() === 'get') ||
-      config.url.includes('/health')
-    );
-    
+    const isPublicEndpoint =
+      config.url &&
+      (config.url.includes("/auth/register") ||
+        config.url.includes("/auth/login") ||
+        config.url.includes("/auth/refresh") ||
+        config.url.includes("/auth/reset-password") ||
+        (config.url.includes("/reviews") &&
+          config.method?.toLowerCase() === "get") ||
+        config.url.includes("/health"));
+
     // Only log detailed info for debugging when needed
     if (!isPublicEndpoint) {
-      console.log('🔍 Request interceptor:', {
+      console.log("🔍 Request interceptor:", {
         url: config.url,
         hasToken,
-        tokenPreview: token ? token.substring(0, 20) + '...' : 'NO TOKEN',
-        timestamp: new Date().toISOString()
+        tokenPreview: token ? token.substring(0, 20) + "..." : "NO TOKEN",
+        timestamp: new Date().toISOString(),
       });
     }
-    
+
     if (token) {
-      config.headers['Authorization'] = `Bearer ${token}`;
+      config.headers["Authorization"] = `Bearer ${token}`;
       if (!isPublicEndpoint) {
-        console.log('✅ Authorization header added');
+        console.log("✅ Authorization header added");
       }
     } else if (!isPublicEndpoint) {
-      console.log('❌ No token found - request will be unauthorized');
+      console.log("❌ No token found - request will be unauthorized");
     }
     return config;
   },
@@ -134,11 +137,11 @@ apiClient.interceptors.response.use(
       // If we're already refreshing, wait for the existing refresh to complete
       if (isRefreshing && refreshPromise) {
         return refreshPromise
-          .then(token => {
-            originalRequest.headers['Authorization'] = `Bearer ${token}`;
+          .then((token) => {
+            originalRequest.headers["Authorization"] = `Bearer ${token}`;
             return apiClient(originalRequest);
           })
-          .catch(err => {
+          .catch((err) => {
             return Promise.reject(err);
           });
       }
@@ -147,12 +150,14 @@ apiClient.interceptors.response.use(
       if (isRefreshing) {
         return new Promise((resolve, reject) => {
           failedQueue.push({ resolve, reject });
-        }).then(token => {
-          originalRequest.headers['Authorization'] = `Bearer ${token}`;
-          return apiClient(originalRequest);
-        }).catch(err => {
-          return Promise.reject(err);
-        });
+        })
+          .then((token) => {
+            originalRequest.headers["Authorization"] = `Bearer ${token}`;
+            return apiClient(originalRequest);
+          })
+          .catch((err) => {
+            return Promise.reject(err);
+          });
       }
 
       originalRequest._retry = true;
@@ -161,36 +166,39 @@ apiClient.interceptors.response.use(
       // Check if we have tokens
       const currentToken = tokenStorage.getToken();
       const refreshToken = tokenStorage.getRefreshToken();
-      
+
       if (!currentToken || !refreshToken) {
         // No tokens, redirect to login
-        console.warn('🔒 No tokens available - redirecting to login');
+        console.warn("🔒 No tokens available - redirecting to login");
         isRefreshing = false;
         refreshPromise = null;
         processQueue(error, null);
         tokenStorage.clearAll();
-        window.location.href = '/login';
+        window.location.href = "/login";
         return Promise.reject(error);
       }
 
       // Create refresh promise
       refreshPromise = (async () => {
         try {
-          console.log('🔄 Attempting to refresh token...');
-          
+          console.log("🔄 Attempting to refresh token...");
+
           // Try to refresh the token with timeout
           const refreshResponse = await Promise.race([
             axios.post(`${API_BASE_URL}/api/auth/refresh`, {
-              refresh_token: refreshToken
+              refresh_token: refreshToken,
             }),
-            new Promise<never>((_, reject) => 
-              setTimeout(() => reject(new Error('Token refresh timeout')), 10000)
-            )
+            new Promise<never>((_, reject) =>
+              setTimeout(
+                () => reject(new Error("Token refresh timeout")),
+                10000
+              )
+            ),
           ]);
 
-        if (refreshResponse.data.token) {
-            console.log('✅ Token refreshed successfully');
-            
+          if (refreshResponse.data.token) {
+            console.log("✅ Token refreshed successfully");
+
             // Update stored tokens
             tokenStorage.setToken(refreshResponse.data.token);
             if (refreshResponse.data.refresh_token) {
@@ -199,20 +207,20 @@ apiClient.interceptors.response.use(
 
             // Process the queue with the new token
             processQueue(null, refreshResponse.data.token);
-            
+
             return refreshResponse.data.token;
           } else {
-            throw new Error('No token in refresh response');
+            throw new Error("No token in refresh response");
           }
         } catch (refreshError) {
-          console.error('🔒 Token refresh failed:', refreshError);
-          
+          console.error("🔒 Token refresh failed:", refreshError);
+
           // Process queue with error
           processQueue(refreshError, null);
-          
+
           // Clear tokens and redirect to login
           tokenStorage.clearAll();
-          window.location.href = '/login';
+          window.location.href = "/login";
           throw refreshError;
         } finally {
           isRefreshing = false;
@@ -223,7 +231,7 @@ apiClient.interceptors.response.use(
       try {
         const newToken = await refreshPromise;
         // Update the authorization header for the original request
-        originalRequest.headers['Authorization'] = `Bearer ${newToken}`;
+        originalRequest.headers["Authorization"] = `Bearer ${newToken}`;
         // Retry the original request
         return apiClient(originalRequest);
       } catch (refreshError) {
@@ -243,29 +251,32 @@ export const authApi = {
     full_name: string;
     company?: string;
   }): Promise<ApiResponse> => {
-    const response = await apiClient.post('/auth/register', userData);
-    
+    const response = await apiClient.post("/auth/register", userData);
+
     // Store tokens if registration is successful
     if (response.data.success && response.data.token) {
-      console.log('🔐 Storing tokens after successful registration');
+      console.log("🔐 Storing tokens after successful registration");
       tokenStorage.setToken(response.data.token);
       if (response.data.refresh_token) {
         tokenStorage.setRefreshToken(response.data.refresh_token);
       }
-      
+
       // Verify token was stored
       const storedToken = tokenStorage.getToken();
-      console.log('✅ Token stored successfully:', !!storedToken);
+      console.log("✅ Token stored successfully:", !!storedToken);
     } else {
-      console.warn('❌ No token received from registration response');
+      console.warn("❌ No token received from registration response");
     }
-    
+
     return response.data;
   },
 
-  login: async (credentials: { email: string; password: string }): Promise<ApiResponse> => {
-    const response = await apiClient.post('/auth/login', credentials);
-    
+  login: async (credentials: {
+    email: string;
+    password: string;
+  }): Promise<ApiResponse> => {
+    const response = await apiClient.post("/auth/login", credentials);
+
     // Store tokens if login is successful
     if (response.data.success && response.data.token) {
       tokenStorage.setToken(response.data.token);
@@ -273,18 +284,18 @@ export const authApi = {
         tokenStorage.setRefreshToken(response.data.refresh_token);
       }
     }
-    
+
     return response.data;
   },
 
   resetPassword: async (email: string): Promise<ApiResponse> => {
-    const response = await apiClient.post('/auth/reset-password', { email });
+    const response = await apiClient.post("/auth/reset-password", { email });
     return response.data;
   },
 
   logout: async (): Promise<ApiResponse> => {
     try {
-      const response = await apiClient.post('/auth/logout');
+      const response = await apiClient.post("/auth/logout");
       return response.data;
     } finally {
       // Always clear tokens on logout, even if the request fails
@@ -293,136 +304,159 @@ export const authApi = {
   },
 
   getCurrentUser: async (): Promise<ApiResponse> => {
-    const response = await apiClient.get('/auth/current-user');
-      return response.data;
+    const response = await apiClient.get("/auth/current-user");
+    return response.data;
   },
 
   signOut: async (): Promise<ApiResponse> => {
     return authApi.logout();
-  }
+  },
 };
 
 // Dashboard API
 export const dashboardApi = {
   getStats: async (): Promise<ApiResponse> => {
-    console.log('📊 Fetching dashboard stats...');
+    console.log("📊 Fetching dashboard stats...");
     try {
-      const response = await apiClient.get('/dashboard/stats');
-      console.log('📊 Stats response:', response.data);
+      const response = await apiClient.get("/dashboard/stats");
+      console.log("📊 Stats response:", response.data);
+      console.log("📊 Stats response URL:", response.config.url);
+      console.log("📊 Stats response status:", response.status);
+      console.log("📊 Stats response headers:", response.headers);
+      console.log("📊 Stats response config:", response.config);
       return response.data;
     } catch (error) {
-      console.error('📊 Failed to fetch dashboard stats:', error);
+      console.error("📊 Failed to fetch dashboard stats:", error);
       throw error;
     }
   },
-  
+
   // Keyword-only search (backend mock; switch to real integration when available)
-  searchByKeywords: async (keywords: string[] | string): Promise<ApiResponse> => {
+  searchByKeywords: async (
+    keywords: string[] | string
+  ): Promise<ApiResponse> => {
     const payload = { keywords };
-    const response = await apiClient.post('/search/keywords', payload);
+    const response = await apiClient.post("/search/keywords", payload);
     return response.data;
   },
-  scheduleKeywordSearch: async (keywords: string[] | string, userEmail?: string): Promise<ApiResponse> => {
-    const payload: { keywords: string[]; user_email?: string } = { keywords: Array.isArray(keywords) ? keywords : [keywords] };
+  scheduleKeywordSearch: async (
+    keywords: string[] | string,
+    userEmail?: string
+  ): Promise<ApiResponse> => {
+    const payload: { keywords: string[]; user_email?: string } = {
+      keywords: Array.isArray(keywords) ? keywords : [keywords],
+    };
     if (userEmail) payload.user_email = userEmail;
-    const AI_BASE = (import.meta as { env?: { VITE_AI_SERVICE_URL?: string } }).env?.VITE_AI_SERVICE_URL || 'http://localhost:8000';
-    const res = await axios.post(`${AI_BASE}/search/keywords/schedule`, payload, {
-      headers: { 'Content-Type': 'application/json' }
-    });
+    const AI_BASE =
+      (import.meta as { env?: { VITE_AI_SERVICE_URL?: string } }).env
+        ?.VITE_AI_SERVICE_URL || "http://localhost:8000";
+    const res = await axios.post(
+      `${AI_BASE}/search/keywords/schedule`,
+      payload,
+      {
+        headers: { "Content-Type": "application/json" },
+      }
+    );
     return res.data;
   },
 
   getRecentUploads: async (limit: number = 5): Promise<ApiResponse> => {
-    console.log('📋 Fetching recent uploads...');
+    console.log("📋 Fetching recent uploads...");
     try {
-      const response = await apiClient.get(`/dashboard/recent-uploads?limit=${limit}`);
-      console.log('📋 Recent uploads response:', response.data);
+      const response = await apiClient.get(
+        `/dashboard/recent-uploads?limit=${limit}`
+      );
+      console.log("📋 Recent uploads response:", response.data);
       return response.data;
     } catch (error) {
-      console.error('📋 Failed to fetch recent uploads:', error);
+      console.error("📋 Failed to fetch recent uploads:", error);
       throw error;
     }
   },
 
   getRecentActivities: async (limit: number = 5): Promise<ApiResponse> => {
-    console.log('🔄 Fetching recent activities...');
+    console.log("🔄 Fetching recent activities...");
     try {
-      const response = await apiClient.get(`/dashboard/recent-activities?limit=${limit}`);
-      console.log('🔄 Recent activities response:', response.data);
+      const response = await apiClient.get(
+        `/dashboard/recent-activities?limit=${limit}`
+      );
+      console.log("🔄 Recent activities response:", response.data);
       return response.data;
     } catch (error) {
-      console.error('🔄 Failed to fetch recent activities:', error);
+      console.error("🔄 Failed to fetch recent activities:", error);
       throw error;
     }
   },
 
   getPerformanceMetrics: async (): Promise<ApiResponse> => {
-    console.log('📈 Fetching performance metrics...');
+    console.log("📈 Fetching performance metrics...");
     try {
-      const response = await apiClient.get('/dashboard/performance-metrics');
-      console.log('📈 Performance metrics response:', response.data);
+      const response = await apiClient.get("/dashboard/performance-metrics");
+      console.log("📈 Performance metrics response:", response.data);
       return response.data;
     } catch (error) {
-      console.error('📈 Failed to fetch performance metrics:', error);
+      console.error("📈 Failed to fetch performance metrics:", error);
       throw error;
     }
   },
 
   // Add missing methods used by History component
-  exportHistory: async (format: 'csv' | 'json' = 'csv'): Promise<ApiResponse> => {
+  exportHistory: async (
+    format: "csv" | "json" = "csv"
+  ): Promise<ApiResponse> => {
     const response = await apiClient.get(`/dashboard/export?format=${format}`);
     return response.data;
   },
 
   deleteUpload: async (uploadId: string): Promise<ApiResponse> => {
     const response = await apiClient.delete(`/dashboard/uploads/${uploadId}`);
-          return response.data;
-  }
+    return response.data;
+  },
 };
 
 // Admin API
 export const adminApi = {
   getUsers: async (
-    page: number = 1, 
-    limit: number = 50, 
-    search?: string, 
+    page: number = 1,
+    limit: number = 50,
+    search?: string,
     roleFilter?: string
   ): Promise<ApiResponse> => {
-    console.log('📋 Fetching users from API...');
+    console.log("📋 Fetching users from API...");
     try {
       const params = new URLSearchParams();
-      params.append('page', page.toString());
-      params.append('limit', limit.toString());
-      
+      params.append("page", page.toString());
+      params.append("limit", limit.toString());
+
       if (search && search.trim()) {
-        params.append('search', search.trim());
+        params.append("search", search.trim());
       }
-      
-      if (roleFilter && roleFilter !== 'all') {
-        params.append('role', roleFilter);
+
+      if (roleFilter && roleFilter !== "all") {
+        params.append("role", roleFilter);
       }
 
       const response = await apiClient.get(`/admin/users?${params.toString()}`);
-      console.log('📋 Raw API response:', response.data);
+      console.log("📋 Raw API response:", response.data);
       return response.data;
     } catch (error) {
-      console.error('📋 Failed to fetch users:', error);
+      console.error("📋 Failed to fetch users:", error);
       throw error;
     }
   },
 
   getAdminStats: async (): Promise<ApiResponse> => {
-    const response = await apiClient.get('/admin/stats');
+    const response = await apiClient.get("/admin/stats");
     return { success: true, data: { statistics: response.data.statistics } };
   },
 
   getAIModels: async (): Promise<ApiResponse> => {
-    const response = await apiClient.get('/admin/ai-models');
+    const response = await apiClient.get("/admin/ai-models");
     return { success: true, data: response.data };
   },
 
   getPaymentMethods: async (): Promise<ApiResponse> => {
-    const response = await apiClient.get('/admin/payment-methods');
+    const response = await apiClient.get("/admin/payment-methods");
     return { success: true, data: response.data };
   },
 
@@ -433,82 +467,137 @@ export const adminApi = {
     secret_key: string;
     description?: string;
   }): Promise<ApiResponse> => {
-    const response = await apiClient.post('/admin/payment-methods', paymentMethodData);
+    const response = await apiClient.post(
+      "/admin/payment-methods",
+      paymentMethodData
+    );
     return { success: true, data: response.data };
   },
 
-  deletePaymentMethod: async (paymentMethodId: string): Promise<ApiResponse> => {
-    const response = await apiClient.delete(`/admin/payment-methods/${paymentMethodId}`);
+  deletePaymentMethod: async (
+    paymentMethodId: string
+  ): Promise<ApiResponse> => {
+    const response = await apiClient.delete(
+      `/admin/payment-methods/${paymentMethodId}`
+    );
     return { success: true, data: response.data };
   },
 
   getEmailTemplates: async (): Promise<ApiResponse> => {
-    const response = await apiClient.get('/admin/email-templates');
+    const response = await apiClient.get("/admin/email-templates");
     return { success: true, data: response.data };
   },
 
   getSystemSettings: async (): Promise<ApiResponse> => {
-    const response = await apiClient.get('/admin/system-settings');
+    const response = await apiClient.get("/admin/system-settings");
     return { success: true, data: response.data };
   },
 
-  getAuditLogs: async (page: number = 1, limit: number = 100): Promise<ApiResponse> => {
-    const response = await apiClient.get(`/admin/audit-logs?page=${page}&limit=${limit}`);
+  getAuditLogs: async (
+    page: number = 1,
+    limit: number = 100
+  ): Promise<ApiResponse> => {
+    const response = await apiClient.get(
+      `/admin/audit-logs?page=${page}&limit=${limit}`
+    );
     return { success: true, data: response.data };
   },
 
-  getAnalytics: async (timeRange: string = '30d'): Promise<ApiResponse> => {
+  getAnalytics: async (timeRange: string = "30d"): Promise<ApiResponse> => {
     const response = await apiClient.get(`/admin/analytics?range=${timeRange}`);
     return { success: true, data: response.data };
   },
 
-  updateUserRole: async (userId: string, role: 'user' | 'admin' | 'super_admin'): Promise<ApiResponse> => {
-    const response = await apiClient.patch(`/admin/users/${userId}/role`, { role });
+  updateUserRole: async (
+    userId: string,
+    role: "user" | "admin" | "super_admin"
+  ): Promise<ApiResponse> => {
+    const response = await apiClient.patch(`/admin/users/${userId}/role`, {
+      role,
+    });
     return response.data;
   },
 
   deleteUser: async (userId: string): Promise<ApiResponse> => {
     const response = await apiClient.delete(`/admin/users/${userId}`);
     return response.data;
-  }
+  },
+
+  getSubscribers: async (
+    page: number = 1,
+    limit: number = 50,
+    tier?: string,
+    status?: string
+  ): Promise<ApiResponse> => {
+    console.log("📊 Fetching subscribers from API...");
+    try {
+      const params = new URLSearchParams();
+      params.append("page", page.toString());
+      params.append("limit", limit.toString());
+
+      if (tier && tier !== "all") {
+        params.append("tier", tier);
+      }
+
+      if (status && status !== "all") {
+        params.append("status", status);
+      }
+
+      const response = await apiClient.get(
+        `/admin/subscribers?${params.toString()}`
+      );
+      console.log("📊 Raw subscribers API response:", response.data);
+      return response.data;
+    } catch (error) {
+      console.error("📊 Failed to fetch subscribers:", error);
+      throw error;
+    }
+  },
 };
 
 // Billing API
 export const billingApi = {
-  getBillingInfo: async (options?: { signal?: AbortSignal }): Promise<ApiResponse> => {
-    const response = await apiClient.get('/billing', {
-      signal: options?.signal
+  getBillingInfo: async (options?: {
+    signal?: AbortSignal;
+  }): Promise<ApiResponse> => {
+    const response = await apiClient.get("/billing", {
+      signal: options?.signal,
     });
     return response.data;
   },
 
-  updateSubscription: async (tier: 'free' | 'pro' | 'enterprise'): Promise<ApiResponse> => {
-    const response = await apiClient.post('/billing/subscription', { tier });
-        return response.data;
+  updateSubscription: async (
+    tier: "free" | "pro" | "enterprise"
+  ): Promise<ApiResponse> => {
+    const response = await apiClient.post("/billing/subscription", { tier });
+    return response.data;
   },
 
   cancelSubscription: async (): Promise<ApiResponse> => {
-    const response = await apiClient.post('/billing/subscription/cancel');
-        return response.data;
+    const response = await apiClient.post("/billing/subscription/cancel");
+    return response.data;
   },
 
-  getInvoices: async (options?: { 
-    page?: number; 
-    limit?: number; 
-    signal?: AbortSignal 
+  getInvoices: async (options?: {
+    page?: number;
+    limit?: number;
+    signal?: AbortSignal;
   }): Promise<ApiResponse> => {
     const params = new URLSearchParams();
-    if (options?.page) params.append('page', options.page.toString());
-    if (options?.limit) params.append('limit', options.limit.toString());
-    
-    const response = await apiClient.get(`/billing/invoices?${params.toString()}`, {
-      signal: options?.signal
-    });
+    if (options?.page) params.append("page", options.page.toString());
+    if (options?.limit) params.append("limit", options.limit.toString());
+
+    const response = await apiClient.get(
+      `/billing/invoices?${params.toString()}`,
+      {
+        signal: options?.signal,
+      }
+    );
     return response.data;
   },
 
   getUsage: async (): Promise<ApiResponse> => {
-    const response = await apiClient.get('/billing/usage');
+    const response = await apiClient.get("/billing/usage");
     return response.data;
   },
 
@@ -528,7 +617,10 @@ export const billingApi = {
       cvv: string;
     };
   }): Promise<ApiResponse> => {
-    const response = await apiClient.post('/billing/process-payment', paymentData);
+    const response = await apiClient.post(
+      "/billing/process-payment",
+      paymentData
+    );
     return response.data;
   },
 
@@ -548,7 +640,10 @@ export const billingApi = {
       cvv: string;
     };
   }): Promise<ApiResponse> => {
-    const response = await apiClient.post('/billing/subscribe', subscriptionData);
+    const response = await apiClient.post(
+      "/billing/subscribe",
+      subscriptionData
+    );
     return response.data;
   },
 
@@ -561,7 +656,10 @@ export const billingApi = {
     cancel_url: string;
     trial_days?: number;
   }): Promise<ApiResponse> => {
-    const response = await apiClient.post('/billing/checkout-session', checkoutData);
+    const response = await apiClient.post(
+      "/billing/checkout-session",
+      checkoutData
+    );
     return response.data;
   },
 
@@ -571,16 +669,19 @@ export const billingApi = {
     success_url: string;
     cancel_url: string;
   }): Promise<ApiResponse> => {
-    const response = await apiClient.post('/billing/credits/checkout-session', options);
+    const response = await apiClient.post(
+      "/billing/credits/checkout-session",
+      options
+    );
     return response.data;
-  }
+  },
 };
 
 // Profile API
 export const profileApi = {
   getProfile: async (): Promise<ApiResponse> => {
-    const response = await apiClient.get('/profile');
-        return response.data;
+    const response = await apiClient.get("/profile");
+    return response.data;
   },
 
   updateProfile: async (profileData: {
@@ -591,20 +692,23 @@ export const profileApi = {
     location?: string;
     website?: string;
   }): Promise<ApiResponse> => {
-    const response = await apiClient.patch('/profile', profileData);
-        return response.data;
+    const response = await apiClient.patch("/profile", profileData);
+    return response.data;
   },
 
-  changePassword: async (currentPassword: string, newPassword: string): Promise<ApiResponse> => {
-    const response = await apiClient.post('/profile/change-password', {
+  changePassword: async (
+    currentPassword: string,
+    newPassword: string
+  ): Promise<ApiResponse> => {
+    const response = await apiClient.post("/profile/change-password", {
       currentPassword,
-      newPassword
-        });
-        return response.data;
+      newPassword,
+    });
+    return response.data;
   },
 
   deleteAccount: async (): Promise<ApiResponse> => {
-    const response = await apiClient.delete('/profile/delete-account');
+    const response = await apiClient.delete("/profile/delete-account");
     return response.data;
   },
 
@@ -613,63 +717,65 @@ export const profileApi = {
     // Mock achievements data
     const mockAchievements = [
       {
-        id: 'first-upload',
-        title: 'First Upload',
-        description: 'Upload your first part image',
-        icon: '🎯',
-        color: 'from-green-600 to-emerald-600',
+        id: "first-upload",
+        title: "First Upload",
+        description: "Upload your first part image",
+        icon: "🎯",
+        color: "from-green-600 to-emerald-600",
         earned: true,
-        earnedAt: new Date().toISOString()
+        earnedAt: new Date().toISOString(),
       },
       {
-        id: 'accuracy-master',
-        title: 'Accuracy Master',
-        description: 'Achieve 95% accuracy rate',
-        icon: '🎯',
-        color: 'from-blue-600 to-cyan-600',
-        earned: false
+        id: "accuracy-master",
+        title: "Accuracy Master",
+        description: "Achieve 95% accuracy rate",
+        icon: "🎯",
+        color: "from-blue-600 to-cyan-600",
+        earned: false,
       },
       {
-        id: 'speed-demon',
-        title: 'Speed Demon',
-        description: 'Complete 50 identifications',
-        icon: '⚡',
-        color: 'from-yellow-600 to-orange-600',
-        earned: false
+        id: "speed-demon",
+        title: "Speed Demon",
+        description: "Complete 50 identifications",
+        icon: "⚡",
+        color: "from-yellow-600 to-orange-600",
+        earned: false,
       },
       {
-        id: 'streak-master',
-        title: 'Streak Master',
-        description: 'Use the app for 7 consecutive days',
-        icon: '🔥',
-        color: 'from-red-600 to-pink-600',
-        earned: false
-      }
+        id: "streak-master",
+        title: "Streak Master",
+        description: "Use the app for 7 consecutive days",
+        icon: "🔥",
+        color: "from-red-600 to-pink-600",
+        earned: false,
+      },
     ];
 
-    const earned = mockAchievements.filter(a => a.earned).length;
-    
-        return {
-          success: true,
+    const earned = mockAchievements.filter((a) => a.earned).length;
+
+    return {
+      success: true,
       data: {
         achievements: mockAchievements,
         totalEarned: earned,
-        totalAvailable: mockAchievements.length
-      }
+        totalAvailable: mockAchievements.length,
+      },
     };
   },
 
   getRecentActivities: async (limit: number = 5): Promise<ApiResponse> => {
-    const response = await apiClient.get(`/dashboard/recent-activities?limit=${limit}`);
+    const response = await apiClient.get(
+      `/dashboard/recent-activities?limit=${limit}`
+    );
     return response.data;
-  }
+  },
 };
 
 // Upload API
 export const uploadApi = {
   image: async (
-    file: File, 
-    keywords: string[] = [], 
+    file: File,
+    keywords: string[] = [],
     options: {
       confidenceThreshold?: number;
       maxPredictions?: number;
@@ -678,31 +784,31 @@ export const uploadApi = {
   ): Promise<ApiResponse> => {
     try {
       const formData = new FormData();
-      formData.append('image', file);
-      
+      formData.append("image", file);
+
       // Add keywords if provided
       if (keywords.length > 0) {
-        formData.append('keywords', keywords.join(', '));
+        formData.append("keywords", keywords.join(", "));
       }
-      
+
       // Add metadata
       const metadata = {
         confidenceThreshold: options.confidenceThreshold || 0.3,
         maxPredictions: options.maxPredictions || 3,
-        includeWebScraping: options.includeWebScraping || false
+        includeWebScraping: options.includeWebScraping || false,
       };
-      formData.append('metadata', JSON.stringify(metadata));
-      
-      const response = await apiClient.post('/upload/image', formData, {
+      formData.append("metadata", JSON.stringify(metadata));
+
+      const response = await apiClient.post("/upload/image", formData, {
         headers: {
-          'Content-Type': 'multipart/form-data',
+          "Content-Type": "multipart/form-data",
         },
         timeout: 60000, // 60 second timeout for image upload
       });
-      
+
       return response.data;
     } catch (error) {
-      console.error('Upload error:', error);
+      console.error("Upload error:", error);
       throw error;
     }
   },
@@ -742,13 +848,17 @@ export const uploadApi = {
     image_name?: string;
   }): Promise<ApiResponse> => {
     try {
-      const response = await apiClient.post('/upload/save-results', analysisResults, {
-        timeout: 30000, // 30 second timeout
-      });
-      
+      const response = await apiClient.post(
+        "/upload/save-results",
+        analysisResults,
+        {
+          timeout: 30000, // 30 second timeout
+        }
+      );
+
       return response.data;
     } catch (error) {
-      console.error('Save results error:', error);
+      console.error("Save results error:", error);
       throw error;
     }
   },
@@ -763,53 +873,56 @@ export const uploadApi = {
   }): Promise<ApiResponse> => {
     try {
       const params = new URLSearchParams();
-      if (options?.page) params.append('page', options.page.toString());
-      if (options?.limit) params.append('limit', options.limit.toString());
-      if (options?.status) params.append('status', options.status);
-      if (options?.web_scraping !== undefined) params.append('web_scraping', options.web_scraping.toString());
-      if (options?.date_from) params.append('date_from', options.date_from);
-      if (options?.date_to) params.append('date_to', options.date_to);
-      
-      const response = await apiClient.get(`/upload/history?${params.toString()}`);
+      if (options?.page) params.append("page", options.page.toString());
+      if (options?.limit) params.append("limit", options.limit.toString());
+      if (options?.status) params.append("status", options.status);
+      if (options?.web_scraping !== undefined)
+        params.append("web_scraping", options.web_scraping.toString());
+      if (options?.date_from) params.append("date_from", options.date_from);
+      if (options?.date_to) params.append("date_to", options.date_to);
+
+      const response = await apiClient.get(
+        `/upload/history?${params.toString()}`
+      );
       return response.data;
     } catch (error) {
-      console.error('Upload history error:', error);
+      console.error("Upload history error:", error);
       throw error;
     }
   },
 
   getStatistics: async (): Promise<ApiResponse> => {
     try {
-      const response = await apiClient.get('/upload/statistics');
+      const response = await apiClient.get("/upload/statistics");
       return response.data;
     } catch (error) {
-      console.error('Upload statistics error:', error);
+      console.error("Upload statistics error:", error);
       throw error;
     }
-  }
+  },
 };
 
 // Statistics API
 export const statisticsApi = {
   refresh: async (): Promise<ApiResponse> => {
     try {
-      const response = await apiClient.post('/statistics/refresh');
+      const response = await apiClient.post("/statistics/refresh");
       return response.data;
     } catch (error) {
-      console.error('Statistics refresh error:', error);
+      console.error("Statistics refresh error:", error);
       throw error;
     }
   },
-  
+
   getStats: async (): Promise<ApiResponse> => {
     try {
-      const response = await apiClient.get('/statistics');
+      const response = await apiClient.get("/statistics");
       return response.data;
     } catch (error) {
-      console.error('Statistics fetch error:', error);
+      console.error("Statistics fetch error:", error);
       throw error;
     }
-  }
+  },
 };
 
 // Notifications API
@@ -820,43 +933,49 @@ export const notificationsApi = {
   }): Promise<ApiResponse> => {
     try {
       const params = new URLSearchParams();
-      if (options?.page) params.append('page', options.page.toString());
-      if (options?.limit) params.append('limit', options.limit.toString());
-      
-      const response = await apiClient.get(`/notifications?${params.toString()}`);
+      if (options?.page) params.append("page", options.page.toString());
+      if (options?.limit) params.append("limit", options.limit.toString());
+
+      const response = await apiClient.get(
+        `/notifications?${params.toString()}`
+      );
       return response.data;
     } catch (error) {
-      console.error('Notifications fetch error:', error);
+      console.error("Notifications fetch error:", error);
       throw error;
     }
   },
 
   markAsRead: async (notificationId: string): Promise<ApiResponse> => {
     try {
-      const response = await apiClient.patch(`/notifications/${notificationId}/read`);
+      const response = await apiClient.patch(
+        `/notifications/${notificationId}/read`
+      );
       return response.data;
     } catch (error) {
-      console.error('Mark notification as read error:', error);
+      console.error("Mark notification as read error:", error);
       throw error;
     }
   },
 
   markAllAsRead: async (): Promise<ApiResponse> => {
     try {
-      const response = await apiClient.patch('/notifications/mark-all-read');
+      const response = await apiClient.patch("/notifications/mark-all-read");
       return response.data;
     } catch (error) {
-      console.error('Mark all notifications as read error:', error);
+      console.error("Mark all notifications as read error:", error);
       throw error;
     }
   },
 
   deleteNotification: async (notificationId: string): Promise<ApiResponse> => {
     try {
-      const response = await apiClient.delete(`/notifications/${notificationId}`);
+      const response = await apiClient.delete(
+        `/notifications/${notificationId}`
+      );
       return response.data;
     } catch (error) {
-      console.error('Delete notification error:', error);
+      console.error("Delete notification error:", error);
       throw error;
     }
   },
@@ -864,37 +983,37 @@ export const notificationsApi = {
   createNotification: async (notification: {
     title: string;
     message: string;
-    type?: 'info' | 'success' | 'warning' | 'error';
+    type?: "info" | "success" | "warning" | "error";
     action_url?: string;
   }): Promise<ApiResponse> => {
     try {
-      const response = await apiClient.post('/notifications', notification);
+      const response = await apiClient.post("/notifications", notification);
       return response.data;
     } catch (error) {
-      console.error('Create notification error:', error);
+      console.error("Create notification error:", error);
       throw error;
     }
   },
 
   getStats: async (): Promise<ApiResponse> => {
     try {
-      const response = await apiClient.get('/notifications/stats');
+      const response = await apiClient.get("/notifications/stats");
       return response.data;
     } catch (error) {
-      console.error('Notifications stats error:', error);
+      console.error("Notifications stats error:", error);
       throw error;
     }
-  }
+  },
 };
 
 // Credits API
 export const creditsApi = {
   getBalance: async (): Promise<ApiResponse> => {
     try {
-      const response = await apiClient.get('/credits/balance');
+      const response = await apiClient.get("/credits/balance");
       return response.data;
     } catch (error) {
-      console.error('Credits balance fetch error:', error);
+      console.error("Credits balance fetch error:", error);
       throw error;
     }
   },
@@ -905,13 +1024,15 @@ export const creditsApi = {
   }): Promise<ApiResponse> => {
     try {
       const params = new URLSearchParams();
-      if (options?.page) params.append('page', options.page.toString());
-      if (options?.limit) params.append('limit', options.limit.toString());
-      
-      const response = await apiClient.get(`/credits/transactions?${params.toString()}`);
+      if (options?.page) params.append("page", options.page.toString());
+      if (options?.limit) params.append("limit", options.limit.toString());
+
+      const response = await apiClient.get(
+        `/credits/transactions?${params.toString()}`
+      );
       return response.data;
     } catch (error) {
-      console.error('Credits transactions fetch error:', error);
+      console.error("Credits transactions fetch error:", error);
       throw error;
     }
   },
@@ -921,22 +1042,26 @@ export const creditsApi = {
       const response = await apiClient.get(`/credits/check/${amount}`);
       return response.data;
     } catch (error) {
-      console.error('Credits check error:', error);
+      console.error("Credits check error:", error);
       throw error;
     }
   },
 
   // Admin only
-  addCredits: async (userId: string, amount: number, reason?: string): Promise<ApiResponse> => {
+  addCredits: async (
+    userId: string,
+    amount: number,
+    reason?: string
+  ): Promise<ApiResponse> => {
     try {
-      const response = await apiClient.post('/credits/add', {
+      const response = await apiClient.post("/credits/add", {
         user_id: userId,
         amount,
-        reason
+        reason,
       });
       return response.data;
     } catch (error) {
-      console.error('Add credits error:', error);
+      console.error("Add credits error:", error);
       throw error;
     }
   },
@@ -944,13 +1069,13 @@ export const creditsApi = {
   // Admin only
   getStatistics: async (): Promise<ApiResponse> => {
     try {
-      const response = await apiClient.get('/credits/statistics');
+      const response = await apiClient.get("/credits/statistics");
       return response.data;
     } catch (error) {
-      console.error('Credits statistics error:', error);
+      console.error("Credits statistics error:", error);
       throw error;
     }
-  }
+  },
 };
 
 // Contact API
@@ -961,16 +1086,16 @@ export const contactApi = {
     company: string;
     subject: string;
     message: string;
-    inquiryType: 'support' | 'sales' | 'billing' | 'technical' | 'general';
+    inquiryType: "support" | "sales" | "billing" | "technical" | "general";
   }): Promise<ApiResponse> => {
     try {
-      const response = await apiClient.post('/contact', formData);
+      const response = await apiClient.post("/contact", formData);
       return response.data;
     } catch (error) {
-      console.error('Contact form submission error:', error);
+      console.error("Contact form submission error:", error);
       throw error;
     }
-  }
+  },
 };
 
 // Reviews API
@@ -978,34 +1103,36 @@ export const reviewsApi = {
   getAll: async (params?: {
     page?: number;
     limit?: number;
-  }): Promise<ApiResponse<{
-    reviews: Array<{
-      id: string;
-      name: string;
-      email: string;
-      company?: string;
-      rating: number;
-      title: string;
-      message: string;
-      created_at: string;
-      verified: boolean;
-    }>;
-    pagination: {
-      page: number;
-      limit: number;
-      total: number;
-      totalPages: number;
-    };
-    stats: {
-      averageRating: number;
-      totalReviews: number;
-    };
-  }>> => {
+  }): Promise<
+    ApiResponse<{
+      reviews: Array<{
+        id: string;
+        name: string;
+        email: string;
+        company?: string;
+        rating: number;
+        title: string;
+        message: string;
+        created_at: string;
+        verified: boolean;
+      }>;
+      pagination: {
+        page: number;
+        limit: number;
+        total: number;
+        totalPages: number;
+      };
+      stats: {
+        averageRating: number;
+        totalReviews: number;
+      };
+    }>
+  > => {
     try {
-      const response = await apiClient.get('/reviews', { params });
+      const response = await apiClient.get("/reviews", { params });
       return response.data;
     } catch (error) {
-      console.error('Error fetching reviews:', error);
+      console.error("Error fetching reviews:", error);
       throw error;
     }
   },
@@ -1017,56 +1144,60 @@ export const reviewsApi = {
     rating: number;
     title: string;
     message: string;
-  }): Promise<ApiResponse<{
-    review: {
-      id: string;
-      rating: number;
-      title: string;
-      submittedAt: string;
-    };
-    emailSent: boolean;
-  }>> => {
+  }): Promise<
+    ApiResponse<{
+      review: {
+        id: string;
+        rating: number;
+        title: string;
+        submittedAt: string;
+      };
+      emailSent: boolean;
+    }>
+  > => {
     try {
-      console.log('📤 Submitting review:', reviewData);
-      const response = await apiClient.post('/reviews', reviewData);
-      console.log('✅ Review submitted successfully:', response.data);
+      console.log("📤 Submitting review:", reviewData);
+      const response = await apiClient.post("/reviews", reviewData);
+      console.log("✅ Review submitted successfully:", response.data);
       return response.data;
     } catch (error) {
-      console.error('❌ Review submission error:', error);
+      console.error("❌ Review submission error:", error);
       throw error;
     }
   },
 
-  getStats: async (): Promise<ApiResponse<{
-    totalReviews: number;
-    averageRating: number;
-    ratingDistribution: Array<{
-      rating: number;
-      count: number;
-      percentage: number;
-    }>;
-  }>> => {
+  getStats: async (): Promise<
+    ApiResponse<{
+      totalReviews: number;
+      averageRating: number;
+      ratingDistribution: Array<{
+        rating: number;
+        count: number;
+        percentage: number;
+      }>;
+    }>
+  > => {
     try {
-      const response = await apiClient.get('/reviews/stats');
+      const response = await apiClient.get("/reviews/stats");
       return response.data;
     } catch (error) {
-      console.error('Error fetching review stats:', error);
+      console.error("Error fetching review stats:", error);
       throw error;
     }
-  }
+  },
 };
 
 // Export combined API
 export const api = {
   auth: authApi,
   user: {
-    getProfile: () => apiClient.get('/user/profile'),
-    updateProfile: (profileData: { 
-      full_name?: string; 
-      company?: string; 
-      phone?: string; 
-      bio?: string; 
-      location?: string; 
+    getProfile: () => apiClient.get("/user/profile"),
+    updateProfile: (profileData: {
+      full_name?: string;
+      company?: string;
+      phone?: string;
+      bio?: string;
+      location?: string;
       website?: string;
       preferences?: {
         emailNotifications?: boolean;
@@ -1075,72 +1206,77 @@ export const api = {
         darkMode?: boolean;
         analytics?: boolean;
         marketing?: boolean;
-      }
-    }) => apiClient.put('/user/profile', profileData),
-    changePassword: async (currentPassword: string, newPassword: string): Promise<ApiResponse> => {
-      const response = await apiClient.post('/profile/change-password', {
+      };
+    }) => apiClient.put("/user/profile", profileData),
+    changePassword: async (
+      currentPassword: string,
+      newPassword: string
+    ): Promise<ApiResponse> => {
+      const response = await apiClient.post("/profile/change-password", {
         currentPassword,
-        newPassword
-          });
-          return response.data;
+        newPassword,
+      });
+      return response.data;
     },
     deleteAccount: async (): Promise<ApiResponse> => {
-      const response = await apiClient.delete('/profile/delete-account');
+      const response = await apiClient.delete("/profile/delete-account");
       return response.data;
     },
     getAchievements: async (): Promise<ApiResponse> => {
       // Mock achievements data
       const mockAchievements = [
         {
-          id: 'first-upload',
-          title: 'First Upload',
-          description: 'Upload your first part image',
-          icon: '🎯',
-          color: 'from-green-600 to-emerald-600',
+          id: "first-upload",
+          title: "First Upload",
+          description: "Upload your first part image",
+          icon: "🎯",
+          color: "from-green-600 to-emerald-600",
           earned: true,
-          earnedAt: new Date().toISOString()
+          earnedAt: new Date().toISOString(),
         },
         {
-          id: 'accuracy-master',
-          title: 'Accuracy Master',
-          description: 'Achieve 95% accuracy rate',
-          icon: '🎯',
-          color: 'from-blue-600 to-cyan-600',
-          earned: false
+          id: "accuracy-master",
+          title: "Accuracy Master",
+          description: "Achieve 95% accuracy rate",
+          icon: "🎯",
+          color: "from-blue-600 to-cyan-600",
+          earned: false,
         },
         {
-          id: 'speed-demon',
-          title: 'Speed Demon',
-          description: 'Complete 50 identifications',
-          icon: '⚡',
-          color: 'from-yellow-600 to-orange-600',
-          earned: false
+          id: "speed-demon",
+          title: "Speed Demon",
+          description: "Complete 50 identifications",
+          icon: "⚡",
+          color: "from-yellow-600 to-orange-600",
+          earned: false,
         },
         {
-          id: 'streak-master',
-          title: 'Streak Master',
-          description: 'Use the app for 7 consecutive days',
-          icon: '🔥',
-          color: 'from-red-600 to-pink-600',
-          earned: false
-        }
+          id: "streak-master",
+          title: "Streak Master",
+          description: "Use the app for 7 consecutive days",
+          icon: "🔥",
+          color: "from-red-600 to-pink-600",
+          earned: false,
+        },
       ];
 
-      const earned = mockAchievements.filter(a => a.earned).length;
-      
-          return {
-            success: true,
+      const earned = mockAchievements.filter((a) => a.earned).length;
+
+      return {
+        success: true,
         data: {
           achievements: mockAchievements,
           totalEarned: earned,
-          totalAvailable: mockAchievements.length
-        }
+          totalAvailable: mockAchievements.length,
+        },
       };
     },
     getRecentActivities: async (limit: number = 5): Promise<ApiResponse> => {
-      const response = await apiClient.get(`/dashboard/recent-activities?limit=${limit}`);
+      const response = await apiClient.get(
+        `/dashboard/recent-activities?limit=${limit}`
+      );
       return response.data;
-    }
+    },
   },
   upload: uploadApi,
   admin: adminApi,
@@ -1149,9 +1285,9 @@ export const api = {
   statistics: statisticsApi,
   credits: creditsApi,
   contact: contactApi,
-  reviews: reviewsApi
+  reviews: reviewsApi,
 };
 
 // Export individual APIs for backward compatibility
 export { apiClient, tokenStorage };
-export default api; 
+export default api;

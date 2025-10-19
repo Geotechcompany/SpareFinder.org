@@ -1,26 +1,37 @@
-import React, { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { useToast } from '@/components/ui/use-toast';
-import { api, tokenStorage } from '@/lib/api';
-import { useAuth } from '@/contexts/AuthContext';
-import { useNavigate } from 'react-router-dom';
-import AdminDesktopSidebar from '@/components/AdminDesktopSidebar';
-import MobileSidebar from '@/components/MobileSidebar';
-import DashboardSkeleton from '@/components/DashboardSkeleton';
-import { 
-  Loader2, 
-  AlertCircle, 
-  Users, 
-  Search, 
-  Activity, 
-  TrendingUp, 
-  Shield, 
-  Settings, 
-  FileText, 
-  BarChart3, 
+import React, { useState, useEffect } from "react";
+import { motion } from "framer-motion";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { useToast } from "@/components/ui/use-toast";
+import { api, tokenStorage } from "@/lib/api";
+import { useAuth } from "@/contexts/AuthContext";
+import { useNavigate } from "react-router-dom";
+import AdminDesktopSidebar from "@/components/AdminDesktopSidebar";
+import MobileSidebar from "@/components/MobileSidebar";
+import {
+  PageSkeleton,
+  CardSkeleton,
+  ListSkeleton,
+  ChartSkeleton,
+} from "@/components/skeletons";
+import {
+  Loader2,
+  AlertCircle,
+  Users,
+  Search,
+  Activity,
+  TrendingUp,
+  Shield,
+  Settings,
+  FileText,
+  BarChart3,
   Menu,
   RefreshCw,
   Download,
@@ -28,8 +39,8 @@ import {
   Clock,
   Zap,
   Database,
-  Server
-} from 'lucide-react';
+  Server,
+} from "lucide-react";
 
 interface AdminStats {
   total_users: number;
@@ -66,7 +77,7 @@ const AdminDashboardLayout = () => {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  
+
   const { toast } = useToast();
   const { user, isLoading: authLoading, logout } = useAuth();
   const navigate = useNavigate();
@@ -75,47 +86,50 @@ const AdminDashboardLayout = () => {
   const checkAuthentication = async () => {
     try {
       const token = tokenStorage.getToken();
-      
+
       if (!token) {
-        console.log('🔒 No admin token found in session storage');
-        navigate('/admin/login');
+        console.log("🔒 No admin token found in session storage");
+        navigate("/admin/login");
         return false;
       }
 
-      console.log('🔍 Admin token found, validating...');
-      
+      console.log("🔍 Admin token found, validating...");
+
       // Verify token with backend
       const userResponse = await api.auth.getCurrentUser();
-      
+
       if (userResponse.success && userResponse.data?.user) {
         const userData = userResponse.data.user;
-        
+
         // Check if user has admin role
-        if (!userData.role || !['admin', 'super_admin'].includes(userData.role)) {
-          console.log('❌ User does not have admin privileges');
+        if (
+          !userData.role ||
+          !["admin", "super_admin"].includes(userData.role)
+        ) {
+          console.log("❌ User does not have admin privileges");
           toast({
             variant: "destructive",
             title: "Access Denied",
             description: "You don't have admin privileges to access this page.",
           });
-          navigate('/dashboard');
+          navigate("/dashboard");
           return false;
         }
 
-        console.log('✅ Admin authentication successful:', userData);
+        console.log("✅ Admin authentication successful:", userData);
         setAdminUser(userData);
         setIsAuthenticated(true);
         return true;
       } else {
-        console.warn('❌ Admin token validation failed:', userResponse.error);
+        console.warn("❌ Admin token validation failed:", userResponse.error);
         tokenStorage.clearAll();
-        navigate('/admin/login');
+        navigate("/admin/login");
         return false;
       }
     } catch (error) {
-      console.error('❌ Admin authentication check failed:', error);
+      console.error("❌ Admin authentication check failed:", error);
       tokenStorage.clearAll();
-      navigate('/admin/login');
+      navigate("/admin/login");
       return false;
     }
   };
@@ -138,7 +152,7 @@ const AdminDashboardLayout = () => {
 
   const fetchAdminData = async (skipAuthCheck = false) => {
     if (!skipAuthCheck && !isAuthenticated) {
-      console.log('⏳ Skipping admin data fetch - not authenticated');
+      console.log("⏳ Skipping admin data fetch - not authenticated");
       return;
     }
 
@@ -146,43 +160,48 @@ const AdminDashboardLayout = () => {
       setIsLoading(true);
       setError(null);
 
-      console.log('📊 Fetching admin dashboard data...');
+      console.log("📊 Fetching admin dashboard data...");
 
       // Check token before making requests
       const token = tokenStorage.getToken();
       if (!token) {
-        console.log('❌ No token available for admin data fetch');
-        navigate('/admin/login');
+        console.log("❌ No token available for admin data fetch");
+        navigate("/admin/login");
         return;
       }
 
       // Fetch admin stats
       const statsResponse = await api.admin.getAdminStats();
       if (statsResponse.success && statsResponse.data?.statistics) {
-        console.log('✅ Admin stats fetched successfully');
+        console.log(
+          "✅ Admin stats fetched successfully:",
+          statsResponse.data.statistics
+        );
         setStats(statsResponse.data.statistics);
       } else {
-        console.warn('❌ Failed to fetch admin stats:', statsResponse);
-        throw new Error(statsResponse.error || 'Failed to fetch admin statistics');
+        console.warn("❌ Failed to fetch admin stats:", statsResponse);
+        throw new Error(
+          statsResponse.error || "Failed to fetch admin statistics"
+        );
       }
-
     } catch (err: any) {
-      console.error('❌ Error fetching admin data:', err);
-      
+      console.error("❌ Error fetching admin data:", err);
+
       // Handle authentication errors
       if (err.response?.status === 401 || err.response?.status === 403) {
-        console.log('🔒 Admin authentication error, redirecting to login');
+        console.log("🔒 Admin authentication error, redirecting to login");
         toast({
           variant: "destructive",
           title: "Session Expired",
           description: "Your admin session has expired. Please log in again.",
         });
         tokenStorage.clearAll();
-        navigate('/admin/login');
+        navigate("/admin/login");
         return;
       }
 
-      const errorMessage = err instanceof Error ? err.message : 'Failed to load admin data';
+      const errorMessage =
+        err instanceof Error ? err.message : "Failed to load admin data";
       setError(errorMessage);
       toast({
         variant: "destructive",
@@ -190,6 +209,7 @@ const AdminDashboardLayout = () => {
         description: errorMessage,
       });
     } finally {
+      console.log("📊 Setting admin dashboard loading to false");
       setIsLoading(false);
     }
   };
@@ -209,7 +229,7 @@ const AdminDashboardLayout = () => {
         title: "Authentication Required",
         description: "Please log in to refresh admin data.",
       });
-      navigate('/admin/login');
+      navigate("/admin/login");
       return;
     }
 
@@ -228,27 +248,33 @@ const AdminDashboardLayout = () => {
     try {
       await logout();
       tokenStorage.clearAll();
-      navigate('/admin/login');
+      navigate("/admin/login");
       toast({
         title: "Logged Out",
         description: "You have been successfully logged out.",
       });
     } catch (error) {
-      console.error('Logout error:', error);
+      console.error("Logout error:", error);
       // Force logout even if API call fails
       tokenStorage.clearAll();
-      navigate('/admin/login');
+      navigate("/admin/login");
     }
   };
 
-  // Show loading while checking authentication
-  if (authLoading || (isLoading && !isAuthenticated)) {
-    return <DashboardSkeleton variant="admin" />;
-  }
+  console.log("📊 Admin Dashboard render state:", {
+    authLoading,
+    isLoading,
+    isAuthenticated,
+    stats: !!stats,
+    error,
+  });
 
-  // Show loading while fetching data
-  if (isLoading && isAuthenticated) {
-    return <DashboardSkeleton variant="admin" />;
+  // Show loading while checking authentication or fetching data
+  if (authLoading || isLoading) {
+    console.log("📊 Rendering admin dashboard skeleton");
+    return (
+      <PageSkeleton variant="dashboard" showSidebar={true} showHeader={true} />
+    );
   }
 
   if (error) {
@@ -270,66 +296,67 @@ const AdminDashboardLayout = () => {
     );
   }
 
+  console.log("📊 Rendering admin dashboard main content");
   const quickStats = [
     {
-      title: 'Total Users',
-      value: stats?.total_users?.toLocaleString() || '0',
+      title: "Total Users",
+      value: stats?.total_users?.toLocaleString() || "0",
       change: `+${stats?.new_users_today || 0} today`,
       icon: Users,
-      color: 'from-blue-600 to-cyan-600',
-      trend: 'up'
+      color: "from-blue-600 to-cyan-600",
+      trend: "up",
     },
     {
-      title: 'Total Searches',
-      value: stats?.total_searches?.toLocaleString() || '0',
+      title: "Total Searches",
+      value: stats?.total_searches?.toLocaleString() || "0",
       change: `+${stats?.searches_today || 0} today`,
       icon: Search,
-      color: 'from-green-600 to-emerald-600',
-      trend: 'up'
+      color: "from-green-600 to-emerald-600",
+      trend: "up",
     },
     {
-      title: 'Active Users',
-      value: stats?.active_users?.toLocaleString() || '0',
-      change: 'Last 30 days',
+      title: "Active Users",
+      value: stats?.active_users?.toLocaleString() || "0",
+      change: "Last 30 days",
       icon: Activity,
-      color: 'from-purple-600 to-pink-600',
-      trend: 'up'
+      color: "from-purple-600 to-pink-600",
+      trend: "up",
     },
     {
-      title: 'Success Rate',
-      value: `${stats?.success_rate?.toFixed(1) || '0'}%`,
-      change: 'AI Accuracy',
+      title: "Success Rate",
+      value: `${stats?.success_rate?.toFixed(1) || "0"}%`,
+      change: "AI Accuracy",
       icon: TrendingUp,
-      color: 'from-orange-600 to-red-600',
-      trend: 'up'
-    }
+      color: "from-orange-600 to-red-600",
+      trend: "up",
+    },
   ];
 
   const systemMetrics = [
     {
-      title: 'Response Time',
+      title: "Response Time",
       value: `${stats?.avg_response_time || 0}ms`,
       icon: Zap,
-      color: 'text-yellow-400'
+      color: "text-yellow-400",
     },
     {
-      title: 'CPU Usage',
+      title: "CPU Usage",
       value: `${stats?.cpu_usage || 0}%`,
       icon: Server,
-      color: 'text-blue-400'
+      color: "text-blue-400",
     },
     {
-      title: 'Memory Usage',
+      title: "Memory Usage",
       value: `${stats?.memory_usage || 0}%`,
       icon: Database,
-      color: 'text-green-400'
+      color: "text-green-400",
     },
     {
-      title: 'Disk Usage',
+      title: "Disk Usage",
       value: `${stats?.disk_usage || 0}%`,
       icon: Database,
-      color: 'text-purple-400'
-    }
+      color: "text-purple-400",
+    },
   ];
 
   return (
@@ -345,7 +372,7 @@ const AdminDashboardLayout = () => {
           transition={{
             duration: 20,
             repeat: Infinity,
-            ease: "linear"
+            ease: "linear",
           }}
         />
         <motion.div
@@ -358,18 +385,24 @@ const AdminDashboardLayout = () => {
           transition={{
             duration: 25,
             repeat: Infinity,
-            ease: "easeInOut"
+            ease: "easeInOut",
           }}
         />
       </div>
 
-      <AdminDesktopSidebar isCollapsed={isCollapsed} onToggle={handleToggleSidebar} />
-      
+      <AdminDesktopSidebar
+        isCollapsed={isCollapsed}
+        onToggle={handleToggleSidebar}
+      />
+
       {/* Mobile Sidebar */}
-      <MobileSidebar isOpen={isMobileMenuOpen} onClose={() => setIsMobileMenuOpen(false)} />
+      <MobileSidebar
+        isOpen={isMobileMenuOpen}
+        onClose={() => setIsMobileMenuOpen(false)}
+      />
 
       {/* Mobile Menu Button */}
-      <button 
+      <button
         onClick={handleToggleMobileMenu}
         className="fixed top-4 right-4 z-50 p-2 rounded-lg bg-black/20 backdrop-blur-xl border border-white/10 md:hidden"
       >
@@ -379,9 +412,9 @@ const AdminDashboardLayout = () => {
       {/* Main Content */}
       <motion.div
         initial={false}
-        animate={{ 
-          marginLeft: isCollapsed ? '80px' : '320px',
-          width: isCollapsed ? 'calc(100% - 80px)' : 'calc(100% - 320px)'
+        animate={{
+          marginLeft: isCollapsed ? "80px" : "320px",
+          width: isCollapsed ? "calc(100% - 80px)" : "calc(100% - 320px)",
         }}
         transition={{ duration: 0.3, ease: "easeInOut" }}
         className="flex-1 p-2 sm:p-4 lg:p-8 relative z-10 overflow-x-hidden md:overflow-x-visible"
@@ -399,13 +432,18 @@ const AdminDashboardLayout = () => {
                 Admin Dashboard
               </h1>
               <p className="text-gray-400 mt-2">
-                Welcome back, {adminUser?.full_name || 'Administrator'}
+                Welcome back, {adminUser?.full_name || "Administrator"}
               </p>
             </div>
             <div className="flex items-center space-x-2">
-              <Badge variant="secondary" className="bg-purple-600/20 text-purple-400 border-purple-500/30">
+              <Badge
+                variant="secondary"
+                className="bg-purple-600/20 text-purple-400 border-purple-500/30"
+              >
                 <Shield className="w-3 h-3 mr-1" />
-                {adminUser?.role === 'super_admin' ? 'Super Admin' : 'Administrator'}
+                {adminUser?.role === "super_admin"
+                  ? "Super Admin"
+                  : "Administrator"}
               </Badge>
               <Button
                 onClick={handleRefresh}
@@ -438,16 +476,26 @@ const AdminDashboardLayout = () => {
                 whileHover={{ y: -5, scale: 1.02 }}
                 className="relative group"
               >
-                <div className={`absolute inset-0 bg-gradient-to-r ${stat.color} opacity-10 rounded-2xl blur-xl group-hover:opacity-20 transition-opacity`} />
+                <div
+                  className={`absolute inset-0 bg-gradient-to-r ${stat.color} opacity-10 rounded-2xl blur-xl group-hover:opacity-20 transition-opacity`}
+                />
                 <Card className="relative bg-black/40 backdrop-blur-xl border-white/10 hover:border-white/20 transition-all duration-300">
                   <CardContent className="p-6">
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="text-gray-400 text-sm font-medium">{stat.title}</p>
-                        <p className="text-2xl font-bold text-white mt-1">{stat.value}</p>
-                        <p className="text-sm mt-1 text-gray-400">{stat.change}</p>
+                        <p className="text-gray-400 text-sm font-medium">
+                          {stat.title}
+                        </p>
+                        <p className="text-2xl font-bold text-white mt-1">
+                          {stat.value}
+                        </p>
+                        <p className="text-sm mt-1 text-gray-400">
+                          {stat.change}
+                        </p>
                       </div>
-                      <div className={`p-3 rounded-xl bg-gradient-to-r ${stat.color} shadow-lg`}>
+                      <div
+                        className={`p-3 rounded-xl bg-gradient-to-r ${stat.color} shadow-lg`}
+                      >
                         <stat.icon className="w-6 h-6 text-white" />
                       </div>
                     </div>
@@ -480,12 +528,17 @@ const AdminDashboardLayout = () => {
                 <CardContent>
                   <div className="space-y-4">
                     {systemMetrics.map((metric, index) => (
-                      <div key={metric.title} className="flex items-center justify-between p-3 rounded-xl bg-white/5">
+                      <div
+                        key={metric.title}
+                        className="flex items-center justify-between p-3 rounded-xl bg-white/5"
+                      >
                         <div className="flex items-center space-x-3">
                           <metric.icon className={`w-5 h-5 ${metric.color}`} />
                           <span className="text-gray-300">{metric.title}</span>
                         </div>
-                        <span className="text-white font-semibold">{metric.value}</span>
+                        <span className="text-white font-semibold">
+                          {metric.value}
+                        </span>
                       </div>
                     ))}
                   </div>
@@ -513,27 +566,36 @@ const AdminDashboardLayout = () => {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
-                    {stats?.recent_searches?.slice(0, 5).map((search, index) => (
-                      <div key={search.id} className="flex items-center justify-between p-3 rounded-xl bg-white/5">
-                        <div className="flex items-center space-x-3">
-                          <Search className="w-4 h-4 text-blue-400" />
-                          <div>
-                            <p className="text-white text-sm">Part Search</p>
-                            <p className="text-gray-400 text-xs">
-                              {search.profiles?.email || 'Unknown user'}
+                    {stats?.recent_searches
+                      ?.slice(0, 5)
+                      .map((search, index) => (
+                        <div
+                          key={search.id}
+                          className="flex items-center justify-between p-3 rounded-xl bg-white/5"
+                        >
+                          <div className="flex items-center space-x-3">
+                            <Search className="w-4 h-4 text-blue-400" />
+                            <div>
+                              <p className="text-white text-sm">Part Search</p>
+                              <p className="text-gray-400 text-xs">
+                                {search.profiles?.email || "Unknown user"}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <Badge
+                              variant="secondary"
+                              className="bg-green-600/20 text-green-400 border-green-500/30 text-xs"
+                            >
+                              {Math.round((search.confidence_score || 0) * 100)}
+                              %
+                            </Badge>
+                            <p className="text-gray-500 text-xs mt-1">
+                              {new Date(search.created_at).toLocaleTimeString()}
                             </p>
                           </div>
                         </div>
-                        <div className="text-right">
-                          <Badge variant="secondary" className="bg-green-600/20 text-green-400 border-green-500/30 text-xs">
-                            {Math.round((search.confidence_score || 0) * 100)}%
-                          </Badge>
-                          <p className="text-gray-500 text-xs mt-1">
-                            {new Date(search.created_at).toLocaleTimeString()}
-                          </p>
-                        </div>
-                      </div>
-                    )) || (
+                      )) || (
                       <div className="text-center py-8 text-gray-400">
                         <Search className="w-8 h-8 mx-auto mb-2 opacity-50" />
                         <p>No recent activity</p>
@@ -550,4 +612,4 @@ const AdminDashboardLayout = () => {
   );
 };
 
-export default AdminDashboardLayout; 
+export default AdminDashboardLayout;

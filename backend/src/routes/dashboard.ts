@@ -1,23 +1,23 @@
-import { Router, Request, Response } from 'express';
-import { createClient } from '@supabase/supabase-js';
-import dotenv from 'dotenv';
-import path from 'path';
+import { Router, Request, Response } from "express";
+import { createClient } from "@supabase/supabase-js";
+import dotenv from "dotenv";
+import path from "path";
 // import { z } from 'zod';
-import winston from 'winston';
-import { authenticateToken } from '../middleware/auth';  // Import authentication middleware
-import { AuthRequest } from '../types/auth';  // Import the correct auth request type
+import winston from "winston";
+import { authenticateToken } from "../middleware/auth"; // Import authentication middleware
+import { AuthRequest } from "../types/auth"; // Import the correct auth request type
 
 // Enhanced logging setup
 const logger = winston.createLogger({
-  level: 'info',
+  level: "info",
   format: winston.format.combine(
     winston.format.timestamp(),
     winston.format.json()
   ),
   transports: [
     new winston.transports.Console(),
-    new winston.transports.File({ filename: 'error.log', level: 'error' })
-  ]
+    new winston.transports.File({ filename: "error.log", level: "error" }),
+  ],
 });
 
 // Performance Metrics Result Type with Zod
@@ -32,27 +32,27 @@ const logger = winston.createLogger({
 
 // Environment Variable Validation
 const validateEnvVars = () => {
-  const requiredVars = ['SUPABASE_URL', 'SUPABASE_SERVICE_KEY'];
-  const missingVars = requiredVars.filter(varName => !process.env[varName]);
+  const requiredVars = ["SUPABASE_URL", "SUPABASE_SERVICE_KEY"];
+  const missingVars = requiredVars.filter((varName) => !process.env[varName]);
 
   if (missingVars.length > 0) {
-    const errorMsg = `Missing environment variables: ${missingVars.join(', ')}`;
+    const errorMsg = `Missing environment variables: ${missingVars.join(", ")}`;
     logger.error(errorMsg);
     throw new Error(errorMsg);
   }
 };
 
 // Load and validate environment variables
-dotenv.config({ 
-  path: path.resolve(__dirname, '../../../.env') 
+dotenv.config({
+  path: path.resolve(__dirname, "../../../.env"),
 });
 validateEnvVars();
 
 const supabaseUrl = process.env.SUPABASE_URL!;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY!;
 
-const supabase = createClient(supabaseUrl, supabaseServiceKey, { 
-  auth: { persistSession: false } 
+const supabase = createClient(supabaseUrl, supabaseServiceKey, {
+  auth: { persistSession: false },
 });
 
 const router = Router();
@@ -65,65 +65,66 @@ const validateQueryParams = (req: Request, res: Response, next: () => void) => {
   try {
     const limit = parseInt(req.query.limit as string) || 5;
     if (limit < 1 || limit > 50) {
-      return res.status(400).json({ 
-        success: false, 
-        error: 'Limit must be between 1 and 50' 
+      return res.status(400).json({
+        success: false,
+        error: "Limit must be between 1 and 50",
       });
     }
     next();
     return;
   } catch (error) {
-    logger.error('Query parameter validation error', { error });
-    return res.status(400).json({ 
-      success: false, 
-      error: 'Invalid query parameters' 
+    logger.error("Query parameter validation error", { error });
+    return res.status(400).json({
+      success: false,
+      error: "Invalid query parameters",
     });
   }
 };
 
 // Centralized error handler
 const handleDashboardError = (
-  res: Response, 
-  error: unknown, 
+  res: Response,
+  error: unknown,
   context: string
 ) => {
   logger.error(`${context} Error`, { error });
-  
+
   if (error instanceof Error) {
-    return res.status(500).json({ 
-      success: false, 
-      error: error.message 
+    return res.status(500).json({
+      success: false,
+      error: error.message,
     });
   } else {
-    return res.status(500).json({ 
-      success: false, 
-      error: 'Unexpected server error' 
+    return res.status(500).json({
+      success: false,
+      error: "Unexpected server error",
     });
   }
 };
 
 // Get recent uploads with enhanced validation
 router.get(
-  '/recent-uploads', 
+  "/recent-uploads",
   validateQueryParams,
   async (req: AuthRequest, res: Response) => {
     try {
       const limit = parseInt(req.query.limit as string) || 5;
       const userId = req.user?.userId;
 
-      console.log('📁 Recent uploads - User ID:', userId);
+      console.log("📁 Recent uploads - User ID:", userId);
 
       if (!userId) {
-        console.log('❌ Recent uploads - No user ID found');
-        return res.status(401).json({ 
-          success: false, 
-          error: 'Unauthorized' 
+        console.log("❌ Recent uploads - No user ID found");
+        return res.status(401).json({
+          success: false,
+          error: "Unauthorized",
         });
       }
 
       const { data, error } = await supabase
-        .from('part_searches')
-        .select(`
+        .from("part_searches")
+        .select(
+          `
           id,
           search_term,
           part_name,
@@ -133,9 +134,10 @@ router.get(
           image_url,
           image_name,
           created_at
-        `)
-        .eq('user_id', userId)
-        .order('created_at', { ascending: false })
+        `
+        )
+        .eq("user_id", userId)
+        .order("created_at", { ascending: false })
         .limit(limit);
 
       if (error) throw error;
@@ -143,44 +145,49 @@ router.get(
       return res.json({
         success: true,
         data: {
-        uploads: (data || []).map(upload => ({
-          id: upload.id,
-            image_name: upload.image_name || upload.part_name || upload.search_term || 'Unknown',
-          created_at: upload.created_at,
+          uploads: (data || []).map((upload) => ({
+            id: upload.id,
+            image_name:
+              upload.image_name ||
+              upload.part_name ||
+              upload.search_term ||
+              "Unknown",
+            created_at: upload.created_at,
             confidence_score: upload.confidence_score || 0,
-          part_details: {
+            part_details: {
               part_number: upload.part_number || null,
-              manufacturer: upload.manufacturer || null
-          }
-        }))
-        }
+              manufacturer: upload.manufacturer || null,
+            },
+          })),
+        },
       });
     } catch (error) {
-      return handleDashboardError(res, error, 'Recent Uploads');
+      return handleDashboardError(res, error, "Recent Uploads");
     }
   }
 );
 
 // Get recent activities
-router.get('/recent-activities', async (req: AuthRequest, res: Response) => {
+router.get("/recent-activities", async (req: AuthRequest, res: Response) => {
   try {
     const limit = parseInt(req.query.limit as string) || 5;
     const userId = req.user?.userId; // Assuming middleware adds user info
 
-    console.log('🔄 Recent activities - User ID:', userId);
+    console.log("🔄 Recent activities - User ID:", userId);
 
     if (!userId) {
-      console.log('❌ Recent activities - No user ID found');
-      return res.status(401).json({ 
-        success: false, 
-        error: 'Unauthorized' 
+      console.log("❌ Recent activities - No user ID found");
+      return res.status(401).json({
+        success: false,
+        error: "Unauthorized",
       });
     }
 
     // Fetch recent activities from part_searches
     const { data, error } = await supabase
-      .from('part_searches')
-      .select(`
+      .from("part_searches")
+      .select(
+        `
         id,
         search_term,
         search_type,
@@ -190,76 +197,81 @@ router.get('/recent-activities', async (req: AuthRequest, res: Response) => {
         is_match,
         analysis_status,
         created_at
-      `)
-      .eq('user_id', userId)
-      .order('created_at', { ascending: false })
+      `
+      )
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false })
       .limit(limit);
 
     if (error) {
-      console.error('Recent Activities Error:', error);
-      return res.status(500).json({ 
-        success: false, 
-        error: error.message 
+      console.error("Recent Activities Error:", error);
+      return res.status(500).json({
+        success: false,
+        error: error.message,
       });
     }
 
     return res.json({
       success: true,
       data: {
-      activities: (data || []).map(activity => ({
-        id: activity.id,
-        resource_type: 'part_search',
-          action: activity.is_match ? 'Part Match Found' : 'Search Performed',
-        details: {
-            search_term: activity.search_term || 'Unknown',
-            search_type: activity.search_type || 'image_upload',
-            part_name: activity.part_name || 'Not identified',
-            manufacturer: activity.manufacturer || 'Unknown',
+        activities: (data || []).map((activity) => ({
+          id: activity.id,
+          resource_type: "part_search",
+          action: activity.is_match ? "Part Match Found" : "Search Performed",
+          details: {
+            search_term: activity.search_term || "Unknown",
+            search_type: activity.search_type || "image_upload",
+            part_name: activity.part_name || "Not identified",
+            manufacturer: activity.manufacturer || "Unknown",
             confidence: Math.round((activity.confidence_score || 0) * 100),
-            status: activity.analysis_status || (activity.is_match ? 'success' : 'pending'),
-            description: activity.part_name 
-              ? `Found ${activity.part_name}${activity.manufacturer ? ` by ${activity.manufacturer}` : ''}`
-              : `Searched for ${activity.search_term || 'part'}`
-        },
-        created_at: activity.created_at
-      }))
-      }
+            status:
+              activity.analysis_status ||
+              (activity.is_match ? "success" : "pending"),
+            description: activity.part_name
+              ? `Found ${activity.part_name}${
+                  activity.manufacturer ? ` by ${activity.manufacturer}` : ""
+                }`
+              : `Searched for ${activity.search_term || "part"}`,
+          },
+          created_at: activity.created_at,
+        })),
+      },
     });
   } catch (error) {
-    console.error('Recent Activities Unexpected Error:', error);
-    return res.status(500).json({ 
-      success: false, 
-      error: 'Internal server error' 
+    console.error("Recent Activities Unexpected Error:", error);
+    return res.status(500).json({
+      success: false,
+      error: "Internal server error",
     });
   }
 });
 
 // Get performance metrics
-router.get('/performance-metrics', async (req: AuthRequest, res: Response) => {
+router.get("/performance-metrics", async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.user?.userId; // Assuming middleware adds user info
 
-    console.log('📈 Performance metrics - User ID:', userId);
+    console.log("📈 Performance metrics - User ID:", userId);
 
     if (!userId) {
-      console.log('❌ Performance metrics - No user ID found');
-      return res.status(401).json({ 
-        success: false, 
-        error: 'Unauthorized' 
+      console.log("❌ Performance metrics - No user ID found");
+      return res.status(401).json({
+        success: false,
+        error: "Unauthorized",
       });
     }
 
     // Fetch all user's part searches to calculate metrics
     const { data: searches, error } = await supabase
-      .from('part_searches')
-      .select('confidence_score, processing_time_ms, is_match')
-      .eq('user_id', userId);
+      .from("part_searches")
+      .select("confidence_score, processing_time_ms, is_match")
+      .eq("user_id", userId);
 
     if (error) {
-      console.error('Performance Metrics Error:', error);
-      return res.status(500).json({ 
-        success: false, 
-        error: error.message 
+      console.error("Performance Metrics Error:", error);
+      return res.status(500).json({
+        success: false,
+        error: error.message,
       });
     }
 
@@ -270,22 +282,29 @@ router.get('/performance-metrics', async (req: AuthRequest, res: Response) => {
     let matchCount = 0;
 
     if (searches && searches.length > 0) {
-      const confidenceSum = searches.reduce((sum, search) => sum + (search.confidence_score || 0), 0);
-      const processTimeSum = searches.reduce((sum, search) => sum + (search.processing_time_ms || 0), 0);
-      matchCount = searches.filter(search => search.is_match).length;
+      const confidenceSum = searches.reduce(
+        (sum, search) => sum + (search.confidence_score || 0),
+        0
+      );
+      const processTimeSum = searches.reduce(
+        (sum, search) => sum + (search.processing_time_ms || 0),
+        0
+      );
+      matchCount = searches.filter((search) => search.is_match).length;
 
       avgConfidence = confidenceSum / searches.length;
       avgProcessTime = processTimeSum / searches.length;
     }
 
-    const matchRate = totalSearches > 0 ? (matchCount / totalSearches) * 100 : 0;
+    const matchRate =
+      totalSearches > 0 ? (matchCount / totalSearches) * 100 : 0;
 
-    console.log('📈 Performance metrics calculated:', {
+    console.log("📈 Performance metrics calculated:", {
       totalSearches,
       avgConfidence,
       avgProcessTime,
       matchRate,
-      rawSearches: searches?.length || 0
+      rawSearches: searches?.length || 0,
     });
 
     return res.json({
@@ -299,61 +318,70 @@ router.get('/performance-metrics', async (req: AuthRequest, res: Response) => {
         accuracyChange: 0, // TODO: Implement historical tracking
         searchesGrowth: 0, // TODO: Implement historical tracking
         avgResponseTime: Math.round(avgProcessTime) || 0,
-        responseTimeChange: 0 // TODO: Implement historical tracking
-      }
+        responseTimeChange: 0, // TODO: Implement historical tracking
+      },
     });
   } catch (error) {
-    console.error('Performance Metrics Unexpected Error:', error);
-    return res.status(500).json({ 
-      success: false, 
-      error: 'Internal server error' 
+    console.error("Performance Metrics Unexpected Error:", error);
+    return res.status(500).json({
+      success: false,
+      error: "Internal server error",
     });
   }
 });
 
 // Get dashboard stats
-router.get('/stats', async (req: AuthRequest, res: Response) => {
+router.get("/stats", async (req: AuthRequest, res: Response) => {
   try {
+    console.log("📊 Dashboard stats endpoint called");
+    console.log("📊 Request URL:", req.url);
+    console.log("📊 Request method:", req.method);
+    console.log("📊 Request headers:", req.headers);
     const userId = req.user?.userId;
 
     if (!userId) {
-      return res.status(401).json({ 
-        success: false, 
-        error: 'Unauthorized' 
+      console.log("📊 Dashboard stats: No user ID");
+      return res.status(401).json({
+        success: false,
+        error: "Unauthorized",
       });
     }
 
+    console.log("📊 Dashboard stats: User ID:", userId);
+
     // Fetch total uploads
     const { count: totalUploads, error: uploadsError } = await supabase
-      .from('part_searches')
-      .select('*', { count: 'exact', head: true })
-      .eq('user_id', userId);
+      .from("part_searches")
+      .select("*", { count: "exact", head: true })
+      .eq("user_id", userId);
 
     // Fetch successful uploads
     const { count: successfulUploads, error: successfulError } = await supabase
-      .from('part_searches')
-      .select('*', { count: 'exact', head: true })
-      .eq('user_id', userId)
-      .eq('is_match', true);
+      .from("part_searches")
+      .select("*", { count: "exact", head: true })
+      .eq("user_id", userId)
+      .eq("is_match", true);
 
     // Calculate average confidence and processing time
     const { data: statsData, error: statsError } = await supabase
-      .from('part_searches')
-      .select('confidence_score, processing_time, processing_time_ms')
-      .eq('user_id', userId);
-
-
+      .from("part_searches")
+      .select("confidence_score, processing_time, processing_time_ms")
+      .eq("user_id", userId);
 
     if (uploadsError || successfulError || statsError) {
-      console.error('Stats Fetch Errors:', { uploadsError, successfulError, statsError });
-      return res.status(500).json({ 
-        success: false, 
-        error: 'Failed to fetch dashboard statistics' 
+      console.error("Stats Fetch Errors:", {
+        uploadsError,
+        successfulError,
+        statsError,
+      });
+      return res.status(500).json({
+        success: false,
+        error: "Failed to fetch dashboard statistics",
       });
     }
 
     // Calculate average confidence (handle both decimal 0.95 and percentage 95 formats)
-    const avgConfidence = statsData?.length 
+    const avgConfidence = statsData?.length
       ? statsData.reduce((sum, item) => {
           let confidence = item.confidence_score || 0;
           // If confidence is stored as decimal (0.95), convert to percentage
@@ -361,17 +389,15 @@ router.get('/stats', async (req: AuthRequest, res: Response) => {
             confidence = confidence * 100;
           }
           return sum + confidence;
-        }, 0) / statsData.length 
+        }, 0) / statsData.length
       : 0;
 
     // Calculate average processing time (handle both processing_time and processing_time_ms)
-    const avgProcessTime = statsData?.length 
+    const avgProcessTime = statsData?.length
       ? statsData.reduce((sum, item) => {
           return sum + (item.processing_time_ms || item.processing_time || 0);
-        }, 0) / statsData.length 
+        }, 0) / statsData.length
       : 0;
-
-
 
     return res.json({
       success: true,
@@ -379,16 +405,16 @@ router.get('/stats', async (req: AuthRequest, res: Response) => {
         totalUploads: totalUploads || 0,
         successfulUploads: successfulUploads || 0,
         avgConfidence: Math.round(avgConfidence) || 0, // Already converted to percentage above
-        avgProcessTime: Math.round(avgProcessTime) || 0 // Round to whole number
-      }
+        avgProcessTime: Math.round(avgProcessTime) || 0, // Round to whole number
+      },
     });
   } catch (error) {
-    console.error('Dashboard Stats Error:', error);
-    return res.status(500).json({ 
-      success: false, 
-      error: 'Internal server error while fetching dashboard stats' 
+    console.error("Dashboard Stats Error:", error);
+    return res.status(500).json({
+      success: false,
+      error: "Internal server error while fetching dashboard stats",
     });
   }
 });
 
-export default router; 
+export default router;

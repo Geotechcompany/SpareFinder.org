@@ -28,6 +28,7 @@ import AuditLogs from "@/pages/admin/AuditLogs";
 import EmailSmtpManagement from "@/pages/admin/EmailSmtpManagement";
 import PaymentManagement from "@/pages/admin/PaymentManagement";
 import AIModelsManagement from "@/pages/admin/AIModelsManagement";
+import SubscribersManagement from "@/components/admin/SubscribersManagement";
 import AdminLogin from "@/pages/admin/AdminLogin";
 import AdminProtectedRoute from "@/components/AdminProtectedRoute";
 
@@ -172,6 +173,14 @@ const App = () => (
                 element={
                   <AdminProtectedRoute requiredRole="super_admin">
                     <AIModelsManagement />
+                  </AdminProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/subscribers"
+                element={
+                  <AdminProtectedRoute>
+                    <SubscribersManagement />
                   </AdminProtectedRoute>
                 }
               />
