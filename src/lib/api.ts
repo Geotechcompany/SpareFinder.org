@@ -362,17 +362,10 @@ export const dashboardApi = {
       keywords: Array.isArray(keywords) ? keywords : [keywords],
     };
     if (userEmail) payload.user_email = userEmail;
-    const AI_BASE =
-      (import.meta as { env?: { VITE_AI_SERVICE_URL?: string } }).env
-        ?.VITE_AI_SERVICE_URL || "http://localhost:8000";
-    const res = await axios.post(
-      `${AI_BASE}/search/keywords/schedule`,
-      payload,
-      {
-        headers: { "Content-Type": "application/json" },
-      }
-    );
-    return res.data;
+
+    // Call backend instead of AI service directly
+    const response = await apiClient.post("/search/keywords", payload);
+    return response.data;
   },
 
   getRecentUploads: async (limit: number = 5): Promise<ApiResponse> => {

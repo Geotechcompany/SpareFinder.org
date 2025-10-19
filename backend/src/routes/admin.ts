@@ -1,4 +1,4 @@
-import { Router, Response } from "express";
+import { Router, Request, Response } from "express";
 import { body, validationResult } from "express-validator";
 import { createClient } from "@supabase/supabase-js";
 import { supabase } from "../server";
@@ -945,6 +945,116 @@ router.get(
     }
   }
 );
+
+// Get SMTP Configuration for AI Service (API Key Authentication)
+router.get("/ai/smtp-config", async (req: Request, res: Response) => {
+  try {
+    // Check API key authentication
+    const apiKey = req.headers["x-api-key"] as string;
+    const expectedApiKey = process.env.AI_SERVICE_API_KEY;
+
+    if (!apiKey || !expectedApiKey || apiKey !== expectedApiKey) {
+      console.warn(
+        "Invalid or missing API key for AI service SMTP config request"
+      );
+      return res.status(401).json({
+        success: false,
+        enabled: false,
+        message: "Unauthorized: Invalid API key",
+      });
+    }
+
+    console.log("✅ AI service authenticated for SMTP config request");
+
+    // Get SMTP settings from database
+    const { data: smtpSettings, error } = await supabase
+      .from("system_settings")
+      .select("setting_key, setting_value")
+      .eq("category", "email");
+
+    if (error) {
+      console.error("Failed to fetch SMTP settings:", error);
+      return res.status(500).json({
+        success: false,
+        enabled: false,
+        message: "Could not retrieve SMTP configuration",
+      });
+    }
+
+    // Convert settings to object
+    const settings: Record<string, any> = {};
+    smtpSettings?.forEach((setting) => {
+      settings[setting.setting_key] = setting.setting_value;
+    });
+
+    // Check if email notifications are enabled
+    const { data: notificationSettings } = await supabase
+      .from("system_settings")
+      .select("setting_value")
+      .eq("category", "notifications")
+      .eq("setting_key", "email_enabled")
+      .single();
+
+    const emailEnabled =
+      notificationSettings?.setting_value === true ||
+      notificationSettings?.setting_value === "true" ||
+      process.env.EMAIL_ENABLED === "true";
+
+    if (!emailEnabled) {
+      return res.json({
+        success: false,
+        enabled: false,
+        message: "Email notifications are disabled",
+      });
+    }
+
+    // Return SMTP configuration
+    const smtpConfig = {
+      host: settings.smtp_host || process.env.SMTP_HOST || "smtp.gmail.com",
+      port:
+        parseInt(settings.smtp_port) ||
+        parseInt(process.env.SMTP_PORT || "587"),
+      secure:
+        settings.smtp_secure === "true" || process.env.SMTP_SECURE === "true",
+      user: settings.smtp_user || process.env.SMTP_USER,
+      password:
+        settings.smtp_password ||
+        process.env.SMTP_PASS ||
+        process.env.SMTP_PASSWORD,
+      from_name: settings.smtp_from_name || "SpareFinder",
+      from_email: settings.smtp_user || process.env.SMTP_USER,
+    };
+
+    // Validate required settings
+    if (!smtpConfig.user || !smtpConfig.password) {
+      return res.json({
+        success: false,
+        enabled: false,
+        message: "SMTP credentials not configured",
+      });
+    }
+
+    console.log("📧 Returning SMTP config to AI service:", {
+      host: smtpConfig.host,
+      port: smtpConfig.port,
+      user: smtpConfig.user,
+      enabled: emailEnabled,
+    });
+
+    return res.json({
+      success: true,
+      enabled: true,
+      config: smtpConfig,
+    });
+  } catch (error) {
+    console.error("Error fetching SMTP config for AI service:", error);
+    return res.status(500).json({
+      success: false,
+      enabled: false,
+      message: "Failed to fetch SMTP configuration",
+    });
+  }
+});
 
 // Email Templates Management
 router.get(

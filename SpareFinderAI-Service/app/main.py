@@ -339,12 +339,23 @@ analysis_results: Dict[str, Dict[str, Any]] = {}
 
 # Email utilities
 def _email_is_enabled() -> bool:
-    """Enable emails if SMTP host is configured.
-
-    _send_email handles FROM/User defaults and auth; we only guard on host presence
-    to avoid overly-strict gating that blocks valid configs.
+    """Check if email notifications are enabled by fetching SMTP config from backend API.
+    
+    Falls back to environment variable check if backend is unavailable.
     """
-    return bool(os.getenv('SMTP_HOST'))
+    try:
+        # Try to get SMTP config from backend API first
+        smtp_config = _get_smtp_config()
+        if smtp_config:
+            logger.info("✅ Email enabled: Using database-configured SMTP settings")
+            return True
+    except Exception as e:
+        logger.warning(f"⚠️ Failed to get SMTP config from backend: {e}")
+    
+    # Fallback to environment variable check
+    env_enabled = bool(os.getenv('SMTP_HOST'))
+    logger.info(f"🔍 Email check: SMTP_HOST env var exists: {env_enabled}")
+    return env_enabled
 
 def _build_analysis_email_html(result: Dict[str, Any]) -> str:
     part_name = result.get("precise_part_name") or result.get("class_name") or "Identified Part"
@@ -455,21 +466,26 @@ def _get_smtp_config() -> Optional[Dict[str, Any]]:
         backend_url = os.getenv('BACKEND_URL', 'http://localhost:4000')
         api_key = os.getenv('AI_SERVICE_API_KEY', '')
         
+        logger.info(f"🔍 Fetching SMTP config from {backend_url}/api/admin/smtp-config")
+        
         if not api_key:
             logger.warning("AI_SERVICE_API_KEY not configured, falling back to environment variables")
             return None
             
         headers = {
-            'Authorization': f'Bearer {api_key}',
+            'x-api-key': api_key,
             'Content-Type': 'application/json'
         }
         
-        response = requests.get(f'{backend_url}/api/admin/smtp-config', headers=headers, timeout=10)
+        response = requests.get(f'{backend_url}/api/admin/ai/smtp-config', headers=headers, timeout=10)
+        
+        logger.info(f"📡 SMTP config response: status={response.status_code}")
         
         if response.status_code == 200:
             data = response.json()
+            logger.info(f"📊 SMTP config data: success={data.get('success')}, enabled={data.get('enabled')}")
             if data.get('success') and data.get('enabled'):
-                logger.info("Using database-configured SMTP settings")
+                logger.info("✅ Using database-configured SMTP settings")
                 return data.get('config')
             else:
                 logger.warning(f"SMTP not enabled or configured: {data.get('message', 'Unknown error')}")
@@ -484,6 +500,8 @@ def _get_smtp_config() -> Optional[Dict[str, Any]]:
 
 def _send_email(to_email: str, subject: str, html_body: str) -> bool:
     try:
+        logger.info(f"📧 Attempting to send email to {to_email} with subject: {subject}")
+        
         # Try to get SMTP config from backend API first
         smtp_config = _get_smtp_config()
         
@@ -496,6 +514,8 @@ def _send_email(to_email: str, subject: str, html_body: str) -> bool:
             sender_name = smtp_config.get('from_name', 'SpareFinder')
             sender_email = smtp_config.get('from_email', user)
             secure = smtp_config.get('secure', False)
+            
+            logger.info(f"📧 Using database SMTP config: host={host}, port={port}, user={user}, secure={secure}")
         else:
             # Fallback to environment variables
             host = os.getenv('SMTP_HOST', '')
@@ -505,6 +525,8 @@ def _send_email(to_email: str, subject: str, html_body: str) -> bool:
             sender_name = 'SpareFinder'
             sender_email = os.getenv('SMTP_FROM', user or 'noreply.tpsinternational@gmail.com')
             secure = os.getenv('SMTP_SECURE', 'starttls').lower() == 'ssl'
+            
+            logger.info(f"📧 Using environment SMTP config: host={host}, port={port}, user={user}, secure={secure}")
 
         if not host or not sender_email:
             logger.warning("SMTP configuration incomplete")
@@ -516,6 +538,8 @@ def _send_email(to_email: str, subject: str, html_body: str) -> bool:
         msg['To'] = to_email
         msg.set_content('Your SpareFinder AI analysis is complete.')
         msg.add_alternative(html_body, subtype='html')
+
+        logger.info(f"📧 Sending email via {host}:{port}")
 
         if secure:
             context = ssl.create_default_context()
@@ -531,9 +555,11 @@ def _send_email(to_email: str, subject: str, html_body: str) -> bool:
                 if user and password:
                     server.login(user, password)
                 server.send_message(msg)
+        
+        logger.info(f"✅ Email sent successfully to {to_email}")
         return True
     except Exception as e:
-        logger.error(f"Email send failed: {e}")
+        logger.error(f"❌ Email send failed: {e}")
         return False
 
 def _send_analysis_email(to_email: str, result: Dict[str, Any]) -> None:
@@ -1359,7 +1385,9 @@ async def _run_keyword_search_job(job_id: str, keyword_list: List[str], user_ema
 async def _process_keyword_job_internal(job_id: str, keyword_list: List[str], user_email: Optional[str]) -> None:
     try:
         # Email start
+        logger.info(f"🔍 Email check for job {job_id}: user_email={user_email}, _email_is_enabled()={_email_is_enabled()}")
         if user_email and _email_is_enabled():
+            logger.info(f"📧 Sending keyword started email to {user_email}")
             try:
                 await asyncio.to_thread(
                     _send_email,
@@ -1367,8 +1395,11 @@ async def _process_keyword_job_internal(job_id: str, keyword_list: List[str], us
                     keyword_started_subject(keyword_list or []),
                     keyword_started_html(keyword_list or []),
                 )
-            except Exception:
-                pass
+                logger.info(f"✅ Keyword started email sent successfully to {user_email}")
+            except Exception as e:
+                logger.error(f"❌ Failed to send keyword started email: {e}")
+        else:
+            logger.warning(f"⚠️ Email not sent: user_email={user_email}, email_enabled={_email_is_enabled()}")
 
         # Use the same comprehensive analysis logic as /search/keywords endpoint
         normalized = [str(k).strip().lower() for k in (keyword_list or []) if str(k).strip()]
@@ -1479,7 +1510,9 @@ async def _process_keyword_job_internal(job_id: str, keyword_list: List[str], us
         analysis_results[job_id] = response_data
 
         # Optional email notification (completed)
+        logger.info(f"🔍 Completion email check for job {job_id}: user_email={user_email}, _email_is_enabled()={_email_is_enabled()}")
         if user_email and _email_is_enabled():
+            logger.info(f"📧 Sending keyword completed email to {user_email}")
             try:
                 await asyncio.to_thread(
                     _send_email,
@@ -1487,8 +1520,11 @@ async def _process_keyword_job_internal(job_id: str, keyword_list: List[str], us
                     keyword_completed_subject(normalized, 1),  # 1 comprehensive result
                     keyword_completed_html(normalized, 1),
                 )
+                logger.info(f"✅ Keyword completed email sent successfully to {user_email}")
             except Exception as e:
-                logger.warning(f"Keyword email send failed: {e}")
+                logger.error(f"❌ Failed to send keyword completed email: {e}")
+        else:
+            logger.warning(f"⚠️ Completion email not sent: user_email={user_email}, email_enabled={_email_is_enabled()}")
 
         analysis_results[job_id] = response_data
         logger.info(f"🔄 Saving keyword job {job_id} to database with status: {response_data.get('status')}")

@@ -250,6 +250,25 @@ router.post(
         }
       }
 
+      // Add user email for AI service notifications
+      try {
+        const { data: userProfile } = await supabase
+          .from("profiles")
+          .select("email")
+          .eq("id", userId)
+          .single();
+
+        if (userProfile?.email) {
+          formData.append("user_email", userProfile.email);
+          console.log(
+            "📧 User email added to AI service request:",
+            userProfile.email
+          );
+        }
+      } catch (emailError) {
+        console.warn("Failed to get user email for AI service:", emailError);
+      }
+
       console.log("Sending request to AI service...");
 
       // Send "Analysis Started" email notification
@@ -503,7 +522,8 @@ router.post(
 
       // Check if analysis is taking longer than expected (for future enhancement)
       // This could be used to send "Analysis Processing" emails for long-running jobs
-      const initialProcessingTime = aiResponse.data?.processing_time_seconds || 0;
+      const initialProcessingTime =
+        aiResponse.data?.processing_time_seconds || 0;
       if (initialProcessingTime > 60) {
         // If analysis took more than 1 minute
         console.log(

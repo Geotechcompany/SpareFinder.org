@@ -141,11 +141,19 @@ analysis_results: Dict[str, Dict[str, Any]] = {}
 
 # Email utilities
 def _email_is_enabled() -> bool:
-    """Enable emails if SMTP host is configured.
-
-    _send_email handles FROM/User defaults and auth; we only guard on host presence
-    to avoid overly-strict gating that blocks valid configs.
+    """Check if email notifications are enabled by fetching SMTP config from backend API.
+    
+    Falls back to environment variable check if backend is unavailable.
     """
+    try:
+        # Try to get SMTP config from backend API first
+        smtp_config = _get_smtp_config()
+        if smtp_config:
+            return True
+    except Exception:
+        pass
+    
+    # Fallback to environment variable check
     return bool(os.getenv('SMTP_HOST'))
 
 def _build_analysis_email_html(result: Dict[str, Any]) -> str:
@@ -262,11 +270,11 @@ def _get_smtp_config() -> Optional[Dict[str, Any]]:
             return None
             
         headers = {
-            'Authorization': f'Bearer {api_key}',
+            'x-api-key': api_key,
             'Content-Type': 'application/json'
         }
         
-        response = requests.get(f'{backend_url}/api/admin/smtp-config', headers=headers, timeout=10)
+        response = requests.get(f'{backend_url}/api/admin/ai/smtp-config', headers=headers, timeout=10)
         
         if response.status_code == 200:
             data = response.json()
@@ -990,7 +998,9 @@ async def _run_keyword_search_job(job_id: str, keyword_list: List[str], user_ema
         save_job_snapshot(job_id, analysis_results[job_id])
 
         # Email start
+        logger.info(f"🔍 Email check for job {job_id}: user_email={user_email}, _email_is_enabled()={_email_is_enabled()}")
         if user_email and _email_is_enabled():
+            logger.info(f"📧 Sending keyword started email to {user_email}")
             try:
                 await asyncio.to_thread(
                     _send_email,
@@ -998,8 +1008,11 @@ async def _run_keyword_search_job(job_id: str, keyword_list: List[str], user_ema
                     keyword_started_subject(keyword_list or []),
                     keyword_started_html(keyword_list or []),
                 )
-            except Exception:
-                pass
+                logger.info(f"✅ Keyword started email sent successfully to {user_email}")
+            except Exception as e:
+                logger.error(f"❌ Failed to send keyword started email: {e}")
+        else:
+            logger.warning(f"⚠️ Email not sent: user_email={user_email}, email_enabled={_email_is_enabled()}")
 
         # Reuse the inline logic from the /search/keywords endpoint
         api_key = os.getenv('OPENAI_API_KEY')
@@ -1058,7 +1071,9 @@ async def _run_keyword_search_job(job_id: str, keyword_list: List[str], user_ema
         }
 
         # Optional email notification (completed)
+        logger.info(f"🔍 Completion email check for job {job_id}: user_email={user_email}, _email_is_enabled()={_email_is_enabled()}")
         if user_email and _email_is_enabled():
+            logger.info(f"📧 Sending keyword completed email to {user_email}")
             try:
                 await asyncio.to_thread(
                     _send_email,
@@ -1066,8 +1081,11 @@ async def _run_keyword_search_job(job_id: str, keyword_list: List[str], user_ema
                     keyword_completed_subject(normalized, len(results)),
                     keyword_completed_html(normalized, len(results)),
                 )
+                logger.info(f"✅ Keyword completed email sent successfully to {user_email}")
             except Exception as e:
-                logger.warning(f"Keyword email send failed: {e}")
+                logger.error(f"❌ Failed to send keyword completed email: {e}")
+        else:
+            logger.warning(f"⚠️ Completion email not sent: user_email={user_email}, email_enabled={_email_is_enabled()}")
 
         analysis_results[job_id] = response_data
         save_job_snapshot(job_id, response_data)
