@@ -1,0 +1,43 @@
+{
+  "filename": "1ec775aa-bba5-459f-9838-1eb9a3228ed9.jpeg",
+  "success": true,
+  "status": "completed",
+  "class_name": "** Turbocharger Kit",
+  "category": "Automotive Parts",
+  "precise_part_name": "** Turbocharger Kit",
+  "material_composition": "Unknown",
+  "manufacturer": "Not Specified",
+  "confidence_score": 70,
+  "confidence_explanation": "Analysis based on visible features and patterns",
+  "estimated_price": {
+    "new": "** $500 - $2000",
+    "used": "Price not available",
+    "refurbished": "** $300 - $1000"
+  },
+  "description": "- **Function:** A turbocharger increases an engine's efficiency and power output by forcing extra air into the combustion chamber.\n- **Typical Applications:** Used in performance and racing vehicles, ...",
+  "technical_data_sheet": {
+    "part_type": "** Turbocharger Kit",
+    "material": "Unknown",
+    "common_specs": "Varies by application",
+    "load_rating": "Standard",
+    "weight": "Varies",
+    "reusability": "Depends on condition",
+    "finish": "Standard finish",
+    "temperature_tolerance": "Standard operating range"
+  },
+  "compatible_vehicles": [
+    "**Example OEM Makes/Models:** Often used in models like Subaru WRX, Mitsubishi Lancer Evo, various performance trims from Ford, GM, etc."
+  ],
+  "engine_types": [
+    "Inline",
+    "V-type",
+    "Flat"
+  ],
+  "buy_links": {},
+  "suppliers": [],
+  "fitment_tips": "** Ensure compatibility with exhaust and intake systems, verify flange and bolt pattern.",
+  "additional_instructions": "Upload clearer images with visible part numbers for better accuracy",
+  "full_analysis": "One-line ID summary — Turbocharger Kit (Confidence: 95%)\n\n---\n\n### 🛞 Part Identification\n- **Precise Part Name:** Turbocharger Kit\n- **Confidence Level:** 95%\n- **Alternate / Synonym Names:** Turbo kit, Forced induction kit\n- **Short Reasoning:** The image shows a turbocharger with associated installation hardware, a common configuration for turbo kits.\n\n### 📘 Technical Description\n- **Function:** A turbocharger increases an engine's efficiency and power output by forcing extra air into the combustion chamber.\n- **Typical Applications:** Used in performance and racing vehicles, as well as in some commercial and passenger vehicles for improved power.\n- **Key Differences:** Compared to superchargers, turbochargers use exhaust gases for operation, which can be more efficient.\n\n### 📊 Technical Data Sheet\n| Specification               | Details                  |\n|-----------------------------|--------------------------|\n| Part type                   | Turbocharger Kit         |\n| Material(s)                 | Aluminum, Steel          |\n| Common sizes/specs          | Variable, specific to application |\n| Bolt pattern(s)             | Varies                   |\n| Offset / orientation data   | Depends on vehicle fitment |\n| Load rating / torque rating | Varies                   |\n| Typical weight range        | 5-15 kg (11-33 lbs)      |\n| Center bore / mating interface size | Varies           |\n| Reusability / serviceability notes | Serviceable with rebuild kits |\n| Finish options              | Polished, Matte          |\n| Temperature tolerance       | Up to 1000°C (1832°F)    |\n\n### 🚗 Compatible Vehicles\n- **Example OEM Makes/Models:** Often used in models like Subaru WRX, Mitsubishi Lancer Evo, various performance trims from Ford, GM, etc.\n- **Aftermarket Compatibility Notes:** May require custom fittings or tuning adjustments.\n\n### 💰 Pricing & Availability\n- **Average New Price (USD):** $500 - $2000\n- **Average Used / Refurbished Price (USD):** $300 - $1000\n- **Typical Lead Time (days) and Availability:** 7-14 days; Common\n- **Fitment Tips:** Ensure compatibility with exhaust and intake systems, verify flange and bolt pattern.\n\n### 🌍 Where to Buy / Supplier Intelligence\n- **Supplier 1:** Turbo Supplier Inc.\n  - **Product Page URL:** [Example URL]\n  - **Price Range USD:** $600 - $1800\n  - **Shipping Region:** Global\n  - **Contact Channel:** website_support_form\n  - **Data Confidence:** 90%\n  - **Citations:** [Example URL]\n\n### 📈 Market Chart Data\n- **Price Trend:** Stable with slight variations based on supplier and market demand.\n- **Supplier Distribution by Region:** Predominantly North America, Europe, Asia.\n\n### 📉 Failure Modes, Diagnostics & Installation Notes\n- **Common Failure Symptoms:** Reduced boost, unusual noises, exhaust smoke.\n- **Quick Field Tests:** Check for shaft play, inspect seals.\n- **Installation Caveats:** Requires precise alignment and torque specifications; consult installation manual.\n\n### 📈 Confidence & Uncertainty Breakdown\n- **Overall Confidence:** 95%\n- **Visual Match Confidence:** 95%\n- **Dimensional Match Confidence:** 90%\n- **Supplier Data Confidence:** 90%\n- **Uncertainty Factors:** Specific flange types, potential aftermarket modifications.\n\n### 📤 Actionable Next Steps\n- **Additional Data Needed:** Confirm specific vehicle application and flange type.\n- **Suggested Search Queries:** \"Turbocharger kit for [specific vehicle model]\", \"Universal turbo kit compatibility\".\n\n---\n\n```json\n{\n  \"part_identification\": {\n    \"precise_name\": \"Turbocharger Kit\",\n    \"confidence\": 95,\n    \"alternates\": [\"Turbo kit\", \"Forced induction kit\"],\n    \"short_reasoning\": \"The image shows a turbocharger with associated installation hardware, a common configuration for turbo kits.\"\n  },\n  \"technical_description\": {\n    \"function\": \"A turbocharger increases an engine's efficiency and power output by forcing extra air into the combustion chamber.\",\n    \"use_cases\": [\"Performance and racing vehicles\", \"Commercial vehicles\"],\n    \"differences\": \"Compared to superchargers, turbochargers use exhaust gases for operation, which can be more efficient.\"\n  },\n  \"technical_data_sheet\": {\n    \"part_type\": \"Turbocharger Kit\",\n    \"material\": \"Aluminum, Steel\",\n    \"common_sizes\": {\"varies\": \"specific to application\"},\n    \"bolt_patterns\": [\"Varies\"],\n    \"offset_range\": \"Depends on vehicle fitment\",\n    \"load_rating\": \"Varies\",\n    \"weight_range_kg\": \"5-15\",\n    \"center_bore_mm\": \"Varies\",\n    \"reusability\": \"Serviceable with rebuild kits\",\n    \"finish_options\": [\"Polished\", \"Matte\"],\n    \"temperature_tolerance_c\": \"Up to 1000\"\n  },\n  \"compatible_vehicles\": [\n    \"Subaru WRX\",\n    \"Mitsubishi Lancer Evo\",\n    \"Ford performance trims\"\n  ],\n  \"pricing_availability\": {\n    \"new_usd\": {\"min\": 500, \"max\": 2000},\n    \"used_usd\": {\"min\": 300, \"max\": 1000},\n    \"refurbished_usd\": {\"min\": 300, \"max\": 1000},\n    \"lead_time_days\": {\"typical\": 7, \"max\": 14},\n    \"availability\": \"Common\",\n    \"fitment_tips\": [\"Ensure compatibility with exhaust and intake systems\", \"verify flange and bolt pattern\"]\n  },\n  \"suppliers\": [\n    {\n      \"supplier_name\": \"Turbo Supplier Inc.\",\n      \"product_page_url\": \"Example URL\",\n      \"price_range_usd\": {\"min\": 600, \"max\": 1800},\n      \"shipping_region\": \"Global\",\n      \"contact_channel\": \"website_support_form\",\n      \"data_confidence\": 90,\n      \"citations\": [\"Example URL\"]\n    }\n  ],\n  \"market_chart_data\": {\n    \"price_trend\": [{\"date\":\"2023-01-01\",\"price\":700}, {\"date\":\"2023-06-01\",\"price\":750}],\n    \"supplier_distribution\": [{\"region\":\"North America\",\"count\":50}, {\"region\":\"Europe\",\"count\":30}]\n  },\n  \"diagnostics_installation\": {\n    \"failure_modes\": [\"Reduced boost\", \"Unusual noises\", \"Exhaust smoke\"],\n    \"tests\": [\"Check for shaft play\", \"Inspect seals\"],\n    \"installation_notes\": \"Requires precise alignment and torque specifications; consult installation manual.\"\n  },\n  \"confidence_breakdown\": {\n    \"overall_confidence\": 95,\n    \"visual_match_confidence\": 95,\n    \"dimensional_match_confidence\": 90,\n    \"supplier_data_confidence\": 90,\n    \"uncertainty_factors\": [\"Specific flange types\", \"potential aftermarket modifications\"]\n  },\n  \"recommended_next_steps\": [\n    \"Confirm specific vehicle application and flange type.\",\n    \"Suggested Search Queries: 'Turbocharger kit for [specific vehicle model]', 'Universal turbo kit compatibility'.\"\n  ]\n}\n```",
+  "processing_time_seconds": 59.8,
+  "model_version": "SpareFinderAI Part Analysis v1.0"
+}

@@ -47,7 +47,157 @@ from .services.email_templates import (
 from .services.scraper import scrape_supplier_page
 from .services.enhanced_scraper import scrape_supplier_page as enhanced_scrape_supplier_page, scrape_multiple_suppliers
 from .core.config import settings
-from .services.job_store import save_job_snapshot, load_job_snapshot
+
+import requests
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
+
+# Supabase configuration
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_ANON_KEY")
+
+if not SUPABASE_URL or not SUPABASE_KEY:
+    logger.error("Missing Supabase configuration")
+    sys.exit(1)
+
+# Supabase headers
+SUPABASE_HEADERS = {
+    "apikey": SUPABASE_KEY,
+    "Authorization": f"Bearer {SUPABASE_KEY}",
+    "Content-Type": "application/json",
+    "Prefer": "resolution=merge-duplicates"
+}
+
+class SupabaseJobStore:
+    """Supabase job storage using REST API"""
+    
+    @staticmethod
+    def save_job(job_id: str, job_data: Dict[str, Any]) -> bool:
+        """Save job to Supabase database"""
+        try:
+            # Prepare data for database
+            insert_data = {
+                'id': job_id,
+                'filename': job_data.get('filename', job_id),
+                'success': job_data.get('success', False),
+                'status': job_data.get('status', 'pending'),
+                'class_name': job_data.get('class_name'),
+                'category': job_data.get('category'),
+                'precise_part_name': job_data.get('precise_part_name'),
+                'material_composition': job_data.get('material_composition'),
+                'manufacturer': job_data.get('manufacturer'),
+                'confidence_score': job_data.get('confidence_score'),
+                'confidence_explanation': job_data.get('confidence_explanation'),
+                'estimated_price': job_data.get('estimated_price', {}),
+                'description': job_data.get('description'),
+                'technical_data_sheet': job_data.get('technical_data_sheet', {}),
+                'compatible_vehicles': job_data.get('compatible_vehicles', []),
+                'engine_types': job_data.get('engine_types', []),
+                'buy_links': job_data.get('buy_links', {}),
+                'suppliers': job_data.get('suppliers', []),
+                'fitment_tips': job_data.get('fitment_tips'),
+                'additional_instructions': job_data.get('additional_instructions'),
+                'full_analysis': job_data.get('full_analysis'),
+                'processing_time_seconds': job_data.get('processing_time_seconds'),
+                'model_version': job_data.get('model_version'),
+                'supplier_enrichment': job_data.get('supplier_enrichment', []),
+                'mode': job_data.get('mode'),
+                'results': job_data.get('results', []),
+                'markdown': job_data.get('markdown'),
+                'query': job_data.get('query', {}),
+            }
+            
+            # Insert into Supabase
+            url = f"{SUPABASE_URL}/rest/v1/jobs"
+            response = requests.post(url, headers=SUPABASE_HEADERS, json=insert_data)
+            
+            if response.status_code in [200, 201]:
+                logger.info(f"Job {job_id} saved to Supabase database")
+                return True
+            else:
+                logger.error(f"Failed to save job {job_id}: {response.status_code} - {response.text}")
+                return False
+                
+        except Exception as e:
+            logger.error(f"Failed to save job {job_id}: {e}")
+            return False
+    
+    @staticmethod
+    def list_jobs(limit: int = 1000) -> List[Dict[str, Any]]:
+        """List all jobs from Supabase database"""
+        try:
+            url = f"{SUPABASE_URL}/rest/v1/jobs"
+            params = {
+                "order": "created_at.desc",
+                "limit": str(limit)
+            }
+            
+            response = requests.get(url, headers=SUPABASE_HEADERS, params=params)
+            
+            if response.status_code == 200:
+                jobs = response.json()
+                logger.info(f"Retrieved {len(jobs)} jobs from Supabase database")
+                return jobs
+            else:
+                logger.error(f"Failed to list jobs: {response.status_code} - {response.text}")
+                return []
+                
+        except Exception as e:
+            logger.error(f"Failed to list jobs: {e}")
+            return []
+    
+    @staticmethod
+    def get_job_statistics() -> Dict[str, Any]:
+        """Get job statistics from Supabase database"""
+        try:
+            # Get all jobs for statistics
+            jobs = SupabaseJobStore.list_jobs(limit=10000)
+            
+            total_jobs = len(jobs)
+            successful_jobs = len([j for j in jobs if j.get('success', False)])
+            failed_jobs = len([j for j in jobs if not j.get('success', False)])
+            pending_jobs = len([j for j in jobs if j.get('status') in ['pending', 'processing']])
+            
+            confidence_scores = [j.get('confidence_score', 0) for j in jobs if j.get('confidence_score')]
+            avg_confidence = sum(confidence_scores) / len(confidence_scores) if confidence_scores else 0
+            
+            processing_times = [j.get('processing_time_seconds', 0) for j in jobs if j.get('processing_time_seconds')]
+            avg_processing_time = sum(processing_times) / len(processing_times) if processing_times else 0
+            
+            return {
+                'total_jobs': total_jobs,
+                'successful_jobs': successful_jobs,
+                'failed_jobs': failed_jobs,
+                'pending_jobs': pending_jobs,
+                'avg_confidence': round(avg_confidence, 2),
+                'avg_processing_time': round(avg_processing_time, 2)
+            }
+            
+        except Exception as e:
+            logger.error(f"Failed to get job statistics: {e}")
+            return {}
+
+def save_job_to_database(job_id: str, job_data: Dict[str, Any]) -> bool:
+    """Save job to database instead of local files"""
+    try:
+        # Save to Supabase database
+        success = SupabaseJobStore.save_job(job_id, job_data)
+        
+        if success:
+            # Also keep in memory for immediate access
+            analysis_results[job_id] = job_data
+            logger.info(f"Job {job_id} saved to database and memory")
+        else:
+            logger.error(f"Failed to save job {job_id} to database")
+        
+        return success
+        
+    except Exception as e:
+        logger.error(f"Error saving job {job_id}: {e}")
+        return False
+
 from supabase import create_client
 
 class KeywordSearchRequest(BaseModel):
@@ -802,7 +952,7 @@ async def _run_analysis_job(
             "status": "processing",
             "filename": filename
         }
-        save_job_snapshot(filename, analysis_results[filename])
+        save_job_to_database(filename, analysis_results[filename])
 
         # Notify start
         if user_email and _email_is_enabled():
@@ -824,7 +974,7 @@ async def _run_analysis_job(
         if not analysis_result.get("success"):
             analysis_result["filename"] = filename
             analysis_results[filename] = analysis_result
-            save_job_snapshot(filename, analysis_result)
+            save_job_to_database(filename, analysis_result)
             return
 
         response_data = {"filename": filename, **analysis_result}
@@ -835,7 +985,7 @@ async def _run_analysis_job(
                 **response_data,
                 "status": "Retrieving Supplier Info",
             }
-            save_job_snapshot(filename, analysis_results[filename])
+            save_job_to_database(filename, analysis_results[filename])
         except Exception:
             pass
 
@@ -856,7 +1006,7 @@ async def _run_analysis_job(
         response_data["status"] = "completed"
         response_data["success"] = True
         analysis_results[filename] = response_data
-        save_job_snapshot(filename, response_data)
+        save_job_to_database(filename, response_data)
 
         # Update database record with completed details if Supabase is configured
         try:
@@ -899,7 +1049,7 @@ async def _run_analysis_job(
             "error": str(e),
             "filename": filename
         }
-        save_job_snapshot(filename, analysis_results[filename])
+        save_job_to_database(filename, analysis_results[filename])
         # Mark failed in DB if possible
         try:
             supabase_url = os.getenv("SUPABASE_URL", "").strip()
@@ -937,7 +1087,7 @@ async def _run_keyword_search_job(job_id: str, keyword_list: List[str], user_ema
             "filename": job_id,
             "mode": "keywords_only",
         }
-        save_job_snapshot(job_id, analysis_results[job_id])
+        save_job_to_database(job_id, analysis_results[job_id])
 
         # Email start
         if user_email and _email_is_enabled():
@@ -1020,7 +1170,7 @@ async def _run_keyword_search_job(job_id: str, keyword_list: List[str], user_ema
                 logger.warning(f"Keyword email send failed: {e}")
 
         analysis_results[job_id] = response_data
-        save_job_snapshot(job_id, response_data)
+        save_job_to_database(job_id, response_data)
     except Exception as e:
         logger.error(f"Keyword job error for {job_id}: {e}")
         analysis_results[job_id] = {
@@ -1030,7 +1180,7 @@ async def _run_keyword_search_job(job_id: str, keyword_list: List[str], user_ema
             "filename": job_id,
             "mode": "keywords_only",
         }
-        save_job_snapshot(job_id, analysis_results[job_id])
+        save_job_to_database(job_id, analysis_results[job_id])
 
 @app.post("/search/keywords/schedule")
 async def schedule_keyword_search(payload: KeywordScheduleRequest):
@@ -1040,7 +1190,7 @@ async def schedule_keyword_search(payload: KeywordScheduleRequest):
 
         job_id = str(uuid.uuid4())
         analysis_results[job_id] = {"success": False, "status": "pending", "filename": job_id, "mode": "keywords_only"}
-        save_job_snapshot(job_id, analysis_results[job_id])
+        save_job_to_database(job_id, analysis_results[job_id])
 
         # Proactively send a "started" email if requested to confirm SMTP pipeline
         if payload.user_email and _email_is_enabled():
@@ -1058,6 +1208,15 @@ async def schedule_keyword_search(payload: KeywordScheduleRequest):
         return JSONResponse(status_code=202, content={"success": True, "status": "pending", "filename": job_id})
     except Exception as e:
         logger.error(f"Schedule keyword search error: {e}")
+        return JSONResponse(status_code=500, content={"success": False, "error": str(e)})
+@app.get("/jobs/stats")
+async def get_job_statistics():
+    """Get job statistics from database"""
+    try:
+        stats = SupabaseJobStore.get_job_statistics()
+        return JSONResponse(status_code=200, content={"success": True, "data": stats})
+    except Exception as e:
+        logger.error(f"/jobs/stats error: {e}")
         return JSONResponse(status_code=500, content={"success": False, "error": str(e)})
 
 @app.get("/search/keywords/status/{job_id}")
@@ -1109,7 +1268,7 @@ async def analyze_part(
             "status": "pending",
             "filename": filename
         }
-        save_job_snapshot(filename, analysis_results[filename])
+        save_job_to_database(filename, analysis_results[filename])
 
         # Persist initial record to database (part_searches) if Supabase is configured
         try:
@@ -1303,6 +1462,15 @@ async def suppliers_enrich(payload: Dict[str, Any]):
     except Exception as e:
         logger.error(f"/suppliers/enrich error: {e}")
         return JSONResponse(status_code=500, content={"success": False, "error": str(e)})
+@app.get("/jobs/stats")
+async def get_job_statistics():
+    """Get job statistics from database"""
+    try:
+        stats = SupabaseJobStore.get_job_statistics()
+        return JSONResponse(status_code=200, content={"success": True, "data": stats})
+    except Exception as e:
+        logger.error(f"/jobs/stats error: {e}")
+        return JSONResponse(status_code=500, content={"success": False, "error": str(e)})
 
 @app.post("/suppliers/scrape")
 async def scrape_supplier_contact(payload: Dict[str, Any]):
@@ -1316,6 +1484,15 @@ async def scrape_supplier_contact(payload: Dict[str, Any]):
         return JSONResponse(status_code=200, content=result)
     except Exception as e:
         logger.error(f"/suppliers/scrape error: {e}")
+        return JSONResponse(status_code=500, content={"success": False, "error": str(e)})
+@app.get("/jobs/stats")
+async def get_job_statistics():
+    """Get job statistics from database"""
+    try:
+        stats = SupabaseJobStore.get_job_statistics()
+        return JSONResponse(status_code=200, content={"success": True, "data": stats})
+    except Exception as e:
+        logger.error(f"/jobs/stats error: {e}")
         return JSONResponse(status_code=500, content={"success": False, "error": str(e)})
 
 @app.post("/suppliers/scrape-multiple")
@@ -1336,35 +1513,41 @@ async def scrape_multiple_suppliers_contact(payload: Dict[str, Any]):
     except Exception as e:
         logger.error(f"/suppliers/scrape-multiple error: {e}")
         return JSONResponse(status_code=500, content={"success": False, "error": str(e)})
+@app.get("/jobs/stats")
+async def get_job_statistics():
+    """Get job statistics from database"""
+    try:
+        stats = SupabaseJobStore.get_job_statistics()
+        return JSONResponse(status_code=200, content={"success": True, "data": stats})
+    except Exception as e:
+        logger.error(f"/jobs/stats error: {e}")
+        return JSONResponse(status_code=500, content={"success": False, "error": str(e)})
 
 @app.get("/jobs")
 async def list_jobs():
     try:
-        # Load all job snapshots from file system
-        jobs = []
-        jobs_dir = os.path.join(os.getcwd(), "uploads", "jobs")
+        # Get jobs from Supabase database
+        jobs = SupabaseJobStore.list_jobs(limit=1000)
         
-        # First, add in-memory jobs
+        # Also include any in-memory jobs that haven't been saved yet
         for k, v in analysis_results.items():
-            jobs.append({"id": k, **v})
-        
-        # Then, load job snapshots from file system
-        if os.path.exists(jobs_dir):
-            for filename in os.listdir(jobs_dir):
-                if filename.endswith('.json'):
-                    job_id = filename[:-5]  # Remove .json extension
-                    # Skip if already in memory
-                    if job_id not in analysis_results:
-                        try:
-                            job_data = load_job_snapshot(job_id)
-                            if job_data:
-                                jobs.append({"id": job_id, **job_data})
-                        except Exception as e:
-                            logger.warning(f"Failed to load job snapshot {job_id}: {e}")
+            # Check if job exists in database
+            existing_job = next((job for job in jobs if job['id'] == k), None)
+            if not existing_job:
+                jobs.append({"id": k, **v})
         
         return JSONResponse(status_code=200, content={"success": True, "results": jobs})
     except Exception as e:
         logger.error(f"/jobs error: {e}")
+        return JSONResponse(status_code=500, content={"success": False, "error": str(e)})
+@app.get("/jobs/stats")
+async def get_job_statistics():
+    """Get job statistics from database"""
+    try:
+        stats = SupabaseJobStore.get_job_statistics()
+        return JSONResponse(status_code=200, content={"success": True, "data": stats})
+    except Exception as e:
+        logger.error(f"/jobs/stats error: {e}")
         return JSONResponse(status_code=500, content={"success": False, "error": str(e)})
 
 @app.get("/jobs/pending")
@@ -1377,6 +1560,15 @@ async def list_pending_jobs():
         return JSONResponse(status_code=200, content={"success": True, "results": pending})
     except Exception as e:
         logger.error(f"/jobs/pending error: {e}")
+        return JSONResponse(status_code=500, content={"success": False, "error": str(e)})
+@app.get("/jobs/stats")
+async def get_job_statistics():
+    """Get job statistics from database"""
+    try:
+        stats = SupabaseJobStore.get_job_statistics()
+        return JSONResponse(status_code=200, content={"success": True, "data": stats})
+    except Exception as e:
+        logger.error(f"/jobs/stats error: {e}")
         return JSONResponse(status_code=500, content={"success": False, "error": str(e)})
 
 # -----------------------------
@@ -1407,8 +1599,37 @@ async def test_email(payload: Dict[str, Any]):
     except Exception as e:
         logger.error(f"/test-email error: {e}")
         return JSONResponse(status_code=500, content={"success": False, "error": str(e)})
+@app.get("/jobs/stats")
+async def get_job_statistics():
+    """Get job statistics from database"""
+    try:
+        stats = SupabaseJobStore.get_job_statistics()
+        return JSONResponse(status_code=200, content={"success": True, "data": stats})
+    except Exception as e:
+        logger.error(f"/jobs/stats error: {e}")
+        return JSONResponse(status_code=500, content={"success": False, "error": str(e)})
 
 # If running the script directly
+
+@app.get("/health")
+async def health_check():
+    """Health check endpoint"""
+    try:
+        # Test database connection
+        jobs = SupabaseJobStore.list_jobs(limit=1)
+        return JSONResponse(status_code=200, content={
+            "status": "healthy",
+            "database": "connected",
+            "jobs_count": len(jobs)
+        })
+    except Exception as e:
+        logger.error(f"Health check failed: {e}")
+        return JSONResponse(status_code=500, content={
+            "status": "unhealthy",
+            "database": "disconnected",
+            "error": str(e)
+        })
+
 if __name__ == "__main__":
     uvicorn.run(
         "main:app", 

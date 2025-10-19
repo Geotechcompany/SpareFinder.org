@@ -1,0 +1,73 @@
+# Core Framework
+fastapi==0.109.0
+uvicorn==0.24.0
+gunicorn==21.2.0
+python-multipart==0.0.9
+python-dotenv==1.0.0
+
+# Web Scraping Libraries
+beautifulsoup4==4.12.2
+selenium==4.15.2
+requests==2.31.0
+fake-useragent==1.4.0
+cloudscraper==1.2.71
+aiohttp==3.9.3
+lxml==4.9.3
+Pillow==10.2.0
+
+# Image Processing - Fix NumPy compatibility
+opencv-python==4.7.0.72
+numpy==1.24.3
+
+# API & Validation
+pydantic==2.6.1
+pydantic-settings==2.0.3
+
+# Database & Storage
+asyncpg==0.29.0
+supabase>=2.3.0
+
+# HTTP Client for external APIs (compatible with supabase)
+httpx==0.24.1
+
+# Utilities
+aiofiles==23.2.1
+python-dateutil==2.8.2
+
+# Monitoring & Logging
+prometheus-client==0.19.0
+structlog==24.1.0
+
+# Security
+python-jose==3.3.0
+passlib[bcrypt]>=1.7.4
+
+# Web Scraping Utilities
+urllib3>=2.0.0
+chardet>=5.2.0
+brotli>=1.0.9
+
+# Development
+pytest==7.4.3
+pytest-asyncio==0.21.1
+black==23.11.0
+isort==5.12.0
+flake8==6.1.0
+
+# Add Supabase and auth dependencies
+gotrue>=2.0.0
+postgrest>=0.13.0
+realtime>=1.0.0
+storage3>=0.7.0
+
+# JWT and auth
+bcrypt>=4.0.0
+
+# Async support for scraping
+asyncio>=3.4.3
+
+# Google Cloud Vision API
+google-cloud-vision==3.7.2
+
+# OpenAI
+openai==1.16.1 
