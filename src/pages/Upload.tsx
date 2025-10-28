@@ -216,6 +216,8 @@ if (typeof document !== "undefined") {
   styleSheet.type = "text/css";
   styleSheet.innerText = technicalDataStyles;
   document.head.appendChild(styleSheet);
+
+  // Lottie Player code removed - using video animation instead
 }
 
 // Add this helper function before the Upload component
@@ -920,6 +922,15 @@ const Upload = () => {
   });
   const [skipWelcome, setSkipWelcome] = useState<boolean>(false);
 
+  // Wizard state
+  const [wizardStep, setWizardStep] = useState<
+    "landing" | "selection" | "image" | "keywords" | "review"
+  >("landing");
+  const [selectedMode, setSelectedMode] = useState<
+    "image" | "keywords" | "both" | null
+  >(null);
+  const [wizardProgress, setWizardProgress] = useState(0);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const keywordsInputRef = useRef<HTMLInputElement>(null);
 
@@ -1012,6 +1023,66 @@ const Upload = () => {
   const extractPrice = (text: string): string => {
     const priceMatches = text.match(/Price\s*Range:\s*([^.\n]+)/i);
     return priceMatches ? priceMatches[1].trim() : "Price not available";
+  };
+
+  // Wizard navigation functions
+  const handleModeSelection = (mode: "image" | "keywords" | "both") => {
+    setSelectedMode(mode);
+    setWizardProgress(33);
+
+    if (mode === "image") {
+      setWizardStep("image");
+    } else if (mode === "keywords") {
+      setWizardStep("keywords");
+    } else {
+      // Both - start with image
+      setWizardStep("image");
+    }
+  };
+
+  const handleNextStep = () => {
+    if (wizardStep === "image" && selectedMode === "both") {
+      setWizardStep("keywords");
+      setWizardProgress(66);
+    } else if (wizardStep === "image" || wizardStep === "keywords") {
+      setWizardStep("review");
+      setWizardProgress(100);
+    }
+  };
+
+  const handleBackStep = () => {
+    if (wizardStep === "review") {
+      if (selectedMode === "both") {
+        setWizardStep("keywords");
+        setWizardProgress(66);
+      } else {
+        setWizardStep(selectedMode === "image" ? "image" : "keywords");
+        setWizardProgress(33);
+      }
+    } else if (wizardStep === "keywords") {
+      setWizardStep("image");
+      setWizardProgress(33);
+    } else if (wizardStep === "image") {
+      setWizardStep("selection");
+      setWizardProgress(0);
+    } else if (wizardStep === "selection") {
+      setWizardStep("landing");
+      setWizardProgress(0);
+      setSelectedMode(null);
+    }
+  };
+
+  const handleResetWizard = () => {
+    setWizardStep("landing");
+    setSelectedMode(null);
+    setWizardProgress(0);
+    setUploadedFile(null);
+    setImagePreview(null);
+    setSavedKeywords([]);
+    setKeywords("");
+    setAnalysisResults(null);
+    setSelectedPrediction(null);
+    setOriginalAiResponse(null);
   };
 
   // Add keyword functionality
@@ -1152,7 +1223,7 @@ const Upload = () => {
 
           if (statusResponse.success && statusResponse.data) {
             // Transform the flat response to match existing interface
-            const flatData = statusResponse.data;
+            const flatData = statusResponse.data as any;
 
             // Create a single prediction from flat data for backward compatibility
             const prediction = {
@@ -1225,7 +1296,7 @@ const Upload = () => {
       // If initial response is successful, process immediately
       if (initialResponse.success && initialResponse.data) {
         // Transform the flat response to match existing interface
-        const flatData = initialResponse.data;
+        const flatData = initialResponse.data as any;
 
         // Create a single prediction from flat data for backward compatibility
         const prediction = {
@@ -1548,18 +1619,24 @@ const Upload = () => {
       if (import.meta.env.DEV) {
         console.log("🔍 AI Response Debug:", {
           success: result.success,
-          dataStructure: result.data ? Object.keys(result.data) : "No data",
-          predictionCount: result.data?.predictions?.length || 0,
-          hasAnalysisField: result.data?.predictions?.[0]?.analysis
+          dataStructure: result.data
+            ? Object.keys(result.data as any)
+            : "No data",
+          predictionCount: (result.data as any)?.predictions?.length || 0,
+          hasAnalysisField: (result.data as any)?.predictions?.[0]?.analysis
             ? "Yes"
             : "No",
-          hasDescriptionField: result.data?.predictions?.[0]?.description
+          hasDescriptionField: (result.data as any)?.predictions?.[0]
+            ?.description
             ? "Yes"
             : "No",
-          analysisLength: result.data?.predictions?.[0]?.analysis?.length || 0,
+          analysisLength:
+            (result.data as any)?.predictions?.[0]?.analysis?.length || 0,
           analysisPreview:
-            result.data?.predictions?.[0]?.analysis?.substring(0, 200) +
-              "..." || "No analysis",
+            (result.data as any)?.predictions?.[0]?.analysis?.substring(
+              0,
+              200
+            ) + "..." || "No analysis",
         });
       }
 
@@ -1568,8 +1645,8 @@ const Upload = () => {
       }
 
       // Prepare predictions, using the service's predictions or fallback parsing
-      const predictions = result.data?.predictions?.length
-        ? result.data.predictions.map((prediction) => ({
+      const predictions = (result.data as any)?.predictions?.length
+        ? (result.data as any).predictions.map((prediction: any) => ({
             class_name: prediction.class_name || "Automotive Component",
             confidence: prediction.confidence || 0.75,
             description: prediction.analysis || prediction.description || "", // Use analysis field first
@@ -1586,8 +1663,8 @@ const Upload = () => {
               class_name: "Automotive Component",
               confidence: 0.75,
               description:
-                result.data?.analysis ||
-                result.data?.description ||
+                (result.data as any)?.analysis ||
+                (result.data as any)?.description ||
                 "No detailed description available",
               category: "Unspecified",
               manufacturer: "Unknown",
@@ -1599,9 +1676,9 @@ const Upload = () => {
       const firstPrediction = predictions[0];
       const additionalDetails = {
         full_analysis:
-          result.data?.predictions?.[0]?.analysis ||
-          result.data?.analysis ||
-          result.data?.description ||
+          (result.data as any)?.predictions?.[0]?.analysis ||
+          (result.data as any)?.analysis ||
+          (result.data as any)?.description ||
           "",
         technical_specifications: `
 - Detailed analysis provided by AI Model
@@ -1627,8 +1704,9 @@ const Upload = () => {
         success: result.success,
         predictions: predictions,
         similar_images: [], // No similar images from this service
-        model_version: result.data?.model_version || "AI Part Analysis",
-        processing_time: result.data?.processing_time || 0,
+        model_version:
+          (result.data as any)?.model_version || "AI Part Analysis",
+        processing_time: (result.data as any)?.processing_time || 0,
         image_metadata: {
           content_type: uploadedFile.type,
           size_bytes: uploadedFile.size,
@@ -1654,12 +1732,12 @@ const Upload = () => {
       }, 1500); // Small delay to let user see the success message
 
       // If analysis is successful, store the results
-      if (result.success && result.data && result.data.length > 0) {
+      if (result.success && result.data && (result.data as any).length > 0) {
         try {
           // Prepare analysis results in the expected format
           const analysisResults: AnalysisResponse = {
             success: result.success,
-            predictions: result.data.map((prediction) => ({
+            predictions: (result.data as any[]).map((prediction: any) => ({
               class_name: prediction.class_name || "Automotive Component",
               confidence: prediction.confidence || 0.75,
               description: prediction.description || "",
@@ -1679,7 +1757,7 @@ const Upload = () => {
               base64_image: await convertImageToBase64(uploadedFile), // Add this helper function
             },
             additional_details: {
-              full_analysis: result.data[0]?.description || "",
+              full_analysis: (result.data as any[])[0]?.description || "",
               technical_specifications: "",
               market_information: "",
               confidence_reasoning: "",
@@ -2468,7 +2546,7 @@ const Upload = () => {
         toast({
           title: "Complete Analysis Saved",
           description: `Full analysis with AI insights saved successfully: ${
-            response.data?.part_name ||
+            (response.data as any)?.part_name ||
             analysisResults.flatData?.precise_part_name ||
             "Analysis Result"
           }`,
@@ -3089,629 +3167,1096 @@ const Upload = () => {
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.4 }}
                 >
-                  Upload an image of your automotive part for instant AI
-                  identification or search using keywords only
+                  {wizardStep === "landing"
+                    ? "Welcome to SpareFinder AI - Let's identify your automotive part!"
+                    : wizardStep === "selection"
+                    ? "Choose how you'd like to identify your automotive part"
+                    : wizardStep === "image"
+                    ? selectedMode === "both"
+                      ? "Upload an image - step 1 of 2"
+                      : "Upload an image of your automotive part for AI analysis"
+                    : wizardStep === "keywords"
+                    ? "Add keywords to refine your search - step 2 of 2"
+                    : "Review and submit your request"}
                 </motion.p>
-                {/* Keyword controls are located below the upload section */}
               </div>
             </div>
           </div>
 
-          {/* Main Content Grid - centered and responsive */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 lg:gap-8 items-start">
-            {/* Upload Section */}
+          {/* Wizard Progress Bar */}
+          {wizardStep !== "landing" && wizardStep !== "selection" && (
             <motion.div
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.3 }}
-              className="relative mx-auto w-full max-w-xl"
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              exit={{ opacity: 0, height: 0 }}
+              className="relative"
             >
-              <div className="absolute inset-0 bg-gradient-to-r from-purple-600/10 to-blue-600/10 rounded-3xl blur-xl opacity-60" />
-              <Card className="relative bg-black/20 backdrop-blur-xl border-white/10 h-full">
-                <CardHeader>
-                  <CardTitle className="text-white flex items-center justify-between">
-                    <div className="flex items-center space-x-2">
-                      <UploadIcon className="w-5 h-5 text-purple-400" />
-                      <span>Upload Part Image</span>
-                    </div>
-                    {uploadedFile && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={handleRemoveFile}
-                        className="text-gray-400 hover:text-white h-8 w-8 p-0"
-                      >
-                        <X className="w-4 h-4" />
-                      </Button>
-                    )}
-                  </CardTitle>
-                  <CardDescription className="text-gray-400">
-                    Upload an image for AI-powered part identification
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  {/* Upload Area */}
-                  <div
-                    id="tour-upload-dropzone"
-                    className={`relative border-2 border-dashed rounded-3xl p-6 sm:p-8 lg:p-12 text-center transition-all duration-300 ${
-                      dragActive
-                        ? "border-purple-500 bg-purple-600/10"
-                        : uploadedFile
-                        ? "border-green-500/50 bg-green-600/5"
-                        : "border-gray-600 hover:border-gray-500"
-                    }`}
-                    onDragOver={handleDrag}
-                    onDragLeave={handleDrag}
-                    onDrop={handleDrop}
+              <div className="absolute inset-0 bg-gradient-to-r from-purple-600/10 to-blue-600/10 rounded-2xl blur-xl opacity-60" />
+              <div className="relative bg-black/20 backdrop-blur-xl rounded-2xl p-4 border border-white/10">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm text-gray-300 font-medium">
+                    Progress
+                  </span>
+                  <span className="text-sm text-purple-400 font-semibold">
+                    {wizardProgress}%
+                  </span>
+                </div>
+                <Progress value={wizardProgress} className="h-2 bg-gray-800" />
+                <div className="flex justify-between mt-2 text-xs text-gray-400">
+                  <span
+                    className={wizardStep === "image" ? "text-purple-400" : ""}
                   >
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      accept="image/*"
-                      onChange={handleFileInput}
-                      className="hidden"
-                    />
+                    {selectedMode === "both" && wizardStep !== "keywords"
+                      ? "Step 1: Image"
+                      : selectedMode === "keywords"
+                      ? "Keywords"
+                      : "Upload"}
+                  </span>
+                  <span
+                    className={
+                      wizardStep === "keywords" ? "text-purple-400" : ""
+                    }
+                  >
+                    {selectedMode === "both" ? "Step 2: Keywords" : ""}
+                  </span>
+                  <span
+                    className={wizardStep === "review" ? "text-purple-400" : ""}
+                  >
+                    Review
+                  </span>
+                </div>
+              </div>
+            </motion.div>
+          )}
 
-                    {uploadedFile && imagePreview ? (
-                      <motion.div
-                        className="space-y-4"
-                        initial={{ opacity: 0, scale: 0.9 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                      >
-                        {/* Image Preview */}
-                        <div className="relative mx-auto w-full max-w-md">
-                          <div className="aspect-video rounded-xl overflow-hidden border border-white/10">
-                            <ImageWithFallback
-                              src={imagePreview}
-                              alt="Uploaded part"
-                              className="w-full h-full object-cover"
-                              onError={() => {
-                                const target = document.createElement("img");
-                                target.src = "/images/placeholder.png";
-                                target.alt = "Placeholder image";
-                                target.className = "w-full h-full object-cover";
-                                target.style.display = "block";
-                                target.onerror = () => {
-                                  const placeholder =
-                                    document.createElement("div");
-                                  placeholder.className =
-                                    "w-full h-full bg-gray-700 flex items-center justify-center text-gray-400 text-xs";
-                                  placeholder.innerHTML =
-                                    '<div class="text-center"><div class="w-8 h-8 mx-auto mb-1 opacity-50"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg></div>Image unavailable</div>';
-                                  target.parentNode?.appendChild(placeholder);
-                                };
-                              }}
-                            />
+          {/* Wizard Content */}
+          <AnimatePresence mode="wait">
+            {/* Landing Page */}
+            {wizardStep === "landing" && (
+              <motion.div
+                key="landing"
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                transition={{ duration: 0.3 }}
+              >
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-stretch">
+                  {/* Left Column - Text Content */}
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.2 }}
+                    className="h-full"
+                  >
+                    <Card className="bg-black/20 backdrop-blur-xl border-white/10 h-full flex flex-col">
+                      <CardHeader>
+                        <CardTitle className="text-white text-3xl mb-4">
+                          Get Started with SpareFinder AI
+                        </CardTitle>
+                        <CardDescription className="text-gray-400 text-lg">
+                          Identify your automotive parts in just a few simple
+                          steps
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent className="space-y-6 flex-1 flex flex-col justify-between">
+                        <div className="space-y-4">
+                          <div className="flex items-start space-x-3">
+                            <div className="flex-shrink-0 w-8 h-8 rounded-full bg-purple-600/20 flex items-center justify-center">
+                              <span className="text-purple-400 text-lg font-bold">
+                                1
+                              </span>
+                            </div>
+                            <div>
+                              <h3 className="text-white font-semibold text-lg mb-1">
+                                Choose Your Method
+                              </h3>
+                              <p className="text-gray-400">
+                                Select image upload, keyword search, or both for
+                                maximum accuracy
+                              </p>
+                            </div>
                           </div>
-                          <div className="absolute top-2 right-2">
-                            <Badge className="bg-green-600/20 text-green-300 border-green-500/30">
-                              <CheckCircle className="w-3 h-3 mr-1" />
-                              Ready
-                            </Badge>
+
+                          <div className="flex items-start space-x-3">
+                            <div className="flex-shrink-0 w-8 h-8 rounded-full bg-blue-600/20 flex items-center justify-center">
+                              <span className="text-blue-400 text-lg font-bold">
+                                2
+                              </span>
+                            </div>
+                            <div>
+                              <h3 className="text-white font-semibold text-lg mb-1">
+                                Upload & Analyze
+                              </h3>
+                              <p className="text-gray-400">
+                                Our AI will process your part image and provide
+                                detailed identification
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="flex items-start space-x-3">
+                            <div className="flex-shrink-0 w-8 h-8 rounded-full bg-emerald-600/20 flex items-center justify-center">
+                              <span className="text-emerald-400 text-lg font-bold">
+                                3
+                              </span>
+                            </div>
+                            <div>
+                              <h3 className="text-white font-semibold text-lg mb-1">
+                                Get Results
+                              </h3>
+                              <p className="text-gray-400">
+                                Receive comprehensive part information, pricing,
+                                and supplier details
+                              </p>
+                            </div>
                           </div>
                         </div>
 
-                        {/* File Info */}
-                        <div className="text-center">
-                          <p className="text-white font-medium text-lg">
-                            {uploadedFile.name}
-                          </p>
-                          <p className="text-gray-400 text-sm">
-                            {(uploadedFile.size / 1024 / 1024).toFixed(2)} MB •{" "}
-                            {uploadedFile.type}
-                          </p>
-                        </div>
-
-                        {/* Analyze Button */}
-                        <motion.div
-                          whileHover={{ scale: 1.05 }}
-                          whileTap={{ scale: 0.95 }}
-                        >
-                          <Button
-                            onClick={scheduleAnalysis}
-                            disabled={isAnalyzing}
-                            className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 shadow-lg shadow-purple-500/25 h-12 px-6"
-                          >
-                            {isAnalyzing ? (
-                              <>
-                                <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                                Analyzing...
-                              </>
-                            ) : (
-                              <>
-                                <Zap className="w-5 h-5 mr-2" />
-                                Analyze Part
-                              </>
-                            )}
-                          </Button>
-                        </motion.div>
-                      </motion.div>
-                    ) : (
-                      <motion.div
-                        className="space-y-6"
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                      >
-                        <motion.div
-                          animate={{ y: [0, -10, 0] }}
-                          transition={{
-                            duration: 2,
-                            repeat: Infinity,
-                            ease: "easeInOut",
-                          }}
-                        >
-                          <ImagePlus className="w-16 h-16 text-gray-400 mx-auto" />
-                        </motion.div>
-                        <div>
-                          <p className="text-white font-medium text-lg mb-2">
-                            Drop your image here
-                          </p>
-                          <p className="text-gray-400 text-sm">
-                            Supports JPG, PNG, WebP up to 10MB
-                          </p>
-                        </div>
-                        <motion.div
-                          whileHover={{ scale: 1.05 }}
-                          whileTap={{ scale: 0.95 }}
-                          className="w-full sm:w-auto inline-block"
-                        >
-                          <Button
-                            onClick={() => fileInputRef.current?.click()}
-                            variant="outline"
-                            className="w-full sm:w-auto border-gray-600 text-gray-300 hover:bg-white/10 hover:text-white hover:border-white/30 h-12 px-6"
-                          >
-                            <Camera className="w-5 h-5 mr-2" />
-                            Choose File
-                          </Button>
-                        </motion.div>
-                      </motion.div>
-                    )}
-                  </div>
-
-                  {/* Keyword Input Section */}
-                  <div className="mb-4 space-y-2">
-                    <div className="flex space-x-2">
-                      <Input
-                        id="tour-keywords-input"
-                        ref={keywordsInputRef}
-                        value={keywords}
-                        onChange={(e) => setKeywords(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") {
-                            handleAddKeyword();
-                          }
-                        }}
-                        placeholder="Add keywords to refine analysis (e.g., brake, suspension)"
-                        className="flex-grow"
-                      />
-                      <Button
-                        onClick={handleAddKeyword}
-                        variant="outline"
-                        className="px-4"
-                      >
-                        <Plus className="w-4 h-4 mr-2" /> Add
-                      </Button>
-                      {savedKeywords.length > 0 && (
-                        <Button
-                          id="tour-search-keywords-btn"
-                          onClick={openKeywordSearchModal}
-                          disabled={isKeywordSearching}
-                          className="px-4 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700"
-                        >
-                          <Search className="w-4 h-4 mr-2" /> Search by Keywords
-                        </Button>
-                      )}
-                    </div>
-
-                    {/* Saved Keywords Display */}
-                    {savedKeywords.length > 0 && (
-                      <div className="flex flex-wrap gap-2">
-                        {savedKeywords.map((keyword, index) => (
+                        <div className="pt-6">
                           <motion.div
-                            key={index}
-                            initial={{ opacity: 0, scale: 0.8 }}
-                            animate={{ opacity: 1, scale: 1 }}
-                            exit={{ opacity: 0, scale: 0.8 }}
-                            className="flex items-center bg-purple-600/20 text-purple-300 px-3 py-1 rounded-full text-sm"
+                            whileHover={{ scale: 1.02 }}
+                            whileTap={{ scale: 0.98 }}
                           >
-                            {keyword}
                             <Button
-                              variant="ghost"
-                              size="sm"
-                              className="ml-2 p-0 h-4 w-4 hover:bg-purple-700/30"
-                              onClick={() => handleRemoveKeyword(keyword)}
+                              onClick={() => setWizardStep("selection")}
+                              size="lg"
+                              className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-lg h-14"
                             >
-                              <X className="w-3 h-3" />
+                              <Zap className="w-5 h-5 mr-2" />
+                              Start Analyzing Parts
                             </Button>
                           </motion.div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Enhanced Progress Bar with Detailed Information */}
-                  <AnimatePresence>
-                    {(isAnalyzing || isLoading) && analysisProgress && (
-                      <motion.div
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -10 }}
-                        className="space-y-6 bg-gray-900/50 rounded-2xl p-6 border border-gray-700/50 backdrop-blur-sm"
-                      >
-                        {/* Enhanced Progress Header */}
-                        <div className="space-y-4">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center space-x-4">
-                              <motion.div
-                                animate={{
-                                  rotate:
-                                    analysisProgress.status === "complete"
-                                      ? 0
-                                      : 360,
-                                }}
-                                transition={{
-                                  duration:
-                                    analysisProgress.status === "complete"
-                                      ? 0
-                                      : 2,
-                                  repeat:
-                                    analysisProgress.status === "complete"
-                                      ? 0
-                                      : Infinity,
-                                  ease: "linear",
-                                }}
-                                className={`p-3 rounded-full bg-gradient-to-r ${getProgressStageColor(
-                                  analysisProgress.status
-                                )} shadow-lg`}
-                              >
-                                {getProgressStageIcon(analysisProgress.status)}
-                              </motion.div>
-                              <div className="flex-1">
-                                <div className="text-white font-bold text-xl">
-                                  {analysisProgress.currentStep ||
-                                    analysisProgress.message}
-                                </div>
-                                <div className="text-gray-300 text-base mt-1">
-                                  {analysisProgress.details ||
-                                    "Processing your automotive part analysis..."}
-                                </div>
-                                {analysisProgress.currentStepIndex &&
-                                  analysisProgress.totalSteps && (
-                                    <div className="text-gray-400 text-sm mt-2 flex items-center space-x-2">
-                                      <span>
-                                        Step {analysisProgress.currentStepIndex}{" "}
-                                        of {analysisProgress.totalSteps}
-                                      </span>
-                                      <span className="w-1 h-1 bg-gray-500 rounded-full"></span>
-                                      <span>AI Engine Processing</span>
-                                    </div>
-                                  )}
-                              </div>
-                            </div>
-                            <div className="text-right">
-                              <div className="text-white text-2xl font-bold">
-                                {analysisProgress.progress}%
-                              </div>
-                              <div className="text-gray-400 text-sm">
-                                Complete
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* Detailed Status Information */}
-                          <div className="bg-gray-800/50 rounded-lg p-4 border border-gray-700/30">
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-                              <div className="flex items-center space-x-2">
-                                <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse"></div>
-                                <span className="text-gray-300">Status:</span>
-                                <span className="text-white font-semibold capitalize">
-                                  {analysisProgress.status.replace("_", " ")}
-                                </span>
-                              </div>
-                              <div className="flex items-center space-x-2">
-                                <div className="w-2 h-2 bg-green-400 rounded-full"></div>
-                                <span className="text-gray-300">Engine:</span>
-                                <span className="text-white font-semibold">
-                                  AI Vision
-                                </span>
-                              </div>
-                              <div className="flex items-center space-x-2">
-                                <div className="w-2 h-2 bg-purple-400 rounded-full"></div>
-                                <span className="text-gray-300">Mode:</span>
-                                <span className="text-white font-semibold">
-                                  Advanced Analysis
-                                </span>
-                              </div>
-                            </div>
-                          </div>
                         </div>
+                      </CardContent>
+                    </Card>
+                  </motion.div>
 
-                        {/* Enhanced Progress Bar */}
-                        <div className="space-y-4">
-                          <div className="relative">
-                            <div className="w-full bg-gray-800 rounded-full h-4 overflow-hidden backdrop-blur-sm border border-gray-600">
-                              <motion.div
-                                className={`h-full bg-gradient-to-r ${getProgressStageColor(
-                                  analysisProgress.status
-                                )} rounded-full relative overflow-hidden`}
-                                initial={{ width: 0 }}
-                                animate={{
-                                  width: `${analysisProgress.progress}%`,
-                                }}
-                                transition={{ duration: 0.8, ease: "easeOut" }}
+                  {/* Right Column - Animation */}
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ delay: 0.3 }}
+                    className="flex items-center justify-center h-full"
+                  >
+                    <div className="relative w-full h-full flex items-center justify-center bg-black/20 backdrop-blur-xl border border-white/10 rounded-lg overflow-hidden">
+                      <video
+                        src="/Animations/scanpart.mp4"
+                        autoPlay
+                        loop
+                        muted
+                        playsInline
+                        className="w-full h-full object-cover scale-[1.35]"
+                        style={{ objectPosition: "center 45%" }}
+                      />
+                    </div>
+                  </motion.div>
+                </div>
+              </motion.div>
+            )}
+
+            {/* Selection Step */}
+            {wizardStep === "selection" && (
+              <motion.div
+                key="selection"
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                transition={{ duration: 0.3 }}
+              >
+                <Card className="bg-black/20 backdrop-blur-xl border-white/10">
+                  <CardHeader>
+                    <CardTitle className="text-white text-center">
+                      How would you like to identify your part?
+                    </CardTitle>
+                    <CardDescription className="text-gray-400 text-center">
+                      Choose the method that works best for you
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                      {/* Image Only Option */}
+                      <motion.button
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        onClick={() => handleModeSelection("image")}
+                        className="p-6 bg-gradient-to-br from-purple-600/20 to-purple-800/20 border border-purple-500/30 rounded-2xl text-left hover:border-purple-400/50 transition-all group"
+                      >
+                        <div className="flex items-center justify-center w-12 h-12 rounded-full bg-purple-600/30 mb-4 group-hover:bg-purple-600/50">
+                          <Camera className="w-6 h-6 text-purple-300" />
+                        </div>
+                        <h3 className="text-white font-semibold text-lg mb-2">
+                          Image Only
+                        </h3>
+                        <p className="text-gray-400 text-sm">
+                          Upload an image and let AI identify the part
+                          automatically
+                        </p>
+                      </motion.button>
+
+                      {/* Keywords Only Option */}
+                      <motion.button
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        onClick={() => handleModeSelection("keywords")}
+                        className="p-6 bg-gradient-to-br from-blue-600/20 to-blue-800/20 border border-blue-500/30 rounded-2xl text-left hover:border-blue-400/50 transition-all group"
+                      >
+                        <div className="flex items-center justify-center w-12 h-12 rounded-full bg-blue-600/30 mb-4 group-hover:bg-blue-600/50">
+                          <Search className="w-6 h-6 text-blue-300" />
+                        </div>
+                        <h3 className="text-white font-semibold text-lg mb-2">
+                          Keywords Only
+                        </h3>
+                        <p className="text-gray-400 text-sm">
+                          Describe your part using keywords for a targeted
+                          search
+                        </p>
+                      </motion.button>
+
+                      {/* Both Option */}
+                      <motion.button
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        onClick={() => handleModeSelection("both")}
+                        className="p-6 bg-gradient-to-br from-emerald-600/20 to-emerald-800/20 border border-emerald-500/30 rounded-2xl text-left hover:border-emerald-400/50 transition-all group"
+                      >
+                        <div className="flex items-center justify-center w-12 h-12 rounded-full bg-emerald-600/30 mb-4 group-hover:bg-emerald-600/50">
+                          <ImagePlus className="w-6 h-6 text-emerald-300" />
+                        </div>
+                        <h3 className="text-white font-semibold text-lg mb-2">
+                          Both
+                        </h3>
+                        <p className="text-gray-400 text-sm">
+                          Upload an image and add keywords for maximum accuracy
+                        </p>
+                      </motion.button>
+                    </div>
+                  </CardContent>
+                </Card>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {(wizardStep === "image" ||
+            wizardStep === "keywords" ||
+            wizardStep === "review") && (
+            <>
+              {/* Main Content Grid - centered and responsive */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 lg:gap-8 items-start">
+                {/* Upload Section - Only show for image or review steps */}
+                {(wizardStep === "image" || wizardStep === "review") &&
+                  selectedMode !== "keywords" && (
+                    <motion.div
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: 0.3 }}
+                      className="relative mx-auto w-full max-w-xl"
+                    >
+                      <div className="absolute inset-0 bg-gradient-to-r from-purple-600/10 to-blue-600/10 rounded-3xl blur-xl opacity-60" />
+                      <Card className="relative bg-black/20 backdrop-blur-xl border-white/10 h-full">
+                        <CardHeader>
+                          <CardTitle className="text-white flex items-center justify-between">
+                            <div className="flex items-center space-x-2">
+                              <UploadIcon className="w-5 h-5 text-purple-400" />
+                              <span>Upload Part Image</span>
+                            </div>
+                            {uploadedFile && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={handleRemoveFile}
+                                className="text-gray-400 hover:text-white h-8 w-8 p-0"
                               >
-                                {/* Enhanced animated shine effect */}
+                                <X className="w-4 h-4" />
+                              </Button>
+                            )}
+                          </CardTitle>
+                          <CardDescription className="text-gray-400">
+                            Upload an image for AI-powered part identification
+                          </CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-6">
+                          {/* Upload Area */}
+                          <div
+                            id="tour-upload-dropzone"
+                            className={`relative border-2 border-dashed rounded-3xl p-6 sm:p-8 lg:p-12 text-center transition-all duration-300 ${
+                              dragActive
+                                ? "border-purple-500 bg-purple-600/10"
+                                : uploadedFile
+                                ? "border-green-500/50 bg-green-600/5"
+                                : "border-gray-600 hover:border-gray-500"
+                            }`}
+                            onDragOver={handleDrag}
+                            onDragLeave={handleDrag}
+                            onDrop={handleDrop}
+                          >
+                            <input
+                              ref={fileInputRef}
+                              type="file"
+                              accept="image/*"
+                              onChange={handleFileInput}
+                              className="hidden"
+                            />
+
+                            {uploadedFile && imagePreview ? (
+                              <motion.div
+                                className="space-y-4"
+                                initial={{ opacity: 0, scale: 0.9 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                              >
+                                {/* Image Preview */}
+                                <div className="relative mx-auto w-full max-w-md">
+                                  <div className="aspect-video rounded-xl overflow-hidden border border-white/10">
+                                    <ImageWithFallback
+                                      src={imagePreview}
+                                      alt="Uploaded part"
+                                      className="w-full h-full object-cover"
+                                      onError={() => {
+                                        const target =
+                                          document.createElement("img");
+                                        target.src = "/images/placeholder.png";
+                                        target.alt = "Placeholder image";
+                                        target.className =
+                                          "w-full h-full object-cover";
+                                        target.style.display = "block";
+                                        target.onerror = () => {
+                                          const placeholder =
+                                            document.createElement("div");
+                                          placeholder.className =
+                                            "w-full h-full bg-gray-700 flex items-center justify-center text-gray-400 text-xs";
+                                          placeholder.innerHTML =
+                                            '<div class="text-center"><div class="w-8 h-8 mx-auto mb-1 opacity-50"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg></div>Image unavailable</div>';
+                                          target.parentNode?.appendChild(
+                                            placeholder
+                                          );
+                                        };
+                                      }}
+                                    />
+                                  </div>
+                                  <div className="absolute top-2 right-2">
+                                    <Badge className="bg-green-600/20 text-green-300 border-green-500/30">
+                                      <CheckCircle className="w-3 h-3 mr-1" />
+                                      Ready
+                                    </Badge>
+                                  </div>
+                                </div>
+
+                                {/* File Info */}
+                                <div className="text-center">
+                                  <p className="text-white font-medium text-lg">
+                                    {uploadedFile.name}
+                                  </p>
+                                  <p className="text-gray-400 text-sm">
+                                    {(uploadedFile.size / 1024 / 1024).toFixed(
+                                      2
+                                    )}{" "}
+                                    MB • {uploadedFile.type}
+                                  </p>
+                                </div>
+
+                                {/* Analyze Button */}
                                 <motion.div
-                                  className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent"
-                                  animate={{ x: ["-100%", "100%"] }}
+                                  whileHover={{ scale: 1.05 }}
+                                  whileTap={{ scale: 0.95 }}
+                                >
+                                  <Button
+                                    onClick={scheduleAnalysis}
+                                    disabled={isAnalyzing}
+                                    className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 shadow-lg shadow-purple-500/25 h-12 px-6"
+                                  >
+                                    {isAnalyzing ? (
+                                      <>
+                                        <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                                        Analyzing...
+                                      </>
+                                    ) : (
+                                      <>
+                                        <Zap className="w-5 h-5 mr-2" />
+                                        Analyze Part
+                                      </>
+                                    )}
+                                  </Button>
+                                </motion.div>
+                              </motion.div>
+                            ) : (
+                              <motion.div
+                                className="space-y-6"
+                                initial={{ opacity: 0, y: 20 }}
+                                animate={{ opacity: 1, y: 0 }}
+                              >
+                                <motion.div
+                                  animate={{ y: [0, -10, 0] }}
                                   transition={{
-                                    duration: 1.5,
-                                    repeat:
-                                      analysisProgress.status !== "complete"
-                                        ? Infinity
-                                        : 0,
+                                    duration: 2,
+                                    repeat: Infinity,
                                     ease: "easeInOut",
                                   }}
-                                />
-                                {/* Progress text overlay */}
-                                <div className="absolute inset-0 flex items-center justify-center">
-                                  <span className="text-white text-xs font-semibold mix-blend-difference">
-                                    {analysisProgress.progress}%
-                                  </span>
-                                </div>
-                              </motion.div>
-                            </div>
-                          </div>
-
-                          {/* Enhanced Progress markers */}
-                          {analysisProgress.totalSteps && (
-                            <div className="space-y-2">
-                              <div className="flex justify-between">
-                                {Array.from(
-                                  { length: analysisProgress.totalSteps },
-                                  (_, i) => (
-                                    <div
-                                      key={i}
-                                      className="flex flex-col items-center space-y-1"
-                                    >
-                                      <div
-                                        className={`w-3 h-3 rounded-full transition-all duration-300 ${
-                                          (analysisProgress.currentStepIndex ||
-                                            0) > i
-                                            ? "bg-green-400 scale-110"
-                                            : (analysisProgress.currentStepIndex ||
-                                                0) ===
-                                              i + 1
-                                            ? `bg-gradient-to-r ${getProgressStageColor(
-                                                analysisProgress.status
-                                              )} scale-125 animate-pulse`
-                                            : "bg-gray-600"
-                                        }`}
-                                      />
-                                      <div className="text-xs text-gray-400 text-center max-w-16">
-                                        {i === 0 && "Upload"}
-                                        {i === 1 && "Validate"}
-                                        {i === 2 && "AI Scan"}
-                                        {i === 3 && "Match"}
-                                        {i === 4 && "Finalize"}
-                                        {i === 5 && "Complete"}
-                                      </div>
-                                    </div>
-                                  )
-                                )}
-                              </div>
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Real-time Activity Log */}
-                        <Collapsible>
-                          <CollapsibleTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="w-full justify-between text-gray-300 hover:text-white"
-                            >
-                              <span className="flex items-center space-x-2">
-                                <Info className="w-4 h-4" />
-                                <span>View Detailed Progress</span>
-                              </span>
-                              <ChevronDown className="w-4 h-4" />
-                            </Button>
-                          </CollapsibleTrigger>
-                          <CollapsibleContent>
-                            <div className="mt-4 space-y-2 bg-gray-900/70 rounded-lg p-4 border border-gray-700/50 max-h-40 overflow-y-auto">
-                              <div className="text-xs font-mono text-gray-300 space-y-1">
-                                <div className="flex justify-between">
-                                  <span>🔄 Analysis started</span>
-                                  <span className="text-gray-500">
-                                    {new Date().toLocaleTimeString()}
-                                  </span>
-                                </div>
-                                <div className="flex justify-between">
-                                  <span>📤 Image uploaded successfully</span>
-                                  <span className="text-gray-500">
-                                    {new Date().toLocaleTimeString()}
-                                  </span>
-                                </div>
-                                <div className="flex justify-between">
-                                  <span>🔍 {analysisProgress.message}</span>
-                                  <span className="text-gray-500">
-                                    {new Date().toLocaleTimeString()}
-                                  </span>
-                                </div>
-                                {analysisProgress.status === "ai_analysis" && (
-                                  <div className="flex justify-between text-blue-300">
-                                    <span>
-                                      🧠 Deep learning model processing...
-                                    </span>
-                                    <span className="text-gray-500">
-                                      {new Date().toLocaleTimeString()}
-                                    </span>
-                                  </div>
-                                )}
-                                {analysisProgress.status ===
-                                  "part_matching" && (
-                                  <div className="flex justify-between text-purple-300">
-                                    <span>
-                                      🔗 Matching against automotive database...
-                                    </span>
-                                    <span className="text-gray-500">
-                                      {new Date().toLocaleTimeString()}
-                                    </span>
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          </CollapsibleContent>
-                        </Collapsible>
-
-                        {/* Identified Part Display - Enhanced */}
-                        {analysisProgress.identifiedPart && (
-                          <motion.div
-                            initial={{ opacity: 0, scale: 0.9 }}
-                            animate={{ opacity: 1, scale: 1 }}
-                            className="p-6 rounded-xl bg-gradient-to-r from-green-600/20 to-emerald-600/20 border border-green-500/30 backdrop-blur-sm"
-                          >
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center space-x-4">
-                                <motion.div
-                                  className="p-3 bg-green-600/30 rounded-full"
-                                  animate={{ scale: [1, 1.1, 1] }}
-                                  transition={{ duration: 2, repeat: Infinity }}
                                 >
-                                  <CheckCircle className="w-6 h-6 text-green-400" />
+                                  <ImagePlus className="w-16 h-16 text-gray-400 mx-auto" />
                                 </motion.div>
                                 <div>
-                                  <div className="text-green-300 font-medium text-lg">
-                                    🎯 Part Successfully Identified!
-                                  </div>
-                                  <div className="text-green-200 font-bold text-xl">
-                                    {analysisProgress.identifiedPart}
-                                  </div>
-                                  <div className="text-green-300 text-sm mt-1">
-                                    Advanced AI pattern recognition complete
-                                  </div>
+                                  <p className="text-white font-medium text-lg mb-2">
+                                    Drop your image here
+                                  </p>
+                                  <p className="text-gray-400 text-sm">
+                                    Supports JPG, PNG, WebP up to 10MB
+                                  </p>
                                 </div>
+                                <motion.div
+                                  whileHover={{ scale: 1.05 }}
+                                  whileTap={{ scale: 0.95 }}
+                                  className="w-full sm:w-auto inline-block"
+                                >
+                                  <Button
+                                    onClick={() =>
+                                      fileInputRef.current?.click()
+                                    }
+                                    variant="outline"
+                                    className="w-full sm:w-auto border-gray-600 text-gray-300 hover:bg-white/10 hover:text-white hover:border-white/30 h-12 px-6"
+                                  >
+                                    <Camera className="w-5 h-5 mr-2" />
+                                    Choose File
+                                  </Button>
+                                </motion.div>
+                              </motion.div>
+                            )}
+                          </div>
+
+                          {/* Keyword Input Section - Only show for "both" mode */}
+                          {selectedMode === "both" && (
+                            <div className="mb-4 space-y-2">
+                              <div className="flex space-x-2">
+                                <Input
+                                  id="tour-keywords-input"
+                                  ref={keywordsInputRef}
+                                  value={keywords}
+                                  onChange={(e) => setKeywords(e.target.value)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Enter") {
+                                      handleAddKeyword();
+                                    }
+                                  }}
+                                  placeholder="Add keywords to refine analysis (e.g., brake, suspension)"
+                                  className="flex-grow"
+                                />
+                                <Button
+                                  onClick={handleAddKeyword}
+                                  variant="outline"
+                                  className="px-4"
+                                >
+                                  <Plus className="w-4 h-4 mr-2" /> Add
+                                </Button>
+                                {savedKeywords.length > 0 && (
+                                  <Button
+                                    id="tour-search-keywords-btn"
+                                    onClick={openKeywordSearchModal}
+                                    disabled={isKeywordSearching}
+                                    className="px-4 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700"
+                                  >
+                                    <Search className="w-4 h-4 mr-2" /> Search
+                                    by Keywords
+                                  </Button>
+                                )}
                               </div>
-                              {analysisProgress.confidence && (
-                                <div className="text-right">
-                                  <div className="text-green-400 text-3xl font-bold">
-                                    {analysisProgress.confidence}%
-                                  </div>
-                                  <div className="text-green-300 text-sm">
-                                    Confidence Score
-                                  </div>
-                                  <div className="text-green-400 text-xs mt-1">
-                                    {analysisProgress.confidence > 90
-                                      ? "Excellent Match"
-                                      : analysisProgress.confidence > 75
-                                      ? "Good Match"
-                                      : "Fair Match"}
-                                  </div>
+
+                              {/* Saved Keywords Display */}
+                              {savedKeywords.length > 0 && (
+                                <div className="flex flex-wrap gap-2">
+                                  {savedKeywords.map((keyword, index) => (
+                                    <motion.div
+                                      key={index}
+                                      initial={{ opacity: 0, scale: 0.8 }}
+                                      animate={{ opacity: 1, scale: 1 }}
+                                      exit={{ opacity: 0, scale: 0.8 }}
+                                      className="flex items-center bg-purple-600/20 text-purple-300 px-3 py-1 rounded-full text-sm"
+                                    >
+                                      {keyword}
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="ml-2 p-0 h-4 w-4 hover:bg-purple-700/30"
+                                        onClick={() =>
+                                          handleRemoveKeyword(keyword)
+                                        }
+                                      >
+                                        <X className="w-3 h-3" />
+                                      </Button>
+                                    </motion.div>
+                                  ))}
                                 </div>
                               )}
                             </div>
-                          </motion.div>
-                        )}
-
-                        {/* Additional Status Messages */}
-                        <motion.div
-                          key={analysisProgress.status}
-                          initial={{ opacity: 0, x: -20 }}
-                          animate={{ opacity: 1, x: 0 }}
-                          className="text-center bg-gray-800/30 rounded-lg p-3"
-                        >
-                          <p className="text-gray-200 text-base font-medium">
-                            {analysisProgress.message}
-                          </p>
-                          {analysisProgress.details && (
-                            <p className="text-gray-400 text-sm mt-1">
-                              {analysisProgress.details}
-                            </p>
                           )}
-                        </motion.div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
 
-                  {/* Tips moved to right column */}
-                </CardContent>
-              </Card>
-            </motion.div>
+                          {/* Enhanced Progress Bar with Detailed Information */}
+                          <AnimatePresence>
+                            {(isAnalyzing || isLoading) && analysisProgress && (
+                              <motion.div
+                                initial={{ opacity: 0, y: 10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0, y: -10 }}
+                                className="space-y-6 bg-gray-900/50 rounded-2xl p-6 border border-gray-700/50 backdrop-blur-sm"
+                              >
+                                {/* Enhanced Progress Header */}
+                                <div className="space-y-4">
+                                  <div className="flex items-center justify-between">
+                                    <div className="flex items-center space-x-4">
+                                      <motion.div
+                                        animate={{
+                                          rotate:
+                                            analysisProgress.status ===
+                                            "complete"
+                                              ? 0
+                                              : 360,
+                                        }}
+                                        transition={{
+                                          duration:
+                                            analysisProgress.status ===
+                                            "complete"
+                                              ? 0
+                                              : 2,
+                                          repeat:
+                                            analysisProgress.status ===
+                                            "complete"
+                                              ? 0
+                                              : Infinity,
+                                          ease: "linear",
+                                        }}
+                                        className={`p-3 rounded-full bg-gradient-to-r ${getProgressStageColor(
+                                          analysisProgress.status
+                                        )} shadow-lg`}
+                                      >
+                                        {getProgressStageIcon(
+                                          analysisProgress.status
+                                        )}
+                                      </motion.div>
+                                      <div className="flex-1">
+                                        <div className="text-white font-bold text-xl">
+                                          {analysisProgress.currentStep ||
+                                            analysisProgress.message}
+                                        </div>
+                                        <div className="text-gray-300 text-base mt-1">
+                                          {analysisProgress.details ||
+                                            "Processing your automotive part analysis..."}
+                                        </div>
+                                        {analysisProgress.currentStepIndex &&
+                                          analysisProgress.totalSteps && (
+                                            <div className="text-gray-400 text-sm mt-2 flex items-center space-x-2">
+                                              <span>
+                                                Step{" "}
+                                                {
+                                                  analysisProgress.currentStepIndex
+                                                }{" "}
+                                                of {analysisProgress.totalSteps}
+                                              </span>
+                                              <span className="w-1 h-1 bg-gray-500 rounded-full"></span>
+                                              <span>AI Engine Processing</span>
+                                            </div>
+                                          )}
+                                      </div>
+                                    </div>
+                                    <div className="text-right">
+                                      <div className="text-white text-2xl font-bold">
+                                        {analysisProgress.progress}%
+                                      </div>
+                                      <div className="text-gray-400 text-sm">
+                                        Complete
+                                      </div>
+                                    </div>
+                                  </div>
 
-            {/* Right column: Tips */}
+                                  {/* Detailed Status Information */}
+                                  <div className="bg-gray-800/50 rounded-lg p-4 border border-gray-700/30">
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                                      <div className="flex items-center space-x-2">
+                                        <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse"></div>
+                                        <span className="text-gray-300">
+                                          Status:
+                                        </span>
+                                        <span className="text-white font-semibold capitalize">
+                                          {analysisProgress.status.replace(
+                                            "_",
+                                            " "
+                                          )}
+                                        </span>
+                                      </div>
+                                      <div className="flex items-center space-x-2">
+                                        <div className="w-2 h-2 bg-green-400 rounded-full"></div>
+                                        <span className="text-gray-300">
+                                          Engine:
+                                        </span>
+                                        <span className="text-white font-semibold">
+                                          AI Vision
+                                        </span>
+                                      </div>
+                                      <div className="flex items-center space-x-2">
+                                        <div className="w-2 h-2 bg-purple-400 rounded-full"></div>
+                                        <span className="text-gray-300">
+                                          Mode:
+                                        </span>
+                                        <span className="text-white font-semibold">
+                                          Advanced Analysis
+                                        </span>
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+
+                                {/* Enhanced Progress Bar */}
+                                <div className="space-y-4">
+                                  <div className="relative">
+                                    <div className="w-full bg-gray-800 rounded-full h-4 overflow-hidden backdrop-blur-sm border border-gray-600">
+                                      <motion.div
+                                        className={`h-full bg-gradient-to-r ${getProgressStageColor(
+                                          analysisProgress.status
+                                        )} rounded-full relative overflow-hidden`}
+                                        initial={{ width: 0 }}
+                                        animate={{
+                                          width: `${analysisProgress.progress}%`,
+                                        }}
+                                        transition={{
+                                          duration: 0.8,
+                                          ease: "easeOut",
+                                        }}
+                                      >
+                                        {/* Enhanced animated shine effect */}
+                                        <motion.div
+                                          className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent"
+                                          animate={{ x: ["-100%", "100%"] }}
+                                          transition={{
+                                            duration: 1.5,
+                                            repeat:
+                                              analysisProgress.status !==
+                                              "complete"
+                                                ? Infinity
+                                                : 0,
+                                            ease: "easeInOut",
+                                          }}
+                                        />
+                                        {/* Progress text overlay */}
+                                        <div className="absolute inset-0 flex items-center justify-center">
+                                          <span className="text-white text-xs font-semibold mix-blend-difference">
+                                            {analysisProgress.progress}%
+                                          </span>
+                                        </div>
+                                      </motion.div>
+                                    </div>
+                                  </div>
+
+                                  {/* Enhanced Progress markers */}
+                                  {analysisProgress.totalSteps && (
+                                    <div className="space-y-2">
+                                      <div className="flex justify-between">
+                                        {Array.from(
+                                          {
+                                            length: analysisProgress.totalSteps,
+                                          },
+                                          (_, i) => (
+                                            <div
+                                              key={i}
+                                              className="flex flex-col items-center space-y-1"
+                                            >
+                                              <div
+                                                className={`w-3 h-3 rounded-full transition-all duration-300 ${
+                                                  (analysisProgress.currentStepIndex ||
+                                                    0) > i
+                                                    ? "bg-green-400 scale-110"
+                                                    : (analysisProgress.currentStepIndex ||
+                                                        0) ===
+                                                      i + 1
+                                                    ? `bg-gradient-to-r ${getProgressStageColor(
+                                                        analysisProgress.status
+                                                      )} scale-125 animate-pulse`
+                                                    : "bg-gray-600"
+                                                }`}
+                                              />
+                                              <div className="text-xs text-gray-400 text-center max-w-16">
+                                                {i === 0 && "Upload"}
+                                                {i === 1 && "Validate"}
+                                                {i === 2 && "AI Scan"}
+                                                {i === 3 && "Match"}
+                                                {i === 4 && "Finalize"}
+                                                {i === 5 && "Complete"}
+                                              </div>
+                                            </div>
+                                          )
+                                        )}
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+
+                                {/* Real-time Activity Log */}
+                                <Collapsible>
+                                  <CollapsibleTrigger asChild>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="w-full justify-between text-gray-300 hover:text-white"
+                                    >
+                                      <span className="flex items-center space-x-2">
+                                        <Info className="w-4 h-4" />
+                                        <span>View Detailed Progress</span>
+                                      </span>
+                                      <ChevronDown className="w-4 h-4" />
+                                    </Button>
+                                  </CollapsibleTrigger>
+                                  <CollapsibleContent>
+                                    <div className="mt-4 space-y-2 bg-gray-900/70 rounded-lg p-4 border border-gray-700/50 max-h-40 overflow-y-auto">
+                                      <div className="text-xs font-mono text-gray-300 space-y-1">
+                                        <div className="flex justify-between">
+                                          <span>🔄 Analysis started</span>
+                                          <span className="text-gray-500">
+                                            {new Date().toLocaleTimeString()}
+                                          </span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                          <span>
+                                            📤 Image uploaded successfully
+                                          </span>
+                                          <span className="text-gray-500">
+                                            {new Date().toLocaleTimeString()}
+                                          </span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                          <span>
+                                            🔍 {analysisProgress.message}
+                                          </span>
+                                          <span className="text-gray-500">
+                                            {new Date().toLocaleTimeString()}
+                                          </span>
+                                        </div>
+                                        {analysisProgress.status ===
+                                          "ai_analysis" && (
+                                          <div className="flex justify-between text-blue-300">
+                                            <span>
+                                              🧠 Deep learning model
+                                              processing...
+                                            </span>
+                                            <span className="text-gray-500">
+                                              {new Date().toLocaleTimeString()}
+                                            </span>
+                                          </div>
+                                        )}
+                                        {analysisProgress.status ===
+                                          "part_matching" && (
+                                          <div className="flex justify-between text-purple-300">
+                                            <span>
+                                              🔗 Matching against automotive
+                                              database...
+                                            </span>
+                                            <span className="text-gray-500">
+                                              {new Date().toLocaleTimeString()}
+                                            </span>
+                                          </div>
+                                        )}
+                                      </div>
+                                    </div>
+                                  </CollapsibleContent>
+                                </Collapsible>
+
+                                {/* Identified Part Display - Enhanced */}
+                                {analysisProgress.identifiedPart && (
+                                  <motion.div
+                                    initial={{ opacity: 0, scale: 0.9 }}
+                                    animate={{ opacity: 1, scale: 1 }}
+                                    className="p-6 rounded-xl bg-gradient-to-r from-green-600/20 to-emerald-600/20 border border-green-500/30 backdrop-blur-sm"
+                                  >
+                                    <div className="flex items-center justify-between">
+                                      <div className="flex items-center space-x-4">
+                                        <motion.div
+                                          className="p-3 bg-green-600/30 rounded-full"
+                                          animate={{ scale: [1, 1.1, 1] }}
+                                          transition={{
+                                            duration: 2,
+                                            repeat: Infinity,
+                                          }}
+                                        >
+                                          <CheckCircle className="w-6 h-6 text-green-400" />
+                                        </motion.div>
+                                        <div>
+                                          <div className="text-green-300 font-medium text-lg">
+                                            🎯 Part Successfully Identified!
+                                          </div>
+                                          <div className="text-green-200 font-bold text-xl">
+                                            {analysisProgress.identifiedPart}
+                                          </div>
+                                          <div className="text-green-300 text-sm mt-1">
+                                            Advanced AI pattern recognition
+                                            complete
+                                          </div>
+                                        </div>
+                                      </div>
+                                      {analysisProgress.confidence && (
+                                        <div className="text-right">
+                                          <div className="text-green-400 text-3xl font-bold">
+                                            {analysisProgress.confidence}%
+                                          </div>
+                                          <div className="text-green-300 text-sm">
+                                            Confidence Score
+                                          </div>
+                                          <div className="text-green-400 text-xs mt-1">
+                                            {analysisProgress.confidence > 90
+                                              ? "Excellent Match"
+                                              : analysisProgress.confidence > 75
+                                              ? "Good Match"
+                                              : "Fair Match"}
+                                          </div>
+                                        </div>
+                                      )}
+                                    </div>
+                                  </motion.div>
+                                )}
+
+                                {/* Additional Status Messages */}
+                                <motion.div
+                                  key={analysisProgress.status}
+                                  initial={{ opacity: 0, x: -20 }}
+                                  animate={{ opacity: 1, x: 0 }}
+                                  className="text-center bg-gray-800/30 rounded-lg p-3"
+                                >
+                                  <p className="text-gray-200 text-base font-medium">
+                                    {analysisProgress.message}
+                                  </p>
+                                  {analysisProgress.details && (
+                                    <p className="text-gray-400 text-sm mt-1">
+                                      {analysisProgress.details}
+                                    </p>
+                                  )}
+                                </motion.div>
+                              </motion.div>
+                            )}
+                          </AnimatePresence>
+
+                          {/* Tips moved to right column */}
+                        </CardContent>
+                      </Card>
+                    </motion.div>
+                  )}
+
+                {/* Keywords Section - Only show for keywords step */}
+                {wizardStep === "keywords" && selectedMode !== "image" && (
+                  <motion.div
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    className="w-full"
+                  >
+                    <Card className="bg-black/20 backdrop-blur-xl border-white/10">
+                      <CardHeader>
+                        <CardTitle className="text-white">
+                          Add Keywords
+                        </CardTitle>
+                        <CardDescription className="text-gray-400">
+                          Describe your automotive part using keywords
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        {/* Keyword Input */}
+                        <div className="mb-4 space-y-2">
+                          <div className="flex space-x-2">
+                            <Input
+                              ref={keywordsInputRef}
+                              value={keywords}
+                              onChange={(e) => setKeywords(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") {
+                                  handleAddKeyword();
+                                }
+                              }}
+                              placeholder="e.g., brake, suspension, Toyota Camry"
+                              className="flex-grow"
+                            />
+                            <Button
+                              onClick={handleAddKeyword}
+                              variant="outline"
+                              className="px-4"
+                            >
+                              <Plus className="w-4 h-4 mr-2" /> Add
+                            </Button>
+                          </div>
+
+                          {/* Saved Keywords Display */}
+                          {savedKeywords.length > 0 && (
+                            <div className="flex flex-wrap gap-2">
+                              {savedKeywords.map((keyword, index) => (
+                                <motion.div
+                                  key={index}
+                                  initial={{ opacity: 0, scale: 0.8 }}
+                                  animate={{ opacity: 1, scale: 1 }}
+                                  exit={{ opacity: 0, scale: 0.8 }}
+                                  className="flex items-center bg-blue-600/20 text-blue-300 px-3 py-1 rounded-full text-sm"
+                                >
+                                  {keyword}
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="ml-2 p-0 h-4 w-4"
+                                    onClick={() => handleRemoveKeyword(keyword)}
+                                  >
+                                    <X className="w-3 h-3" />
+                                  </Button>
+                                </motion.div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </motion.div>
+                )}
+
+                {/* Right column: Tips */}
+                <motion.div
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: 0.35 }}
+                  className="w-full"
+                >
+                  {showOnboarding && (
+                    <OnboardingGuide
+                      userId={null}
+                      onDismiss={() => setShowOnboarding(false)}
+                      className="mb-6"
+                      steps={[
+                        {
+                          selector: "#tour-upload-dropzone",
+                          title: "Choose a file",
+                          description:
+                            "Click Choose File to select a clear photo of the part (max 10MB).",
+                        },
+                        {
+                          selector: "#tour-keywords-input",
+                          title: "Add precise keywords",
+                          description:
+                            "Optionally add 3–5 precise terms like part number and vehicle make/model/year.",
+                        },
+                        {
+                          selector: "#tour-search-keywords-btn",
+                          title: "Analyze Part",
+                          description:
+                            "Press Analyze Part. You will be redirected to History to track progress in real time.",
+                        },
+                      ]}
+                    />
+                  )}
+                  <Card className="bg-black/20 backdrop-blur-xl border-white/10">
+                    <CardHeader>
+                      <CardTitle className="text-white flex items-center">
+                        <Target className="w-4 h-4 mr-2 text-blue-400" />
+                        Tips for Better Results
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <ul className="text-gray-400 text-sm space-y-1">
+                        <li>• Use clear, well-lit images</li>
+                        <li>• Capture the part from multiple angles</li>
+                        <li>• Ensure the part number is visible if possible</li>
+                        <li>• Remove any packaging or covers</li>
+                      </ul>
+                      <div className="border-t border-white/10 my-4" />
+                      <div>
+                        <div className="text-white font-medium mb-2">
+                          Keyword Search Guidance
+                        </div>
+                        <ul className="text-gray-400 text-sm space-y-1">
+                          <li>
+                            • Image analysis is recommended for the most
+                            accurate results.
+                          </li>
+                          <li>
+                            • If using keywords only, include 3–5 precise terms.
+                          </li>
+                          <li>
+                            • Add part number, vehicle make/model/year, side
+                            (e.g., front-left).
+                          </li>
+                          <li>
+                            • Avoid generic words like "car part" or "spare".
+                          </li>
+                        </ul>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </motion.div>
+              </div>
+            </>
+          )}
+
+          {/* Navigation Buttons */}
+          {(wizardStep === "image" || wizardStep === "keywords") && (
             <motion.div
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.35 }}
-              className="w-full"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="flex justify-between items-center"
             >
-              {showOnboarding && (
-                <OnboardingGuide
-                  userId={null}
-                  onDismiss={() => setShowOnboarding(false)}
-                  className="mb-6"
-                  steps={[
-                    {
-                      selector: "#tour-upload-dropzone",
-                      title: "Choose a file",
-                      description:
-                        "Click Choose File to select a clear photo of the part (max 10MB).",
-                    },
-                    {
-                      selector: "#tour-keywords-input",
-                      title: "Add precise keywords",
-                      description:
-                        "Optionally add 3–5 precise terms like part number and vehicle make/model/year.",
-                    },
-                    {
-                      selector: "#tour-search-keywords-btn",
-                      title: "Analyze Part",
-                      description:
-                        "Press Analyze Part. You will be redirected to History to track progress in real time.",
-                    },
-                  ]}
-                />
-              )}
-              <Card className="bg-black/20 backdrop-blur-xl border-white/10">
-                <CardHeader>
-                  <CardTitle className="text-white flex items-center">
-                    <Target className="w-4 h-4 mr-2 text-blue-400" />
-                    Tips for Better Results
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <ul className="text-gray-400 text-sm space-y-1">
-                    <li>• Use clear, well-lit images</li>
-                    <li>• Capture the part from multiple angles</li>
-                    <li>• Ensure the part number is visible if possible</li>
-                    <li>• Remove any packaging or covers</li>
-                  </ul>
-                  <div className="border-t border-white/10 my-4" />
-                  <div>
-                    <div className="text-white font-medium mb-2">
-                      Keyword Search Guidance
-                    </div>
-                    <ul className="text-gray-400 text-sm space-y-1">
-                      <li>
-                        • Image analysis is recommended for the most accurate
-                        results.
-                      </li>
-                      <li>
-                        • If using keywords only, include 3–5 precise terms.
-                      </li>
-                      <li>
-                        • Add part number, vehicle make/model/year, side (e.g.,
-                        front-left).
-                      </li>
-                      <li>• Avoid generic words like "car part" or "spare".</li>
-                    </ul>
-                  </div>
-                </CardContent>
-              </Card>
+              <Button
+                variant="outline"
+                onClick={handleBackStep}
+                className="bg-black/20 border-white/10 hover:bg-white/10"
+              >
+                Back
+              </Button>
+
+              <Button
+                onClick={handleNextStep}
+                disabled={
+                  (wizardStep === "image" && !uploadedFile) ||
+                  (wizardStep === "keywords" && savedKeywords.length === 0)
+                }
+                className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
+              >
+                Continue
+              </Button>
             </motion.div>
-          </div>
+          )}
+
+          {wizardStep === "review" && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="flex justify-between items-center"
+            >
+              <Button
+                variant="outline"
+                onClick={handleBackStep}
+                className="bg-black/20 border-white/10 hover:bg-white/10"
+              >
+                Back
+              </Button>
+
+              <div className="flex gap-3">
+                <Button
+                  variant="outline"
+                  onClick={handleResetWizard}
+                  className="bg-black/20 border-white/10 hover:bg-white/10"
+                >
+                  Start Over
+                </Button>
+                <Button
+                  onClick={() => {
+                    if (selectedMode === "image" || selectedMode === "both") {
+                      scheduleAnalysis();
+                    } else {
+                      performKeywordSearch();
+                    }
+                  }}
+                  disabled={isAnalyzing || isKeywordSearching}
+                  className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
+                >
+                  {isAnalyzing || isKeywordSearching ? (
+                    <>
+                      <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                      Processing...
+                    </>
+                  ) : (
+                    <>
+                      <Zap className="w-5 h-5 mr-2" />
+                      Submit
+                    </>
+                  )}
+                </Button>
+              </div>
+            </motion.div>
+          )}
         </motion.div>
       </motion.div>
 
