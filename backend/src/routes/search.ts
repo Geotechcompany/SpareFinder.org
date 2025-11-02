@@ -225,15 +225,16 @@ router.post(
             userEmail
           );
 
-          // Send "Analysis Started" email notification for keyword search
+          // Send "Analysis Started" email notification for keyword search (non-blocking)
           try {
             const currentDate = new Date().toLocaleDateString();
             const currentTime = new Date().toLocaleTimeString();
             const dashboardUrl = `${
-              process.env.FRONTEND_URL || "https://app.sparefinder.org"
+              process.env.FRONTEND_URL || "https://sparefinder.org"
             }/dashboard`;
 
-            await emailService
+            // Fire-and-forget: don't await, let it run in background
+            emailService
               .sendTemplateEmail({
                 templateName: "Analysis Started",
                 userEmail: userProfile.email,
@@ -244,6 +245,12 @@ router.post(
                   currentTime: currentTime,
                 },
               })
+              .then(() => {
+                console.log(
+                  "📧 Keyword search started email sent to:",
+                  userProfile.email
+                );
+              })
               .catch((error) => {
                 console.error(
                   "Failed to send keyword search started email:",
@@ -252,12 +259,12 @@ router.post(
               });
 
             console.log(
-              "📧 Keyword search started email sent to:",
+              "📧 Keyword search started email queued for:",
               userProfile.email
             );
           } catch (emailError) {
             console.error(
-              "Error sending keyword search started email:",
+              "Error queueing keyword search started email:",
               emailError
             );
           }
@@ -316,6 +323,7 @@ router.post(
       // The schedule endpoint returns a job ID, we need to return that to the frontend
       // The frontend will need to poll for results using the job ID
       return res.status(202).json({
+        success: true,
         ...response.data,
         elapsed_ms: duration,
         message:
