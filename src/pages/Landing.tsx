@@ -45,6 +45,7 @@ import { DemoOne } from "@/components/ui/demo";
 import { DashboardScrollDemo } from "@/components/DashboardScrollDemo";
 import { HowItWorks } from "@/components/ui/how-it-works";
 import CoreValueStatsDemo from "@/components/CoreValueStatsDemo";
+import StaggerTestimonialsDemo from "@/components/StaggerTestimonialsDemo";
 import {
   Dialog,
   DialogContent,
@@ -308,36 +309,6 @@ const Landing = () => {
     },
   ];
 
-  const testimonials = [
-    {
-      name: "Marcus Johnson",
-      role: "CTO, AutoParts Pro",
-      text: "Reduced part identification time by 70% while improving accuracy. This AI system has revolutionized our entire supply chain management process.",
-      avatar:
-        "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=150&h=150",
-      company: "AutoParts Pro",
-      rating: 5,
-    },
-    {
-      name: "Sarah Chen",
-      role: "Lead Manufacturing Engineer",
-      text: "The AI recognition system transformed our maintenance workflows. We've seen a 40% reduction in downtime and significant cost savings.",
-      avatar:
-        "https://images.unsplash.com/photo-1494790108755-2616b332c3cc?auto=format&fit=crop&w=150&h=150",
-      company: "Industrial Solutions Ltd",
-      rating: 5,
-    },
-    {
-      name: "David Rodriguez",
-      role: "Operations Director",
-      text: "Integration was seamless and the accuracy is incredible. Our team can now identify complex automotive parts in seconds instead of hours.",
-      avatar:
-        "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=150&h=150",
-      company: "MechTech Industries",
-      rating: 5,
-    },
-  ];
-
   const faqs = [
     {
       question: "How accurate is the part identification?",
@@ -578,122 +549,7 @@ const Landing = () => {
       </section>
 
       {/* Testimonials */}
-      <section className="relative py-24 px-4 sm:px-6 lg:px-8 overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-r from-gray-900 via-black to-gray-900" />
-        <div className="absolute inset-0">
-          <div className="absolute top-0 left-1/3 w-72 h-72 bg-purple-500/5 rounded-full blur-3xl" />
-          <div className="absolute bottom-0 right-1/3 w-72 h-72 bg-blue-500/5 rounded-full blur-3xl" />
-        </div>
-
-        <div className="max-w-7xl mx-auto relative z-10">
-          <motion.div
-            className="text-center mb-20"
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8 }}
-          >
-            <motion.div
-              initial={{ opacity: 0, scale: 0.5 }}
-              whileInView={{ opacity: 1, scale: 1 }}
-              transition={{ duration: 0.5 }}
-              className="inline-flex items-center px-4 py-2 bg-gradient-to-r from-green-500/20 to-emerald-500/20 rounded-full border border-green-500/30 mb-8"
-            >
-              <Users className="w-4 h-4 text-green-400 mr-2" />
-              <span className="text-sm text-green-300 font-medium">
-                Success Stories
-              </span>
-            </motion.div>
-            <h2 className="text-5xl lg:text-6xl font-bold bg-gradient-to-r from-white via-green-200 to-emerald-200 bg-clip-text text-transparent mb-6">
-              Trusted by Industry Leaders
-            </h2>
-            <p className="text-xl text-gray-400 max-w-3xl mx-auto leading-relaxed">
-              See how leading manufacturers are transforming their operations
-              with our AI-powered part identification
-            </p>
-          </motion.div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {testimonials.map((testimonial, index) => (
-              <motion.div
-                key={testimonial.name}
-                initial={{ opacity: 0, y: 30 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                transition={{ delay: index * 0.2, duration: 0.8 }}
-                className="group relative"
-              >
-                <div className="absolute -inset-px bg-gradient-to-r from-green-600/50 to-emerald-600/50 rounded-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 blur-sm" />
-                <div className="relative h-full bg-gray-900/90 backdrop-blur-xl rounded-3xl border border-gray-800/50 group-hover:border-green-500/30 transition-all duration-500 p-8">
-                  <div className="absolute inset-0 bg-gradient-to-br from-green-900/10 via-transparent to-emerald-900/10 opacity-0 group-hover:opacity-100 transition-opacity duration-500 rounded-3xl" />
-
-                  <div className="relative">
-                    {/* Rating Stars */}
-                    <div className="flex items-center gap-1 mb-6">
-                      {[...Array(testimonial.rating)].map((_, i) => (
-                        <motion.div
-                          key={i}
-                          initial={{ opacity: 0, scale: 0 }}
-                          whileInView={{ opacity: 1, scale: 1 }}
-                          transition={{ delay: index * 0.2 + i * 0.1 }}
-                        >
-                          <Sparkles className="w-5 h-5 text-yellow-400 fill-current" />
-                        </motion.div>
-                      ))}
-                    </div>
-
-                    {/* Testimonial Text */}
-                    <blockquote className="text-gray-300 text-lg leading-relaxed mb-8 relative">
-                      <div className="absolute -top-2 -left-2 text-6xl text-green-500/20 font-serif">
-                        "
-                      </div>
-                      {testimonial.text}
-                      <div className="absolute -bottom-4 -right-2 text-6xl text-green-500/20 font-serif">
-                        "
-                      </div>
-                    </blockquote>
-
-                    {/* Author Info */}
-                    <div className="flex items-center gap-4">
-                      <div className="relative">
-                        <div className="absolute -inset-1 bg-gradient-to-r from-green-600 to-emerald-600 rounded-full opacity-60 group-hover:opacity-100 transition-opacity duration-300 blur-sm" />
-                        <img
-                          src={testimonial.avatar}
-                          className="relative w-16 h-16 rounded-full border-2 border-green-400/30 object-cover"
-                          alt={testimonial.name}
-                        />
-                      </div>
-                      <div className="flex-1">
-                        <h3 className="text-xl font-bold text-white group-hover:text-green-300 transition-colors duration-300">
-                          {testimonial.name}
-                        </h3>
-                        <p className="text-gray-400 font-medium">
-                          {testimonial.role}
-                        </p>
-                        <p className="text-green-400 text-sm font-semibold">
-                          {testimonial.company}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </motion.div>
-            ))}
-          </div>
-
-          <motion.div
-            className="text-center mt-16"
-            initial={{ opacity: 0 }}
-            whileInView={{ opacity: 1 }}
-            transition={{ delay: 0.8, duration: 0.8 }}
-          >
-            <p className="text-gray-400 mb-6">
-              Join 500+ companies already transforming their operations
-            </p>
-            <Button className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white px-8 py-4 rounded-2xl text-lg font-semibold shadow-2xl shadow-green-500/25 hover:shadow-green-500/40 transition-all duration-300 transform hover:scale-105">
-              Read More Success Stories
-            </Button>
-          </motion.div>
-        </div>
-      </section>
+      <StaggerTestimonialsDemo />
 
       {/* FAQ Section */}
       <section className="py-20 px-4 sm:px-6 lg:px-8">
