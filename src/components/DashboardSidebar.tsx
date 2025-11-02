@@ -18,7 +18,8 @@ import {
   ChevronRight,
   Bell,
   UserCircle,
-  Shield
+  Shield,
+  Star
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
@@ -74,6 +75,7 @@ const DashboardSidebar: React.FC<SidebarProps> = ({ isCollapsed = false, onToggl
     { href: '/dashboard', icon: Home, label: 'Dashboard', description: 'Overview & analytics' },
     { href: '/dashboard/upload', icon: Upload, label: 'Upload', description: 'Identify parts' },
     { href: '/dashboard/history', icon: History, label: 'History', description: 'Past uploads' },
+    { href: '/dashboard/reviews', icon: Star, label: 'Reviews', description: 'Your feedback' },
     { href: '/dashboard/profile', icon: User, label: 'Profile', description: 'Your account' },
     { href: '/dashboard/notifications', icon: Bell, label: 'Notifications', description: 'Updates & alerts' },
     { href: '/dashboard/billing', icon: CreditCard, label: 'Billing', description: 'Subscription' },

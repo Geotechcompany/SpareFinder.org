@@ -1,6 +1,7 @@
 import { Router, Response } from "express";
 import multer from "multer";
 import { authenticateToken } from "../middleware/auth";
+import { requireSubscriptionOrTrial } from "../middleware/subscription";
 import { AuthRequest } from "../types/auth";
 import { supabase } from "../server";
 import axios from "axios";
@@ -151,6 +152,7 @@ router.get(
 router.post(
   "/keywords",
   authenticateToken,
+  requireSubscriptionOrTrial,
   async (req: AuthRequest, res: Response) => {
     try {
       const { keywords } = req.body as { keywords?: string | string[] };
@@ -278,7 +280,7 @@ router.post(
       );
 
       const requestData = {
-        keywords: normalized,
+        keywords: normalized.join(" "), // Join array into a single string
         user_email: userEmail,
       };
 

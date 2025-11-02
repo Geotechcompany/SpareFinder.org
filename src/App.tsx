@@ -41,6 +41,7 @@ import ForgotPassword from "@/pages/ForgotPassword";
 import Contact from "@/pages/Contact";
 import Reviews from "@/pages/Reviews";
 import DashboardLayout from "@/components/DashboardLayout";
+import SharedAnalysis from "@/pages/SharedAnalysis";
 
 const queryClient = new QueryClient();
 
@@ -90,6 +91,7 @@ const App = () => (
                 <Route index element={<Dashboard />} />
                 <Route path="upload" element={<Upload />} />
                 <Route path="history" element={<History />} />
+                <Route path="reviews" element={<Reviews />} />
                 <Route path="billing" element={<Billing />} />
                 <Route path="settings" element={<Settings />} />
                 <Route path="notifications" element={<Notifications />} />
@@ -188,8 +190,8 @@ const App = () => (
               <Route path="/privacy-policy" element={<PrivacyPolicy />} />
               <Route path="/terms-of-service" element={<TermsOfService />} />
               <Route path="/contact" element={<Contact />} />
-              <Route path="/reviews" element={<Reviews />} />
               <Route path="/unauthorized" element={<Unauthorized />} />
+              <Route path="/share/:token" element={<SharedAnalysis />} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>

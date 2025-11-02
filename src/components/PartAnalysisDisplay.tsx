@@ -68,10 +68,26 @@ export const FlatPartAnalysisDisplay: React.FC<PartAnalysisDisplayProps> = ({
   imagePreview,
   className = "",
 }) => {
+  // Debug logging
+  console.log("📊 PartAnalysisDisplay - analysisData:", analysisData);
+  console.log("📝 Full analysis exists:", !!analysisData?.full_analysis);
+  if (analysisData?.full_analysis) {
+    console.log("📝 Full analysis length:", analysisData.full_analysis.length);
+    console.log(
+      "📝 Full analysis preview:",
+      analysisData.full_analysis.substring(0, 100)
+    );
+  }
+
   return (
     <div className={`space-y-6 ${className}`}>
       {/* Full AI Analysis - Rich Markdown Content */}
-      {analysisData.full_analysis ? (
+      {analysisData?.full_analysis &&
+      !analysisData.full_analysis.includes(
+        "I'm sorry, I can't assist with that request."
+      ) &&
+      !analysisData.full_analysis.includes("I cannot assist") &&
+      analysisData.full_analysis.length > 100 ? (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -92,28 +108,66 @@ export const FlatPartAnalysisDisplay: React.FC<PartAnalysisDisplayProps> = ({
         </Card>
       ) : (
         <Card>
-          <CardContent className="flex items-center justify-center p-8">
-            <div className="text-center text-gray-400">
-              <Brain className="w-16 h-16 mx-auto mb-4 text-purple-400 opacity-50" />
-              <p className="text-lg font-medium">
-                No detailed analysis available
-              </p>
-              <p className="text-sm mt-2">
-                The AI analysis content could not be loaded
-              </p>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Brain className="h-6 w-6 text-purple-600" />
+              Analysis Summary
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {analysisData?.description && (
+                <div>
+                  <h3 className="font-semibold text-purple-400 mb-2">
+                    Description
+                  </h3>
+                  <p className="text-gray-300">{analysisData.description}</p>
+                </div>
+              )}
+              {analysisData?.precise_part_name && (
+                <div>
+                  <h3 className="font-semibold text-purple-400 mb-2">Part</h3>
+                  <p className="text-gray-300">
+                    {analysisData.precise_part_name}
+                  </p>
+                </div>
+              )}
+              {analysisData?.confidence_explanation && (
+                <div>
+                  <h3 className="font-semibold text-purple-400 mb-2">
+                    Confidence
+                  </h3>
+                  <p className="text-gray-300">
+                    {analysisData.confidence_explanation}
+                  </p>
+                </div>
+              )}
+              {!analysisData?.description &&
+                !analysisData?.precise_part_name &&
+                !analysisData?.confidence_explanation && (
+                  <div className="text-center text-gray-400">
+                    <Brain className="w-16 h-16 mx-auto mb-4 text-purple-400 opacity-50" />
+                    <p className="text-lg font-medium">
+                      No detailed analysis available
+                    </p>
+                    <p className="text-sm mt-2">
+                      The AI analysis content could not be loaded
+                    </p>
+                  </div>
+                )}
             </div>
           </CardContent>
         </Card>
       )}
 
       {/* Enhanced Supplier Display with Contact Scraping */}
-      {(analysisData.suppliers?.length > 0 || analysisData.buy_links) && (
+      {(analysisData?.suppliers?.length > 0 || analysisData?.buy_links) && (
         <EnhancedSupplierDisplay
-          suppliers={analysisData.suppliers || []}
-          buyLinks={analysisData.buy_links || {}}
+          suppliers={analysisData?.suppliers || []}
+          buyLinks={analysisData?.buy_links || {}}
           partName={
-            analysisData.precise_part_name ||
-            analysisData.class_name ||
+            analysisData?.precise_part_name ||
+            analysisData?.class_name ||
             "this part"
           }
           showScraper={true}
@@ -143,8 +197,8 @@ export const PartAnalysisDisplayModal: React.FC<
 }) => {
   const modalTitle =
     title ||
-    analysisData.precise_part_name ||
-    analysisData.class_name ||
+    analysisData?.precise_part_name ||
+    analysisData?.class_name ||
     "Analysis Details";
 
   const handleDownloadPdf = async () => {
@@ -186,7 +240,7 @@ export const PartAnalysisDisplayModal: React.FC<
         );
         pdf.save(
           `analysis_${
-            analysisData.filename || analysisData.class_name || "result"
+            analysisData?.filename || analysisData?.class_name || "result"
           }.pdf`
         );
         return;
@@ -214,7 +268,7 @@ export const PartAnalysisDisplayModal: React.FC<
       pdf.addImage(imgData, "PNG", x, y, imgW, imgH, undefined, "FAST");
       pdf.save(
         `analysis_${
-          analysisData.filename || analysisData.class_name || "result"
+          analysisData?.filename || analysisData?.class_name || "result"
         }.pdf`
       );
     } catch {}
@@ -231,11 +285,11 @@ export const PartAnalysisDisplayModal: React.FC<
               </Button>
             </div>
           </div>
-          {(analysisData.filename ||
-            analysisData.model_version ||
-            analysisData.processing_time_seconds) && (
+          {(analysisData?.filename ||
+            analysisData?.model_version ||
+            analysisData?.processing_time_seconds) && (
             <div className="mt-1 text-xs text-gray-500 flex flex-wrap gap-3">
-              {analysisData.filename && (
+              {analysisData?.filename && (
                 <span>
                   Job:{" "}
                   <span className="text-gray-300 font-mono">
@@ -243,7 +297,7 @@ export const PartAnalysisDisplayModal: React.FC<
                   </span>
                 </span>
               )}
-              {analysisData.model_version && (
+              {analysisData?.model_version && (
                 <span>
                   Model:{" "}
                   <span className="text-gray-300">
@@ -251,7 +305,7 @@ export const PartAnalysisDisplayModal: React.FC<
                   </span>
                 </span>
               )}
-              {typeof analysisData.processing_time_seconds !== "undefined" && (
+              {typeof analysisData?.processing_time_seconds !== "undefined" && (
                 <span>
                   Time:{" "}
                   <span className="text-gray-300">

@@ -988,12 +988,24 @@ export const uploadApi = {
       if (options?.date_from) params.append("date_from", options.date_from);
       if (options?.date_to) params.append("date_to", options.date_to);
 
+      // Align with backend route: /uploads
       const response = await apiClient.get(
-        `/upload/history?${params.toString()}`
+        `/history/uploads?${params.toString()}`
       );
       return response.data;
     } catch (error) {
       console.error("Upload history error:", error);
+      throw error;
+    }
+  },
+
+  deleteUpload: async (uploadId: string): Promise<ApiResponse> => {
+    try {
+      // Backend exposes deletion at /uploads/:uploadId
+    const response = await apiClient.delete(`/history/uploads/${uploadId}`);
+      return response.data;
+    } catch (error) {
+      console.error("Delete upload error:", error);
       throw error;
     }
   },
@@ -1004,6 +1016,51 @@ export const uploadApi = {
       return response.data;
     } catch (error) {
       console.error("Upload statistics error:", error);
+      throw error;
+    }
+  },
+
+  createCrewAnalysisJob: async (
+    file: File,
+    keywords: string = ""
+  ): Promise<ApiResponse<{ jobId: string; imageUrl: string }>> => {
+    try {
+      const formData = new FormData();
+      formData.append("image", file);
+      if (keywords) {
+        formData.append("keywords", keywords);
+      }
+
+      const response = await apiClient.post("/upload/crew-analysis", formData, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+        timeout: 30000, // 30 second timeout
+      });
+
+      return response.data;
+    } catch (error) {
+      console.error("Create Deep Research job error:", error);
+      throw error;
+    }
+  },
+
+  getCrewAnalysisJobs: async (): Promise<ApiResponse> => {
+    try {
+      const response = await apiClient.get("/upload/crew-analysis-jobs");
+      return response.data;
+    } catch (error) {
+      console.error("Get Deep Research jobs error:", error);
+      throw error;
+    }
+  },
+
+  deleteCrewAnalysisJob: async (jobId: string): Promise<ApiResponse> => {
+    try {
+      const response = await apiClient.delete(`/upload/crew-analysis/${jobId}`);
+      return response.data;
+    } catch (error) {
+      console.error("Delete Deep Research job error:", error);
       throw error;
     }
   },

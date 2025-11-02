@@ -32,21 +32,30 @@ import {
   Activity,
   Menu,
   Trash2,
+  Star,
+  Image as ImageIcon,
+  Calendar,
+  Sparkles,
 } from "lucide-react";
 import DashboardSidebar from "@/components/DashboardSidebar";
 import MobileSidebar from "@/components/MobileSidebar";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/components/ui/use-toast";
-import { dashboardApi, tokenStorage } from "@/lib/api";
+import { dashboardApi, tokenStorage, uploadApi, api } from "@/lib/api";
 import { PartAnalysisDisplayModal } from "@/components/PartAnalysisDisplay";
+import { ReviewModal } from "@/components/ReviewModal";
 import OnboardingGuide from "@/components/OnboardingGuide";
+import { CrewAnalysisProgress } from "@/components/CrewAnalysisProgress";
+import { AnalysisResultModal } from "@/components/AnalysisResultModal";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
   DialogDescription,
+  DialogFooter,
 } from "@/components/ui/dialog";
+import { supabase } from "@/lib/supabase/client";
 import { useDashboardLayout } from "@/contexts/DashboardLayoutContext";
 import DashboardSkeleton from "@/components/DashboardSkeleton";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -57,6 +66,7 @@ import {
   PaginationItem,
   PaginationPrevious,
   PaginationNext,
+  PaginationLink,
 } from "@/components/ui/pagination";
 
 const History = () => {
@@ -84,6 +94,7 @@ const History = () => {
     undefined
   );
   const [isAnalysisLoading, setIsAnalysisLoading] = useState(false);
+  const [loadingJobIds, setLoadingJobIds] = useState<Set<string>>(new Set());
   const [jobImages, setJobImages] = useState<
     Record<string, string | undefined>
   >({});
@@ -97,6 +108,52 @@ const History = () => {
     new Set()
   );
   const [lastPollTime, setLastPollTime] = useState(0);
+
+  // Review modal state
+  const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
+  const [reviewJobId, setReviewJobId] = useState<string>("");
+  const [reviewJobType, setReviewJobType] = useState<
+    "image" | "keyword" | "both"
+  >("image");
+  const [reviewPartSearchId, setReviewPartSearchId] = useState<
+    string | undefined
+  >(undefined);
+  const [currentViewedJob, setCurrentViewedJob] = useState<any>(null);
+
+  // Image and Delete Dialog state
+  const [isImageOpen, setIsImageOpen] = useState(false);
+  const [selectedImageJob, setSelectedImageJob] = useState<any | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [jobToDelete, setJobToDelete] = useState<any | null>(null);
+
+  // Deep Research Jobs state
+  const [crewJobs, setCrewJobs] = useState<any[]>([]);
+  const [isCrewJobOpen, setIsCrewJobOpen] = useState(false);
+  const [selectedCrewJob, setSelectedCrewJob] = useState<any | null>(null);
+  const [isAnalysisResultOpen, setIsAnalysisResultOpen] = useState(false);
+  const [selectedAnalysisResult, setSelectedAnalysisResult] = useState<
+    any | null
+  >(null);
+  const [crewJobToDelete, setCrewJobToDelete] = useState<any | null>(null);
+  const [deleteCrewJobDialogOpen, setDeleteCrewJobDialogOpen] = useState(false);
+  const [expandedJobIds, setExpandedJobIds] = useState<Set<string>>(new Set());
+
+  // Create stable unique IDs for each crew job card, removing duplicates
+  const uniqueCrewJobs = useMemo(() => {
+    // First, deduplicate jobs by ID (keep first occurrence only)
+    const uniqueJobsMap = new Map<string, any>();
+    crewJobs.forEach((job) => {
+      if (!uniqueJobsMap.has(job.id)) {
+        uniqueJobsMap.set(job.id, job);
+      }
+    });
+
+    // Convert back to array with unique keys
+    return Array.from(uniqueJobsMap.values()).map((job) => ({
+      ...job,
+      _uniqueCardKey: job.id, // Use job ID directly since they're now unique
+    }));
+  }, [crewJobs]);
 
   // Pagination state
   const [imagePage, setImagePage] = useState(1);
@@ -195,34 +252,34 @@ const History = () => {
 
       console.log("🔄 Starting comprehensive data fetch for user:", user?.id);
 
-      // Fetch stats and jobs in parallel (but controlled)
-      const API_BASE =
-        (import.meta as any).env?.VITE_AI_SERVICE_URL ||
-        "http://localhost:8000";
-      const [statsResponse, jobsPrimaryResponse, jobsSecondaryResponse] =
+      // Fetch stats and user's history in parallel (but controlled)
+      const BACKEND_BASE =
+        import.meta.env.VITE_API_URL || "http://localhost:4000";
+      const [statsResponse, historyResponse, crewJobsResponse] =
         await Promise.allSettled([
           dashboardApi.getStats().catch((err) => {
             if (signal.aborted) throw new Error("Request aborted");
             throw err;
           }),
-          fetch(`${API_BASE}/jobs`)
-            .then((r) => r.json())
-            .catch((err) => {
-              if (signal.aborted) throw new Error("Request aborted");
-              throw err;
-            }),
-          // Optional: alternate SpareFinder service URL
-          fetch(
-            `${
-              (import.meta as any).env?.VITE_SPAREFINDER_SERVICE_URL || API_BASE
-            }/jobs`
-          )
-            .then((r) => r.json())
-            .catch((err) => {
-              if (signal.aborted) throw new Error("Request aborted");
-              // Do not rethrow to allow fallback
-              return { success: false, results: [] } as any;
-            }),
+          // Fetch history using the updated API wrapper (aligned with backend routes)
+          (async () => {
+            try {
+              const resp = await uploadApi.getHistory({ limit: 100 as any });
+              return resp;
+            } catch (e) {
+              throw e;
+            }
+          })(),
+          // Fetch Deep Research jobs
+          (async () => {
+            try {
+              const resp = await api.upload.getCrewAnalysisJobs();
+              return resp;
+            } catch (e) {
+              console.error("Failed to fetch crew jobs:", e);
+              return { success: false, jobs: [] };
+            }
+          })(),
         ]);
 
       // Handle stats response
@@ -244,109 +301,74 @@ const History = () => {
         });
       }
 
-      // Handle jobs response (merge all available jobs from both sources)
-      console.log("🔍 Jobs API responses:", {
-        primary: jobsPrimaryResponse.status,
-        primarySuccess:
-          jobsPrimaryResponse.status === "fulfilled"
-            ? jobsPrimaryResponse.value?.success
+      // Handle history response
+      console.log("🔍 History API response:", {
+        status: historyResponse.status,
+        success:
+          historyResponse.status === "fulfilled" && historyResponse.value
+            ? (historyResponse.value as any).success
             : false,
-        primaryResults:
-          jobsPrimaryResponse.status === "fulfilled"
-            ? jobsPrimaryResponse.value?.results?.length
-            : 0,
-        secondary: jobsSecondaryResponse.status,
-        secondarySuccess:
-          jobsSecondaryResponse.status === "fulfilled"
-            ? jobsSecondaryResponse.value?.success
-            : false,
-        secondaryResults:
-          jobsSecondaryResponse.status === "fulfilled"
-            ? jobsSecondaryResponse.value?.results?.length
+        results:
+          historyResponse.status === "fulfilled" && historyResponse.value
+            ? (historyResponse.value as any).uploads?.length ?? 0
             : 0,
       });
 
-      const primaryJobs =
-        jobsPrimaryResponse.status === "fulfilled" &&
-        jobsPrimaryResponse.value?.success
-          ? Array.isArray(jobsPrimaryResponse.value.results)
-            ? jobsPrimaryResponse.value.results
-            : []
-          : [];
-      const secondaryJobs =
-        jobsSecondaryResponse.status === "fulfilled" &&
-        jobsSecondaryResponse.value?.success
-          ? Array.isArray(jobsSecondaryResponse.value.results)
-            ? jobsSecondaryResponse.value.results
-            : []
+      if (historyResponse.status === "fulfilled" && historyResponse.value) {
+        // History response is expected to contain an `uploads` array from backend
+        const historyData = historyResponse.value as any;
+        const userJobs: any[] = Array.isArray(historyData.uploads)
+          ? historyData.uploads
           : [];
 
-      // Merge and de-duplicate by id or filename
-      const mergedJobs = (() => {
-        const seen = new Set<string>();
-        const all = [...secondaryJobs, ...primaryJobs];
-        const unique: any[] = [];
-        for (const job of all) {
-          const key = String(job?.id || job?.filename || "");
-          if (!key) {
-            unique.push(job);
-            continue;
-          }
-          if (!seen.has(key)) {
-            seen.add(key);
-            unique.push(job);
-          }
-        }
-        return unique;
-      })();
-
-      console.log("🔄 Final merged jobs:", mergedJobs.length, "jobs");
-      console.log(
-        "📊 Job details:",
-        mergedJobs.map((j) => ({
-          id: j.id,
-          mode: j.mode,
-          status: j.status,
-          success: j.success,
-        }))
-      );
-      setpastAnalysis(mergedJobs);
-
-      // Compute accurate stats from merged jobs (image analyses only)
-      try {
-        const imageJobs = (mergedJobs || []).filter(
-          (j: any) => j.mode !== "keywords_only"
+        console.log("🔄 User's history jobs:", userJobs.length, "jobs");
+        console.log(
+          "📊 Job details:",
+          userJobs.map((j: any) => ({
+            id: j.id,
+            filename: j.image_name,
+            status: j.analysis_status,
+            success: j.is_match,
+          }))
         );
-        const total = imageJobs.length;
-        const completed = imageJobs.filter(
-          (j: any) =>
-            String(j.status).toLowerCase() === "completed" || j.success === true
-        ).length;
-        const normConf = (v: any) =>
-          typeof v === "number" ? (v <= 1 ? v * 100 : v) : null;
-        const normSec = (t: any) =>
-          typeof t === "number" ? (t > 100 ? t / 1000 : t) : null;
-        const confs = imageJobs
-          .map((j: any) => normConf(j.confidence_score ?? j.confidence))
-          .filter((n: any): n is number => typeof n === "number");
-        const times = imageJobs
-          .map((j: any) =>
-            normSec(j.processing_time_seconds ?? j.processing_time)
-          )
-          .filter((n: any): n is number => typeof n === "number");
-        const avgConf = confs.length
-          ? confs.reduce((a: number, b: number) => a + b, 0) / confs.length
-          : 0;
-        const avgTime = times.length
-          ? times.reduce((a: number, b: number) => a + b, 0) / times.length
-          : 0;
-        setStats({
-          totalUploads: total,
-          completed,
-          avgConfidence: avgConf.toFixed(1),
-          avgProcessingTime: `${Math.round(avgTime)}s`,
-        });
-      } catch {}
+        setpastAnalysis(userJobs);
+      } else {
+        console.warn("❌ Failed to fetch user history:", historyResponse);
+        setpastAnalysis([]);
+      }
+
+      // Handle crew jobs response
+      if (crewJobsResponse.status === "fulfilled" && crewJobsResponse.value) {
+        const crewData = crewJobsResponse.value as any;
+        const crewAnalysisJobs: any[] = Array.isArray(crewData.data)
+          ? crewData.data
+          : [];
+        console.log("🤖 Deep Research jobs:", crewAnalysisJobs.length, "jobs");
+
+        // Check for duplicate IDs
+        const uniqueIds = new Set(crewAnalysisJobs.map((j: any) => j.id));
+        if (uniqueIds.size !== crewAnalysisJobs.length) {
+          console.warn(
+            `⚠️ Found ${
+              crewAnalysisJobs.length - uniqueIds.size
+            } duplicate job(s) in crew jobs data`
+          );
+          console.log(
+            "Duplicate IDs:",
+            crewAnalysisJobs.map((j: any) => j.id)
+          );
+        }
+
+        setCrewJobs(crewAnalysisJobs);
+      } else {
+        console.warn("❌ Failed to fetch crew jobs:", crewJobsResponse);
+        setCrewJobs([]);
+      }
+
+      // Compute accurate stats from user's jobs (image analyses only)
+      // Stats are now fetched from the backend API above (includes crew jobs)
+      // No longer recalculating locally from pastAnalysis
+      console.log("📊 Using stats from API");
 
       // Hydrate missing thumbnails by querying job status
       const hydrateImages = async () => {
@@ -354,10 +376,31 @@ const History = () => {
           const API_BASE =
             (import.meta as any).env?.VITE_AI_SERVICE_URL ||
             "http://localhost:8000";
-          const toFetch = (mergedJobs || []).filter(
-            (j: any) => !j.image_url && (j.filename || j.id)
+          // Only fetch from AI service if image_url is missing
+          // Images are already stored in Supabase Storage
+          const toFetch = (pastAnalysis || []).filter(
+            (j: any) => !j.image_url && (j.image_name || j.id)
           );
-          if (!toFetch.length) return;
+
+          const alreadyHaveImages = (pastAnalysis || []).filter(
+            (j: any) => j.image_url
+          ).length;
+          if (alreadyHaveImages > 0) {
+            console.log(
+              `✅ ${alreadyHaveImages} jobs already have images from Supabase Storage`
+            );
+          }
+
+          if (!toFetch.length) {
+            if (alreadyHaveImages > 0) {
+              console.log(
+                `🎉 All ${
+                  pastAnalysis?.length || 0
+                } job images are ready for display`
+              );
+            }
+            return;
+          }
 
           // First check if AI service is available
           try {
@@ -381,76 +424,123 @@ const History = () => {
             `🖼️ Attempting to fetch images for ${toFetch.length} jobs`
           );
 
-          const results = await Promise.all(
-            toFetch.map(async (j: any) => {
-              try {
-                const filename = j.filename || j.id;
-                console.log(`🔍 Fetching image for job: ${filename}`);
+          // Batch fetch images to avoid overwhelming the server
+          const BATCH_SIZE = 10;
+          const BATCH_DELAY = 500; // ms between batches
+          const results: Array<{ id: string; url?: string; error?: string }> =
+            [];
 
-                const res = await fetch(
-                  `${API_BASE}/analyze-part/status/${encodeURIComponent(
-                    filename
-                  )}`,
-                  {
-                    method: "GET",
-                    headers: {
-                      Accept: "application/json",
-                    },
-                    // Add timeout to prevent hanging
-                    signal: AbortSignal.timeout(5000),
-                  }
-                );
+          for (let i = 0; i < toFetch.length; i += BATCH_SIZE) {
+            const batch = toFetch.slice(i, i + BATCH_SIZE);
+            console.log(
+              `📦 Processing batch ${
+                Math.floor(i / BATCH_SIZE) + 1
+              }/${Math.ceil(toFetch.length / BATCH_SIZE)} (${
+                batch.length
+              } jobs)`
+            );
 
-                if (!res.ok) {
-                  console.log(
-                    `❌ Status ${res.status} for job ${filename}: ${res.statusText}`
+            const batchResults = await Promise.all(
+              batch.map(async (j: any) => {
+                try {
+                  const filename = j.image_name || j.id;
+
+                  const res = await fetch(
+                    `${API_BASE}/analyze-part/status/${encodeURIComponent(
+                      filename
+                    )}`,
+                    {
+                      method: "GET",
+                      headers: {
+                        Accept: "application/json",
+                      },
+                      // Increase timeout to 30 seconds for slow AI service
+                      signal: AbortSignal.timeout(30000),
+                    }
                   );
+
+                  if (!res.ok) {
+                    return {
+                      id: j.id,
+                      url: undefined,
+                      error:
+                        res.status === 404
+                          ? "not_found"
+                          : `${res.status} ${res.statusText}`,
+                    };
+                  }
+
+                  const data = await res.json();
+
+                  return {
+                    id: j.id,
+                    url: data?.image_url,
+                    error: undefined,
+                  } as {
+                    id: string;
+                    url?: string;
+                    error?: string;
+                  };
+                } catch (error: any) {
                   return {
                     id: j.id,
                     url: undefined,
-                    error: `${res.status} ${res.statusText}`,
+                    error: error.message,
+                  } as {
+                    id: string;
+                    url?: string;
+                    error?: string;
                   };
                 }
+              })
+            );
 
-                const data = await res.json();
-                console.log(
-                  `✅ Got response for ${filename}:`,
-                  data?.image_url ? "has image" : "no image"
-                );
+            results.push(...batchResults);
 
-                return {
-                  id: j.id,
-                  url: data?.image_url,
-                  error: undefined,
-                } as {
-                  id: string;
-                  url?: string;
-                  error?: string;
-                };
-              } catch (error: any) {
-                console.log(
-                  `❌ Error fetching image for job ${j.id}:`,
-                  error.message
-                );
-                return {
-                  id: j.id,
-                  url: undefined,
-                  error: error.message,
-                } as {
-                  id: string;
-                  url?: string;
-                  error?: string;
-                };
-              }
-            })
-          );
+            // Log batch results
+            const batchSuccess = batchResults.filter((r) => r.url).length;
+            const batch404 = batchResults.filter(
+              (r) => r.error === "not_found"
+            ).length;
 
-          // Log results summary
+            if (batchSuccess > 0) {
+              console.log(
+                `✅ Batch complete: ${batchSuccess}/${batch.length} images loaded`
+              );
+            } else if (batch404 === batch.length) {
+              console.log(
+                `ℹ️ Batch ${Math.floor(i / BATCH_SIZE) + 1}: All ${
+                  batch.length
+                } images not found in storage`
+              );
+            }
+
+            // Delay between batches (except for the last one)
+            if (i + BATCH_SIZE < toFetch.length) {
+              await new Promise((resolve) => setTimeout(resolve, BATCH_DELAY));
+            }
+          }
+
+          // Log final results summary
           const successful = results.filter((r) => r.url).length;
-          const failed = results.filter((r) => r.error).length;
-          console.log(
-            `📊 Image fetch results: ${successful} successful, ${failed} failed`
-          );
+          const notFound = results.filter(
+            (r) => r.error === "not_found"
+          ).length;
+          const otherErrors = results.filter(
+            (r) => r.error && r.error !== "not_found"
+          ).length;
+
+          if (successful > 0) {
+            console.log(`✅ ${successful} images loaded successfully`);
+          }
+          if (notFound > 0) {
+            console.log(
+              `ℹ️ ${notFound} images not found (original uploads may be missing from AI service)`
+            );
+          }
+          if (otherErrors > 0) {
+            console.log(`❌ ${otherErrors} images failed with errors`);
+          }
 
           setJobImages((prev) => {
             const copy = { ...prev };
@@ -531,23 +621,31 @@ const History = () => {
       setLastPollTime(now);
 
       setIsPolling(true);
-      const API_BASE =
-        (import.meta as any).env?.VITE_AI_SERVICE_URL ||
-        "http://localhost:8000";
-      const res = await fetch(`${API_BASE}/jobs`);
-      const data = await res.json();
-      if (data?.success && Array.isArray(data.results)) {
-        console.log(
-          "🔄 Polling: Updating jobs data with",
-          data.results.length,
-          "jobs"
-        );
+      // Use backend endpoint instead of AI service to ensure user filtering
+      const historyData = await uploadApi.getHistory({ limit: 100 });
+      // Normalize response shape for robust polling
+      if (historyData?.success) {
+        // Support both possible shapes from backend: { searches: [...] } and { uploads: [...] }
+        const potentialSearches =
+          (historyData as any).searches ?? (historyData as any).uploads ?? [];
+        let searches: any[] = [];
+        if (Array.isArray(potentialSearches)) {
+          searches = potentialSearches;
+        }
+        // Polling: Updating jobs data (logging disabled to reduce console clutter)
+
+        // Helper to determine if a job is still processing
+        const isJobInProgress = (item: any) => {
+          const st = String(
+            item?.analysis_status ?? item?.status ?? ""
+          ).toLowerCase();
+          return st === "processing" || st === "pending";
+        };
 
         // Check for stuck jobs (processing for more than 5 minutes)
         const now = Date.now();
-        const stuckJobs = data.results.filter((job: any) => {
-          if (job.status !== "processing" && job.status !== "pending")
-            return false;
+        const stuckJobs = searches.filter((job: any) => {
+          if (!isJobInProgress(job)) return false;
           const createdAt = new Date(
             job.created_at || job.updated_at
           ).getTime();
@@ -556,16 +654,15 @@ const History = () => {
         });
 
         if (stuckJobs.length > 0) {
-          console.log(
-            "⚠️ Found stuck jobs:",
-            stuckJobs.map((j: any) => j.id)
+          console.warn(
+            `Found ${stuckJobs.length} stuck job(s) - automatically marking as failed`
           );
           // Mark stuck jobs as failed
-          const updatedJobs = data.results.map((job: any) => {
+          const updatedJobs = searches.map((job: any) => {
             if (stuckJobs.some((stuck: any) => stuck.id === job.id)) {
               return {
                 ...job,
-                status: "failed",
+                analysis_status: "failed",
                 success: false,
                 error: "Job timed out - processing took too long",
               };
@@ -575,16 +672,20 @@ const History = () => {
           setpastAnalysis(updatedJobs);
         } else {
           // Update the main jobs data for real-time display
-          setpastAnalysis(data.results);
+          setpastAnalysis(searches);
         }
 
         const nextMap: Record<string, any> = {};
         const nextImages: Record<string, string | undefined> = {};
-        for (const j of data.results) {
-          const id = j.id || j.filename;
+        for (const j of searches) {
+          const id = j.id || j.image_name;
           if (!id) continue;
+          // Normalize status from either field
+          const statusFromDb = String(
+            j?.analysis_status ?? j?.status ?? ""
+          ).toLowerCase();
           nextMap[id] = {
-            status: j.status,
+            status: statusFromDb,
             confidence_score:
               typeof j.confidence_score !== "undefined"
                 ? j.confidence_score
@@ -597,7 +698,8 @@ const History = () => {
                 : typeof j.processing_time !== "undefined"
                 ? j.processing_time
                 : undefined,
-            precise_part_name: j.precise_part_name || j.class_name || undefined,
+            precise_part_name:
+              j.precise_part_name || j.part_name || j.class_name || undefined,
           };
           if (j.image_url) nextImages[id] = j.image_url as string;
         }
@@ -608,14 +710,14 @@ const History = () => {
 
         // Update stats from current jobs (image-only)
         try {
-          const imageJobs = data.results.filter(
-            (j: any) => j.mode !== "keywords_only"
+          const imageJobs = searches.filter(
+            (j: any) => j.mode !== "keywords_only" && j.image_name
           );
           const total = imageJobs.length;
           const completed = imageJobs.filter(
             (j: any) =>
-              String(j.status).toLowerCase() === "completed" ||
-              j.success === true
+              String(j.analysis_status || j.status).toLowerCase() ===
+                "completed" || j.success === true
           ).length;
           const normConf = (v: any) =>
             typeof v === "number" ? (v <= 1 ? v * 100 : v) : null;
@@ -635,12 +737,13 @@ const History = () => {
           const avgTime = times.length
             ? times.reduce((a: number, b: number) => a + b, 0) / times.length
             : 0;
-          setStats({
-            totalUploads: total,
-            completed,
-            avgConfidence: avgConf.toFixed(1),
-            avgProcessingTime: `${Math.round(avgTime)}s`,
-          });
+          // Stats are now from API, not recalculated locally
+          // setStats({
+          //   totalUploads: total,
+          //   completed,
+          //   avgConfidence: avgConf.toFixed(1),
+          //   avgProcessingTime: `${Math.round(avgTime)}s`,
+          // });
         } catch {}
       }
     } catch (error) {
@@ -679,9 +782,7 @@ const History = () => {
         if (pollCount > 1)
           nextInterval = Math.min(2000 * Math.pow(2, pollCount - 1), 30000);
 
-        console.log(
-          `🔄 Polling attempt ${pollCount}/${maxPolls}, next in ${nextInterval}ms`
-        );
+        // Polling attempt logged (disabled to reduce console clutter)
 
         pollJobStatuses()
           .then(() => {
@@ -793,18 +894,16 @@ const History = () => {
     }
   };
 
-  // Delete analysis (AI service cleanup)
+  // Delete analysis (backend API)
   const handleDeleteAnalysis = async (job: any) => {
     try {
-      const API_BASE =
-        (import.meta as any).env?.VITE_AI_SERVICE_URL ||
-        "http://localhost:8000";
-      const id = encodeURIComponent(job.filename || job.id);
-      const res = await fetch(`${API_BASE}/analyze-part/cleanup/${id}`, {
-        method: "DELETE",
-      });
-      if (!res.ok) throw new Error("Cleanup failed");
-      setpastAnalysis((prev) => prev.filter((p: any) => p.id !== job.id));
+      const uploadId = job.id;
+      if (!uploadId) {
+        throw new Error("Invalid job ID");
+      }
+
+      await uploadApi.deleteUpload(uploadId);
+      setpastAnalysis((prev) => prev.filter((p: any) => p.id !== uploadId));
       toast({ title: "Deleted", description: "Analysis removed." });
     } catch (e: any) {
       console.error("Delete analysis error", e);
@@ -836,21 +935,46 @@ const History = () => {
 
   // View job -> open analysis modal
   const handleViewJob = async (job: any) => {
+    const jobId = job.id;
     try {
+      setCurrentViewedJob(job); // Store the current job being viewed
+
+      // Check if we already have the full analysis data
+      const existingData = jobStatusMap[jobId] || job;
+      const status = String(existingData?.status || "").toLowerCase();
+
+      // If job is completed and we have the data, show it immediately
+      if (status === "completed" && existingData) {
+        console.log("✅ Using cached analysis data for", jobId);
+        setSelectedImageJob(existingData);
+        setIsImageOpen(true);
+        return;
+      }
+
+      // Otherwise, fetch from AI service
+      setLoadingJobIds((prev) => new Set(prev).add(jobId));
       setIsAnalysisLoading(true);
       setSelectedAnalysis(null);
+
       const API_BASE =
         (import.meta as any).env?.VITE_AI_SERVICE_URL ||
         "http://localhost:8000";
       const res = await fetch(
         `${API_BASE}/analyze-part/status/${encodeURIComponent(
           job.filename || job.id
-        )}`
+        )}`,
+        {
+          signal: AbortSignal.timeout(10000), // 10 second timeout
+        }
       );
+
+      if (!res.ok) {
+        throw new Error(`Failed to fetch analysis: ${res.status}`);
+      }
+
       const data = await res.json();
-      setSelectedAnalysis(data);
-      setSelectedImageUrl(job.image_url || data.image_url);
-      setIsAnalysisOpen(true);
+      setSelectedImageJob(data);
+      setIsImageOpen(true);
     } catch (e: any) {
       console.error("View job error:", e);
       toast({
@@ -859,6 +983,12 @@ const History = () => {
         variant: "destructive",
       });
     } finally {
+      // Remove this job ID from loading set
+      setLoadingJobIds((prev) => {
+        const newSet = new Set(prev);
+        newSet.delete(jobId);
+        return newSet;
+      });
       setIsAnalysisLoading(false);
     }
   };
@@ -889,6 +1019,88 @@ const History = () => {
     }
   }, [isAuthenticated, user?.id, authLoading, fetchAllData]);
 
+  // Real-time Supabase subscription for Deep Research jobs
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const channel = supabase
+      .channel("crew_jobs_changes")
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "crew_analysis_jobs",
+          filter: `user_id=eq.${user.id}`,
+        },
+        (payload) => {
+          console.log("📡 Crew job update received:", payload);
+
+          if (payload.eventType === "INSERT") {
+            setCrewJobs((prev) => {
+              // Prevent duplicate insertions
+              const existingJob = prev.find((job) => job.id === payload.new.id);
+              if (existingJob) {
+                console.log(
+                  "⚠️ Job already exists, skipping INSERT:",
+                  payload.new.id
+                );
+                return prev;
+              }
+              return [payload.new as any, ...prev];
+            });
+          } else if (payload.eventType === "UPDATE") {
+            setCrewJobs((prev) =>
+              prev.map((job) =>
+                job.id === payload.new.id ? (payload.new as any) : job
+              )
+            );
+          } else if (payload.eventType === "DELETE") {
+            setCrewJobs((prev) =>
+              prev.filter((job) => job.id !== payload.old.id)
+            );
+          }
+        }
+      )
+      .subscribe((status) => {
+        if (status === "SUBSCRIBED") {
+          console.log("✅ Real-time subscription active");
+          setIsPolling(true);
+        }
+      });
+
+    return () => {
+      supabase.removeChannel(channel);
+      setIsPolling(false);
+    };
+  }, [user?.id]);
+
+  // Poll for crew job updates when there are active jobs
+  useEffect(() => {
+    if (!user?.id || crewJobs.length === 0) return;
+
+    // Check if there are any jobs that aren't completed
+    const hasActiveJobs = crewJobs.some(
+      (job) => job.status === "processing" || job.status === "pending"
+    );
+
+    if (!hasActiveJobs) return;
+
+    // Poll every 3 seconds for active jobs
+    const pollInterval = setInterval(async () => {
+      try {
+        const resp = await api.upload.getCrewAnalysisJobs();
+        if (resp && (resp as any).data) {
+          setCrewJobs((resp as any).data);
+        }
+      } catch (error) {
+        console.error("Failed to poll crew jobs:", error);
+      }
+    }, 3000);
+
+    return () => clearInterval(pollInterval);
+  }, [user?.id, crewJobs]);
+
   // Cleanup on unmount
   useEffect(() => {
     return () => {
@@ -904,6 +1116,147 @@ const History = () => {
 
   const handleToggleMobileMenu = () => {
     setIsMobileMenuOpen(!isMobileMenuOpen);
+  };
+
+  // Handle view crew job analysis
+  const handleViewCrewAnalysis = (job: any) => {
+    setSelectedAnalysisResult(job);
+    setIsAnalysisResultOpen(true);
+  };
+
+  // Handle delete crew job
+  const handleDeleteCrewJob = (job: any) => {
+    setCrewJobToDelete(job);
+    setDeleteCrewJobDialogOpen(true);
+  };
+
+  // Confirm delete crew job
+  const confirmDeleteCrewJob = async () => {
+    if (!crewJobToDelete) return;
+
+    try {
+      const response = await api.upload.deleteCrewAnalysisJob(
+        crewJobToDelete.id
+      );
+
+      if (response.success) {
+        toast({
+          title: "Success",
+          description: "Analysis deleted successfully",
+        });
+
+        // Remove from local state (real-time will also update)
+        setCrewJobs((prev) =>
+          prev.filter((job) => job.id !== crewJobToDelete.id)
+        );
+      } else {
+        throw new Error(response.message || "Failed to delete");
+      }
+    } catch (error) {
+      console.error("Delete error:", error);
+      toast({
+        title: "Error",
+        description: "Failed to delete analysis",
+        variant: "destructive",
+      });
+    } finally {
+      setDeleteCrewJobDialogOpen(false);
+      setCrewJobToDelete(null);
+    }
+  };
+
+  // Handle download PDF
+  const handleDownloadPDF = async (pdfUrl: string) => {
+    try {
+      // Extract filename from URL
+      const filename = pdfUrl.split("/").pop() || "report.pdf";
+
+      // Use backend endpoint to serve PDF
+      const downloadUrl = `${
+        import.meta.env.VITE_API_URL || "http://localhost:4000"
+      }/api/reports/pdf/${filename}`;
+
+      // Create a temporary link and trigger download
+      const link = document.createElement("a");
+      link.href = downloadUrl;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      toast({
+        title: "Download Started",
+        description: "Your PDF report is being downloaded.",
+      });
+    } catch (error) {
+      console.error("Download error:", error);
+      toast({
+        title: "Download Failed",
+        description: "Failed to download PDF. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Handle create shareable link
+  const handleCreateShareLink = async (jobId: string) => {
+    try {
+      const response = await fetch(
+        `${
+          import.meta.env.VITE_API_URL || "http://localhost:4000"
+        }/api/reports/share/${jobId}`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-user-id": user?.id || "",
+          },
+          body: JSON.stringify({ userId: user?.id }),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error("Failed to create shareable link");
+      }
+
+      const data = await response.json();
+
+      // Copy to clipboard
+      await navigator.clipboard.writeText(data.shareUrl);
+
+      // Open in new tab
+      window.open(data.shareUrl, "_blank");
+
+      toast({
+        title: "Shareable Link Created!",
+        description: "Link copied to clipboard and opened in new tab.",
+      });
+    } catch (error) {
+      console.error("Share error:", error);
+      toast({
+        title: "Failed to Create Link",
+        description: "Could not create shareable link. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Toggle expanded state for a specific card using unique card identifier
+  const toggleJobExpanded = (cardKey: string) => {
+    if (!cardKey) {
+      console.warn("Cannot toggle expansion for card with undefined key");
+      return;
+    }
+
+    setExpandedJobIds((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(cardKey)) {
+        newSet.delete(cardKey);
+      } else {
+        newSet.add(cardKey);
+      }
+      return newSet;
+    });
   };
 
   // Show loading state (uniform skeleton)
@@ -1139,7 +1492,7 @@ const History = () => {
             ))}
           </div>
 
-          {/* Past Analysis - Tabbed (Images vs Keywords) */}
+          {/* History - Tabbed (Images vs Keywords) */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -1152,7 +1505,7 @@ const History = () => {
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-white flex items-center space-x-2 text-base md:text-lg">
                     <Database className="w-4 h-4 md:w-5 md:h-5 text-emerald-400" />
-                    <span>Past Analysis</span>
+                    <span>History</span>
                     {isPolling && (
                       <div className="flex items-center space-x-1 text-xs text-emerald-400">
                         <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse" />
@@ -1178,1673 +1531,329 @@ const History = () => {
                 </CardDescription>
               </CardHeader>
               <CardContent className="p-4 md:p-6 pt-0">
-                {pastAnalysis.length === 0 ? (
+                {uniqueCrewJobs.length === 0 ? (
                   <div className="text-center py-6 md:py-8">
-                    <Clock className="w-8 h-8 md:w-12 md:h-12 text-gray-600 mx-auto mb-3 md:mb-4" />
+                    <Sparkles className="w-8 h-8 md:w-12 md:h-12 text-purple-400/50 mx-auto mb-3 md:mb-4" />
                     <p className="text-gray-400 text-sm md:text-base">
-                      No jobs found
+                      No Deep Research jobs yet
                     </p>
                     <p className="text-gray-500 text-xs md:text-sm mt-2">
-                      New jobs will appear here after you upload.
+                      Start a comprehensive AI Deep Research from the upload
+                      page
                     </p>
                   </div>
                 ) : (
-                  <Tabs defaultValue="images" className="w-full">
-                    <TabsList className="mb-4 bg-white/5 border border-white/10">
-                      <TabsTrigger value="images">Image Analyses</TabsTrigger>
-                      <TabsTrigger value="keywords">
-                        Keyword Searches
-                      </TabsTrigger>
-                    </TabsList>
+                  <div className="w-full">
+                    {/* Deep Research Jobs Grid */}
+                    <div
+                      id="tour-past-jobs-table"
+                      className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"
+                    >
+                      {uniqueCrewJobs
+                        .sort(
+                          (a: any, b: any) =>
+                            new Date(b.created_at).getTime() -
+                            new Date(a.created_at).getTime()
+                        )
+                        .map((job: any) => {
+                          // Use the stable unique key pre-assigned in useMemo
+                          const cardUniqueKey = job._uniqueCardKey;
 
-                    {/* Images Tab */}
-                    <TabsContent value="images">
-                      <div
-                        id="tour-past-jobs-table"
-                        className="overflow-x-auto"
-                      >
-                        {/* Desktop/Tablet Table */}
-                        <table className="min-w-full text-xs md:text-sm hidden md:table">
-                          <thead>
-                            <tr className="text-left text-gray-400">
-                              <th className="py-3 pr-4 font-medium">Job ID</th>
-                              <th className="py-3 pr-4 font-medium">Status</th>
-                              <th className="py-3 pr-4 font-medium">Part</th>
-                              <th className="py-3 pr-4 font-medium hidden lg:table-cell">
-                                Confidence
-                              </th>
-                              <th className="py-3 pr-4 font-medium hidden lg:table-cell">
-                                Time (s)
-                              </th>
-                              <th className="py-3 pr-4 font-medium">Actions</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-white/10">
-                            {(() => {
-                              const toTime = (j: any): number => {
-                                const cands: any[] = [
-                                  j?.metadata?.upload_timestamp,
-                                  j?.upload_timestamp,
-                                  j?.created_at,
-                                  j?.updated_at,
-                                  j?.createdAt,
-                                  j?.updatedAt,
-                                  j?.timestamp,
-                                  j?.started_at,
-                                  j?.completed_at,
-                                ];
-                                for (const v of cands) {
-                                  if (!v) continue;
-                                  if (typeof v === "number") {
-                                    return v > 1e12 ? v : v * 1000;
-                                  }
-                                  const t = Date.parse(String(v));
-                                  if (!Number.isNaN(t)) return t;
-                                }
-                                return 0;
-                              };
-                              const imageJobs = pastAnalysis
-                                .filter((j: any) => j.mode !== "keywords_only")
-                                .slice()
-                                .sort(
-                                  (a: any, b: any) => toTime(b) - toTime(a)
-                                );
-                              const total = imageJobs.length;
-                              const totalPages = Math.max(
-                                1,
-                                Math.ceil(total / pageSize)
-                              );
-                              const current = Math.min(imagePage, totalPages);
-                              const start = (current - 1) * pageSize;
-                              const page = imageJobs.slice(
-                                start,
-                                start + pageSize
-                              );
-                              return page;
-                            })().map((j: any) => (
-                              <tr
-                                key={j.id}
-                                className="text-gray-200 hover:bg-white/5 transition-colors"
-                              >
-                                <td className="py-3 pr-4 font-mono truncate max-w-[200px]">
-                                  {j.id}
-                                </td>
-                                <td className="py-3 pr-4 capitalize">
-                                  <span
-                                    className={`px-2 py-1 rounded text-xs ${
-                                      String(
-                                        jobStatusMap[j.id]?.status ||
-                                          j.status ||
-                                          ""
-                                      ).toLowerCase() === "completed"
-                                        ? "bg-emerald-600/20 text-emerald-300 border border-emerald-500/30"
-                                        : String(
-                                            jobStatusMap[j.id]?.status ||
-                                              j.status ||
-                                              ""
-                                          ).toLowerCase() === "failed"
-                                        ? "bg-red-600/20 text-red-300 border border-red-500/30"
-                                        : "bg-yellow-600/20 text-yellow-300 border border-yellow-500/30"
-                                    }`}
-                                  >
-                                    {jobStatusMap[j.id]?.status || j.status}
-                                  </span>
-                                </td>
-
-                                <td className="py-3 pr-4">
-                                  {jobStatusMap[j.id]?.precise_part_name ||
-                                    j.precise_part_name ||
-                                    j.class_name ||
-                                    "-"}
-                                </td>
-                                <td className="py-3 pr-4 hidden lg:table-cell">
-                                  {getConfidence(j)}
-                                </td>
-                                <td className="py-3 pr-4 hidden lg:table-cell">
-                                  {typeof jobStatusMap[j.id]
-                                    ?.processing_time_seconds !== "undefined"
-                                    ? jobStatusMap[j.id]
-                                        ?.processing_time_seconds
-                                    : j.processing_time_seconds ?? "-"}
-                                </td>
-                                <td className="py-3 pr-4">
-                                  <div className="flex items-center gap-2">
-                                    <Button
-                                      variant="outline"
-                                      size="sm"
-                                      className="text-xs"
-                                      onClick={() => handleViewJob(j)}
-                                    >
-                                      {isAnalysisLoading
-                                        ? "Loading..."
-                                        : "View"}
-                                    </Button>
-                                    {j.success && (
-                                      <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        className="text-xs"
-                                        onClick={() =>
-                                          handleDownloadAnalysisPdf(j)
-                                        }
-                                      >
-                                        Download
-                                      </Button>
-                                    )}
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      className="text-xs text-red-300 hover:text-red-200"
-                                      onClick={() => requestDeleteAnalysis(j)}
-                                    >
-                                      Delete
-                                    </Button>
-                                  </div>
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-
-                        {/* Mobile List */}
-                        {(() => {
-                          const toTime = (j: any): number => {
-                            const cands: any[] = [
-                              j?.metadata?.upload_timestamp,
-                              j?.upload_timestamp,
-                              j?.created_at,
-                              j?.updated_at,
-                              j?.createdAt,
-                              j?.updatedAt,
-                              j?.timestamp,
-                              j?.started_at,
-                              j?.completed_at,
-                            ];
-                            for (const v of cands) {
-                              if (!v) continue;
-                              if (typeof v === "number")
-                                return v > 1e12 ? v : v * 1000;
-                              const t = Date.parse(String(v));
-                              if (!Number.isNaN(t)) return t;
-                            }
-                            return 0;
-                          };
-                          const imageJobs = pastAnalysis
-                            .filter((j: any) => j.mode !== "keywords_only")
-                            .slice()
-                            .sort((a: any, b: any) => toTime(b) - toTime(a));
-                          const total = imageJobs.length;
-                          const totalPages = Math.max(
-                            1,
-                            Math.ceil(total / pageSize)
-                          );
-                          const current = Math.min(imagePage, totalPages);
-                          const start = (current - 1) * pageSize;
-                          const page = imageJobs.slice(start, start + pageSize);
                           return (
-                            <div className="md:hidden space-y-3">
-                              {page.map((j: any) => (
-                                <div
-                                  key={j.id}
-                                  className="p-3 rounded-lg border border-white/10 bg-white/5"
-                                >
-                                  <div className="flex items-start justify-between">
-                                    <div className="min-w-0">
-                                      <div className="font-mono text-[11px] text-gray-400 truncate max-w-[220px]">
-                                        {j.id}
-                                      </div>
-                                      <div className="text-white text-sm mt-1 truncate">
-                                        {jobStatusMap[j.id]
-                                          ?.precise_part_name ||
-                                          j.precise_part_name ||
-                                          j.class_name ||
-                                          "-"}
-                                      </div>
-                                      <div className="text-[11px] text-gray-400 mt-1">
-                                        {getConfidence(j)}
-                                        {" • "}
-                                        {typeof jobStatusMap[j.id]
-                                          ?.processing_time_seconds !==
-                                        "undefined"
-                                          ? jobStatusMap[j.id]
-                                              ?.processing_time_seconds
-                                          : j.processing_time_seconds ?? "-"}
-                                        s
-                                      </div>
+                            <motion.div
+                              key={cardUniqueKey}
+                              initial={{ opacity: 0, y: 20 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              transition={{ duration: 0.3 }}
+                              className="group"
+                            >
+                              <Card className="bg-gradient-to-br from-purple-600/10 to-blue-600/10 backdrop-blur-xl border-purple-500/20 hover:border-purple-500/40 transition-all duration-300 overflow-hidden h-full">
+                                <CardContent className="p-0">
+                                  {/* Image/Icon Header */}
+                                  <div className="relative h-32 bg-gradient-to-br from-purple-600/30 to-blue-600/30 flex items-center justify-center overflow-hidden">
+                                    {job.image_url ? (
+                                      <img
+                                        src={job.image_url}
+                                        alt="Part"
+                                        className={`w-full h-full object-cover ${
+                                          job.status !== "completed"
+                                            ? "opacity-50 blur-sm"
+                                            : ""
+                                        }`}
+                                      />
+                                    ) : (
+                                      <Sparkles className="w-16 h-16 text-purple-400/50" />
+                                    )}
+
+                                    {/* Status Badge */}
+                                    <div className="absolute top-2 right-2">
+                                      <Badge
+                                        className={`${
+                                          job.status === "completed"
+                                            ? "bg-emerald-600/90 text-white border-emerald-500/50"
+                                            : job.status === "failed"
+                                            ? "bg-red-600/90 text-white border-red-500/50"
+                                            : "bg-yellow-600/90 text-white border-yellow-500/50 animate-pulse"
+                                        } backdrop-blur-sm`}
+                                      >
+                                        {job.status === "completed" && (
+                                          <CheckCircle className="w-3 h-3 mr-1" />
+                                        )}
+                                        {job.status === "failed" && (
+                                          <AlertTriangle className="w-3 h-3 mr-1" />
+                                        )}
+                                        {job.status !== "completed" &&
+                                          job.status !== "failed" && (
+                                            <Activity className="w-3 h-3 mr-1 animate-spin" />
+                                          )}
+                                        {job.status}
+                                      </Badge>
                                     </div>
-                                    <span
-                                      className={`px-2 py-1 rounded text-[10px] ${
-                                        String(
-                                          jobStatusMap[j.id]?.status ||
-                                            j.status ||
-                                            ""
-                                        ).toLowerCase() === "completed"
-                                          ? "bg-emerald-600/20 text-emerald-300 border border-emerald-500/30"
-                                          : String(
-                                              jobStatusMap[j.id]?.status ||
-                                                j.status ||
-                                                ""
-                                            ).toLowerCase() === "failed"
-                                          ? "bg-red-600/20 text-red-300 border border-red-500/30"
-                                          : "bg-yellow-600/20 text-yellow-300 border border-yellow-500/30"
-                                      }`}
-                                    >
-                                      {jobStatusMap[j.id]?.status || j.status}
-                                    </span>
                                   </div>
-                                  <div className="flex items-center gap-2 mt-3">
-                                    <Button
-                                      variant="outline"
-                                      size="sm"
-                                      className="h-8 px-3"
-                                      onClick={() => handleViewJob(j)}
-                                    >
-                                      {isAnalysisLoading
-                                        ? "Loading..."
-                                        : "View"}
-                                    </Button>
-                                    {j.success && (
-                                      <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        className="h-8 px-3"
-                                        onClick={() =>
-                                          handleDownloadAnalysisPdf(j)
-                                        }
-                                      >
-                                        Download
-                                      </Button>
-                                    )}
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      className="h-8 px-3 text-red-300 hover:text-red-200"
-                                      onClick={() => requestDeleteAnalysis(j)}
-                                    >
-                                      Delete
-                                    </Button>
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          );
-                        })()}
-                        {(() => {
-                          const total = pastAnalysis.filter(
-                            (j: any) => j.mode !== "keywords_only"
-                          ).length;
-                          const totalPages = Math.max(
-                            1,
-                            Math.ceil(total / pageSize)
-                          );
-                          const current = Math.min(imagePage, totalPages);
-                          return (
-                            <Pagination className="mt-4">
-                              <PaginationContent>
-                                <PaginationItem>
-                                  <PaginationPrevious
-                                    href="#"
-                                    onClick={(e) => {
-                                      e.preventDefault();
-                                      setImagePage(Math.max(1, current - 1));
-                                    }}
-                                  />
-                                </PaginationItem>
-                                <PaginationItem>
-                                  <span className="px-3 py-2 text-xs text-gray-400">
-                                    Page {current} of {totalPages}
-                                  </span>
-                                </PaginationItem>
-                                <PaginationItem>
-                                  <PaginationNext
-                                    href="#"
-                                    onClick={(e) => {
-                                      e.preventDefault();
-                                      setImagePage(
-                                        Math.min(totalPages, current + 1)
-                                      );
-                                    }}
-                                  />
-                                </PaginationItem>
-                              </PaginationContent>
-                            </Pagination>
-                          );
-                        })()}
-                      </div>
-                    </TabsContent>
 
-                    {/* Keywords Tab */}
-                    <TabsContent value="keywords">
-                      <div className="overflow-x-auto">
-                        <table className="min-w-full text-xs md:text-sm">
-                          <thead>
-                            <tr className="text-left text-gray-400">
-                              <th className="py-3 pr-4 font-medium">Job ID</th>
-                              <th className="py-3 pr-4 font-medium">
-                                Keywords
-                              </th>
-                              <th className="py-3 pr-4 font-medium">
-                                Top Result
-                              </th>
-                              <th className="py-3 pr-4 font-medium">Results</th>
-                              <th className="py-3 pr-4 font-medium">Status</th>
-                              <th className="py-3 pr-4 font-medium">
-                                All Results
-                              </th>
-                              <th className="py-3 pr-4 font-medium">Actions</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-white/10">
-                            {(() => {
-                              const toTime = (j: any): number => {
-                                const cands: any[] = [
-                                  j?.metadata?.upload_timestamp,
-                                  j?.upload_timestamp,
-                                  j?.created_at,
-                                  j?.updated_at,
-                                  j?.createdAt,
-                                  j?.updatedAt,
-                                  j?.timestamp,
-                                  j?.started_at,
-                                  j?.completed_at,
-                                ];
-                                for (const v of cands) {
-                                  if (!v) continue;
-                                  if (typeof v === "number")
-                                    return v > 1e12 ? v : v * 1000;
-                                  const t = Date.parse(String(v));
-                                  if (!Number.isNaN(t)) return t;
-                                }
-                                return 0;
-                              };
-                              const listSorted = pastAnalysis
-                                .filter((j: any) => j.mode === "keywords_only")
-                                .slice()
-                                .sort(
-                                  (a: any, b: any) => toTime(b) - toTime(a)
-                                );
-                              const total = listSorted.length;
-                              const totalPages = Math.max(
-                                1,
-                                Math.ceil(total / pageSize)
-                              );
-                              const current = Math.min(keywordPage, totalPages);
-                              const start = (current - 1) * pageSize;
-                              return listSorted
-                                .slice(start, start + pageSize)
-                                .map((j: any) => {
-                                  // Handle both old format (with results array) and new comprehensive format
-                                  let list: any[] = [];
-                                  let top: any = {};
+                                  {/* Content */}
+                                  <div className="p-4 space-y-3">
+                                    {/* Job Info */}
+                                    <div>
+                                      <h3 className="text-white font-semibold line-clamp-1 group-hover:text-purple-400 transition-colors">
+                                        {job.status === "completed"
+                                          ? "✅ Deep Research Complete"
+                                          : job.status === "failed"
+                                          ? "❌ Analysis Failed"
+                                          : "🤖Deep research Ongoing..."}
+                                      </h3>
+                                      <p className="text-xs text-gray-400 font-mono truncate mt-1">
+                                        ID: {job.id?.slice(0, 8)}...
+                                      </p>
+                                    </div>
 
-                                  if (Array.isArray(j.results)) {
-                                    // Old format with results array
-                                    list = j.results;
-                                    top = list[0] || {};
-                                  } else if (
-                                    j.precise_part_name ||
-                                    j.class_name
-                                  ) {
-                                    // New comprehensive format - create a single result from the comprehensive data
-                                    top = {
-                                      name:
-                                        j.precise_part_name ||
-                                        j.class_name ||
-                                        "Unknown Part",
-                                      manufacturer: j.manufacturer || "Unknown",
-                                      category: j.category || "General",
-                                      price:
-                                        j.estimated_price?.new ||
-                                        j.estimated_price ||
-                                        "Price not available",
-                                      part_number: j.part_number || null,
-                                      confidence: j.confidence_score || 0.75,
-                                      description:
-                                        j.description ||
-                                        j.full_analysis ||
-                                        "Comprehensive part analysis",
-                                      // Include all comprehensive data
-                                      precise_part_name: j.precise_part_name,
-                                      confidence_explanation:
-                                        j.confidence_explanation,
-                                      material_composition:
-                                        j.material_composition,
-                                      technical_data_sheet:
-                                        j.technical_data_sheet,
-                                      compatible_vehicles:
-                                        j.compatible_vehicles,
-                                      engine_types: j.engine_types,
-                                      buy_links: j.buy_links,
-                                      suppliers: j.suppliers,
-                                      fitment_tips: j.fitment_tips,
-                                      additional_instructions:
-                                        j.additional_instructions,
-                                    };
-                                    list = [top]; // Create a single-item array for consistency
-                                  }
+                                    {/* Progress Display */}
+                                    {job.status !== "completed" &&
+                                      job.status !== "failed" &&
+                                      job.id && (
+                                        <CrewAnalysisProgress
+                                          key={`progress-${cardUniqueKey}`}
+                                          status={job.status}
+                                          currentStage={job.current_stage}
+                                          progress={job.progress || 0}
+                                          errorMessage={job.error_message}
+                                          compact={true}
+                                          isExpanded={expandedJobIds.has(
+                                            cardUniqueKey
+                                          )}
+                                          onToggleExpanded={() =>
+                                            toggleJobExpanded(cardUniqueKey)
+                                          }
+                                        />
+                                      )}
 
-                                  const keys = Array.isArray(j.query?.keywords)
-                                    ? j.query.keywords.join(", ")
-                                    : "-";
-                                  return (
-                                    <tr
-                                      key={j.id}
-                                      className="text-gray-200 hover:bg-white/5 transition-colors align-top"
-                                    >
-                                      <td className="py-3 pr-4 font-mono truncate max-w-[200px]">
-                                        {j.id}
-                                      </td>
-                                      <td className="py-3 pr-4">{keys}</td>
-                                      <td className="py-3 pr-4">
-                                        {top.name ? (
-                                          <div>
-                                            <div className="font-medium">
-                                              {top.name}
-                                            </div>
-                                            <div className="text-gray-400 text-[11px]">
-                                              {top.manufacturer || "Unknown"} •{" "}
-                                              {top.category || "Unspecified"}
-                                            </div>
-                                            {typeof top.price !==
-                                              "undefined" && (
-                                              <div className="text-gray-400 text-[11px]">
-                                                Price: {String(top.price)}
-                                              </div>
-                                            )}
-                                          </div>
-                                        ) : (
-                                          "-"
-                                        )}
-                                      </td>
-                                      <td className="py-3 pr-4">
-                                        {list.length}
-                                      </td>
-                                      <td className="py-3 pr-4 capitalize">
-                                        <span
-                                          className={`px-2 py-1 rounded text-xs ${
-                                            String(j.status).toLowerCase() ===
-                                            "completed"
-                                              ? "bg-emerald-600/20 text-emerald-300 border border-emerald-500/30"
-                                              : String(
-                                                  j.status
-                                                ).toLowerCase() === "failed"
-                                              ? "bg-red-600/20 text-red-300 border border-red-500/30"
-                                              : "bg-yellow-600/20 text-yellow-300 border border-yellow-500/30"
-                                          }`}
-                                        >
-                                          {j.status}
-                                        </span>
-                                      </td>
-                                      <td className="py-3 pr-4">
-                                        {list.length ? (
-                                          <div className="max-h-32 overflow-auto pr-2">
-                                            {(() => {
-                                              // Check if this is the new comprehensive format
-                                              const isComprehensive =
-                                                list[0]?.precise_part_name ||
-                                                list[0]
-                                                  ?.confidence_explanation ||
-                                                list[0]?.technical_data_sheet ||
-                                                list[0]?.compatible_vehicles;
+                                    {/* Timestamp */}
+                                    <div className="flex items-center gap-1.5 text-xs">
+                                      <Clock className="w-4 h-4 text-blue-400" />
+                                      <span className="text-gray-300">
+                                        {new Date(
+                                          job.created_at
+                                        ).toLocaleString()}
+                                      </span>
+                                    </div>
 
-                                              if (isComprehensive) {
-                                                // Display comprehensive analysis data
-                                                const r = list[0];
-                                                return (
-                                                  <div className="space-y-2 text-xs">
-                                                    <div className="font-medium text-white">
-                                                      {r.name || "Result"}
-                                                    </div>
-
-                                                    {/* Basic Info */}
-                                                    <div className="text-gray-400">
-                                                      <div>
-                                                        {r.manufacturer ||
-                                                          "Unknown"}{" "}
-                                                        •{" "}
-                                                        {r.category ||
-                                                          "Unspecified"}
-                                                      </div>
-                                                      {r.price && (
-                                                        <div>
-                                                          Price:{" "}
-                                                          {String(r.price)}
-                                                        </div>
-                                                      )}
-                                                      {r.part_number && (
-                                                        <div>
-                                                          Part #:{" "}
-                                                          {r.part_number}
-                                                        </div>
-                                                      )}
-                                                    </div>
-
-                                                    {/* Confidence */}
-                                                    {r.confidence_explanation && (
-                                                      <div className="text-blue-300">
-                                                        Confidence:{" "}
-                                                        {Math.round(
-                                                          (r.confidence ||
-                                                            0.75) * 100
-                                                        )}
-                                                        %
-                                                      </div>
-                                                    )}
-
-                                                    {/* Description */}
-                                                    {r.description && (
-                                                      <div className="text-gray-300 text-[10px] line-clamp-2">
-                                                        {r.description}
-                                                      </div>
-                                                    )}
-
-                                                    {/* Technical Specs */}
-                                                    {r.technical_data_sheet && (
-                                                      <div className="text-gray-400 text-[10px]">
-                                                        {r.technical_data_sheet
-                                                          .part_type && (
-                                                          <div>
-                                                            Type:{" "}
-                                                            {
-                                                              r
-                                                                .technical_data_sheet
-                                                                .part_type
-                                                            }
-                                                          </div>
-                                                        )}
-                                                        {r.technical_data_sheet
-                                                          .material && (
-                                                          <div>
-                                                            Material:{" "}
-                                                            {
-                                                              r
-                                                                .technical_data_sheet
-                                                                .material
-                                                            }
-                                                          </div>
-                                                        )}
-                                                      </div>
-                                                    )}
-
-                                                    {/* Compatible Vehicles */}
-                                                    {r.compatible_vehicles &&
-                                                      r.compatible_vehicles
-                                                        .length > 0 && (
-                                                        <div className="text-green-300 text-[10px]">
-                                                          Compatible:{" "}
-                                                          {r.compatible_vehicles
-                                                            .slice(0, 2)
-                                                            .join(", ")}
-                                                          {r.compatible_vehicles
-                                                            .length > 2 &&
-                                                            ` +${
-                                                              r
-                                                                .compatible_vehicles
-                                                                .length - 2
-                                                            } more`}
-                                                        </div>
-                                                      )}
-
-                                                    {/* Suppliers */}
-                                                    {r.suppliers &&
-                                                      r.suppliers.length >
-                                                        0 && (
-                                                        <div className="text-purple-300 text-[10px]">
-                                                          Suppliers:{" "}
-                                                          {r.suppliers
-                                                            .slice(0, 2)
-                                                            .map(
-                                                              (s: any) => s.name
-                                                            )
-                                                            .join(", ")}
-                                                          {r.suppliers.length >
-                                                            2 &&
-                                                            ` +${
-                                                              r.suppliers
-                                                                .length - 2
-                                                            } more`}
-                                                        </div>
-                                                      )}
-                                                  </div>
-                                                );
-                                              } else {
-                                                // Display old format as bullet list
-                                                return (
-                                                  <ul className="list-disc pl-5 space-y-1">
-                                                    {list.map(
-                                                      (r: any, idx: number) => (
-                                                        <li
-                                                          key={idx}
-                                                          className="text-gray-300"
-                                                        >
-                                                          <span className="font-medium">
-                                                            {r.name || "Result"}
-                                                          </span>
-                                                          {" – "}
-                                                          <span className="text-gray-400 text-[11px]">
-                                                            {r.manufacturer ||
-                                                              "Unknown"}{" "}
-                                                            •{" "}
-                                                            {r.category ||
-                                                              "Unspecified"}
-                                                            {typeof r.price !==
-                                                            "undefined"
-                                                              ? ` • ${String(
-                                                                  r.price
-                                                                )}`
-                                                              : ""}
-                                                            {r.part_number
-                                                              ? ` • ${r.part_number}`
-                                                              : ""}
-                                                          </span>
-                                                        </li>
-                                                      )
-                                                    )}
-                                                  </ul>
-                                                );
-                                              }
-                                            })()}
-                                          </div>
-                                        ) : (
-                                          "-"
-                                        )}
-                                      </td>
-                                      <td className="py-3 pr-4">
-                                        <div className="flex items-center gap-2">
+                                    {/* Action Buttons */}
+                                    <div className="flex gap-2 pt-2">
+                                      {job.status === "completed" && (
+                                        <>
                                           <Button
-                                            variant="outline"
                                             size="sm"
-                                            className="text-xs"
-                                            disabled={loadingKeywordJobs.has(
-                                              j.id || j.filename
-                                            )}
-                                            onClick={async () => {
-                                              const jobId = j.id || j.filename;
-                                              try {
-                                                setLoadingKeywordJobs((prev) =>
-                                                  new Set(prev).add(jobId)
-                                                );
-
-                                                // Primary: Fetch comprehensive job data from database
-                                                try {
-                                                  const dbResponse =
-                                                    await dashboardApi.getJobData(
-                                                      jobId
-                                                    );
-                                                  if (
-                                                    dbResponse.success &&
-                                                    dbResponse.data
-                                                  ) {
-                                                    console.log(
-                                                      "✅ Fetched comprehensive data from database"
-                                                    );
-                                                    setSelectedKeywordJob(
-                                                      dbResponse.data
-                                                    );
-                                                    setLoadingKeywordJobs(
-                                                      (prev) => {
-                                                        const newSet = new Set(
-                                                          prev
-                                                        );
-                                                        newSet.delete(jobId);
-                                                        return newSet;
-                                                      }
-                                                    );
-                                                    setIsKeywordOpen(true);
-                                                    return;
-                                                  }
-                                                } catch (dbError) {
-                                                  console.log(
-                                                    "❌ Database fetch failed, trying AI service:",
-                                                    dbError
-                                                  );
-                                                }
-
-                                                // Fallback: Try AI service if database fails
-                                                const API_BASE =
-                                                  (import.meta as any).env
-                                                    ?.VITE_AI_SERVICE_URL ||
-                                                  "http://localhost:8000";
-
-                                                try {
-                                                  const response = await fetch(
-                                                    `${API_BASE}/analyze-part/status/${jobId}`,
-                                                    {
-                                                      method: "GET",
-                                                      signal:
-                                                        AbortSignal.timeout(
-                                                          3000
-                                                        ), // 3 second timeout
-                                                    }
-                                                  );
-
-                                                  if (response.ok) {
-                                                    const comprehensiveData =
-                                                      await response.json();
-                                                    if (
-                                                      comprehensiveData.success &&
-                                                      comprehensiveData.status ===
-                                                        "completed"
-                                                    ) {
-                                                      console.log(
-                                                        "✅ Fetched comprehensive data from AI service"
-                                                      );
-                                                      setSelectedKeywordJob(
-                                                        comprehensiveData
-                                                      );
-                                                      setLoadingKeywordJobs(
-                                                        (prev) => {
-                                                          const newSet =
-                                                            new Set(prev);
-                                                          newSet.delete(jobId);
-                                                          return newSet;
-                                                        }
-                                                      );
-                                                      setIsKeywordOpen(true);
-                                                      return;
-                                                    }
-                                                  }
-                                                } catch (aiError) {
-                                                  console.log(
-                                                    "❌ AI service fetch failed:",
-                                                    aiError
-                                                  );
-                                                }
-
-                                                // Final fallback: Use basic job data
-                                                console.log(
-                                                  "⚠️ Using basic job data as final fallback"
-                                                );
-                                                setSelectedKeywordJob(j);
-                                              } catch (error) {
-                                                console.error(
-                                                  "Failed to fetch job data:",
-                                                  error
-                                                );
-                                                setSelectedKeywordJob(j);
-                                              } finally {
-                                                setLoadingKeywordJobs(
-                                                  (prev) => {
-                                                    const newSet = new Set(
-                                                      prev
-                                                    );
-                                                    newSet.delete(jobId);
-                                                    return newSet;
-                                                  }
-                                                );
-                                                setIsKeywordOpen(true);
-                                              }
-                                            }}
-                                          >
-                                            {loadingKeywordJobs.has(
-                                              j.id || j.filename
-                                            )
-                                              ? "Loading..."
-                                              : "View"}
-                                          </Button>
-                                          <Button
-                                            variant="ghost"
-                                            size="sm"
-                                            className="text-xs"
                                             onClick={() =>
-                                              downloadPdfFromData(
-                                                j,
-                                                `keyword_job_${j.id}`
-                                              )
+                                              handleViewCrewAnalysis(job)
                                             }
+                                            className="flex-1 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
                                           >
-                                            Download
+                                            <Eye className="w-3 h-3 mr-1" />
+                                            View
                                           </Button>
+                                          {job.pdf_url && (
+                                            <Button
+                                              size="sm"
+                                              onClick={() =>
+                                                handleDownloadPDF(job.pdf_url)
+                                              }
+                                              variant="outline"
+                                              className="border-purple-500/50 hover:bg-purple-500/20"
+                                            >
+                                              <Download className="w-3 h-3" />
+                                            </Button>
+                                          )}
+                                        </>
+                                      )}
+                                      {job.status === "failed" && (
+                                        <div className="flex-1 text-xs text-red-400 p-2 bg-red-900/20 rounded">
+                                          {job.error_message ||
+                                            "Analysis failed"}
                                         </div>
-                                      </td>
-                                    </tr>
-                                  );
-                                });
-                            })()}
-                          </tbody>
-                        </table>
-                        {(() => {
-                          const total = pastAnalysis.filter(
-                            (j: any) => j.mode === "keywords_only"
-                          ).length;
-                          const totalPages = Math.max(
-                            1,
-                            Math.ceil(total / pageSize)
+                                      )}
+                                      <Button
+                                        size="sm"
+                                        onClick={() => handleDeleteCrewJob(job)}
+                                        variant="outline"
+                                        className="border-red-500/50 hover:bg-red-500/20 px-2"
+                                      >
+                                        <Trash2 className="w-3 h-3" />
+                                      </Button>
+                                    </div>
+                                  </div>
+                                </CardContent>
+                              </Card>
+                            </motion.div>
                           );
-                          const current = Math.min(keywordPage, totalPages);
-                          return (
-                            <Pagination className="mt-4">
-                              <PaginationContent>
-                                <PaginationItem>
-                                  <PaginationPrevious
-                                    href="#"
-                                    onClick={(e) => {
-                                      e.preventDefault();
-                                      setKeywordPage(Math.max(1, current - 1));
-                                    }}
-                                  />
-                                </PaginationItem>
-                                <PaginationItem>
-                                  <span className="px-3 py-2 text-xs text-gray-400">
-                                    Page {current} of {totalPages}
-                                  </span>
-                                </PaginationItem>
-                                <PaginationItem>
-                                  <PaginationNext
-                                    href="#"
-                                    onClick={(e) => {
-                                      e.preventDefault();
-                                      setKeywordPage(
-                                        Math.min(totalPages, current + 1)
-                                      );
-                                    }}
-                                  />
-                                </PaginationItem>
-                              </PaginationContent>
-                            </Pagination>
-                          );
-                        })()}
-                      </div>
-                    </TabsContent>
-                  </Tabs>
+                        })}
+                    </div>
+                  </div>
                 )}
               </CardContent>
             </Card>
           </motion.div>
-          {/* Past Jobs (duplicate) removed */}
-          {/* Analysis Modal */}
-          <PartAnalysisDisplayModal
-            open={isAnalysisOpen}
-            onOpenChange={setIsAnalysisOpen}
-            analysisData={
-              selectedAnalysis || {
-                success: false,
-                status: isAnalysisLoading ? "loading" : "idle",
-              }
-            }
-            imagePreview={selectedImageUrl}
-            title={
-              selectedAnalysis?.precise_part_name ||
-              selectedAnalysis?.class_name
-            }
-          />
-          {/* Keyword results modal */}
-          <Dialog open={isKeywordOpen} onOpenChange={setIsKeywordOpen}>
-            <DialogContent className="max-w-3xl">
+
+          {/* Delete Confirmation Dialog */}
+          <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+            <DialogContent className="bg-gradient-to-br from-slate-900/95 to-slate-800/95 backdrop-blur-xl border-white/10">
               <DialogHeader>
-                <DialogTitle>Keyword Results</DialogTitle>
-                <DialogDescription>
-                  {Array.isArray((selectedKeywordJob as any)?.query?.keywords)
-                    ? `Keywords: ${(
-                        selectedKeywordJob as any
-                      ).query.keywords.join(", ")}`
-                    : "Results from keyword-only search"}
+                <DialogTitle className="text-white">
+                  Delete Analysis
+                </DialogTitle>
+                <DialogDescription className="text-gray-400">
+                  Are you sure you want to delete this analysis? This action
+                  cannot be undone.
                 </DialogDescription>
               </DialogHeader>
-              <div className="max-h-[60vh] overflow-auto space-y-3">
-                {(() => {
-                  const job = selectedKeywordJob as any;
-
-                  // Debug logging
-                  console.log("🔍 Modal rendering - selectedKeywordJob:", job);
-                  console.log("🔍 Job keys:", job ? Object.keys(job) : "null");
-                  console.log(
-                    "🔍 Has results array:",
-                    Array.isArray(job?.results)
-                  );
-                  console.log(
-                    "🔍 Has precise_part_name:",
-                    !!job?.precise_part_name
-                  );
-                  console.log("🔍 Has class_name:", !!job?.class_name);
-                  console.log("🔍 Has manufacturer:", !!job?.manufacturer);
-                  console.log(
-                    "🔍 Has metadata.analysis:",
-                    !!job?.metadata?.analysis
-                  );
-                  console.log(
-                    "🔍 Condition check:",
-                    !!(
-                      job?.precise_part_name ||
-                      job?.class_name ||
-                      job?.metadata?.analysis ||
-                      job?.manufacturer
-                    )
-                  );
-
-                  // TEMPORARY: Force comprehensive format for testing
-                  if (
-                    job &&
-                    (job.precise_part_name ||
-                      job.class_name ||
-                      job.manufacturer ||
-                      job.metadata?.analysis)
-                  ) {
-                    console.log("🔍 Using comprehensive format");
-                    return (
-                      <div className="space-y-4">
-                        {/* Part Identification */}
-                        <div className="p-4 rounded-lg bg-white/5 border border-white/10">
-                          <h3 className="font-semibold text-white mb-2">
-                            🛞 Part Identification
-                          </h3>
-                          <div className="space-y-1 text-sm">
-                            <div>
-                              <span className="text-gray-400">Name:</span>{" "}
-                              <span className="text-white">
-                                {job.precise_part_name ||
-                                  job.class_name ||
-                                  job.metadata?.analysis?.precise_part_name ||
-                                  job.metadata?.analysis?.class_name}
-                              </span>
-                            </div>
-                            <div>
-                              <span className="text-gray-400">Category:</span>{" "}
-                              <span className="text-white">
-                                {job.category ||
-                                  job.metadata?.analysis?.category}
-                              </span>
-                            </div>
-                            <div>
-                              <span className="text-gray-400">
-                                Manufacturer:
-                              </span>{" "}
-                              <span className="text-white">
-                                {job.manufacturer ||
-                                  job.metadata?.analysis?.manufacturer}
-                              </span>
-                            </div>
-                            <div>
-                              <span className="text-gray-400">Confidence:</span>{" "}
-                              <span className="text-white">
-                                {Math.round(
-                                  (job.confidence_score ||
-                                    job.metadata?.analysis?.confidence_score ||
-                                    0.75) * 100
-                                )}
-                                %
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Technical Description */}
-                        {(job.description ||
-                          job.metadata?.analysis?.description) && (
-                          <div className="p-4 rounded-lg bg-white/5 border border-white/10">
-                            <h3 className="font-semibold text-white mb-2">
-                              📘 Technical Description
-                            </h3>
-                            <p className="text-gray-300 text-sm">
-                              {job.description ||
-                                job.metadata?.analysis?.description}
-                            </p>
-                          </div>
-                        )}
-
-                        {/* Full Analysis */}
-                        {job.metadata?.analysis?.full_analysis && (
-                          <div className="p-4 rounded-lg bg-white/5 border border-white/10">
-                            <h3 className="font-semibold text-white mb-2">
-                              📋 Complete Analysis
-                            </h3>
-                            <div className="text-gray-300 text-sm whitespace-pre-wrap">
-                              {job.metadata.analysis.full_analysis}
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Pricing */}
-                        {(job.estimated_price ||
-                          job.metadata?.analysis?.estimated_price) && (
-                          <div className="p-4 rounded-lg bg-white/5 border border-white/10">
-                            <h3 className="font-semibold text-white mb-2">
-                              💰 Pricing
-                            </h3>
-                            <div className="space-y-1 text-sm">
-                              {(
-                                job.estimated_price ||
-                                job.metadata?.analysis?.estimated_price
-                              )?.new && (
-                                <div>
-                                  <span className="text-gray-400">New:</span>{" "}
-                                  <span className="text-white">
-                                    {
-                                      (
-                                        job.estimated_price ||
-                                        job.metadata?.analysis?.estimated_price
-                                      ).new
-                                    }
-                                  </span>
-                                </div>
-                              )}
-                              {(
-                                job.estimated_price ||
-                                job.metadata?.analysis?.estimated_price
-                              )?.used && (
-                                <div>
-                                  <span className="text-gray-400">Used:</span>{" "}
-                                  <span className="text-white">
-                                    {
-                                      (
-                                        job.estimated_price ||
-                                        job.metadata?.analysis?.estimated_price
-                                      ).used
-                                    }
-                                  </span>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Material Composition */}
-                        {(job.material_composition ||
-                          job.metadata?.analysis?.material_composition) && (
-                          <div className="p-4 rounded-lg bg-white/5 border border-white/10">
-                            <h3 className="font-semibold text-white mb-2">
-                              🔧 Material Composition
-                            </h3>
-                            <p className="text-gray-300 text-sm">
-                              {job.material_composition ||
-                                job.metadata?.analysis?.material_composition}
-                            </p>
-                          </div>
-                        )}
-
-                        {/* Technical Data Sheet */}
-                        {(job.technical_data_sheet ||
-                          job.metadata?.analysis?.technical_data_sheet) && (
-                          <div className="p-4 rounded-lg bg-white/5 border border-white/10">
-                            <h3 className="font-semibold text-white mb-2">
-                              📊 Technical Specifications
-                            </h3>
-                            <div className="space-y-1 text-sm">
-                              {(
-                                job.technical_data_sheet ||
-                                job.metadata?.analysis?.technical_data_sheet
-                              )?.part_type && (
-                                <div>
-                                  <span className="text-gray-400">
-                                    Part Type:
-                                  </span>{" "}
-                                  <span className="text-white">
-                                    {
-                                      (
-                                        job.technical_data_sheet ||
-                                        job.metadata?.analysis
-                                          ?.technical_data_sheet
-                                      ).part_type
-                                    }
-                                  </span>
-                                </div>
-                              )}
-                              {(
-                                job.technical_data_sheet ||
-                                job.metadata?.analysis?.technical_data_sheet
-                              )?.material && (
-                                <div>
-                                  <span className="text-gray-400">
-                                    Material:
-                                  </span>{" "}
-                                  <span className="text-white">
-                                    {
-                                      (
-                                        job.technical_data_sheet ||
-                                        job.metadata?.analysis
-                                          ?.technical_data_sheet
-                                      ).material
-                                    }
-                                  </span>
-                                </div>
-                              )}
-                              {(
-                                job.technical_data_sheet ||
-                                job.metadata?.analysis?.technical_data_sheet
-                              )?.weight && (
-                                <div>
-                                  <span className="text-gray-400">Weight:</span>{" "}
-                                  <span className="text-white">
-                                    {
-                                      (
-                                        job.technical_data_sheet ||
-                                        job.metadata?.analysis
-                                          ?.technical_data_sheet
-                                      ).weight
-                                    }
-                                  </span>
-                                </div>
-                              )}
-                              {(
-                                job.technical_data_sheet ||
-                                job.metadata?.analysis?.technical_data_sheet
-                              )?.temperature_tolerance && (
-                                <div>
-                                  <span className="text-gray-400">
-                                    Temperature Tolerance:
-                                  </span>{" "}
-                                  <span className="text-white">
-                                    {
-                                      (
-                                        job.technical_data_sheet ||
-                                        job.metadata?.analysis
-                                          ?.technical_data_sheet
-                                      ).temperature_tolerance
-                                    }
-                                  </span>
-                                </div>
-                              )}
-                              {(
-                                job.technical_data_sheet ||
-                                job.metadata?.analysis?.technical_data_sheet
-                              )?.common_specs && (
-                                <div>
-                                  <span className="text-gray-400">
-                                    Common Specs:
-                                  </span>{" "}
-                                  <span className="text-white">
-                                    {
-                                      (
-                                        job.technical_data_sheet ||
-                                        job.metadata?.analysis
-                                          ?.technical_data_sheet
-                                      ).common_specs
-                                    }
-                                  </span>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Compatible Vehicles */}
-                        {(job.compatible_vehicles ||
-                          job.metadata?.analysis?.compatible_vehicles) && (
-                          <div className="p-4 rounded-lg bg-white/5 border border-white/10">
-                            <h3 className="font-semibold text-white mb-2">
-                              🚗 Compatible Vehicles
-                            </h3>
-                            <div className="text-gray-300 text-sm">
-                              {(
-                                job.compatible_vehicles ||
-                                job.metadata?.analysis?.compatible_vehicles
-                              ).join(", ")}
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Engine Types */}
-                        {(job.engine_types ||
-                          job.metadata?.analysis?.engine_types) && (
-                          <div className="p-4 rounded-lg bg-white/5 border border-white/10">
-                            <h3 className="font-semibold text-white mb-2">
-                              ⚙️ Engine Types
-                            </h3>
-                            <div className="text-gray-300 text-sm">
-                              {(
-                                job.engine_types ||
-                                job.metadata?.analysis?.engine_types
-                              ).join(", ")}
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Suppliers */}
-                        {(job.suppliers ||
-                          job.metadata?.analysis?.suppliers) && (
-                          <div className="p-4 rounded-lg bg-white/5 border border-white/10">
-                            <h3 className="font-semibold text-white mb-2">
-                              🌍 Where to Buy
-                            </h3>
-                            <div className="space-y-2 text-sm">
-                              {(
-                                job.suppliers ||
-                                job.metadata?.analysis?.suppliers
-                              ).map((supplier: any, idx: number) => (
-                                <div
-                                  key={idx}
-                                  className="flex justify-between items-center"
-                                >
-                                  <div>
-                                    <span className="text-white font-medium">
-                                      {supplier.name}
-                                    </span>
-                                    <div className="text-gray-400 text-xs">
-                                      {supplier.shipping_region}
-                                    </div>
-                                  </div>
-                                  <div className="text-right">
-                                    <div className="text-white">
-                                      {supplier.price_range}
-                                    </div>
-                                    <a
-                                      href={supplier.url}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="text-blue-400 hover:text-blue-300 text-xs"
-                                    >
-                                      Visit Store
-                                    </a>
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Fitment Tips */}
-                        {(job.fitment_tips ||
-                          job.metadata?.analysis?.fitment_tips) && (
-                          <div className="p-4 rounded-lg bg-white/5 border border-white/10">
-                            <h3 className="font-semibold text-white mb-2">
-                              🔧 Installation Tips
-                            </h3>
-                            <p className="text-gray-300 text-sm">
-                              {job.fitment_tips ||
-                                job.metadata?.analysis?.fitment_tips}
-                            </p>
-                          </div>
-                        )}
-
-                        {/* Additional Instructions */}
-                        {(job.additional_instructions ||
-                          job.metadata?.analysis?.additional_instructions) && (
-                          <div className="p-4 rounded-lg bg-white/5 border border-white/10">
-                            <h3 className="font-semibold text-white mb-2">
-                              📝 Additional Instructions
-                            </h3>
-                            <p className="text-gray-300 text-sm">
-                              {job.additional_instructions ||
-                                job.metadata?.analysis?.additional_instructions}
-                            </p>
-                          </div>
-                        )}
-
-                        {/* Buy Links */}
-                        {(job.buy_links ||
-                          job.metadata?.analysis?.buy_links) && (
-                          <div className="p-4 rounded-lg bg-white/5 border border-white/10">
-                            <h3 className="font-semibold text-white mb-2">
-                              🔗 Quick Links
-                            </h3>
-                            <div className="space-y-2 text-sm">
-                              {Object.entries(
-                                job.buy_links ||
-                                  job.metadata?.analysis?.buy_links
-                              ).map(([key, url]: [string, any]) => (
-                                <div key={key}>
-                                  <a
-                                    href={url}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="text-blue-400 hover:text-blue-300"
-                                  >
-                                    {key.replace("supplier", "Supplier ")} →
-                                  </a>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  }
-
-                  // Handle both old format (with results array) and new comprehensive format
-                  if (Array.isArray(job?.results)) {
-                    // Old format with results array
-                    return job.results.map((r: any, idx: number) => (
-                      <div
-                        key={idx}
-                        className="p-3 rounded-lg bg-white/5 border border-white/10"
-                      >
-                        <div className="font-medium text-white">
-                          {r.name || "Result"}
-                        </div>
-                        <div className="text-gray-400 text-sm">
-                          {(r.manufacturer || "Unknown") +
-                            " • " +
-                            (r.category || "Unspecified")}
-                          {typeof r.price !== "undefined"
-                            ? ` • ${String(r.price)}`
-                            : ""}
-                          {r.part_number ? ` • ${r.part_number}` : ""}
-                        </div>
-                      </div>
-                    ));
-                  } else if (
-                    job?.precise_part_name ||
-                    job?.class_name ||
-                    job?.metadata?.analysis ||
-                    job?.manufacturer
-                  ) {
-                    // New comprehensive format - display comprehensive analysis
-                    return (
-                      <div className="space-y-4">
-                        {/* Part Identification */}
-                        <div className="p-4 rounded-lg bg-white/5 border border-white/10">
-                          <h3 className="font-semibold text-white mb-2">
-                            🛞 Part Identification
-                          </h3>
-                          <div className="space-y-1 text-sm">
-                            <div>
-                              <span className="text-gray-400">Name:</span>{" "}
-                              <span className="text-white">
-                                {job.precise_part_name || job.class_name}
-                              </span>
-                            </div>
-                            <div>
-                              <span className="text-gray-400">Category:</span>{" "}
-                              <span className="text-white">{job.category}</span>
-                            </div>
-                            <div>
-                              <span className="text-gray-400">
-                                Manufacturer:
-                              </span>{" "}
-                              <span className="text-white">
-                                {job.manufacturer}
-                              </span>
-                            </div>
-                            <div>
-                              <span className="text-gray-400">Confidence:</span>{" "}
-                              <span className="text-white">
-                                {Math.round(
-                                  (job.confidence_score || 0.75) * 100
-                                )}
-                                %
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Technical Description */}
-                        {job.description && (
-                          <div className="p-4 rounded-lg bg-white/5 border border-white/10">
-                            <h3 className="font-semibold text-white mb-2">
-                              📘 Technical Description
-                            </h3>
-                            <p className="text-gray-300 text-sm">
-                              {job.description}
-                            </p>
-                          </div>
-                        )}
-
-                        {/* Pricing & Availability */}
-                        {job.estimated_price && (
-                          <div className="p-4 rounded-lg bg-white/5 border border-white/10">
-                            <h3 className="font-semibold text-white mb-2">
-                              💰 Pricing & Availability
-                            </h3>
-                            <div className="space-y-1 text-sm">
-                              {job.estimated_price.new && (
-                                <div>
-                                  <span className="text-gray-400">New:</span>{" "}
-                                  <span className="text-white">
-                                    {job.estimated_price.new}
-                                  </span>
-                                </div>
-                              )}
-                              {job.estimated_price.used && (
-                                <div>
-                                  <span className="text-gray-400">Used:</span>{" "}
-                                  <span className="text-white">
-                                    {job.estimated_price.used}
-                                  </span>
-                                </div>
-                              )}
-                              {job.estimated_price.refurbished && (
-                                <div>
-                                  <span className="text-gray-400">
-                                    Refurbished:
-                                  </span>{" "}
-                                  <span className="text-white">
-                                    {job.estimated_price.refurbished}
-                                  </span>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Technical Data Sheet */}
-                        {job.technical_data_sheet && (
-                          <div className="p-4 rounded-lg bg-white/5 border border-white/10">
-                            <h3 className="font-semibold text-white mb-2">
-                              📊 Technical Data Sheet
-                            </h3>
-                            <div className="space-y-1 text-sm">
-                              {job.technical_data_sheet.part_type && (
-                                <div>
-                                  <span className="text-gray-400">
-                                    Part Type:
-                                  </span>{" "}
-                                  <span className="text-white">
-                                    {job.technical_data_sheet.part_type}
-                                  </span>
-                                </div>
-                              )}
-                              {job.technical_data_sheet.material && (
-                                <div>
-                                  <span className="text-gray-400">
-                                    Material:
-                                  </span>{" "}
-                                  <span className="text-white">
-                                    {job.technical_data_sheet.material}
-                                  </span>
-                                </div>
-                              )}
-                              {job.technical_data_sheet.common_specs && (
-                                <div>
-                                  <span className="text-gray-400">Specs:</span>{" "}
-                                  <span className="text-white">
-                                    {job.technical_data_sheet.common_specs}
-                                  </span>
-                                </div>
-                              )}
-                              {job.technical_data_sheet
-                                .temperature_tolerance && (
-                                <div>
-                                  <span className="text-gray-400">
-                                    Temperature Tolerance:
-                                  </span>{" "}
-                                  <span className="text-white">
-                                    {
-                                      job.technical_data_sheet
-                                        .temperature_tolerance
-                                    }
-                                  </span>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Compatible Vehicles */}
-                        {job.compatible_vehicles &&
-                          job.compatible_vehicles.length > 0 && (
-                            <div className="p-4 rounded-lg bg-white/5 border border-white/10">
-                              <h3 className="font-semibold text-white mb-2">
-                                🚗 Compatible Vehicles
-                              </h3>
-                              <div className="text-gray-300 text-sm">
-                                {job.compatible_vehicles.join(", ")}
-                              </div>
-                            </div>
-                          )}
-
-                        {/* Suppliers */}
-                        {job.suppliers && job.suppliers.length > 0 && (
-                          <div className="p-4 rounded-lg bg-white/5 border border-white/10">
-                            <h3 className="font-semibold text-white mb-2">
-                              🌍 Where to Buy
-                            </h3>
-                            <div className="space-y-2 text-sm">
-                              {job.suppliers.map(
-                                (supplier: any, idx: number) => (
-                                  <div
-                                    key={idx}
-                                    className="flex justify-between items-center"
-                                  >
-                                    <span className="text-white">
-                                      {supplier.name}
-                                    </span>
-                                    <span className="text-gray-400">
-                                      {supplier.price_range}
-                                    </span>
-                                  </div>
-                                )
-                              )}
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Fitment Tips */}
-                        {job.fitment_tips && (
-                          <div className="p-4 rounded-lg bg-white/5 border border-white/10">
-                            <h3 className="font-semibold text-white mb-2">
-                              🔧 Fitment Tips
-                            </h3>
-                            <p className="text-gray-300 text-sm">
-                              {job.fitment_tips}
-                            </p>
-                          </div>
-                        )}
-
-                        {/* Full Analysis from Metadata */}
-                        {job.metadata?.analysis?.full_analysis && (
-                          <div className="p-4 rounded-lg bg-white/5 border border-white/10">
-                            <h3 className="font-semibold text-white mb-2">
-                              📋 Complete Analysis
-                            </h3>
-                            <div className="text-gray-300 text-sm whitespace-pre-wrap">
-                              {job.metadata.analysis.full_analysis}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  } else {
-                    // Fallback: Try to display any available data
-                    console.log(
-                      "🔍 Falling back to display any available data"
-                    );
-                    return (
-                      <div className="space-y-4">
-                        <div className="p-4 rounded-lg bg-white/5 border border-white/10">
-                          <h3 className="font-semibold text-white mb-2">
-                            🔍 Raw Data Debug
-                          </h3>
-                          <pre className="text-xs text-gray-300 overflow-auto max-h-40">
-                            {JSON.stringify(job, null, 2)}
-                          </pre>
-                        </div>
-
-                        {/* Try to display any available fields */}
-                        {job && (
-                          <div className="p-4 rounded-lg bg-white/5 border border-white/10">
-                            <h3 className="font-semibold text-white mb-2">
-                              📋 Available Data
-                            </h3>
-                            <div className="space-y-1 text-sm">
-                              {job.precise_part_name && (
-                                <div>
-                                  <span className="text-gray-400">
-                                    Part Name:
-                                  </span>{" "}
-                                  <span className="text-white">
-                                    {job.precise_part_name}
-                                  </span>
-                                </div>
-                              )}
-                              {job.class_name && (
-                                <div>
-                                  <span className="text-gray-400">Class:</span>{" "}
-                                  <span className="text-white">
-                                    {job.class_name}
-                                  </span>
-                                </div>
-                              )}
-                              {job.manufacturer && (
-                                <div>
-                                  <span className="text-gray-400">
-                                    Manufacturer:
-                                  </span>{" "}
-                                  <span className="text-white">
-                                    {job.manufacturer}
-                                  </span>
-                                </div>
-                              )}
-                              {job.category && (
-                                <div>
-                                  <span className="text-gray-400">
-                                    Category:
-                                  </span>{" "}
-                                  <span className="text-white">
-                                    {job.category}
-                                  </span>
-                                </div>
-                              )}
-                              {job.description && (
-                                <div>
-                                  <span className="text-gray-400">
-                                    Description:
-                                  </span>{" "}
-                                  <span className="text-white">
-                                    {job.description}
-                                  </span>
-                                </div>
-                              )}
-                              {job.full_analysis && (
-                                <div>
-                                  <span className="text-gray-400">
-                                    Analysis:
-                                  </span>{" "}
-                                  <span className="text-white">
-                                    {job.full_analysis}
-                                  </span>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        )}
-
-                        <div className="text-gray-400 text-center">
-                          Debug mode - showing raw data structure
-                        </div>
-                      </div>
-                    );
-                  }
-                })()}
-              </div>
-            </DialogContent>
-          </Dialog>
-
-          {/* Delete confirmation modal */}
-          <Dialog open={isDeleteOpen} onOpenChange={setIsDeleteOpen}>
-            <DialogContent className="max-w-md">
-              <DialogHeader>
-                <DialogTitle>Delete Analysis</DialogTitle>
-                <DialogDescription>
-                  This action will permanently remove the analysis and its
-                  files. This cannot be undone.
-                </DialogDescription>
-              </DialogHeader>
-              <div className="flex justify-end gap-2 pt-2">
+              <DialogFooter>
                 <Button
                   variant="outline"
-                  size="sm"
-                  onClick={() => setIsDeleteOpen(false)}
+                  onClick={() => setDeleteDialogOpen(false)}
+                  className="border-white/10"
                 >
                   Cancel
                 </Button>
                 <Button
-                  size="sm"
-                  className="bg-red-600 hover:bg-red-700"
+                  variant="destructive"
                   onClick={confirmDelete}
+                  className="bg-red-600 hover:bg-red-700"
                 >
                   Delete
                 </Button>
-              </div>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          {/* Display Modals */}
+          <PartAnalysisDisplayModal
+            open={isImageOpen}
+            onOpenChange={(open) => {
+              setIsImageOpen(open);
+              if (!open && currentViewedJob) {
+                const jobId = currentViewedJob.id;
+                if (jobId) {
+                  setReviewJobId(jobId);
+                  setReviewJobType(currentViewedJob.mode || "image");
+                  setReviewPartSearchId(currentViewedJob.part_search_id);
+                  setIsReviewModalOpen(true);
+                }
+                setCurrentViewedJob(null);
+              }
+            }}
+            analysisData={selectedImageJob}
+          />
+
+          <PartAnalysisDisplayModal
+            open={isKeywordOpen}
+            onOpenChange={setIsKeywordOpen}
+            analysisData={selectedKeywordJob}
+          />
+
+          <ReviewModal
+            isOpen={isReviewModalOpen}
+            onClose={() => setIsReviewModalOpen(false)}
+            jobId={reviewJobId}
+            jobType={reviewJobType}
+            partSearchId={reviewPartSearchId}
+          />
+
+          {/* Analysis Result Modal */}
+          <AnalysisResultModal
+            isOpen={isAnalysisResultOpen}
+            onClose={() => {
+              setIsAnalysisResultOpen(false);
+
+              // Open review modal after closing analysis modal
+              if (selectedAnalysisResult) {
+                setReviewJobId(selectedAnalysisResult.id);
+
+                // Determine job type based on keywords and image
+                if (
+                  selectedAnalysisResult.keywords &&
+                  selectedAnalysisResult.image_url
+                ) {
+                  setReviewJobType("both");
+                } else if (selectedAnalysisResult.keywords) {
+                  setReviewJobType("keyword");
+                } else {
+                  setReviewJobType("image");
+                }
+
+                // Set part search ID if available (for legacy compatibility)
+                setReviewPartSearchId(selectedAnalysisResult.part_search_id);
+
+                // Open review modal
+                setIsReviewModalOpen(true);
+              }
+
+              setSelectedAnalysisResult(null);
+            }}
+            analysis={selectedAnalysisResult}
+            onDownloadPDF={() => {
+              if (selectedAnalysisResult?.pdf_url) {
+                handleDownloadPDF(selectedAnalysisResult.pdf_url);
+              }
+            }}
+            onShare={() => {
+              if (selectedAnalysisResult?.id) {
+                handleCreateShareLink(selectedAnalysisResult.id);
+              }
+            }}
+          />
+
+          {/* Delete Crew Job Confirmation Dialog */}
+          <Dialog
+            open={deleteCrewJobDialogOpen}
+            onOpenChange={setDeleteCrewJobDialogOpen}
+          >
+            <DialogContent className="bg-gradient-to-br from-slate-900/95 to-slate-800/95 backdrop-blur-xl border-white/10">
+              <DialogHeader>
+                <DialogTitle className="text-white">
+                  Delete Deep Research
+                </DialogTitle>
+                <DialogDescription className="text-gray-400">
+                  Are you sure you want to delete this Deep Research? This
+                  action cannot be undone and will permanently delete the
+                  analysis results.
+                </DialogDescription>
+              </DialogHeader>
+              <DialogFooter>
+                <Button
+                  variant="outline"
+                  onClick={() => setDeleteCrewJobDialogOpen(false)}
+                  className="border-white/10"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  variant="destructive"
+                  onClick={confirmDeleteCrewJob}
+                  className="bg-red-600 hover:bg-red-700"
+                >
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  Delete
+                </Button>
+              </DialogFooter>
             </DialogContent>
           </Dialog>
         </motion.div>

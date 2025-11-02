@@ -56,6 +56,19 @@ interface AnalysisProcessingEmailData {
   processingTimeMinutes?: number;
 }
 
+interface SubscriptionEmailData {
+  userEmail: string;
+  userName: string;
+  planName: string;
+  planTier: string;
+  amount?: number;
+  currency?: string;
+  trialDays?: number;
+  trialEndDate?: string;
+  subscriptionStartDate?: string;
+  subscriptionEndDate?: string;
+}
+
 class EmailService {
   private transporter: nodemailer.Transporter | null = null;
   private isConfigured = false;
@@ -889,6 +902,593 @@ class EmailService {
     }
   }
 
+  // Send trial activation email
+  async sendTrialActivatedEmail(data: SubscriptionEmailData): Promise<boolean> {
+    try {
+      const emailEnabled = await this.isEmailEnabled();
+      if (!emailEnabled) return false;
+
+      const dashboardUrl = `${
+        process.env.FRONTEND_URL || "https://app.sparefinder.org"
+      }/dashboard`;
+      const billingUrl = `${
+        process.env.FRONTEND_URL || "https://app.sparefinder.org"
+      }/dashboard/billing`;
+      const trialEndDate = data.trialEndDate || "30 days from now";
+
+      const subject = `🎉 Your ${data.planName} Trial is Active!`;
+      const html = `
+<!doctype html>
+<html>
+<body style="margin:0;padding:0;background:#0b1026;color:#edf2f7;font-family:Segoe UI,Arial,sans-serif;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:linear-gradient(135deg,#0b1026,#1a1033,#0c1226);padding:32px 0;">
+    <tr>
+      <td>
+        <table role="presentation" width="600" align="center" cellspacing="0" cellpadding="0" style="background:#0f172a;border-radius:14px;overflow:hidden;box-shadow:0 20px 50px rgba(0,0,0,.35);">
+          <tr>
+            <td style="padding:28px 32px;background:linear-gradient(135deg,#10b981,#059669);color:#fff;">
+              <h1 style="margin:0;font-size:24px;">Your Trial is Active! 🎉</h1>
+              <p style="margin:6px 0 0 0;opacity:.9;">Welcome to ${
+                data.planName
+              }</p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:28px 32px;">
+              <p style="margin:0 0 16px 0;color:#cbd5e1;line-height:1.6;">
+                Hi ${data.userName || "there"},
+              </p>
+              <p style="margin:0 0 16px 0;color:#cbd5e1;line-height:1.6;">
+                Great news! Your ${
+                  data.trialDays || 30
+                }-day free trial for the <strong>${
+        data.planName
+      }</strong> plan has been activated.
+              </p>
+              <div style="background:#1e293b;border-left:4px solid #10b981;padding:16px;margin:20px 0;border-radius:8px;">
+                <p style="margin:0 0 8px 0;color:#e2e8f0;font-weight:600;">Trial Details:</p>
+                <ul style="margin:0;padding-left:20px;color:#cbd5e1;line-height:1.8;">
+                  <li>Plan: <strong>${data.planName}</strong></li>
+                  <li>Trial Period: ${data.trialDays || 30} days</li>
+                  <li>Trial Ends: ${trialEndDate}</li>
+                  <li>After Trial: £${data.amount || 12.99}/${
+        data.currency?.toLowerCase() === "gbp" ? "month" : "month"
+      }</li>
+                </ul>
+              </div>
+              <p style="margin:16px 0;color:#cbd5e1;line-height:1.6;">
+                During your trial, you have full access to all ${
+                  data.planName
+                } features. No charges will be made until the trial period ends.
+              </p>
+              <div style="margin:24px 0;">
+                <a href="${dashboardUrl}" style="display:inline-block;background:#3b82f6;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-weight:600;margin-right:12px;">Go to Dashboard</a>
+                <a href="${billingUrl}" style="display:inline-block;background:#1e293b;color:#e2e8f0;text-decoration:none;padding:12px 24px;border-radius:10px;font-weight:600;">Manage Subscription</a>
+              </div>
+              <p style="margin:24px 0 0 0;color:#94a3b8;font-size:14px;line-height:1.6;">
+                You can cancel anytime during your trial period with no charges. After the trial ends, your subscription will automatically continue at £${
+                  data.amount || 12.99
+                }/${data.currency?.toLowerCase() === "gbp" ? "month" : "month"}.
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+
+      const success = await this.sendEmail({
+        to: data.userEmail,
+        subject,
+        html,
+      });
+
+      if (success) {
+        const userId = await this.getUserIdByEmail(data.userEmail);
+        if (userId) {
+          await supabase.from("notifications").insert({
+            user_id: userId,
+            title: "Trial Activated",
+            message: `Your ${data.planName} trial has been activated`,
+            type: "success",
+            metadata: {
+              email_sent: true,
+              plan_name: data.planName,
+              trial_days: data.trialDays,
+            },
+          });
+        }
+      }
+
+      return success;
+    } catch (error) {
+      console.error("Failed to send trial activated email:", error);
+      return false;
+    }
+  }
+
+  // Send subscription purchased/upgraded email
+  async sendSubscriptionPurchasedEmail(
+    data: SubscriptionEmailData
+  ): Promise<boolean> {
+    try {
+      const emailEnabled = await this.isEmailEnabled();
+      if (!emailEnabled) return false;
+
+      const dashboardUrl = `${
+        process.env.FRONTEND_URL || "https://app.sparefinder.org"
+      }/dashboard`;
+      const billingUrl = `${
+        process.env.FRONTEND_URL || "https://app.sparefinder.org"
+      }/dashboard/billing`;
+
+      const subject = `✅ Subscription Confirmed – ${data.planName}`;
+      const html = `
+<!doctype html>
+<html>
+<body style="margin:0;padding:0;background:#0b1026;color:#edf2f7;font-family:Segoe UI,Arial,sans-serif;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:linear-gradient(135deg,#0b1026,#1a1033,#0c1226);padding:32px 0;">
+    <tr>
+      <td>
+        <table role="presentation" width="600" align="center" cellspacing="0" cellpadding="0" style="background:#0f172a;border-radius:14px;overflow:hidden;box-shadow:0 20px 50px rgba(0,0,0,.35);">
+          <tr>
+            <td style="padding:28px 32px;background:linear-gradient(135deg,#3b82f6,#1d4ed8);color:#fff;">
+              <h1 style="margin:0;font-size:24px;">Subscription Confirmed! ✅</h1>
+              <p style="margin:6px 0 0 0;opacity:.9;">Thank you for subscribing</p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:28px 32px;">
+              <p style="margin:0 0 16px 0;color:#cbd5e1;line-height:1.6;">
+                Hi ${data.userName || "there"},
+              </p>
+              <p style="margin:0 0 16px 0;color:#cbd5e1;line-height:1.6;">
+                Your subscription to the <strong>${
+                  data.planName
+                }</strong> plan has been confirmed!
+              </p>
+              <div style="background:#1e293b;border-left:4px solid #3b82f6;padding:16px;margin:20px 0;border-radius:8px;">
+                <p style="margin:0 0 8px 0;color:#e2e8f0;font-weight:600;">Subscription Details:</p>
+                <ul style="margin:0;padding-left:20px;color:#cbd5e1;line-height:1.8;">
+                  <li>Plan: <strong>${data.planName}</strong></li>
+                  <li>Amount: £${data.amount || 12.99}/${
+        data.currency?.toLowerCase() === "gbp" ? "month" : "month"
+      }</li>
+                  ${
+                    data.subscriptionStartDate
+                      ? `<li>Start Date: ${data.subscriptionStartDate}</li>`
+                      : ""
+                  }
+                  ${
+                    data.subscriptionEndDate
+                      ? `<li>Next Billing: ${data.subscriptionEndDate}</li>`
+                      : ""
+                  }
+                </ul>
+              </div>
+              <p style="margin:16px 0;color:#cbd5e1;line-height:1.6;">
+                You now have full access to all ${
+                  data.planName
+                } features. Start using SpareFinder AI to identify and manage your automotive parts!
+              </p>
+              <div style="margin:24px 0;">
+                <a href="${dashboardUrl}" style="display:inline-block;background:#3b82f6;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-weight:600;margin-right:12px;">Go to Dashboard</a>
+                <a href="${billingUrl}" style="display:inline-block;background:#1e293b;color:#e2e8f0;text-decoration:none;padding:12px 24px;border-radius:10px;font-weight:600;">Manage Subscription</a>
+              </div>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+
+      const success = await this.sendEmail({
+        to: data.userEmail,
+        subject,
+        html,
+      });
+
+      if (success) {
+        const userId = await this.getUserIdByEmail(data.userEmail);
+        if (userId) {
+          await supabase.from("notifications").insert({
+            user_id: userId,
+            title: "Subscription Confirmed",
+            message: `Your ${data.planName} subscription has been confirmed`,
+            type: "success",
+            metadata: {
+              email_sent: true,
+              plan_name: data.planName,
+            },
+          });
+        }
+      }
+
+      return success;
+    } catch (error) {
+      console.error("Failed to send subscription purchased email:", error);
+      return false;
+    }
+  }
+
+  // Send subscription renewal email
+  async sendSubscriptionRenewedEmail(
+    data: SubscriptionEmailData
+  ): Promise<boolean> {
+    try {
+      const emailEnabled = await this.isEmailEnabled();
+      if (!emailEnabled) return false;
+
+      const billingUrl = `${
+        process.env.FRONTEND_URL || "https://app.sparefinder.org"
+      }/dashboard/billing`;
+
+      const subject = `🔄 Subscription Renewed – ${data.planName}`;
+      const html = `
+<!doctype html>
+<html>
+<body style="margin:0;padding:0;background:#0b1026;color:#edf2f7;font-family:Segoe UI,Arial,sans-serif;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:linear-gradient(135deg,#0b1026,#1a1033,#0c1226);padding:32px 0;">
+    <tr>
+      <td>
+        <table role="presentation" width="600" align="center" cellspacing="0" cellpadding="0" style="background:#0f172a;border-radius:14px;overflow:hidden;box-shadow:0 20px 50px rgba(0,0,0,.35);">
+          <tr>
+            <td style="padding:28px 32px;background:linear-gradient(135deg,#8b5cf6,#7c3aed);color:#fff;">
+              <h1 style="margin:0;font-size:24px;">Subscription Renewed 🔄</h1>
+              <p style="margin:6px 0 0 0;opacity:.9;">Your monthly credits have been added</p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:28px 32px;">
+              <p style="margin:0 0 16px 0;color:#cbd5e1;line-height:1.6;">
+                Hi ${data.userName || "there"},
+              </p>
+              <p style="margin:0 0 16px 0;color:#cbd5e1;line-height:1.6;">
+                Your <strong>${
+                  data.planName
+                }</strong> subscription has been renewed for another month.
+              </p>
+              <div style="background:#1e293b;border-left:4px solid #8b5cf6;padding:16px;margin:20px 0;border-radius:8px;">
+                <p style="margin:0 0 8px 0;color:#e2e8f0;font-weight:600;">Renewal Details:</p>
+                <ul style="margin:0;padding-left:20px;color:#cbd5e1;line-height:1.8;">
+                  <li>Plan: <strong>${data.planName}</strong></li>
+                  <li>Amount Charged: £${data.amount || 12.99}</li>
+                  ${
+                    data.subscriptionEndDate
+                      ? `<li>Next Billing Date: ${data.subscriptionEndDate}</li>`
+                      : ""
+                  }
+                </ul>
+              </div>
+              <p style="margin:16px 0;color:#cbd5e1;line-height:1.6;">
+                Your monthly credits have been added to your account. Thank you for being a valued customer!
+              </p>
+              <div style="margin:24px 0;">
+                <a href="${billingUrl}" style="display:inline-block;background:#8b5cf6;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-weight:600;">View Billing</a>
+              </div>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+
+      const success = await this.sendEmail({
+        to: data.userEmail,
+        subject,
+        html,
+      });
+
+      if (success) {
+        const userId = await this.getUserIdByEmail(data.userEmail);
+        if (userId) {
+          await supabase.from("notifications").insert({
+            user_id: userId,
+            title: "Subscription Renewed",
+            message: `Your ${data.planName} subscription has been renewed`,
+            type: "info",
+            metadata: {
+              email_sent: true,
+              plan_name: data.planName,
+            },
+          });
+        }
+      }
+
+      return success;
+    } catch (error) {
+      console.error("Failed to send subscription renewed email:", error);
+      return false;
+    }
+  }
+
+  // Send payment failed email
+  async sendPaymentFailedEmail(data: SubscriptionEmailData): Promise<boolean> {
+    try {
+      const emailEnabled = await this.isEmailEnabled();
+      if (!emailEnabled) return false;
+
+      const billingUrl = `${
+        process.env.FRONTEND_URL || "https://app.sparefinder.org"
+      }/dashboard/billing`;
+
+      const subject = `⚠️ Payment Failed – Action Required`;
+      const html = `
+<!doctype html>
+<html>
+<body style="margin:0;padding:0;background:#0b1026;color:#edf2f7;font-family:Segoe UI,Arial,sans-serif;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:linear-gradient(135deg,#0b1026,#1a1033,#0c1226);padding:32px 0;">
+    <tr>
+      <td>
+        <table role="presentation" width="600" align="center" cellspacing="0" cellpadding="0" style="background:#0f172a;border-radius:14px;overflow:hidden;box-shadow:0 20px 50px rgba(0,0,0,.35);">
+          <tr>
+            <td style="padding:28px 32px;background:linear-gradient(135deg,#ef4444,#dc2626);color:#fff;">
+              <h1 style="margin:0;font-size:24px;">Payment Failed ⚠️</h1>
+              <p style="margin:6px 0 0 0;opacity:.9;">Action required to maintain your subscription</p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:28px 32px;">
+              <p style="margin:0 0 16px 0;color:#cbd5e1;line-height:1.6;">
+                Hi ${data.userName || "there"},
+              </p>
+              <p style="margin:0 0 16px 0;color:#cbd5e1;line-height:1.6;">
+                We were unable to process the payment for your <strong>${
+                  data.planName
+                }</strong> subscription.
+              </p>
+              <div style="background:#1e293b;border-left:4px solid #ef4444;padding:16px;margin:20px 0;border-radius:8px;">
+                <p style="margin:0 0 8px 0;color:#e2e8f0;font-weight:600;">Payment Details:</p>
+                <ul style="margin:0;padding-left:20px;color:#cbd5e1;line-height:1.8;">
+                  <li>Plan: <strong>${data.planName}</strong></li>
+                  <li>Amount: £${data.amount || 12.99}</li>
+                </ul>
+              </div>
+              <p style="margin:16px 0;color:#cbd5e1;line-height:1.6;">
+                Please update your payment method to avoid service interruption. Your subscription will remain active while we retry the payment.
+              </p>
+              <div style="margin:24px 0;">
+                <a href="${billingUrl}" style="display:inline-block;background:#ef4444;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-weight:600;">Update Payment Method</a>
+              </div>
+              <p style="margin:24px 0 0 0;color:#94a3b8;font-size:14px;line-height:1.6;">
+                If you have any questions, please contact our support team.
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+
+      const success = await this.sendEmail({
+        to: data.userEmail,
+        subject,
+        html,
+      });
+
+      if (success) {
+        const userId = await this.getUserIdByEmail(data.userEmail);
+        if (userId) {
+          await supabase.from("notifications").insert({
+            user_id: userId,
+            title: "Payment Failed",
+            message: `Payment failed for ${data.planName} subscription. Please update your payment method.`,
+            type: "error",
+            metadata: {
+              email_sent: true,
+              plan_name: data.planName,
+            },
+          });
+        }
+      }
+
+      return success;
+    } catch (error) {
+      console.error("Failed to send payment failed email:", error);
+      return false;
+    }
+  }
+
+  // Send admin notification for purchases/subscriptions
+  async sendAdminPurchaseNotification(data: {
+    purchaseType: "trial" | "purchase" | "renewal";
+    userEmail: string;
+    userName: string;
+    planName: string;
+    planTier: string;
+    amount?: number;
+    currency?: string;
+    trialDays?: number;
+    userId: string;
+  }): Promise<boolean> {
+    try {
+      const emailEnabled = await this.isEmailEnabled();
+      if (!emailEnabled) return false;
+
+      // Get all admin users
+      const { data: adminUsers, error } = await supabase
+        .from("profiles")
+        .select("id, email, full_name, first_name, last_name")
+        .in("role", ["admin", "super_admin"]);
+
+      if (error || !adminUsers || adminUsers.length === 0) {
+        console.warn("No admin users found for purchase notification");
+        return false;
+      }
+
+      // Support payment failure notifications (check metadata or add explicit type)
+      const isPaymentFailure = (data as any).isPaymentFailure === true;
+      const subject = isPaymentFailure
+        ? `⚠️ Payment Failed: ${data.planName}`
+        : `💰 New ${
+            data.purchaseType === "trial"
+              ? "Trial"
+              : data.purchaseType === "renewal"
+              ? "Renewal"
+              : "Purchase"
+          }: ${data.planName}`;
+      const purchaseTitle = isPaymentFailure
+        ? "Payment Failed ⚠️"
+        : data.purchaseType === "trial"
+        ? "Trial Started"
+        : data.purchaseType === "renewal"
+        ? "Subscription Renewed"
+        : "Subscription Purchased";
+      const purchaseDescription = isPaymentFailure
+        ? "User's payment failed - action may be required"
+        : data.purchaseType === "trial"
+        ? `User started a ${data.trialDays || 30}-day free trial`
+        : data.purchaseType === "renewal"
+        ? "User's subscription was renewed"
+        : "User purchased a new subscription";
+
+      const html = `
+<!doctype html>
+<html>
+<body style="margin:0;padding:0;background:#0b1026;color:#edf2f7;font-family:Segoe UI,Arial,sans-serif;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:linear-gradient(135deg,#0b1026,#1a1033,#0c1226);padding:32px 0;">
+    <tr>
+      <td>
+        <table role="presentation" width="600" align="center" cellspacing="0" cellpadding="0" style="background:#0f172a;border-radius:14px;overflow:hidden;box-shadow:0 20px 50px rgba(0,0,0,.35);">
+          <tr>
+            <td style="padding:28px 32px;background:linear-gradient(135deg,${
+              isPaymentFailure ? "#ef4444,#dc2626" : "#f59e0b,#d97706"
+            });color:#fff;">
+              <h1 style="margin:0;font-size:24px;">${purchaseTitle} ${
+        isPaymentFailure ? "⚠️" : "💰"
+      }</h1>
+              <p style="margin:6px 0 0 0;opacity:.9;">${
+                isPaymentFailure
+                  ? "Payment issue detected"
+                  : "New subscription activity"
+              }</p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:28px 32px;">
+              <p style="margin:0 0 16px 0;color:#cbd5e1;line-height:1.6;">
+                Admin Notification,
+              </p>
+              <p style="margin:0 0 16px 0;color:#cbd5e1;line-height:1.6;">
+                ${purchaseDescription}:
+              </p>
+              <div style="background:#1e293b;border-left:4px solid ${
+                isPaymentFailure ? "#ef4444" : "#f59e0b"
+              };padding:16px;margin:20px 0;border-radius:8px;">
+                <p style="margin:0 0 8px 0;color:#e2e8f0;font-weight:600;">Purchase Details:</p>
+                <ul style="margin:0;padding-left:20px;color:#cbd5e1;line-height:1.8;">
+                  <li>User: <strong>${data.userName}</strong> (${
+        data.userEmail
+      })</li>
+                  <li>Plan: <strong>${data.planName}</strong> (${
+        data.planTier
+      })</li>
+                  ${
+                    data.amount
+                      ? `<li>Amount: £${data.amount} ${
+                          data.currency || "GBP"
+                        }</li>`
+                      : ""
+                  }
+                  ${
+                    data.trialDays
+                      ? `<li>Trial Period: ${data.trialDays} days</li>`
+                      : ""
+                  }
+                  <li>User ID: ${data.userId}</li>
+                  <li>Time: ${new Date().toLocaleString("en-GB", {
+                    weekday: "long",
+                    year: "numeric",
+                    month: "long",
+                    day: "numeric",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })}</li>
+                </ul>
+              </div>
+              <p style="margin:16px 0;color:#cbd5e1;line-height:1.6;">
+                This is an automated notification for admin review.
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+
+      // Send email to all admins
+      let successCount = 0;
+      for (const admin of adminUsers) {
+        const adminEmail = admin.email;
+        if (adminEmail) {
+          const success = await this.sendEmail({
+            to: adminEmail,
+            subject,
+            html,
+          });
+          if (success) {
+            successCount++;
+            // Create notification record for admin
+            await supabase.from("notifications").insert({
+              user_id: admin.id,
+              title: purchaseTitle,
+              message: `${data.userName} (${data.userEmail}) - ${data.planName} ${data.purchaseType}`,
+              type: "info",
+              metadata: {
+                email_sent: true,
+                purchase_type: data.purchaseType,
+                customer_email: data.userEmail,
+                customer_name: data.userName,
+                plan_name: data.planName,
+                plan_tier: data.planTier,
+                amount: data.amount,
+                user_id: data.userId,
+              },
+            });
+          }
+        }
+      }
+
+      console.log(
+        `📧 Admin purchase notification sent to ${successCount}/${adminUsers.length} admins`
+      );
+      return successCount > 0;
+    } catch (error) {
+      console.error("Failed to send admin purchase notification:", error);
+      return false;
+    }
+  }
+
+  // Helper method to check if email is enabled
+  private async isEmailEnabled(): Promise<boolean> {
+    try {
+      const { data: notificationSettings } = await supabase
+        .from("system_settings")
+        .select("setting_value")
+        .eq("category", "notifications")
+        .eq("setting_key", "email_enabled")
+        .single();
+
+      return (
+        notificationSettings?.setting_value === true ||
+        notificationSettings?.setting_value === "true" ||
+        process.env.EMAIL_ENABLED === "true"
+      );
+    } catch {
+      return false;
+    }
+  }
+
   // Method to refresh SMTP configuration (useful when admin updates settings)
   async refreshSmtpConfiguration(): Promise<boolean> {
     try {
@@ -924,4 +1524,5 @@ export {
   AnalysisStartedEmailData,
   AnalysisFailedEmailData,
   AnalysisProcessingEmailData,
+  SubscriptionEmailData,
 };

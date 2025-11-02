@@ -1,9 +1,9 @@
-import { Router, Request, Response, NextFunction } from 'express';
-import { body, validationResult } from 'express-validator';
-import { createClient } from '@supabase/supabase-js';
-import { emailService } from '../services/email-service';
-import { authenticateToken } from '../middleware/auth';
-import { AuthRequest } from '../types/auth';
+import { Router, Request, Response, NextFunction } from "express";
+import { body, validationResult } from "express-validator";
+import { createClient } from "@supabase/supabase-js";
+import { emailService } from "../services/email-service";
+import { authenticateToken } from "../middleware/auth";
+import { AuthRequest } from "../types/auth";
 
 // Initialize Supabase client directly to avoid circular dependency
 const supabase = createClient(
@@ -23,22 +23,26 @@ interface ReviewRequest {
 }
 
 // Middleware to check if user has active subscription or trial
-const requireSubscriptionOrTrial = async (req: AuthRequest, res: Response, next: NextFunction) => {
+const requireSubscriptionOrTrial = async (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+) => {
   try {
     const userId = req.user!.userId;
-    
+
     // Check user's subscription status
     const { data: subscription, error } = await supabase
-      .from('subscriptions')
-      .select('tier, status, current_period_end')
-      .eq('user_id', userId)
+      .from("subscriptions")
+      .select("tier, status, current_period_end")
+      .eq("user_id", userId)
       .single();
 
-    if (error && error.code !== 'PGRST116') {
-      console.error('Error fetching subscription:', error);
+    if (error && error.code !== "PGRST116") {
+      console.error("Error fetching subscription:", error);
       return res.status(500).json({
         success: false,
-        error: 'Unable to verify subscription status'
+        error: "Unable to verify subscription status",
       });
     }
 
@@ -46,94 +50,103 @@ const requireSubscriptionOrTrial = async (req: AuthRequest, res: Response, next:
     if (!subscription) {
       return res.status(403).json({
         success: false,
-        error: 'Subscription required',
-        message: 'You need an active subscription or trial to write reviews. Please upgrade your plan to continue.'
+        error: "Subscription required",
+        message:
+          "You need an active subscription or trial to write reviews. Please upgrade your plan to continue.",
       });
     }
 
     // Check if subscription is active or in trial
-    const isActive = subscription.status === 'active' || subscription.status === 'trialing';
+    const isActive =
+      subscription.status === "active" || subscription.status === "trialing";
     const isNotExpired = new Date(subscription.current_period_end) > new Date();
 
     if (!isActive || !isNotExpired) {
       return res.status(403).json({
         success: false,
-        error: 'Subscription expired',
-        message: 'Your subscription has expired. Please renew your subscription to write reviews.'
+        error: "Subscription expired",
+        message:
+          "Your subscription has expired. Please renew your subscription to write reviews.",
       });
     }
 
     // User has valid subscription/trial, continue
     return next();
   } catch (error) {
-    console.error('Subscription check error:', error);
+    console.error("Subscription check error:", error);
     return res.status(500).json({
       success: false,
-      error: 'Unable to verify subscription status'
+      error: "Unable to verify subscription status",
     });
   }
 };
 
 // Validation middleware for review submission
 const reviewValidation = [
-  body('name')
+  body("name")
     .trim()
     .isLength({ min: 2, max: 100 })
-    .withMessage('Name must be between 2 and 100 characters'),
-  body('email')
+    .withMessage("Name must be between 2 and 100 characters"),
+  body("email")
     .isEmail()
     .normalizeEmail()
-    .withMessage('Please provide a valid email address'),
-  body('company')
+    .withMessage("Please provide a valid email address"),
+  body("company")
     .optional()
     .trim()
     .isLength({ max: 100 })
-    .withMessage('Company name must not exceed 100 characters'),
-  body('rating')
+    .withMessage("Company name must not exceed 100 characters"),
+  body("rating")
     .isInt({ min: 1, max: 5 })
-    .withMessage('Rating must be between 1 and 5'),
-  body('title')
+    .withMessage("Rating must be between 1 and 5"),
+  body("title")
     .trim()
     .isLength({ min: 5, max: 200 })
-    .withMessage('Review title must be between 5 and 200 characters'),
-  body('message')
+    .withMessage("Review title must be between 5 and 200 characters"),
+  body("message")
     .trim()
     .isLength({ min: 10, max: 2000 })
-    .withMessage('Review message must be between 10 and 2000 characters')
+    .withMessage("Review message must be between 10 and 2000 characters"),
 ];
 
 // Get all reviews (public endpoint)
-router.get('/', async (req: Request, res: Response) => {
+router.get("/", async (req: Request, res: Response) => {
   try {
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 20;
     const offset = (page - 1) * limit;
 
     // Get reviews from database
-    const { data: reviews, error, count } = await supabase
-      .from('reviews')
-      .select('*', { count: 'exact' })
-      .eq('published', true)
-      .order('created_at', { ascending: false })
+    const {
+      data: reviews,
+      error,
+      count,
+    } = await supabase
+      .from("reviews")
+      .select("*", { count: "exact" })
+      .eq("published", true)
+      .order("created_at", { ascending: false })
       .range(offset, offset + limit - 1);
 
     if (error) {
-      console.error('Error fetching reviews:', error);
+      console.error("Error fetching reviews:", error);
       return res.status(500).json({
         success: false,
-        error: 'Failed to fetch reviews'
+        error: "Failed to fetch reviews",
       });
     }
 
     // Calculate average rating
     const { data: ratingStats } = await supabase
-      .from('reviews')
-      .select('rating')
-      .eq('published', true);
+      .from("reviews")
+      .select("rating")
+      .eq("published", true);
 
-    const averageRating = ratingStats && ratingStats.length > 0 
-      ? ratingStats.reduce((sum, review) => sum + review.rating, 0) / ratingStats.length
-      : 0;
+    const averageRating =
+      ratingStats && ratingStats.length > 0
+        ? ratingStats.reduce((sum, review) => sum + review.rating, 0) /
+          ratingStats.length
+        : 0;
 
     return res.json({
       success: true,
@@ -143,80 +156,85 @@ router.get('/', async (req: Request, res: Response) => {
           page,
           limit,
           total: count || 0,
-          totalPages: Math.ceil((count || 0) / limit)
+          totalPages: Math.ceil((count || 0) / limit),
         },
         stats: {
           averageRating: Math.round(averageRating * 10) / 10,
-          totalReviews: count || 0
-        }
-      }
+          totalReviews: count || 0,
+        },
+      },
     });
-
   } catch (error) {
-    console.error('Get reviews error:', error);
+    console.error("Get reviews error:", error);
     return res.status(500).json({
       success: false,
-      error: 'Internal server error'
+      error: "Internal server error",
     });
   }
 });
 
 // Submit a new review (requires authentication and active subscription/trial)
-router.post('/', authenticateToken, requireSubscriptionOrTrial, ...reviewValidation, async (req: AuthRequest, res: Response) => {
-  try {
-    // Check validation errors
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({
-        success: false,
-        error: 'Validation failed',
-        message: errors.array()[0].msg,
-        details: errors.array()
+router.post(
+  "/",
+  authenticateToken,
+  requireSubscriptionOrTrial,
+  ...reviewValidation,
+  async (req: AuthRequest, res: Response) => {
+    try {
+      // Check validation errors
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          success: false,
+          error: "Validation failed",
+          message: errors.array()[0].msg,
+          details: errors.array(),
+        });
+      }
+
+      const { name, email, company, rating, title, message }: ReviewRequest =
+        req.body;
+
+      console.log("📝 New review submission:", {
+        name,
+        email,
+        company: company || "Not provided",
+        rating,
+        title,
+        messageLength: message?.length || 0,
+        timestamp: new Date().toISOString(),
       });
-    }
 
-    const { name, email, company, rating, title, message }: ReviewRequest = req.body;
+      // Insert review into database
+      const { data: newReview, error: insertError } = await supabase
+        .from("reviews")
+        .insert([
+          {
+            name,
+            email,
+            company: company || null,
+            rating,
+            title,
+            message,
+            published: true, // Auto-publish for now, can add moderation later
+            verified: false, // Will be manually verified later
+            created_at: new Date().toISOString(),
+          },
+        ])
+        .select()
+        .single();
 
-    console.log('📝 New review submission:', {
-      name,
-      email,
-      company: company || 'Not provided',
-      rating,
-      title,
-      messageLength: message?.length || 0,
-      timestamp: new Date().toISOString()
-    });
+      if (insertError) {
+        console.error("Error inserting review:", insertError);
+        return res.status(500).json({
+          success: false,
+          error: "Failed to save review",
+        });
+      }
 
-    // Insert review into database
-    const { data: newReview, error: insertError } = await supabase
-      .from('reviews')
-      .insert([
-        {
-          name,
-          email,
-          company: company || null,
-          rating,
-          title,
-          message,
-          published: true, // Auto-publish for now, can add moderation later
-          verified: false, // Will be manually verified later
-          created_at: new Date().toISOString()
-        }
-      ])
-      .select()
-      .single();
-
-    if (insertError) {
-      console.error('Error inserting review:', insertError);
-      return res.status(500).json({
-        success: false,
-        error: 'Failed to save review'
-      });
-    }
-
-    // Prepare email content for sales team
-    const emailSubject = `New Customer Review: ${rating} stars - ${title}`;
-    const emailHtml = `
+      // Prepare email content for sales team
+      const emailSubject = `New Customer Review: ${rating} stars - ${title}`;
+      const emailHtml = `
 <!doctype html>
 <html>
 <head>
@@ -246,7 +264,7 @@ router.post('/', authenticateToken, requireSubscriptionOrTrial, ...reviewValidat
             <td style="padding:24px 24px 0;">
               <div style="text-align:center;margin-bottom:24px;">
                 <div style="font-size:48px;margin-bottom:8px;">
-                  ${'⭐'.repeat(rating)}${'☆'.repeat(5 - rating)}
+                  ${"⭐".repeat(rating)}${"☆".repeat(5 - rating)}
                 </div>
                 <div style="font-size:24px;font-weight:bold;color:#1e293b;">${rating}/5 Stars</div>
               </div>
@@ -270,19 +288,26 @@ router.post('/', authenticateToken, requireSubscriptionOrTrial, ...reviewValidat
                     <td style="padding:4px 0;color:#64748b;font-weight:600;">Email:</td>
                     <td style="padding:4px 0;color:#1e293b;"><a href="mailto:${email}" style="color:#3b82f6;text-decoration:none;">${email}</a></td>
                   </tr>
-                  ${company ? `
+                  ${
+                    company
+                      ? `
                   <tr>
                     <td style="padding:4px 0;color:#64748b;font-weight:600;">Company:</td>
                     <td style="padding:4px 0;color:#1e293b;">${company}</td>
                   </tr>
-                  ` : ''}
+                  `
+                      : ""
+                  }
                   <tr>
                     <td style="padding:4px 0;color:#64748b;font-weight:600;">Submitted:</td>
-                    <td style="padding:4px 0;color:#1e293b;">${new Date().toLocaleString('en-UK', { 
-                      dateStyle: 'full', 
-                      timeStyle: 'short',
-                      timeZone: 'Europe/London'
-                    })}</td>
+                    <td style="padding:4px 0;color:#1e293b;">${new Date().toLocaleString(
+                      "en-UK",
+                      {
+                        dateStyle: "full",
+                        timeStyle: "short",
+                        timeZone: "Europe/London",
+                      }
+                    )}</td>
                   </tr>
                 </table>
               </div>
@@ -328,18 +353,18 @@ router.post('/', authenticateToken, requireSubscriptionOrTrial, ...reviewValidat
 </html>
     `;
 
-    const emailText = `
+      const emailText = `
 New Customer Review - Part Finder AI
 
 Rating: ${rating}/5 stars
 Customer: ${name}
 Email: ${email}
-Company: ${company || 'Not provided'}
-Submitted: ${new Date().toLocaleString('en-UK', { 
-  dateStyle: 'full', 
-  timeStyle: 'short',
-  timeZone: 'Europe/London'
-})}
+Company: ${company || "Not provided"}
+Submitted: ${new Date().toLocaleString("en-UK", {
+        dateStyle: "full",
+        timeStyle: "short",
+        timeZone: "Europe/London",
+      })}
 
 Review Title: "${title}"
 
@@ -351,21 +376,23 @@ Review ID: ${newReview.id}
 This review was submitted through the Part Finder AI reviews page.
     `;
 
-    // Send email to sales team
-    const emailSuccess = await emailService.sendEmail({
-      to: 'sales@tpsinternational.co.uk',
-      subject: emailSubject,
-      html: emailHtml,
-      text: emailText
-    });
+      // Send email to sales team
+      const emailSuccess = await emailService.sendEmail({
+        to: "sales@tpsinternational.co.uk",
+        subject: emailSubject,
+        html: emailHtml,
+        text: emailText,
+      });
 
-    if (!emailSuccess) {
-      console.warn('📧 Failed to send review notification email, but review was saved successfully');
-    }
+      if (!emailSuccess) {
+        console.warn(
+          "📧 Failed to send review notification email, but review was saved successfully"
+        );
+      }
 
-    // Send confirmation email to customer
-    const confirmationSubject = 'Thank you for your review - Part Finder AI';
-    const confirmationHtml = `
+      // Send confirmation email to customer
+      const confirmationSubject = "Thank you for your review - Part Finder AI";
+      const confirmationHtml = `
 <!doctype html>
 <html>
 <head>
@@ -406,11 +433,14 @@ This review was submitted through the Part Finder AI reviews page.
                 <h3 style="margin:0 0 12px;color:#1e293b;font-size:16px;">Your Review Summary:</h3>
                 <p style="margin:0 0 8px;color:#64748b;"><strong>Rating:</strong> ${rating}/5 stars</p>
                 <p style="margin:0 0 8px;color:#64748b;"><strong>Title:</strong> "${title}"</p>
-                <p style="margin:0;color:#64748b;"><strong>Submitted:</strong> ${new Date().toLocaleString('en-UK', { 
-                  dateStyle: 'full', 
-                  timeStyle: 'short',
-                  timeZone: 'Europe/London'
-                })}</p>
+                <p style="margin:0;color:#64748b;"><strong>Submitted:</strong> ${new Date().toLocaleString(
+                  "en-UK",
+                  {
+                    dateStyle: "full",
+                    timeStyle: "short",
+                    timeZone: "Europe/London",
+                  }
+                )}</p>
               </div>
 
               <p style="margin:24px 0 16px;color:#374151;font-size:16px;line-height:1.6;">
@@ -418,7 +448,9 @@ This review was submitted through the Part Finder AI reviews page.
               </p>
 
               <div style="text-align:center;margin:32px 0;">
-                <a href="${process.env.FRONTEND_URL || 'https://app.sparefinder.org'}/reviews" 
+                <a href="${
+                  process.env.FRONTEND_URL || "https://app.sparefinder.org"
+                }/reviews" 
                    style="background:linear-gradient(135deg,#7c3aed,#3b82f6);color:#ffffff;text-decoration:none;padding:12px 24px;border-radius:8px;font-weight:600;display:inline-block;">
                   View All Reviews
                 </a>
@@ -428,8 +460,10 @@ This review was submitted through the Part Finder AI reviews page.
                 <p style="margin:0;color:#64748b;font-size:14px;line-height:1.6;">
                   <strong>Part Finder AI Team</strong><br>
                   sales@tpsinternational.co.uk<br>
-                  <a href="${process.env.FRONTEND_URL || 'https://app.sparefinder.org'}" style="color:#3b82f6;text-decoration:none;">
-                    ${process.env.FRONTEND_URL || 'https://app.sparefinder.org'}
+                  <a href="${
+                    process.env.FRONTEND_URL || "https://app.sparefinder.org"
+                  }" style="color:#3b82f6;text-decoration:none;">
+                    ${process.env.FRONTEND_URL || "https://app.sparefinder.org"}
                   </a>
                 </p>
               </div>
@@ -444,7 +478,7 @@ This review was submitted through the Part Finder AI reviews page.
 </html>
     `;
 
-    const confirmationText = `
+      const confirmationText = `
 Thank you for your review - Part Finder AI!
 
 Hi ${name},
@@ -454,87 +488,98 @@ Thank you for taking the time to review Part Finder AI! Your feedback helps us i
 Your Review Summary:
 - Rating: ${rating}/5 stars
 - Title: "${title}"
-- Submitted: ${new Date().toLocaleString('en-UK', { 
-  dateStyle: 'full', 
-  timeStyle: 'short',
-  timeZone: 'Europe/London'
-})}
+- Submitted: ${new Date().toLocaleString("en-UK", {
+        dateStyle: "full",
+        timeStyle: "short",
+        timeZone: "Europe/London",
+      })}
 
 Your review will be published on our website shortly. We truly appreciate customers like you who help us build trust and credibility in the AI-powered part identification space.
 
-View all reviews: ${process.env.FRONTEND_URL || 'https://sparefinder.org'}/reviews
+View all reviews: ${
+        process.env.FRONTEND_URL || "https://sparefinder.org"
+      }/reviews
 
 Best regards,
 Part Finder AI Team
 sales@tpsinternational.co.uk
     `;
 
-    // Send confirmation email (don't fail if this doesn't work)
-    await emailService.sendEmail({
-      to: email,
-      subject: confirmationSubject,
-      html: confirmationHtml,
-      text: confirmationText
-    }).catch(error => {
-      console.warn('📧 Failed to send confirmation email:', error);
-    });
+      // Send confirmation email (don't fail if this doesn't work)
+      await emailService
+        .sendEmail({
+          to: email,
+          subject: confirmationSubject,
+          html: confirmationHtml,
+          text: confirmationText,
+        })
+        .catch((error) => {
+          console.warn("📧 Failed to send confirmation email:", error);
+        });
 
-    console.log('✅ Review submitted and notifications sent successfully');
+      console.log("✅ Review submitted and notifications sent successfully");
 
-    return res.status(201).json({
-      success: true,
-      message: 'Review submitted successfully! Thank you for your feedback.',
-      data: {
-        review: {
-          id: newReview.id,
-          rating,
-          title,
-          submittedAt: newReview.created_at
+      return res.status(201).json({
+        success: true,
+        message: "Review submitted successfully! Thank you for your feedback.",
+        data: {
+          review: {
+            id: newReview.id,
+            rating,
+            title,
+            submittedAt: newReview.created_at,
+          },
+          emailSent: emailSuccess,
         },
-        emailSent: emailSuccess
-      }
-    });
+      });
+    } catch (error) {
+      console.error("❌ Submit review error:", error);
 
-  } catch (error) {
-    console.error('❌ Submit review error:', error);
-    
-    return res.status(500).json({
-      success: false,
-      error: 'Internal server error',
-      message: 'We apologize, but there was an error processing your review. Please try again or contact us directly at sales@tpsinternational.co.uk'
-    });
+      return res.status(500).json({
+        success: false,
+        error: "Internal server error",
+        message:
+          "We apologize, but there was an error processing your review. Please try again or contact us directly at sales@tpsinternational.co.uk",
+      });
+    }
   }
-});
+);
 
 // Get review statistics (public endpoint)
-router.get('/stats', async (_req: Request, res: Response) => {
+router.get("/stats", async (_req: Request, res: Response) => {
   try {
     // Get review statistics
     const { data: reviews, error } = await supabase
-      .from('reviews')
-      .select('rating')
-      .eq('published', true);
+      .from("reviews")
+      .select("rating")
+      .eq("published", true);
 
     if (error) {
-      console.error('Error fetching review stats:', error);
+      console.error("Error fetching review stats:", error);
       return res.status(500).json({
         success: false,
-        error: 'Failed to fetch review statistics'
+        error: "Failed to fetch review statistics",
       });
     }
 
     const totalReviews = reviews?.length || 0;
-    const averageRating = totalReviews > 0 
-      ? reviews.reduce((sum, review) => sum + review.rating, 0) / totalReviews
-      : 0;
+    const averageRating =
+      totalReviews > 0
+        ? reviews.reduce((sum, review) => sum + review.rating, 0) / totalReviews
+        : 0;
 
     // Calculate rating distribution
-    const ratingDistribution = [1, 2, 3, 4, 5].map(rating => ({
+    const ratingDistribution = [1, 2, 3, 4, 5].map((rating) => ({
       rating,
-      count: reviews?.filter(r => r.rating === rating).length || 0,
-      percentage: totalReviews > 0 
-        ? Math.round(((reviews?.filter(r => r.rating === rating).length || 0) / totalReviews) * 100)
-        : 0
+      count: reviews?.filter((r) => r.rating === rating).length || 0,
+      percentage:
+        totalReviews > 0
+          ? Math.round(
+              ((reviews?.filter((r) => r.rating === rating).length || 0) /
+                totalReviews) *
+                100
+            )
+          : 0,
     }));
 
     return res.json({
@@ -542,17 +587,236 @@ router.get('/stats', async (_req: Request, res: Response) => {
       data: {
         totalReviews,
         averageRating: Math.round(averageRating * 10) / 10,
-        ratingDistribution
-      }
+        ratingDistribution,
+      },
     });
-
   } catch (error) {
-    console.error('Get review stats error:', error);
+    console.error("Get review stats error:", error);
     return res.status(500).json({
       success: false,
-      error: 'Internal server error'
+      error: "Internal server error",
     });
   }
 });
 
 export default router;
+
+// Analysis Reviews Routes - for rating specific analysis results
+// Get user's analysis reviews
+router.get(
+  "/analysis",
+  authenticateToken,
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const userId = req.user!.userId;
+
+      const { data: reviews, error } = await supabase
+        .from("analysis_reviews")
+        .select("*")
+        .eq("user_id", userId)
+        .order("created_at", { ascending: false });
+
+      if (error) {
+        console.error("Error fetching analysis reviews:", error);
+        return res.status(500).json({
+          success: false,
+          error: "Failed to fetch analysis reviews",
+        });
+      }
+
+      return res.json({
+        success: true,
+        data: reviews || [],
+      });
+    } catch (error) {
+      console.error("Get analysis reviews error:", error);
+      return res.status(500).json({
+        success: false,
+        error: "Internal server error",
+      });
+    }
+  }
+);
+
+// Submit analysis review
+router.post(
+  "/analysis",
+  authenticateToken,
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const userId = req.user!.userId;
+      const {
+        job_id,
+        job_type,
+        part_search_id,
+        rating,
+        comment,
+        feedback_type,
+        helpful_features,
+        improvement_suggestions,
+      } = req.body;
+
+      // Validate required fields
+      if (!job_id || !job_type || !rating) {
+        return res.status(400).json({
+          success: false,
+          error:
+            "Missing required fields: job_id, job_type, and rating are required",
+        });
+      }
+
+      if (rating < 1 || rating > 5) {
+        return res.status(400).json({
+          success: false,
+          error: "Rating must be between 1 and 5",
+        });
+      }
+
+      if (!["image", "keyword", "both"].includes(job_type)) {
+        return res.status(400).json({
+          success: false,
+          error: "Invalid job_type. Must be: image, keyword, or both",
+        });
+      }
+
+      // Insert review
+      const { data: newReview, error: insertError } = await supabase
+        .from("analysis_reviews")
+        .insert([
+          {
+            user_id: userId,
+            job_id,
+            job_type,
+            part_search_id: part_search_id || null,
+            rating,
+            comment: comment || null,
+            feedback_type: feedback_type || null,
+            helpful_features: helpful_features || null,
+            improvement_suggestions: improvement_suggestions || null,
+          },
+        ])
+        .select()
+        .single();
+
+      if (insertError) {
+        // Check if it's a duplicate
+        if (insertError.code === "23505") {
+          return res.status(409).json({
+            success: false,
+            error: "You have already reviewed this analysis",
+          });
+        }
+
+        console.error("Error inserting analysis review:", insertError);
+        return res.status(500).json({
+          success: false,
+          error: "Failed to save review",
+        });
+      }
+
+      console.log("✅ Analysis review submitted:", {
+        userId,
+        jobId: job_id,
+        rating,
+        timestamp: new Date().toISOString(),
+      });
+
+      return res.status(201).json({
+        success: true,
+        message: "Review submitted successfully!",
+        data: newReview,
+      });
+    } catch (error) {
+      console.error("❌ Submit analysis review error:", error);
+      return res.status(500).json({
+        success: false,
+        error: "Internal server error",
+      });
+    }
+  }
+);
+
+// Get analysis review stats for user
+router.get(
+  "/analysis/stats",
+  authenticateToken,
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const userId = req.user!.userId;
+
+      const { data: reviews, error } = await supabase
+        .from("analysis_reviews")
+        .select("rating")
+        .eq("user_id", userId);
+
+      if (error) {
+        console.error("Error fetching analysis review stats:", error);
+        return res.status(500).json({
+          success: false,
+          error: "Failed to fetch review statistics",
+        });
+      }
+
+      const totalReviews = reviews?.length || 0;
+      const averageRating =
+        totalReviews > 0
+          ? reviews.reduce((sum, review) => sum + review.rating, 0) /
+            totalReviews
+          : 0;
+
+      const fiveStarCount = reviews?.filter((r) => r.rating === 5).length || 0;
+
+      return res.json({
+        success: true,
+        data: {
+          totalReviews,
+          averageRating: Math.round(averageRating * 10) / 10,
+          fiveStarCount,
+        },
+      });
+    } catch (error) {
+      console.error("Get analysis review stats error:", error);
+      return res.status(500).json({
+        success: false,
+        error: "Internal server error",
+      });
+    }
+  }
+);
+
+// Delete analysis review
+router.delete(
+  "/analysis/:reviewId",
+  authenticateToken,
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const userId = req.user!.userId;
+      const { reviewId } = req.params;
+
+      const { error } = await supabase
+        .from("analysis_reviews")
+        .delete()
+        .eq("id", reviewId)
+        .eq("user_id", userId);
+
+      if (error) {
+        console.error("Error deleting analysis review:", error);
+        return res.status(500).json({
+          success: false,
+          error: "Failed to delete review",
+        });
+      }
+
+      return res.json({
+        success: true,
+        message: "Review deleted successfully",
+      });
+    } catch (error) {
+      console.error("Delete analysis review error:", error);
+      return res.status(500).json({
+        success: false,
+        error: "Internal server error",
+      });
+    }
+  }
+);

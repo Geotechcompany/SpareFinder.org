@@ -3,6 +3,7 @@ import multer from "multer";
 import axios from "axios";
 import FormData from "form-data";
 import { authenticateToken } from "../middleware/auth";
+import { requireSubscriptionOrTrial } from "../middleware/subscription";
 import { AuthRequest } from "../types/auth";
 import { supabase } from "../server";
 import {
@@ -16,6 +17,130 @@ import { emailService, AnalysisEmailData } from "../services/email-service";
 import { creditService, CreditResult } from "../services/credit-service";
 
 const router = Router();
+
+// Helper function to start Deep Research (reusable for retries)
+async function startCrewAnalysis(
+  jobId: string,
+  imageBuffer: Buffer,
+  originalName: string,
+  mimeType: string,
+  userEmail: string,
+  keywords: string
+): Promise<void> {
+  const aiCrewUrl = process.env.AI_CREW_URL || "http://localhost:8000";
+
+  try {
+    console.log(`📤 Sending analysis request to crew for job ${jobId}`);
+
+    const formData = new FormData();
+    formData.append("file", imageBuffer, {
+      filename: originalName,
+      contentType: mimeType,
+    });
+    formData.append("user_email", userEmail);
+    formData.append("keywords", keywords);
+    formData.append("analysis_id", jobId);
+
+    await axios.post(`${aiCrewUrl}/analyze-part`, formData, {
+      headers: {
+        ...formData.getHeaders(),
+      },
+      timeout: 300000, // 5 minutes timeout
+    });
+
+    console.log(`✅ AI Deep Research started for job ${jobId}`);
+  } catch (error) {
+    console.error(
+      `❌ Failed to start AI Deep Research for job ${jobId}:`,
+      error
+    );
+    throw error;
+  }
+}
+
+// Auto-retry failed jobs (runs every 5 minutes)
+setInterval(async () => {
+  try {
+    console.log("🔄 Checking for failed Deep Research jobs to retry...");
+
+    // Get failed jobs that haven't exceeded retry limit
+    const { data: failedJobs, error } = await supabase
+      .from("crew_analysis_jobs")
+      .select("*")
+      .eq("status", "failed")
+      .or("retry_count.is.null,retry_count.lt.3") // Retry up to 3 times
+      .limit(5); // Process max 5 at a time
+
+    if (error) {
+      console.error("❌ Error fetching failed jobs:", error);
+      return;
+    }
+
+    if (!failedJobs || failedJobs.length === 0) {
+      return;
+    }
+
+    console.log(`🔄 Found ${failedJobs.length} failed jobs to retry`);
+
+    for (const job of failedJobs) {
+      try {
+        const retryCount = (job.retry_count || 0) + 1;
+        console.log(`🔄 Retrying job ${job.id} (attempt ${retryCount}/3)`);
+
+        // Update status to pending for retry
+        await supabase
+          .from("crew_analysis_jobs")
+          .update({
+            status: "pending",
+            retry_count: retryCount,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", job.id);
+
+        // Fetch image from storage
+        const imageResponse = await axios.get(job.image_url, {
+          responseType: "arraybuffer",
+        });
+
+        // Start analysis in background
+        setImmediate(async () => {
+          try {
+            await startCrewAnalysis(
+              job.id,
+              Buffer.from(imageResponse.data),
+              job.image_name,
+              "image/png", // Default to PNG, could be enhanced
+              job.user_email,
+              job.keywords || ""
+            );
+          } catch (retryError) {
+            console.error(`❌ Retry failed for job ${job.id}:`, retryError);
+
+            // Update to failed again
+            await supabase
+              .from("crew_analysis_jobs")
+              .update({
+                status: "failed",
+                error_message:
+                  retryError instanceof Error
+                    ? retryError.message
+                    : "Retry failed",
+                updated_at: new Date().toISOString(),
+              })
+              .eq("id", job.id);
+          }
+        });
+      } catch (retryError) {
+        console.error(
+          `❌ Error processing retry for job ${job.id}:`,
+          retryError
+        );
+      }
+    }
+  } catch (error) {
+    console.error("❌ Error in auto-retry process:", error);
+  }
+}, 5 * 60 * 1000); // Run every 5 minutes
 
 // Configure multer for file uploads
 const upload = multer({
@@ -122,6 +247,7 @@ router.get(
 router.post(
   "/image",
   authenticateToken,
+  requireSubscriptionOrTrial,
   upload.single("image"),
   handleMulterError,
   async (req: AuthRequest, res: Response) => {
@@ -203,6 +329,12 @@ router.post(
         .from(bucketName)
         .getPublicUrl(fileName);
 
+      console.log("📦 Uploaded to Supabase Storage:", {
+        fileName,
+        publicUrl: urlData.publicUrl,
+        bucketName,
+      });
+
       // Step 3: Check AI service availability and send image for analysis
       const aiServiceUrl = process.env.AI_SERVICE_URL;
       const aiServiceApiKey = process.env.AI_SERVICE_API_KEY;
@@ -231,6 +363,10 @@ router.post(
         filename: originalname,
         contentType: mimetype,
       });
+
+      // Add Supabase Storage URL so AI service can store it
+      console.log("🔗 Adding image_url to FormData:", urlData.publicUrl);
+      formData.append("image_url", urlData.publicUrl);
 
       // Add metadata if provided
       if (req.body.metadata) {
@@ -1393,6 +1529,405 @@ router.post(
       return res.status(500).json({
         success: false,
         error: "Store failed",
+        message: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  }
+);
+
+/**
+ * Delete Deep Research Job
+ * Deletes a specific Deep Research job
+ */
+router.delete(
+  "/crew-analysis/:jobId",
+  authenticateToken,
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const userId = req.user?.userId;
+      const { jobId } = req.params;
+
+      if (!userId) {
+        return res.status(401).json({
+          success: false,
+          error: "Authentication required",
+          message: "User ID not found",
+        });
+      }
+
+      if (!jobId) {
+        return res.status(400).json({
+          success: false,
+          error: "Job ID required",
+          message: "Job ID parameter is missing",
+        });
+      }
+
+      console.log(
+        `🗑️ Deleting Deep Research job: ${jobId} for user: ${userId}`
+      );
+
+      // Delete the job (RLS will ensure user can only delete their own jobs)
+      const { error: deleteError } = await supabase
+        .from("crew_analysis_jobs")
+        .delete()
+        .eq("id", jobId)
+        .eq("user_id", userId);
+
+      if (deleteError) {
+        console.error("❌ Failed to delete Deep Research job:", deleteError);
+        return res.status(500).json({
+          success: false,
+          error: "Failed to delete job",
+          message: deleteError.message,
+        });
+      }
+
+      console.log("✅ Deep Research job deleted successfully");
+
+      return res.status(200).json({
+        success: true,
+        message: "Deep Research job deleted successfully",
+      });
+    } catch (error) {
+      console.error("❌ Delete Deep Research job error:", error);
+      return res.status(500).json({
+        success: false,
+        error: "Internal server error",
+        message: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  }
+);
+
+/**
+ * Get Deep Research Jobs
+ * Returns all Deep Research jobs for the current user
+ */
+router.get(
+  "/crew-analysis-jobs",
+  authenticateToken,
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const userId = req.user?.userId;
+
+      if (!userId) {
+        return res.status(401).json({
+          success: false,
+          error: "Authentication required",
+          message: "User ID not found",
+        });
+      }
+
+      // Fetch Deep Research jobs for this user
+      const { data: jobs, error: jobsError } = await supabase
+        .from("crew_analysis_jobs")
+        .select("*")
+        .eq("user_id", userId)
+        .order("created_at", { ascending: false });
+
+      if (jobsError) {
+        console.error("❌ Failed to fetch Deep Research jobs:", jobsError);
+
+        // Return empty array if table doesn't exist yet
+        if (jobsError.code === "42P01") {
+          return res.status(200).json({
+            success: true,
+            data: [],
+            message: "No Deep Research jobs found",
+          });
+        }
+
+        return res.status(500).json({
+          success: false,
+          error: "Failed to fetch jobs",
+          message: jobsError.message,
+        });
+      }
+
+      return res.status(200).json({
+        success: true,
+        data: jobs || [],
+      });
+    } catch (error) {
+      console.error("❌ Get Deep Research jobs error:", error);
+      return res.status(500).json({
+        success: false,
+        error: "Internal server error",
+        message: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  }
+);
+
+/**
+ * Create Deep Research Job
+ * Creates a new Deep Research job in the database and returns the job ID
+ * User will be redirected to history page to watch progress
+ */
+router.post(
+  "/crew-analysis",
+  authenticateToken,
+  upload.single("image"),
+  handleMulterError,
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const userId = req.user?.userId;
+
+      if (!userId) {
+        return res.status(401).json({
+          success: false,
+          error: "Authentication required",
+          message: "User ID not found",
+        });
+      }
+
+      const file = req.file;
+      const keywords = req.body.keywords || "";
+
+      if (!file) {
+        return res.status(400).json({
+          success: false,
+          error: "No file provided",
+          message: "Image file is required for Deep Research",
+        });
+      }
+
+      console.log("🤖 Creating Deep Research job for user:", userId);
+
+      // Upload image to Supabase Storage
+      const fileExt = file.originalname.split(".").pop();
+      const fileName = `${uuidv4()}.${fileExt}`;
+      const filePath = `crew-analysis/${userId}/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from("sparefinder")
+        .upload(filePath, file.buffer, {
+          contentType: file.mimetype,
+          upsert: false,
+        });
+
+      if (uploadError) {
+        console.error("❌ Storage upload error:", uploadError);
+        return res.status(500).json({
+          success: false,
+          error: "Upload failed",
+          message: uploadError.message,
+        });
+      }
+
+      // Get public URL
+      const {
+        data: { publicUrl },
+      } = supabase.storage.from("sparefinder").getPublicUrl(filePath);
+
+      console.log("✅ Image uploaded to:", publicUrl);
+
+      // Get user email
+      const { data: userProfile } = await supabase
+        .from("profiles")
+        .select("email")
+        .eq("id", userId)
+        .single();
+
+      const userEmail = userProfile?.email || "";
+
+      // Create Deep Research job in database
+      const jobId = uuidv4();
+      const { error: jobError } = await supabase
+        .from("crew_analysis_jobs")
+        .insert({
+          id: jobId,
+          user_id: userId,
+          user_email: userEmail,
+          image_url: publicUrl,
+          image_name: file.originalname,
+          keywords: keywords,
+          status: "pending",
+          current_stage: "initialization",
+          progress: 0,
+          created_at: new Date().toISOString(),
+        })
+        .select()
+        .single();
+
+      if (jobError) {
+        console.error("❌ Failed to create Deep Research job:", jobError);
+
+        // Try to create table if it doesn't exist
+        if (jobError.code === "42P01") {
+          console.log(
+            "📝 crew_analysis_jobs table doesn't exist, creating it..."
+          );
+
+          const createTableQuery = `
+            CREATE TABLE IF NOT EXISTS crew_analysis_jobs (
+              id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+              user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+              user_email TEXT,
+              image_url TEXT,
+              image_name TEXT,
+              keywords TEXT,
+              status TEXT DEFAULT 'pending',
+              current_stage TEXT,
+              progress INTEGER DEFAULT 0,
+              error_message TEXT,
+              result_data JSONB,
+              pdf_url TEXT,
+              created_at TIMESTAMPTZ DEFAULT NOW(),
+              updated_at TIMESTAMPTZ DEFAULT NOW(),
+              completed_at TIMESTAMPTZ
+            );
+            
+            CREATE INDEX IF NOT EXISTS idx_crew_jobs_user_id ON crew_analysis_jobs(user_id);
+            CREATE INDEX IF NOT EXISTS idx_crew_jobs_status ON crew_analysis_jobs(status);
+            
+            ALTER TABLE crew_analysis_jobs ENABLE ROW LEVEL SECURITY;
+            
+            CREATE POLICY IF NOT EXISTS "Users can insert their own crew jobs"
+            ON crew_analysis_jobs FOR INSERT
+            WITH CHECK (auth.uid() = user_id);
+            
+            CREATE POLICY IF NOT EXISTS "Users can view their own crew jobs"
+            ON crew_analysis_jobs FOR SELECT
+            USING (auth.uid() = user_id);
+            
+            CREATE POLICY IF NOT EXISTS "Users can update their own crew jobs"
+            ON crew_analysis_jobs FOR UPDATE
+            USING (auth.uid() = user_id);
+          `;
+
+          const { error: createError } = await supabase.rpc("exec_sql", {
+            sql: createTableQuery,
+          });
+
+          if (!createError) {
+            // Retry insertion
+            const { error: retryError } = await supabase
+              .from("crew_analysis_jobs")
+              .insert({
+                id: jobId,
+                user_id: userId,
+                user_email: userEmail,
+                image_url: publicUrl,
+                image_name: file.originalname,
+                keywords: keywords,
+                status: "pending",
+                current_stage: "initialization",
+                progress: 0,
+                created_at: new Date().toISOString(),
+              })
+              .select()
+              .single();
+
+            if (retryError) {
+              throw retryError;
+            }
+
+            console.log("✅ Deep Research job created:", jobId);
+
+            // Trigger the AI Deep Research in the background
+            console.log("🚀 Triggering AI Deep Research");
+
+            setImmediate(async () => {
+              try {
+                await startCrewAnalysis(
+                  jobId,
+                  file.buffer,
+                  file.originalname,
+                  file.mimetype,
+                  userEmail,
+                  keywords
+                );
+              } catch (crewError) {
+                console.error(
+                  `❌ Failed to start AI Deep Research for job ${jobId}:`,
+                  crewError
+                );
+
+                await supabase
+                  .from("crew_analysis_jobs")
+                  .update({
+                    status: "failed",
+                    error_message:
+                      crewError instanceof Error
+                        ? crewError.message
+                        : "Failed to start analysis",
+                    retry_count: 0,
+                    updated_at: new Date().toISOString(),
+                  })
+                  .eq("id", jobId);
+              }
+            });
+
+            return res.status(201).json({
+              success: true,
+              message: "Deep Research job created successfully",
+              jobId: jobId,
+              imageUrl: publicUrl,
+            });
+          }
+        }
+
+        return res.status(500).json({
+          success: false,
+          error: "Failed to create job",
+          message: jobError.message,
+        });
+      }
+
+      console.log("✅ Deep Research job created:", jobId);
+
+      // Trigger the AI Deep Research in the background
+      // Don't await this - let it run asynchronously
+      const aiCrewUrl = process.env.AI_CREW_URL || "http://localhost:8000";
+
+      console.log("🚀 Triggering AI Deep Research at:", aiCrewUrl);
+
+      // Start analysis in background - don't wait for completion
+      setImmediate(async () => {
+        try {
+          await startCrewAnalysis(
+            jobId,
+            file.buffer,
+            file.originalname,
+            file.mimetype,
+            userEmail,
+            keywords
+          );
+        } catch (crewError) {
+          console.error(
+            `❌ Failed to start AI Deep Research for job ${jobId}:`,
+            crewError
+          );
+
+          // Update job status to failed
+          await supabase
+            .from("crew_analysis_jobs")
+            .update({
+              status: "failed",
+              error_message:
+                crewError instanceof Error
+                  ? crewError.message
+                  : "Failed to start analysis",
+              retry_count: 0,
+              updated_at: new Date().toISOString(),
+            })
+            .eq("id", jobId);
+        }
+      });
+
+      return res.status(201).json({
+        success: true,
+        message: "Deep Research job created successfully",
+        jobId: jobId,
+        imageUrl: publicUrl,
+      });
+    } catch (error) {
+      console.error("❌ Deep Research job creation error:", error);
+      return res.status(500).json({
+        success: false,
+        error: "Internal server error",
         message: error instanceof Error ? error.message : "Unknown error",
       });
     }

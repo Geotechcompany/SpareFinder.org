@@ -86,6 +86,7 @@ import {
 import { dashboardApi } from "@/lib/api";
 import KeywordMarkdownResults from "@/components/KeywordMarkdownResults";
 import OnboardingGuide from "@/components/OnboardingGuide";
+import { ComprehensiveAnalysisModal } from "@/components/ComprehensiveAnalysisModal";
 // Pending jobs UI removed; redirect goes to History
 
 // Enhanced CSS styles for technical data visibility
@@ -930,6 +931,7 @@ const Upload = () => {
     "image" | "keywords" | "both" | null
   >(null);
   const [wizardProgress, setWizardProgress] = useState(0);
+  const [showComprehensiveAnalysis, setShowComprehensiveAnalysis] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const keywordsInputRef = useRef<HTMLInputElement>(null);
@@ -1151,6 +1153,29 @@ const Upload = () => {
       return; // Exit early since we're scheduling, not processing immediately
     } catch (error: any) {
       console.error("Keyword search error:", error);
+
+      // Handle subscription errors
+      if (axios.isAxiosError(error) && error.response?.status === 403) {
+        const errorData = error.response.data;
+        if (
+          errorData?.error === "subscription_required" ||
+          errorData?.error === "subscription_expired"
+        ) {
+          toast({
+            title: "Subscription Required",
+            description:
+              errorData.message ||
+              "You need an active subscription or trial to use this feature. Redirecting to billing...",
+            variant: "destructive",
+          });
+          setTimeout(() => {
+            window.location.href =
+              "/dashboard/billing?subscription_required=true";
+          }, 2000);
+          return;
+        }
+      }
+
       toast({
         title: "Keyword search failed",
         description: error.message || "Please try again",
@@ -1374,6 +1399,45 @@ const Upload = () => {
       // Handle axios errors with better messages
       if (axios.isAxiosError(error)) {
         const response = error.response;
+
+        // Handle subscription errors - redirect to billing
+        if (response?.status === 403) {
+          const errorData = response.data;
+          if (
+            errorData?.error === "subscription_required" ||
+            errorData?.error === "subscription_expired"
+          ) {
+            errorTitle = "Subscription Required";
+            errorMessage =
+              errorData.message ||
+              "You need an active subscription or trial to use this feature.";
+            retryable = false;
+
+            // Redirect to billing page after showing error
+            setTimeout(() => {
+              window.location.href =
+                "/dashboard/billing?subscription_required=true";
+            }, 2000);
+
+            toast({
+              title: errorTitle,
+              description: errorMessage + " Redirecting to billing...",
+              variant: "destructive",
+            });
+
+            onProgress?.({
+              status: "error",
+              message: errorMessage,
+              progress: 0,
+              currentStep: errorTitle,
+              currentStepIndex: 0,
+              totalSteps: 6,
+              details: "Please start your free trial or upgrade your plan",
+            });
+
+            return;
+          }
+        }
 
         if (response?.data) {
           const errorData = response.data;
@@ -3436,602 +3500,616 @@ const Upload = () => {
             )}
           </AnimatePresence>
 
-          {(wizardStep === "image" ||
-            wizardStep === "keywords" ||
-            wizardStep === "review") && (
+          {/* Review/Summary Step */}
+          {wizardStep === "review" && (
+            <motion.div
+              key="review"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              className="max-w-4xl mx-auto"
+            >
+              <Card className="bg-black/20 backdrop-blur-xl border-white/10">
+                <CardHeader>
+                  <CardTitle className="text-white flex items-center gap-2">
+                    <FileText className="w-6 h-6 text-purple-400" />
+                    Analysis Summary
+                  </CardTitle>
+                  <CardDescription className="text-gray-400">
+                    Review your submission before starting the analysis
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  {/* Mode Badge */}
+                  <div className="flex items-center gap-2">
+                    <span className="text-gray-400 text-sm">
+                      Analysis Mode:
+                    </span>
+                    <Badge className="bg-purple-600/20 text-purple-300 border-purple-500/30">
+                      {selectedMode === "both"
+                        ? "Image + Keywords"
+                        : selectedMode === "image"
+                        ? "Image Only"
+                        : "Keywords Only"}
+                    </Badge>
+                  </div>
+
+                  {/* Image Summary */}
+                  {(selectedMode === "image" || selectedMode === "both") &&
+                    uploadedFile && (
+                      <div className="space-y-3">
+                        <h3 className="text-white font-semibold flex items-center gap-2">
+                          <ImagePlus className="w-5 h-5 text-blue-400" />
+                          Uploaded Image
+                        </h3>
+                        <div className="flex items-start gap-4 p-4 rounded-lg bg-white/5 border border-white/10">
+                          {imagePreview && (
+                            <div className="relative w-32 h-32 rounded-lg overflow-hidden border border-white/10 flex-shrink-0">
+                              <img
+                                src={imagePreview}
+                                alt="Part preview"
+                                className="w-full h-full object-cover"
+                              />
+                            </div>
+                          )}
+                          <div className="flex-1 space-y-2">
+                            <p className="text-white font-medium">
+                              {uploadedFile.name}
+                            </p>
+                            <p className="text-sm text-gray-400">
+                              {(uploadedFile.size / 1024).toFixed(2)} KB •{" "}
+                              {uploadedFile.type}
+                            </p>
+                            <Badge className="bg-green-600/20 text-green-300 border-green-500/30">
+                              <CheckCircle className="w-3 h-3 mr-1" />
+                              Ready for analysis
+                            </Badge>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                  {/* Keywords Summary */}
+                  {(selectedMode === "keywords" || selectedMode === "both") &&
+                    savedKeywords.length > 0 && (
+                      <div className="space-y-3">
+                        <h3 className="text-white font-semibold flex items-center gap-2">
+                          <Target className="w-5 h-5 text-emerald-400" />
+                          Search Keywords ({savedKeywords.length})
+                        </h3>
+                        <div className="p-4 rounded-lg bg-white/5 border border-white/10">
+                          <div className="flex flex-wrap gap-2">
+                            {savedKeywords.map((keyword, index) => (
+                              <Badge
+                                key={index}
+                                className="bg-emerald-600/20 text-emerald-300 border-emerald-500/30"
+                              >
+                                {keyword}
+                              </Badge>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                  {/* Processing Info */}
+                  <div className="p-4 rounded-lg bg-blue-600/10 border border-blue-500/20">
+                    <div className="flex items-start gap-3">
+                      <Info className="w-5 h-5 text-blue-400 mt-0.5 flex-shrink-0" />
+                      <div className="space-y-1">
+                        <p className="text-sm text-blue-300 font-medium">
+                          What happens next?
+                        </p>
+                        <p className="text-xs text-blue-200/80">
+                          {selectedMode === "both"
+                            ? "Your image will be analyzed using AI, refined with your keywords for maximum accuracy."
+                            : selectedMode === "image"
+                            ? "Your image will be processed using advanced AI to identify the automotive part."
+                            : "Our system will search for parts matching your keywords in our extensive catalog."}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </motion.div>
+          )}
+
+          {(wizardStep === "image" || wizardStep === "keywords") && (
             <>
               {/* Main Content Grid - centered and responsive */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 lg:gap-8 items-start">
-                {/* Upload Section - Only show for image or review steps */}
-                {(wizardStep === "image" || wizardStep === "review") &&
-                  selectedMode !== "keywords" && (
-                    <motion.div
-                      initial={{ opacity: 0, x: -20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: 0.3 }}
-                      className="relative mx-auto w-full max-w-xl"
-                    >
-                      <div className="absolute inset-0 bg-gradient-to-r from-purple-600/10 to-blue-600/10 rounded-3xl blur-xl opacity-60" />
-                      <Card className="relative bg-black/20 backdrop-blur-xl border-white/10 h-full">
-                        <CardHeader>
-                          <CardTitle className="text-white flex items-center justify-between">
-                            <div className="flex items-center space-x-2">
-                              <UploadIcon className="w-5 h-5 text-purple-400" />
-                              <span>Upload Part Image</span>
-                            </div>
-                            {uploadedFile && (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={handleRemoveFile}
-                                className="text-gray-400 hover:text-white h-8 w-8 p-0"
-                              >
-                                <X className="w-4 h-4" />
-                              </Button>
-                            )}
-                          </CardTitle>
-                          <CardDescription className="text-gray-400">
-                            Upload an image for AI-powered part identification
-                          </CardDescription>
-                        </CardHeader>
-                        <CardContent className="space-y-6">
-                          {/* Upload Area */}
-                          <div
-                            id="tour-upload-dropzone"
-                            className={`relative border-2 border-dashed rounded-3xl p-6 sm:p-8 lg:p-12 text-center transition-all duration-300 ${
-                              dragActive
-                                ? "border-purple-500 bg-purple-600/10"
-                                : uploadedFile
-                                ? "border-green-500/50 bg-green-600/5"
-                                : "border-gray-600 hover:border-gray-500"
-                            }`}
-                            onDragOver={handleDrag}
-                            onDragLeave={handleDrag}
-                            onDrop={handleDrop}
-                          >
-                            <input
-                              ref={fileInputRef}
-                              type="file"
-                              accept="image/*"
-                              onChange={handleFileInput}
-                              className="hidden"
-                            />
-
-                            {uploadedFile && imagePreview ? (
-                              <motion.div
-                                className="space-y-4"
-                                initial={{ opacity: 0, scale: 0.9 }}
-                                animate={{ opacity: 1, scale: 1 }}
-                              >
-                                {/* Image Preview */}
-                                <div className="relative mx-auto w-full max-w-md">
-                                  <div className="aspect-video rounded-xl overflow-hidden border border-white/10">
-                                    <ImageWithFallback
-                                      src={imagePreview}
-                                      alt="Uploaded part"
-                                      className="w-full h-full object-cover"
-                                      onError={() => {
-                                        const target =
-                                          document.createElement("img");
-                                        target.src = "/images/placeholder.png";
-                                        target.alt = "Placeholder image";
-                                        target.className =
-                                          "w-full h-full object-cover";
-                                        target.style.display = "block";
-                                        target.onerror = () => {
-                                          const placeholder =
-                                            document.createElement("div");
-                                          placeholder.className =
-                                            "w-full h-full bg-gray-700 flex items-center justify-center text-gray-400 text-xs";
-                                          placeholder.innerHTML =
-                                            '<div class="text-center"><div class="w-8 h-8 mx-auto mb-1 opacity-50"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg></div>Image unavailable</div>';
-                                          target.parentNode?.appendChild(
-                                            placeholder
-                                          );
-                                        };
-                                      }}
-                                    />
-                                  </div>
-                                  <div className="absolute top-2 right-2">
-                                    <Badge className="bg-green-600/20 text-green-300 border-green-500/30">
-                                      <CheckCircle className="w-3 h-3 mr-1" />
-                                      Ready
-                                    </Badge>
-                                  </div>
-                                </div>
-
-                                {/* File Info */}
-                                <div className="text-center">
-                                  <p className="text-white font-medium text-lg">
-                                    {uploadedFile.name}
-                                  </p>
-                                  <p className="text-gray-400 text-sm">
-                                    {(uploadedFile.size / 1024 / 1024).toFixed(
-                                      2
-                                    )}{" "}
-                                    MB • {uploadedFile.type}
-                                  </p>
-                                </div>
-
-                                {/* Analyze Button */}
-                                <motion.div
-                                  whileHover={{ scale: 1.05 }}
-                                  whileTap={{ scale: 0.95 }}
-                                >
-                                  <Button
-                                    onClick={scheduleAnalysis}
-                                    disabled={isAnalyzing}
-                                    className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 shadow-lg shadow-purple-500/25 h-12 px-6"
-                                  >
-                                    {isAnalyzing ? (
-                                      <>
-                                        <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                                        Analyzing...
-                                      </>
-                                    ) : (
-                                      <>
-                                        <Zap className="w-5 h-5 mr-2" />
-                                        Analyze Part
-                                      </>
-                                    )}
-                                  </Button>
-                                </motion.div>
-                              </motion.div>
-                            ) : (
-                              <motion.div
-                                className="space-y-6"
-                                initial={{ opacity: 0, y: 20 }}
-                                animate={{ opacity: 1, y: 0 }}
-                              >
-                                <motion.div
-                                  animate={{ y: [0, -10, 0] }}
-                                  transition={{
-                                    duration: 2,
-                                    repeat: Infinity,
-                                    ease: "easeInOut",
-                                  }}
-                                >
-                                  <ImagePlus className="w-16 h-16 text-gray-400 mx-auto" />
-                                </motion.div>
-                                <div>
-                                  <p className="text-white font-medium text-lg mb-2">
-                                    Drop your image here
-                                  </p>
-                                  <p className="text-gray-400 text-sm">
-                                    Supports JPG, PNG, WebP up to 10MB
-                                  </p>
-                                </div>
-                                <motion.div
-                                  whileHover={{ scale: 1.05 }}
-                                  whileTap={{ scale: 0.95 }}
-                                  className="w-full sm:w-auto inline-block"
-                                >
-                                  <Button
-                                    onClick={() =>
-                                      fileInputRef.current?.click()
-                                    }
-                                    variant="outline"
-                                    className="w-full sm:w-auto border-gray-600 text-gray-300 hover:bg-white/10 hover:text-white hover:border-white/30 h-12 px-6"
-                                  >
-                                    <Camera className="w-5 h-5 mr-2" />
-                                    Choose File
-                                  </Button>
-                                </motion.div>
-                              </motion.div>
-                            )}
+                {/* Upload Section - Only show for image step */}
+                {wizardStep === "image" && selectedMode !== "keywords" && (
+                  <motion.div
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: 0.3 }}
+                    className="relative mx-auto w-full max-w-xl"
+                  >
+                    <div className="absolute inset-0 bg-gradient-to-r from-purple-600/10 to-blue-600/10 rounded-3xl blur-xl opacity-60" />
+                    <Card className="relative bg-black/20 backdrop-blur-xl border-white/10 h-full">
+                      <CardHeader>
+                        <CardTitle className="text-white flex items-center justify-between">
+                          <div className="flex items-center space-x-2">
+                            <UploadIcon className="w-5 h-5 text-purple-400" />
+                            <span>Upload Part Image</span>
                           </div>
+                          {uploadedFile && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={handleRemoveFile}
+                              className="text-gray-400 hover:text-white h-8 w-8 p-0"
+                            >
+                              <X className="w-4 h-4" />
+                            </Button>
+                          )}
+                        </CardTitle>
+                        <CardDescription className="text-gray-400">
+                          Upload an image for AI-powered part identification
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent className="space-y-6">
+                        {/* Upload Area */}
+                        <div
+                          id="tour-upload-dropzone"
+                          className={`relative border-2 border-dashed rounded-3xl p-6 sm:p-8 lg:p-12 text-center transition-all duration-300 ${
+                            dragActive
+                              ? "border-purple-500 bg-purple-600/10"
+                              : uploadedFile
+                              ? "border-green-500/50 bg-green-600/5"
+                              : "border-gray-600 hover:border-gray-500"
+                          }`}
+                          onDragOver={handleDrag}
+                          onDragLeave={handleDrag}
+                          onDrop={handleDrop}
+                        >
+                          <input
+                            ref={fileInputRef}
+                            type="file"
+                            accept="image/*"
+                            onChange={handleFileInput}
+                            className="hidden"
+                          />
 
-                          {/* Keyword Input Section - Only show for "both" mode */}
-                          {selectedMode === "both" && (
-                            <div className="mb-4 space-y-2">
-                              <div className="flex space-x-2">
-                                <Input
-                                  id="tour-keywords-input"
-                                  ref={keywordsInputRef}
-                                  value={keywords}
-                                  onChange={(e) => setKeywords(e.target.value)}
-                                  onKeyDown={(e) => {
-                                    if (e.key === "Enter") {
-                                      handleAddKeyword();
-                                    }
-                                  }}
-                                  placeholder="Add keywords to refine analysis (e.g., brake, suspension)"
-                                  className="flex-grow"
-                                />
+                          {uploadedFile && imagePreview ? (
+                            <motion.div
+                              className="space-y-4"
+                              initial={{ opacity: 0, scale: 0.9 }}
+                              animate={{ opacity: 1, scale: 1 }}
+                            >
+                              {/* Image Preview */}
+                              <div className="relative mx-auto w-full max-w-md">
+                                <div className="aspect-video rounded-xl overflow-hidden border border-white/10">
+                                  <ImageWithFallback
+                                    src={imagePreview}
+                                    alt="Uploaded part"
+                                    className="w-full h-full object-cover"
+                                    onError={() => {
+                                      const target =
+                                        document.createElement("img");
+                                      target.src = "/images/placeholder.png";
+                                      target.alt = "Placeholder image";
+                                      target.className =
+                                        "w-full h-full object-cover";
+                                      target.style.display = "block";
+                                      target.onerror = () => {
+                                        const placeholder =
+                                          document.createElement("div");
+                                        placeholder.className =
+                                          "w-full h-full bg-gray-700 flex items-center justify-center text-gray-400 text-xs";
+                                        placeholder.innerHTML =
+                                          '<div class="text-center"><div class="w-8 h-8 mx-auto mb-1 opacity-50"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg></div>Image unavailable</div>';
+                                        target.parentNode?.appendChild(
+                                          placeholder
+                                        );
+                                      };
+                                    }}
+                                  />
+                                </div>
+                                <div className="absolute top-2 right-2">
+                                  <Badge className="bg-green-600/20 text-green-300 border-green-500/30">
+                                    <CheckCircle className="w-3 h-3 mr-1" />
+                                    Ready
+                                  </Badge>
+                                </div>
+                              </div>
+
+                              {/* File Info */}
+                              <div className="text-center">
+                                <p className="text-white font-medium text-lg">
+                                  {uploadedFile.name}
+                                </p>
+                                <p className="text-gray-400 text-sm">
+                                  {(uploadedFile.size / 1024 / 1024).toFixed(2)}{" "}
+                                  MB • {uploadedFile.type}
+                                </p>
+                              </div>
+                            </motion.div>
+                          ) : (
+                            <motion.div
+                              className="space-y-6"
+                              initial={{ opacity: 0, y: 20 }}
+                              animate={{ opacity: 1, y: 0 }}
+                            >
+                              <motion.div
+                                animate={{ y: [0, -10, 0] }}
+                                transition={{
+                                  duration: 2,
+                                  repeat: Infinity,
+                                  ease: "easeInOut",
+                                }}
+                              >
+                                <ImagePlus className="w-16 h-16 text-gray-400 mx-auto" />
+                              </motion.div>
+                              <div>
+                                <p className="text-white font-medium text-lg mb-2">
+                                  Drop your image here
+                                </p>
+                                <p className="text-gray-400 text-sm">
+                                  Supports JPG, PNG, WebP up to 10MB
+                                </p>
+                              </div>
+                              <motion.div
+                                whileHover={{ scale: 1.05 }}
+                                whileTap={{ scale: 0.95 }}
+                                className="w-full sm:w-auto inline-block"
+                              >
                                 <Button
-                                  onClick={handleAddKeyword}
+                                  onClick={() => fileInputRef.current?.click()}
                                   variant="outline"
-                                  className="px-4"
+                                  className="w-full sm:w-auto border-gray-600 text-gray-300 hover:bg-white/10 hover:text-white hover:border-white/30 h-12 px-6"
                                 >
-                                  <Plus className="w-4 h-4 mr-2" /> Add
+                                  <Camera className="w-5 h-5 mr-2" />
+                                  Choose File
                                 </Button>
-                                {savedKeywords.length > 0 && (
-                                  <Button
-                                    id="tour-search-keywords-btn"
-                                    onClick={openKeywordSearchModal}
-                                    disabled={isKeywordSearching}
-                                    className="px-4 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700"
-                                  >
-                                    <Search className="w-4 h-4 mr-2" /> Search
-                                    by Keywords
-                                  </Button>
+                              </motion.div>
+                            </motion.div>
+                          )}
+                        </div>
+
+                        {/* Enhanced Progress Bar with Detailed Information */}
+                        <AnimatePresence>
+                          {(isAnalyzing || isLoading) && analysisProgress && (
+                            <motion.div
+                              initial={{ opacity: 0, y: 10 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              exit={{ opacity: 0, y: -10 }}
+                              className="space-y-6 bg-gray-900/50 rounded-2xl p-6 border border-gray-700/50 backdrop-blur-sm"
+                            >
+                              {/* Enhanced Progress Header */}
+                              <div className="space-y-4">
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center space-x-4">
+                                    <motion.div
+                                      animate={{
+                                        rotate:
+                                          analysisProgress.status === "complete"
+                                            ? 0
+                                            : 360,
+                                      }}
+                                      transition={{
+                                        duration:
+                                          analysisProgress.status === "complete"
+                                            ? 0
+                                            : 2,
+                                        repeat:
+                                          analysisProgress.status === "complete"
+                                            ? 0
+                                            : Infinity,
+                                        ease: "linear",
+                                      }}
+                                      className={`p-3 rounded-full bg-gradient-to-r ${getProgressStageColor(
+                                        analysisProgress.status
+                                      )} shadow-lg`}
+                                    >
+                                      {getProgressStageIcon(
+                                        analysisProgress.status
+                                      )}
+                                    </motion.div>
+                                    <div className="flex-1">
+                                      <div className="text-white font-bold text-xl">
+                                        {analysisProgress.currentStep ||
+                                          analysisProgress.message}
+                                      </div>
+                                      <div className="text-gray-300 text-base mt-1">
+                                        {analysisProgress.details ||
+                                          "Processing your automotive part analysis..."}
+                                      </div>
+                                      {analysisProgress.currentStepIndex &&
+                                        analysisProgress.totalSteps && (
+                                          <div className="text-gray-400 text-sm mt-2 flex items-center space-x-2">
+                                            <span>
+                                              Step{" "}
+                                              {
+                                                analysisProgress.currentStepIndex
+                                              }{" "}
+                                              of {analysisProgress.totalSteps}
+                                            </span>
+                                            <span className="w-1 h-1 bg-gray-500 rounded-full"></span>
+                                            <span>AI Engine Processing</span>
+                                          </div>
+                                        )}
+                                    </div>
+                                  </div>
+                                  <div className="text-right">
+                                    <div className="text-white text-2xl font-bold">
+                                      {analysisProgress.progress}%
+                                    </div>
+                                    <div className="text-gray-400 text-sm">
+                                      Complete
+                                    </div>
+                                  </div>
+                                </div>
+
+                                {/* Detailed Status Information */}
+                                <div className="bg-gray-800/50 rounded-lg p-4 border border-gray-700/30">
+                                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                                    <div className="flex items-center space-x-2">
+                                      <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse"></div>
+                                      <span className="text-gray-300">
+                                        Status:
+                                      </span>
+                                      <span className="text-white font-semibold capitalize">
+                                        {analysisProgress.status.replace(
+                                          "_",
+                                          " "
+                                        )}
+                                      </span>
+                                    </div>
+                                    <div className="flex items-center space-x-2">
+                                      <div className="w-2 h-2 bg-green-400 rounded-full"></div>
+                                      <span className="text-gray-300">
+                                        Engine:
+                                      </span>
+                                      <span className="text-white font-semibold">
+                                        AI Vision
+                                      </span>
+                                    </div>
+                                    <div className="flex items-center space-x-2">
+                                      <div className="w-2 h-2 bg-purple-400 rounded-full"></div>
+                                      <span className="text-gray-300">
+                                        Mode:
+                                      </span>
+                                      <span className="text-white font-semibold">
+                                        Advanced Analysis
+                                      </span>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* Enhanced Progress Bar */}
+                              <div className="space-y-4">
+                                <div className="relative">
+                                  <div className="w-full bg-gray-800 rounded-full h-4 overflow-hidden backdrop-blur-sm border border-gray-600">
+                                    <motion.div
+                                      className={`h-full bg-gradient-to-r ${getProgressStageColor(
+                                        analysisProgress.status
+                                      )} rounded-full relative overflow-hidden`}
+                                      initial={{ width: 0 }}
+                                      animate={{
+                                        width: `${analysisProgress.progress}%`,
+                                      }}
+                                      transition={{
+                                        duration: 0.8,
+                                        ease: "easeOut",
+                                      }}
+                                    >
+                                      {/* Enhanced animated shine effect */}
+                                      <motion.div
+                                        className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent"
+                                        animate={{ x: ["-100%", "100%"] }}
+                                        transition={{
+                                          duration: 1.5,
+                                          repeat:
+                                            analysisProgress.status !==
+                                            "complete"
+                                              ? Infinity
+                                              : 0,
+                                          ease: "easeInOut",
+                                        }}
+                                      />
+                                      {/* Progress text overlay */}
+                                      <div className="absolute inset-0 flex items-center justify-center">
+                                        <span className="text-white text-xs font-semibold mix-blend-difference">
+                                          {analysisProgress.progress}%
+                                        </span>
+                                      </div>
+                                    </motion.div>
+                                  </div>
+                                </div>
+
+                                {/* Enhanced Progress markers */}
+                                {analysisProgress.totalSteps && (
+                                  <div className="space-y-2">
+                                    <div className="flex justify-between">
+                                      {Array.from(
+                                        {
+                                          length: analysisProgress.totalSteps,
+                                        },
+                                        (_, i) => (
+                                          <div
+                                            key={i}
+                                            className="flex flex-col items-center space-y-1"
+                                          >
+                                            <div
+                                              className={`w-3 h-3 rounded-full transition-all duration-300 ${
+                                                (analysisProgress.currentStepIndex ||
+                                                  0) > i
+                                                  ? "bg-green-400 scale-110"
+                                                  : (analysisProgress.currentStepIndex ||
+                                                      0) ===
+                                                    i + 1
+                                                  ? `bg-gradient-to-r ${getProgressStageColor(
+                                                      analysisProgress.status
+                                                    )} scale-125 animate-pulse`
+                                                  : "bg-gray-600"
+                                              }`}
+                                            />
+                                            <div className="text-xs text-gray-400 text-center max-w-16">
+                                              {i === 0 && "Upload"}
+                                              {i === 1 && "Validate"}
+                                              {i === 2 && "AI Scan"}
+                                              {i === 3 && "Match"}
+                                              {i === 4 && "Finalize"}
+                                              {i === 5 && "Complete"}
+                                            </div>
+                                          </div>
+                                        )
+                                      )}
+                                    </div>
+                                  </div>
                                 )}
                               </div>
 
-                              {/* Saved Keywords Display */}
-                              {savedKeywords.length > 0 && (
-                                <div className="flex flex-wrap gap-2">
-                                  {savedKeywords.map((keyword, index) => (
-                                    <motion.div
-                                      key={index}
-                                      initial={{ opacity: 0, scale: 0.8 }}
-                                      animate={{ opacity: 1, scale: 1 }}
-                                      exit={{ opacity: 0, scale: 0.8 }}
-                                      className="flex items-center bg-purple-600/20 text-purple-300 px-3 py-1 rounded-full text-sm"
-                                    >
-                                      {keyword}
-                                      <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        className="ml-2 p-0 h-4 w-4 hover:bg-purple-700/30"
-                                        onClick={() =>
-                                          handleRemoveKeyword(keyword)
-                                        }
-                                      >
-                                        <X className="w-3 h-3" />
-                                      </Button>
-                                    </motion.div>
-                                  ))}
-                                </div>
-                              )}
-                            </div>
-                          )}
-
-                          {/* Enhanced Progress Bar with Detailed Information */}
-                          <AnimatePresence>
-                            {(isAnalyzing || isLoading) && analysisProgress && (
-                              <motion.div
-                                initial={{ opacity: 0, y: 10 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                exit={{ opacity: 0, y: -10 }}
-                                className="space-y-6 bg-gray-900/50 rounded-2xl p-6 border border-gray-700/50 backdrop-blur-sm"
-                              >
-                                {/* Enhanced Progress Header */}
-                                <div className="space-y-4">
-                                  <div className="flex items-center justify-between">
-                                    <div className="flex items-center space-x-4">
-                                      <motion.div
-                                        animate={{
-                                          rotate:
-                                            analysisProgress.status ===
-                                            "complete"
-                                              ? 0
-                                              : 360,
-                                        }}
-                                        transition={{
-                                          duration:
-                                            analysisProgress.status ===
-                                            "complete"
-                                              ? 0
-                                              : 2,
-                                          repeat:
-                                            analysisProgress.status ===
-                                            "complete"
-                                              ? 0
-                                              : Infinity,
-                                          ease: "linear",
-                                        }}
-                                        className={`p-3 rounded-full bg-gradient-to-r ${getProgressStageColor(
-                                          analysisProgress.status
-                                        )} shadow-lg`}
-                                      >
-                                        {getProgressStageIcon(
-                                          analysisProgress.status
-                                        )}
-                                      </motion.div>
-                                      <div className="flex-1">
-                                        <div className="text-white font-bold text-xl">
-                                          {analysisProgress.currentStep ||
-                                            analysisProgress.message}
-                                        </div>
-                                        <div className="text-gray-300 text-base mt-1">
-                                          {analysisProgress.details ||
-                                            "Processing your automotive part analysis..."}
-                                        </div>
-                                        {analysisProgress.currentStepIndex &&
-                                          analysisProgress.totalSteps && (
-                                            <div className="text-gray-400 text-sm mt-2 flex items-center space-x-2">
-                                              <span>
-                                                Step{" "}
-                                                {
-                                                  analysisProgress.currentStepIndex
-                                                }{" "}
-                                                of {analysisProgress.totalSteps}
-                                              </span>
-                                              <span className="w-1 h-1 bg-gray-500 rounded-full"></span>
-                                              <span>AI Engine Processing</span>
-                                            </div>
-                                          )}
-                                      </div>
-                                    </div>
-                                    <div className="text-right">
-                                      <div className="text-white text-2xl font-bold">
-                                        {analysisProgress.progress}%
-                                      </div>
-                                      <div className="text-gray-400 text-sm">
-                                        Complete
-                                      </div>
-                                    </div>
-                                  </div>
-
-                                  {/* Detailed Status Information */}
-                                  <div className="bg-gray-800/50 rounded-lg p-4 border border-gray-700/30">
-                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-                                      <div className="flex items-center space-x-2">
-                                        <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse"></div>
-                                        <span className="text-gray-300">
-                                          Status:
-                                        </span>
-                                        <span className="text-white font-semibold capitalize">
-                                          {analysisProgress.status.replace(
-                                            "_",
-                                            " "
-                                          )}
-                                        </span>
-                                      </div>
-                                      <div className="flex items-center space-x-2">
-                                        <div className="w-2 h-2 bg-green-400 rounded-full"></div>
-                                        <span className="text-gray-300">
-                                          Engine:
-                                        </span>
-                                        <span className="text-white font-semibold">
-                                          AI Vision
-                                        </span>
-                                      </div>
-                                      <div className="flex items-center space-x-2">
-                                        <div className="w-2 h-2 bg-purple-400 rounded-full"></div>
-                                        <span className="text-gray-300">
-                                          Mode:
-                                        </span>
-                                        <span className="text-white font-semibold">
-                                          Advanced Analysis
-                                        </span>
-                                      </div>
-                                    </div>
-                                  </div>
-                                </div>
-
-                                {/* Enhanced Progress Bar */}
-                                <div className="space-y-4">
-                                  <div className="relative">
-                                    <div className="w-full bg-gray-800 rounded-full h-4 overflow-hidden backdrop-blur-sm border border-gray-600">
-                                      <motion.div
-                                        className={`h-full bg-gradient-to-r ${getProgressStageColor(
-                                          analysisProgress.status
-                                        )} rounded-full relative overflow-hidden`}
-                                        initial={{ width: 0 }}
-                                        animate={{
-                                          width: `${analysisProgress.progress}%`,
-                                        }}
-                                        transition={{
-                                          duration: 0.8,
-                                          ease: "easeOut",
-                                        }}
-                                      >
-                                        {/* Enhanced animated shine effect */}
-                                        <motion.div
-                                          className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent"
-                                          animate={{ x: ["-100%", "100%"] }}
-                                          transition={{
-                                            duration: 1.5,
-                                            repeat:
-                                              analysisProgress.status !==
-                                              "complete"
-                                                ? Infinity
-                                                : 0,
-                                            ease: "easeInOut",
-                                          }}
-                                        />
-                                        {/* Progress text overlay */}
-                                        <div className="absolute inset-0 flex items-center justify-center">
-                                          <span className="text-white text-xs font-semibold mix-blend-difference">
-                                            {analysisProgress.progress}%
-                                          </span>
-                                        </div>
-                                      </motion.div>
-                                    </div>
-                                  </div>
-
-                                  {/* Enhanced Progress markers */}
-                                  {analysisProgress.totalSteps && (
-                                    <div className="space-y-2">
-                                      <div className="flex justify-between">
-                                        {Array.from(
-                                          {
-                                            length: analysisProgress.totalSteps,
-                                          },
-                                          (_, i) => (
-                                            <div
-                                              key={i}
-                                              className="flex flex-col items-center space-y-1"
-                                            >
-                                              <div
-                                                className={`w-3 h-3 rounded-full transition-all duration-300 ${
-                                                  (analysisProgress.currentStepIndex ||
-                                                    0) > i
-                                                    ? "bg-green-400 scale-110"
-                                                    : (analysisProgress.currentStepIndex ||
-                                                        0) ===
-                                                      i + 1
-                                                    ? `bg-gradient-to-r ${getProgressStageColor(
-                                                        analysisProgress.status
-                                                      )} scale-125 animate-pulse`
-                                                    : "bg-gray-600"
-                                                }`}
-                                              />
-                                              <div className="text-xs text-gray-400 text-center max-w-16">
-                                                {i === 0 && "Upload"}
-                                                {i === 1 && "Validate"}
-                                                {i === 2 && "AI Scan"}
-                                                {i === 3 && "Match"}
-                                                {i === 4 && "Finalize"}
-                                                {i === 5 && "Complete"}
-                                              </div>
-                                            </div>
-                                          )
-                                        )}
-                                      </div>
-                                    </div>
-                                  )}
-                                </div>
-
-                                {/* Real-time Activity Log */}
-                                <Collapsible>
-                                  <CollapsibleTrigger asChild>
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      className="w-full justify-between text-gray-300 hover:text-white"
-                                    >
-                                      <span className="flex items-center space-x-2">
-                                        <Info className="w-4 h-4" />
-                                        <span>View Detailed Progress</span>
-                                      </span>
-                                      <ChevronDown className="w-4 h-4" />
-                                    </Button>
-                                  </CollapsibleTrigger>
-                                  <CollapsibleContent>
-                                    <div className="mt-4 space-y-2 bg-gray-900/70 rounded-lg p-4 border border-gray-700/50 max-h-40 overflow-y-auto">
-                                      <div className="text-xs font-mono text-gray-300 space-y-1">
-                                        <div className="flex justify-between">
-                                          <span>🔄 Analysis started</span>
-                                          <span className="text-gray-500">
-                                            {new Date().toLocaleTimeString()}
-                                          </span>
-                                        </div>
-                                        <div className="flex justify-between">
-                                          <span>
-                                            📤 Image uploaded successfully
-                                          </span>
-                                          <span className="text-gray-500">
-                                            {new Date().toLocaleTimeString()}
-                                          </span>
-                                        </div>
-                                        <div className="flex justify-between">
-                                          <span>
-                                            🔍 {analysisProgress.message}
-                                          </span>
-                                          <span className="text-gray-500">
-                                            {new Date().toLocaleTimeString()}
-                                          </span>
-                                        </div>
-                                        {analysisProgress.status ===
-                                          "ai_analysis" && (
-                                          <div className="flex justify-between text-blue-300">
-                                            <span>
-                                              🧠 Deep learning model
-                                              processing...
-                                            </span>
-                                            <span className="text-gray-500">
-                                              {new Date().toLocaleTimeString()}
-                                            </span>
-                                          </div>
-                                        )}
-                                        {analysisProgress.status ===
-                                          "part_matching" && (
-                                          <div className="flex justify-between text-purple-300">
-                                            <span>
-                                              🔗 Matching against automotive
-                                              database...
-                                            </span>
-                                            <span className="text-gray-500">
-                                              {new Date().toLocaleTimeString()}
-                                            </span>
-                                          </div>
-                                        )}
-                                      </div>
-                                    </div>
-                                  </CollapsibleContent>
-                                </Collapsible>
-
-                                {/* Identified Part Display - Enhanced */}
-                                {analysisProgress.identifiedPart && (
-                                  <motion.div
-                                    initial={{ opacity: 0, scale: 0.9 }}
-                                    animate={{ opacity: 1, scale: 1 }}
-                                    className="p-6 rounded-xl bg-gradient-to-r from-green-600/20 to-emerald-600/20 border border-green-500/30 backdrop-blur-sm"
+                              {/* Real-time Activity Log */}
+                              <Collapsible>
+                                <CollapsibleTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="w-full justify-between text-gray-300 hover:text-white"
                                   >
-                                    <div className="flex items-center justify-between">
-                                      <div className="flex items-center space-x-4">
-                                        <motion.div
-                                          className="p-3 bg-green-600/30 rounded-full"
-                                          animate={{ scale: [1, 1.1, 1] }}
-                                          transition={{
-                                            duration: 2,
-                                            repeat: Infinity,
-                                          }}
-                                        >
-                                          <CheckCircle className="w-6 h-6 text-green-400" />
-                                        </motion.div>
-                                        <div>
-                                          <div className="text-green-300 font-medium text-lg">
-                                            🎯 Part Successfully Identified!
-                                          </div>
-                                          <div className="text-green-200 font-bold text-xl">
-                                            {analysisProgress.identifiedPart}
-                                          </div>
-                                          <div className="text-green-300 text-sm mt-1">
-                                            Advanced AI pattern recognition
-                                            complete
-                                          </div>
-                                        </div>
+                                    <span className="flex items-center space-x-2">
+                                      <Info className="w-4 h-4" />
+                                      <span>View Detailed Progress</span>
+                                    </span>
+                                    <ChevronDown className="w-4 h-4" />
+                                  </Button>
+                                </CollapsibleTrigger>
+                                <CollapsibleContent>
+                                  <div className="mt-4 space-y-2 bg-gray-900/70 rounded-lg p-4 border border-gray-700/50 max-h-40 overflow-y-auto">
+                                    <div className="text-xs font-mono text-gray-300 space-y-1">
+                                      <div className="flex justify-between">
+                                        <span>🔄 Analysis started</span>
+                                        <span className="text-gray-500">
+                                          {new Date().toLocaleTimeString()}
+                                        </span>
                                       </div>
-                                      {analysisProgress.confidence && (
-                                        <div className="text-right">
-                                          <div className="text-green-400 text-3xl font-bold">
-                                            {analysisProgress.confidence}%
-                                          </div>
-                                          <div className="text-green-300 text-sm">
-                                            Confidence Score
-                                          </div>
-                                          <div className="text-green-400 text-xs mt-1">
-                                            {analysisProgress.confidence > 90
-                                              ? "Excellent Match"
-                                              : analysisProgress.confidence > 75
-                                              ? "Good Match"
-                                              : "Fair Match"}
-                                          </div>
+                                      <div className="flex justify-between">
+                                        <span>
+                                          📤 Image uploaded successfully
+                                        </span>
+                                        <span className="text-gray-500">
+                                          {new Date().toLocaleTimeString()}
+                                        </span>
+                                      </div>
+                                      <div className="flex justify-between">
+                                        <span>
+                                          🔍 {analysisProgress.message}
+                                        </span>
+                                        <span className="text-gray-500">
+                                          {new Date().toLocaleTimeString()}
+                                        </span>
+                                      </div>
+                                      {analysisProgress.status ===
+                                        "ai_analysis" && (
+                                        <div className="flex justify-between text-blue-300">
+                                          <span>
+                                            🧠 Deep learning model processing...
+                                          </span>
+                                          <span className="text-gray-500">
+                                            {new Date().toLocaleTimeString()}
+                                          </span>
+                                        </div>
+                                      )}
+                                      {analysisProgress.status ===
+                                        "part_matching" && (
+                                        <div className="flex justify-between text-purple-300">
+                                          <span>
+                                            🔗 Matching against automotive
+                                            database...
+                                          </span>
+                                          <span className="text-gray-500">
+                                            {new Date().toLocaleTimeString()}
+                                          </span>
                                         </div>
                                       )}
                                     </div>
-                                  </motion.div>
-                                )}
+                                  </div>
+                                </CollapsibleContent>
+                              </Collapsible>
 
-                                {/* Additional Status Messages */}
+                              {/* Identified Part Display - Enhanced */}
+                              {analysisProgress.identifiedPart && (
                                 <motion.div
-                                  key={analysisProgress.status}
-                                  initial={{ opacity: 0, x: -20 }}
-                                  animate={{ opacity: 1, x: 0 }}
-                                  className="text-center bg-gray-800/30 rounded-lg p-3"
+                                  initial={{ opacity: 0, scale: 0.9 }}
+                                  animate={{ opacity: 1, scale: 1 }}
+                                  className="p-6 rounded-xl bg-gradient-to-r from-green-600/20 to-emerald-600/20 border border-green-500/30 backdrop-blur-sm"
                                 >
-                                  <p className="text-gray-200 text-base font-medium">
-                                    {analysisProgress.message}
-                                  </p>
-                                  {analysisProgress.details && (
-                                    <p className="text-gray-400 text-sm mt-1">
-                                      {analysisProgress.details}
-                                    </p>
-                                  )}
+                                  <div className="flex items-center justify-between">
+                                    <div className="flex items-center space-x-4">
+                                      <motion.div
+                                        className="p-3 bg-green-600/30 rounded-full"
+                                        animate={{ scale: [1, 1.1, 1] }}
+                                        transition={{
+                                          duration: 2,
+                                          repeat: Infinity,
+                                        }}
+                                      >
+                                        <CheckCircle className="w-6 h-6 text-green-400" />
+                                      </motion.div>
+                                      <div>
+                                        <div className="text-green-300 font-medium text-lg">
+                                          🎯 Part Successfully Identified!
+                                        </div>
+                                        <div className="text-green-200 font-bold text-xl">
+                                          {analysisProgress.identifiedPart}
+                                        </div>
+                                        <div className="text-green-300 text-sm mt-1">
+                                          Advanced AI pattern recognition
+                                          complete
+                                        </div>
+                                      </div>
+                                    </div>
+                                    {analysisProgress.confidence && (
+                                      <div className="text-right">
+                                        <div className="text-green-400 text-3xl font-bold">
+                                          {analysisProgress.confidence}%
+                                        </div>
+                                        <div className="text-green-300 text-sm">
+                                          Confidence Score
+                                        </div>
+                                        <div className="text-green-400 text-xs mt-1">
+                                          {analysisProgress.confidence > 90
+                                            ? "Excellent Match"
+                                            : analysisProgress.confidence > 75
+                                            ? "Good Match"
+                                            : "Fair Match"}
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
                                 </motion.div>
-                              </motion.div>
-                            )}
-                          </AnimatePresence>
+                              )}
 
-                          {/* Tips moved to right column */}
-                        </CardContent>
-                      </Card>
-                    </motion.div>
-                  )}
+                              {/* Additional Status Messages */}
+                              <motion.div
+                                key={analysisProgress.status}
+                                initial={{ opacity: 0, x: -20 }}
+                                animate={{ opacity: 1, x: 0 }}
+                                className="text-center bg-gray-800/30 rounded-lg p-3"
+                              >
+                                <p className="text-gray-200 text-base font-medium">
+                                  {analysisProgress.message}
+                                </p>
+                                {analysisProgress.details && (
+                                  <p className="text-gray-400 text-sm mt-1">
+                                    {analysisProgress.details}
+                                  </p>
+                                )}
+                              </motion.div>
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+
+                        {/* Tips moved to right column */}
+                      </CardContent>
+                    </Card>
+                  </motion.div>
+                )}
 
                 {/* Keywords Section - Only show for keywords step */}
                 {wizardStep === "keywords" && selectedMode !== "image" && (
@@ -4231,34 +4309,122 @@ const Upload = () => {
                 >
                   Start Over
                 </Button>
+                
                 <Button
-                  onClick={() => {
+                  onClick={async () => {
                     if (selectedMode === "image" || selectedMode === "both") {
-                      scheduleAnalysis();
+                      // Create Deep Research job and redirect to history
+                      if (!uploadedFile) {
+                        toast({
+                          title: "No Image",
+                          description: "Please upload an image to analyze",
+                          variant: "destructive",
+                        });
+                        return;
+                      }
+
+                      try {
+                        setIsAnalyzing(true);
+                        
+                        // Create Deep Research job
+                        const response = await api.upload.createCrewAnalysisJob(
+                          uploadedFile,
+                          savedKeywords.join(' ')
+                        );
+
+                        if (!response.success) {
+                          throw new Error(response.message || "Failed to create analysis job");
+                        }
+
+                        toast({
+                          title: "Analysis Started! 🚀",
+                          description: "Redirecting you to history to watch progress...",
+                        });
+
+                        // Redirect to history page
+                        setTimeout(() => {
+                          navigate("/dashboard/history");
+                        }, 1500);
+                      } catch (error) {
+                        console.error("Deep Research error:", error);
+                        setIsAnalyzing(false);
+                        
+                        toast({
+                          title: "Analysis Failed",
+                          description: error instanceof Error ? error.message : "Please try again",
+                          variant: "destructive",
+                        });
+                      }
                     } else {
                       performKeywordSearch();
                     }
                   }}
-                  disabled={isAnalyzing || isKeywordSearching}
-                  className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
+                  disabled={!uploadedFile && selectedMode !== "keywords"}
+                  className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 shadow-lg shadow-purple-500/25 px-8 h-12"
                 >
-                  {isAnalyzing || isKeywordSearching ? (
-                    <>
-                      <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                      Processing...
-                    </>
-                  ) : (
-                    <>
-                      <Zap className="w-5 h-5 mr-2" />
-                      Submit
-                    </>
-                  )}
+                  <Brain className="w-5 h-5 mr-2" />
+                  🤖 AI Deep Research
                 </Button>
               </div>
             </motion.div>
           )}
         </motion.div>
       </motion.div>
+
+      {/* Fullscreen Loading Overlay */}
+      {(isAnalyzing || isKeywordSearching) && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md"
+        >
+          <div className="text-center space-y-6 p-8">
+            {/* Animated Loader */}
+            <div className="relative mx-auto w-24 h-24">
+              <Loader2 className="w-full h-full text-purple-500 animate-spin" />
+              <div className="absolute inset-0 rounded-full border-4 border-purple-500/20"></div>
+              <div className="absolute inset-4 rounded-full border-4 border-blue-500/30"></div>
+            </div>
+
+            {/* Loading Text */}
+            <div className="space-y-2">
+              <h3 className="text-2xl font-bold text-white flex items-center gap-3 justify-center">
+                <Sparkles className="w-6 h-6 text-purple-400 animate-pulse" />
+                {isAnalyzing ? "Analyzing Your Image" : "Searching Our Catalog"}
+              </h3>
+              <p className="text-gray-400 text-lg">
+                {isAnalyzing
+                  ? "Our AI is examining your automotive part..."
+                  : "Finding matching parts for your keywords..."}
+              </p>
+            </div>
+
+            {/* Progress Indicators */}
+            <div className="flex gap-2 justify-center">
+              <motion.div
+                className="w-2 h-2 rounded-full bg-purple-500"
+                animate={{ scale: [1, 1.5, 1] }}
+                transition={{ duration: 0.6, repeat: Infinity, delay: 0 }}
+              />
+              <motion.div
+                className="w-2 h-2 rounded-full bg-blue-500"
+                animate={{ scale: [1, 1.5, 1] }}
+                transition={{ duration: 0.6, repeat: Infinity, delay: 0.2 }}
+              />
+              <motion.div
+                className="w-2 h-2 rounded-full bg-emerald-500"
+                animate={{ scale: [1, 1.5, 1] }}
+                transition={{ duration: 0.6, repeat: Infinity, delay: 0.4 }}
+              />
+            </div>
+
+            <p className="text-sm text-gray-500 mt-4">
+              Please wait, this may take a few moments...
+            </p>
+          </div>
+        </motion.div>
+      )}
 
       {/* Confirm keyword-only search modal */}
       <Dialog
@@ -4304,6 +4470,14 @@ const Upload = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Comprehensive AI Analysis Modal */}
+      <ComprehensiveAnalysisModal
+        open={showComprehensiveAnalysis}
+        onOpenChange={setShowComprehensiveAnalysis}
+        imageFile={uploadedFile}
+        keywords={savedKeywords.join(' ')}
+      />
     </div>
   );
 };

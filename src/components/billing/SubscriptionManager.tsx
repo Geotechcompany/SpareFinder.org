@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
 import { api } from "@/lib/api";
-import { PLAN_CONFIG, getPlan, PlanTier } from '@/lib/plans';
+import { PLAN_CONFIG, getPlan, PlanTier } from "@/lib/plans";
 import SubscriptionTrialModal from "./SubscriptionTrialModal";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
@@ -136,7 +136,8 @@ export const SubscriptionManager: React.FC = () => {
         setBillingData(response.data as BillingData);
 
         // Use invoices returned by the billing endpoint
-        const preloaded = (response.data as BillingData).invoices as BillingResponse['invoices'];
+        const preloaded = (response.data as BillingData)
+          .invoices as BillingResponse["invoices"];
         if (Array.isArray(preloaded)) {
           const normalized = preloaded.map((inv) => ({
             id: inv.id,
@@ -176,34 +177,39 @@ export const SubscriptionManager: React.FC = () => {
 
     setIsUpdating(tier);
     try {
-      // Starter (free tier label) -> Stripe checkout with 5-day trial @ £15
+      // Starter (free tier label) -> Stripe checkout with 30-day trial @ £12.99
       if (tier === "free") {
         const plan = PLAN_FEATURES["free"];
+        const starterPlan = PLAN_CONFIG.free;
         const checkoutData = {
           plan: plan.name,
-          amount: 15,
-          currency: "gbp",
+          amount: starterPlan.price,
+          currency: starterPlan.currency.toLowerCase(),
           billing_cycle: "monthly",
-          trial_days: 5,
+          trial_days: starterPlan.trial?.days || 30,
           success_url: `${window.location.origin}/dashboard/billing?payment_success=true&tier=starter`,
           cancel_url: `${window.location.origin}/dashboard/billing?payment_cancelled=true`,
         };
-        const checkoutResponse = await api.billing.createCheckoutSession(
+        const checkoutResponse = (await api.billing.createCheckoutSession(
           checkoutData
-        ) as { success: boolean; data?: { checkout_url: string }; error?: string };
+        )) as {
+          success: boolean;
+          data?: { checkout_url: string };
+          error?: string;
+        };
         if (checkoutResponse.success && checkoutResponse.data?.checkout_url) {
           window.location.href = checkoutResponse.data.checkout_url;
         } else {
           setPaymentError(
-            "We couldn’t start your trial with this payment method."
+            "We couldn't start your trial with this payment method."
           );
           setTrialPlan({
             tier: "free",
             name: plan.name,
-            price: "£15 / month",
-            trialDays: 5,
+            price: `£${starterPlan.price} / month`,
+            trialDays: starterPlan.trial?.days || 30,
             nextCharge: new Date(
-              Date.now() + 5 * 86400000
+              Date.now() + (starterPlan.trial?.days || 30) * 86400000
             ).toLocaleDateString(),
             features: plan.features,
             colorClass: plan.color,
@@ -224,9 +230,13 @@ export const SubscriptionManager: React.FC = () => {
         cancel_url: `${window.location.origin}/dashboard/billing?payment_cancelled=true`,
       };
 
-      const checkoutResponse = await api.billing.createCheckoutSession(
+      const checkoutResponse = (await api.billing.createCheckoutSession(
         checkoutData
-      ) as { success: boolean; data?: { checkout_url: string }; error?: string };
+      )) as {
+        success: boolean;
+        data?: { checkout_url: string };
+        error?: string;
+      };
 
       if (checkoutResponse.success && checkoutResponse.data?.checkout_url) {
         // Redirect to Stripe checkout
@@ -323,11 +333,11 @@ export const SubscriptionManager: React.FC = () => {
         toast.error("Enter a valid credits amount");
         return;
       }
-      const resp = await api.billing.createCreditsCheckoutSession({
+      const resp = (await api.billing.createCreditsCheckoutSession({
         credits,
         success_url: `${window.location.origin}/dashboard/billing?payment_success=true`,
         cancel_url: `${window.location.origin}/dashboard/billing?payment_cancelled=true`,
-      }) as { success: boolean; data?: { checkout_url: string } };
+      })) as { success: boolean; data?: { checkout_url: string } };
       if (resp.success && resp.data?.checkout_url) {
         window.location.href = resp.data.checkout_url;
       } else {

@@ -30,6 +30,7 @@ import {
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
+import { PLAN_CONFIG } from "@/lib/plans";
 import {
   Dialog,
   DialogContent,
@@ -538,11 +539,12 @@ const Register = () => {
         <DialogContent className="sm:max-w-lg border-white/10 bg-gradient-to-b from-gray-900 to-black text-white">
           <DialogHeader>
             <DialogTitle className="text-2xl">
-              Start your 5-day free trial
+              Start your 30-day free trial
             </DialogTitle>
             <DialogDescription className="text-gray-300">
-              Enjoy full access to SpareFinder Starter for 5 days. No charge
-              today. £15/month after trial. Cancel anytime.
+              Enjoy full access to SpareFinder Starter for 30 days. No charge
+              today. £{PLAN_CONFIG.free.price}/month after trial. Cancel
+              anytime.
             </DialogDescription>
           </DialogHeader>
           <div className="mt-2">
@@ -554,9 +556,11 @@ const Register = () => {
               />
             </div>
             <ul className="mt-4 space-y-2 text-gray-300 text-sm">
-              <li>• 5-day free trial, then £15/month</li>
-              <li>• 50 AI identifications/month</li>
-              <li>• Basic web scraping and email support</li>
+              <li>• 30-day free trial, then £{PLAN_CONFIG.free.price}/month</li>
+              <li>
+                • {PLAN_CONFIG.free.limits.searches} AI identifications/month
+              </li>
+              <li>• {PLAN_CONFIG.free.features.join(", ")}</li>
             </ul>
           </div>
           <DialogFooter className="mt-4 flex gap-3">
@@ -577,15 +581,20 @@ const Register = () => {
               onClick={async () => {
                 try {
                   setIsStartingTrial(true);
-                  const resp = await api.billing.createCheckoutSession({
-                    plan: "Starter",
-                    amount: 15,
-                    currency: "GBP",
+                  const starterPlan = PLAN_CONFIG.free;
+                  const resp = (await api.billing.createCheckoutSession({
+                    plan: starterPlan.name,
+                    amount: starterPlan.price,
+                    currency: starterPlan.currency.toUpperCase(),
                     billing_cycle: "monthly",
-                    trial_days: 5,
+                    trial_days: starterPlan.trial?.days || 30,
                     success_url: `${window.location.origin}/dashboard/billing?payment_success=true`,
                     cancel_url: `${window.location.origin}/dashboard/billing?payment_cancelled=true`,
-                  });
+                  })) as {
+                    success: boolean;
+                    data?: { checkout_url?: string };
+                    error?: string;
+                  };
                   if (resp.success && resp.data?.checkout_url) {
                     window.location.href = resp.data.checkout_url;
                   } else {
@@ -600,7 +609,9 @@ const Register = () => {
                 }
               }}
             >
-              {isStartingTrial ? "Starting trial..." : "Start 5-day Free Trial"}
+              {isStartingTrial
+                ? "Starting trial..."
+                : "Start 30-day Free Trial"}
             </Button>
           </DialogFooter>
         </DialogContent>

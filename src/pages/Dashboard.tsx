@@ -35,7 +35,7 @@ import { format } from "date-fns";
 import { useNavigate } from "react-router-dom";
 import { Loader2 } from "lucide-react";
 import OnboardingGuide from "@/components/OnboardingGuide";
-import { dashboardApi, tokenStorage } from "@/lib/api";
+import { dashboardApi, tokenStorage, apiClient } from "@/lib/api";
 import { useToast } from "@/components/ui/use-toast";
 import DashboardSkeleton from "@/components/DashboardSkeleton";
 
@@ -127,16 +127,16 @@ const Dashboard = () => {
       // Fetch all data in parallel with proper error handling
       const [
         statsResponse,
-        uploadsResponse,
+        crewJobsResponse,
         activitiesResponse,
         metricsResponse,
-        aiJobsResponse,
       ] = await Promise.allSettled([
         dashboardApi.getStats().catch((err) => {
           if (signal.aborted) throw new Error("Request aborted");
           throw err;
         }),
-        dashboardApi.getRecentUploads().catch((err) => {
+        // Fetch crew analysis jobs instead of regular uploads
+        apiClient.get("/upload/crew-analysis-jobs").catch((err) => {
           if (signal.aborted) throw new Error("Request aborted");
           throw err;
         }),
@@ -148,38 +148,6 @@ const Dashboard = () => {
           if (signal.aborted) throw new Error("Request aborted");
           throw err;
         }),
-        (async () => {
-          try {
-            const API_BASE =
-              (import.meta as any).env?.VITE_AI_SERVICE_URL ||
-              "http://localhost:8000";
-
-            console.log("🔄 Starting AI jobs request...");
-            const startTime = Date.now();
-
-            // Add timeout to prevent blocking
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => {
-              console.warn("⏰ AI jobs request timed out after 3 seconds");
-              controller.abort();
-            }, 3000); // 3 second timeout
-
-            const r = await fetch(`${API_BASE}/jobs`, {
-              signal: controller.signal,
-            });
-            clearTimeout(timeoutId);
-
-            const endTime = Date.now();
-            console.log(
-              `✅ AI jobs request completed in ${endTime - startTime}ms`
-            );
-
-            return await r.json();
-          } catch (e) {
-            console.warn("⚠️ AI jobs endpoint failed or timed out:", e);
-            return { success: false, results: [] } as any;
-          }
-        })(),
       ]);
 
       // Check if request was aborted
@@ -214,28 +182,26 @@ const Dashboard = () => {
           avgProcessTime: avgSec,
         });
       } else {
-        // Fallback: Calculate stats from uploads data if available
+        // Fallback: Calculate stats from crew jobs if available
         if (
-          uploadsResponse.status === "fulfilled" &&
-          uploadsResponse.value.success
+          crewJobsResponse.status === "fulfilled" &&
+          crewJobsResponse.value.data
         ) {
-          const uploadsData =
-            (uploadsResponse.value.data as any)?.uploads || [];
+          const crewJobs = crewJobsResponse.value.data.jobs || [];
 
-          const totalUploads = uploadsData.length;
-          const successfulUploads = uploadsData.filter(
-            (upload: any) => upload.confidence_score > 0
+          const totalUploads = crewJobs.length;
+          const successfulUploads = crewJobs.filter(
+            (job: any) => job.status === "completed"
           ).length;
           const avgConfidence =
             totalUploads > 0
-              ? uploadsData.reduce(
-                  (sum: number, upload: any) =>
-                    sum + (upload.confidence_score * 100 || 0),
+              ? crewJobs.reduce(
+                  (sum: number, job: any) => sum + (job.progress || 0),
                   0
                 ) / totalUploads
               : 0;
 
-          const avgSecFallback = 0; // unknown from uploads list
+          const avgSecFallback = 0; // unknown without API stats
           setStats({
             totalUploads,
             successfulUploads,
@@ -254,21 +220,28 @@ const Dashboard = () => {
 
       // Handle uploads response
       if (
-        uploadsResponse.status === "fulfilled" &&
-        uploadsResponse.value.success
+        crewJobsResponse.status === "fulfilled" &&
+        crewJobsResponse.value.data
       ) {
-        const uploadsData = (uploadsResponse.value.data as any)?.uploads || [];
+        const crewJobs = crewJobsResponse.value.data.jobs || [];
+        
+        // Show only completed jobs, sorted by most recent
+        const recentCompleted = crewJobs
+          .filter((job: any) => job.status === "completed")
+          .sort((a: any, b: any) => new Date(b.completed_at || b.created_at).getTime() - new Date(a.completed_at || a.created_at).getTime())
+          .slice(0, 5); // Show top 5
+        
         setRecentUploads(
-          uploadsData.map((upload) => ({
-            id: upload.id,
-            name: upload.image_name || "Unknown",
-            date: format(new Date(upload.created_at), "PPp"),
-            status: "completed",
-            confidence: Math.round((upload.confidence_score || 0) * 100),
+          recentCompleted.map((job: any) => ({
+            id: job.id,
+            name: job.keywords || "AI Deep Research",
+            date: format(new Date(job.completed_at || job.created_at), "PPp"),
+            status: job.status,
+            confidence: job.progress || 100, // Use progress as confidence (completed jobs are 100%)
           }))
         );
       } else {
-        console.warn("❌ Failed to fetch recent uploads:", uploadsResponse);
+        console.warn("❌ Failed to fetch crew jobs:", crewJobsResponse);
         setRecentUploads([]);
       }
 
@@ -280,127 +253,83 @@ const Dashboard = () => {
         ) {
           const activitiesData =
             (activitiesResponse.value.data as any)?.activities || [];
-          return activitiesData.map((activity) => ({
-            id: activity.id,
-            type: activity.resource_type,
-            title: activity.action,
-            description: activity.details.description,
-            time: format(new Date(activity.created_at), "PPp"),
-            confidence: activity.details.confidence ?? null,
-            status: activity.details.status,
-          }));
-        }
-        return [] as any[];
-      })();
-
-      const aiJobsMapped = (() => {
-        if (
-          aiJobsResponse.status === "fulfilled" &&
-          aiJobsResponse.value?.success &&
-          Array.isArray(aiJobsResponse.value.results)
-        ) {
-          const jobs = aiJobsResponse.value.results as any[];
-          const normalizeConfidence = (val: any): number | null => {
-            if (typeof val !== "number" || isNaN(val)) return null;
-            return val <= 1 ? Math.round(val * 100) : Math.round(val);
-          };
-
-          return jobs.map((j) => {
-            const isKeyword = String(j.mode) === "keywords_only";
-            const rawConf =
-              typeof j.confidence_score === "number"
-                ? j.confidence_score
-                : typeof j.confidence === "number"
-                ? j.confidence
-                : undefined;
-            const confidence = normalizeConfidence(rawConf);
-            const title = isKeyword
-              ? `Keyword search ${j.status}`
-              : `Image analysis ${j.status}`;
-            const desc =
-              j.precise_part_name ||
-              j.class_name ||
-              (Array.isArray(j.query?.keywords)
-                ? j.query.keywords.join(", ")
-                : "");
+          return activitiesData.map((activity) => {
+            // Normalize confidence (9500 -> 95, 95 -> 95)
+            let confidence = activity.details.confidence ?? null;
+            if (typeof confidence === 'number' && confidence > 100) {
+              confidence = Math.round(confidence / 100);
+            }
+            
             return {
-              id: j.id || j.filename,
-              type: isKeyword ? "search" : "upload",
-              title,
-              description: desc || "",
-              time: "",
-              confidence,
-              status: j.status,
+              id: activity.id,
+              type: activity.resource_type,
+              title: activity.action,
+              description: activity.details.description,
+              time: format(new Date(activity.created_at), "PPp"),
+              confidence: confidence,
+              status: activity.details.status,
             };
           });
         }
         return [] as any[];
       })();
 
-      // Show only latest 3 image analyses with accurate confidence
-      const mergedActivities = aiJobsMapped
-        .filter((a) => a.type === "upload")
+      const aiJobsMapped = (() => {
+        if (
+          crewJobsResponse.status === "fulfilled" &&
+          crewJobsResponse.value?.data &&
+          Array.isArray(crewJobsResponse.value.data.jobs)
+        ) {
+          const jobs = crewJobsResponse.value.data.jobs as any[];
+
+          return jobs
+            .filter((j) => j.status === "completed")
+            .map((j) => {
+              const title = `AI Deep Research`;
+              const desc = j.keywords || "Analysis Complete";
+              const timeStr = j.completed_at 
+                ? format(new Date(j.completed_at), "PPp")
+                : j.created_at
+                ? format(new Date(j.created_at), "PPp")
+                : "";
+              return {
+                id: j.id,
+                type: "upload",
+                title,
+                description: desc,
+                time: timeStr,
+                confidence: j.progress || 100,
+                status: j.status,
+              };
+            });
+        }
+        return [] as any[];
+      })();
+
+      // Merge both activity sources and show latest 3
+      const allActivities = [...activitiesMapped, ...aiJobsMapped];
+      
+      console.log(`📊 Activities mapped: ${activitiesMapped.length}, AI jobs: ${aiJobsMapped.length}, Total: ${allActivities.length}`);
+      
+      // Sort by time (most recent first) and take top 3
+      const mergedActivities = allActivities
+        .sort((a, b) => {
+          // Parse time strings back to dates for sorting
+          const timeA = a.time ? new Date(a.time).getTime() : 0;
+          const timeB = b.time ? new Date(b.time).getTime() : 0;
+          return timeB - timeA; // Descending order
+        })
         .slice(0, 3);
+      
+      console.log(`✅ Setting ${mergedActivities.length} recent activities:`, mergedActivities);
+      
       if (!mergedActivities.length) {
         console.warn("❌ No recent activities available");
       }
       setRecentActivities(mergedActivities);
 
-      // Derive accurate stats from AI jobs when available
-      if (
-        aiJobsResponse.status === "fulfilled" &&
-        aiJobsResponse.value?.success &&
-        Array.isArray(aiJobsResponse.value.results)
-      ) {
-        const normalizeConfidence = (val: any): number | null => {
-          if (typeof val !== "number" || isNaN(val)) return null;
-          return val <= 1 ? val * 100 : val;
-        };
-        const toMs = (t: any): number | null => {
-          if (typeof t !== "number" || isNaN(t)) return null;
-          // if looks like seconds, convert to ms
-          return t < 50 ? Math.round(t * 1000) : Math.round(t);
-        };
-        const jobs = (aiJobsResponse.value.results as any[]).filter(
-          (j) => String(j.mode) !== "keywords_only"
-        );
-        const total = jobs.length;
-        const completed = jobs.filter(
-          (j) => String(j.status) === "completed" || j.success === true
-        ).length;
-        const confs = jobs
-          .map((j) =>
-            normalizeConfidence(
-              typeof j.confidence_score === "number"
-                ? j.confidence_score
-                : (j as any).confidence
-            )
-          )
-          .filter((n): n is number => typeof n === "number");
-        const times = jobs
-          .map((j) =>
-            toMs(
-              typeof j.processing_time_seconds === "number"
-                ? j.processing_time_seconds
-                : (j as any).processing_time
-            )
-          )
-          .filter((n): n is number => typeof n === "number");
-        const avgConf = confs.length
-          ? Math.round(confs.reduce((a, b) => a + b, 0) / confs.length)
-          : 0;
-        const avgMs = times.length
-          ? Math.round(times.reduce((a, b) => a + b, 0) / times.length)
-          : 0;
-        const avgSec = Math.round(avgMs / 1000);
-
-        setStats({
-          totalUploads: total,
-          successfulUploads: completed,
-          avgConfidence: avgConf,
-          avgProcessTime: avgSec,
-        });
-      }
+      // Stats are now fetched from the API endpoint above
+      // No need to recalculate from jobs array
 
       // Handle performance metrics response
       if (
@@ -489,7 +418,7 @@ const Dashboard = () => {
       // Check if any request failed with auth error
       const authErrors = [
         statsResponse,
-        uploadsResponse,
+        crewJobsResponse,
         activitiesResponse,
         metricsResponse,
       ].filter(

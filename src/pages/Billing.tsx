@@ -18,6 +18,7 @@ import {
   formatPrice,
   PlanTier,
   isUnlimited,
+  PLAN_CONFIG,
 } from "@/lib/plans";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import {
@@ -252,15 +253,16 @@ const Billing = () => {
 
   const handlePlanChange = async (planId: string) => {
     try {
-      // Starter (free) -> begin 30-day trial at £15/month via Stripe
+      // Starter (free) -> begin 30-day trial at £12.99/month via Stripe
       if (planId === "free") {
         const starter = plans.find((p) => p.id === "free");
+        const starterPlan = PLAN_CONFIG.free;
         const checkoutResponse = (await api.billing.createCheckoutSession({
-          plan: "Starter",
-          amount: 15,
-          currency: "GBP",
+          plan: starterPlan.name,
+          amount: starterPlan.price,
+          currency: starterPlan.currency.toUpperCase(),
           billing_cycle: "monthly",
-          trial_days: 30,
+          trial_days: starterPlan.trial?.days || 30,
           success_url: `${window.location.origin}/dashboard/billing?payment_success=true&tier=starter`,
           cancel_url: `${window.location.origin}/dashboard/billing?payment_cancelled=true`,
         })) as CheckoutResponse;

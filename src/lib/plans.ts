@@ -1,14 +1,14 @@
-import { Shield, Zap, Crown, LucideIcon } from 'lucide-react';
+import { Shield, Zap, Crown, LucideIcon } from "lucide-react";
 
 // Centralized plan configuration to ensure consistency across the entire app
-export type PlanTier = 'free' | 'pro' | 'enterprise';
+export type PlanTier = "free" | "pro" | "enterprise";
 
 export interface PlanFeature {
   id: string;
   name: string;
   price: number;
-  currency: 'GBP';
-  period: 'month';
+  currency: "GBP";
+  period: "month";
   description: string;
   features: string[];
   popular?: boolean;
@@ -28,19 +28,19 @@ export interface PlanFeature {
 // Master plan configuration - UPDATE THIS TO CHANGE PLANS ACROSS THE ENTIRE APP
 export const PLAN_CONFIG: Record<PlanTier, PlanFeature> = {
   free: {
-    id: 'starter',
-    name: 'Starter / Basic',
+    id: "starter",
+    name: "Starter / Basic",
     price: 12.99,
-    currency: 'GBP',
-    period: 'month',
-    description: 'For small users testing the service',
+    currency: "GBP",
+    period: "month",
+    description: "For small users testing the service",
     features: [
-      '20 image recognitions per month',
-      'Basic search & match results',
-      'Access via web portal only',
+      "20 image recognitions per month",
+      "Basic search & match results",
+      "Access via web portal only",
     ],
     popular: false,
-    color: 'from-gray-600 to-gray-700',
+    color: "from-gray-600 to-gray-700",
     icon: Shield,
     limits: {
       searches: 20,
@@ -48,25 +48,25 @@ export const PLAN_CONFIG: Record<PlanTier, PlanFeature> = {
       storage: 1 * 1024 * 1024 * 1024, // 1GB
     },
     trial: {
-      days: 5,
+      days: 30,
       trialPrice: 15, // Special trial pricing
     },
   },
   pro: {
-    id: 'professional',
-    name: 'Professional / Business',
+    id: "professional",
+    name: "Professional / Business",
     price: 69.99,
-    currency: 'GBP',
-    period: 'month',
-    description: 'For SMEs managing spare parts more actively',
+    currency: "GBP",
+    period: "month",
+    description: "For SMEs managing spare parts more actively",
     features: [
-      '500 recognitions per month',
-      'Catalogue storage (part lists, drawings)',
-      'API access for ERP/CMMS',
-      'Analytics dashboard',
+      "500 recognitions per month",
+      "Catalogue storage (part lists, drawings)",
+      "API access for ERP/CMMS",
+      "Analytics dashboard",
     ],
     popular: true,
-    color: 'from-purple-600 to-blue-600',
+    color: "from-purple-600 to-blue-600",
     icon: Zap,
     limits: {
       searches: 500,
@@ -78,28 +78,27 @@ export const PLAN_CONFIG: Record<PlanTier, PlanFeature> = {
     },
   },
   enterprise: {
-    id: 'enterprise',
-    name: 'Enterprise',
+    id: "enterprise",
+    name: "Enterprise",
     price: 460,
-    currency: 'GBP',
-    period: 'month',
-    description: 'For OEMs, large factories, distributors',
+    currency: "GBP",
+    period: "month",
+    description: "For OEMs, large factories, distributors",
     features: [
-      'Unlimited recognition',
-      'Advanced AI customisation (train on your data)',
-      'ERP/CMMS full integration',
-      'Predictive demand analytics',
-      'Dedicated support & SLA',
+      "Unlimited recognition",
+      "Advanced AI customisation (train on your data)",
+      "ERP/CMMS full integration",
+      "Predictive demand analytics",
+      "Dedicated support & SLA",
     ],
     popular: false,
-    color: 'from-emerald-600 to-green-600',
+    color: "from-emerald-600 to-green-600",
     icon: Crown,
     limits: {
       searches: -1, // unlimited
       api_calls: -1, // unlimited
       storage: -1, // unlimited
     },
-   
   },
 };
 
@@ -113,7 +112,7 @@ export const getAllPlans = (): PlanFeature[] => {
 };
 
 export const getPlanByPrice = (price: number): PlanFeature | null => {
-  return getAllPlans().find(plan => plan.price === price) || null;
+  return getAllPlans().find((plan) => plan.price === price) || null;
 };
 
 export const formatPrice = (plan: PlanFeature): string => {
@@ -138,16 +137,16 @@ export const isUnlimited = (value: number): boolean => {
 
 export const formatLimit = (value: number, unit: string): string => {
   if (isUnlimited(value)) {
-    return 'Unlimited';
+    return "Unlimited";
   }
   return `${value} ${unit}`;
 };
 
 // For legacy compatibility - maps internal tier names to display names
 export const TIER_DISPLAY_MAP: Record<PlanTier, string> = {
-  free: 'Starter',
-  pro: 'Professional',
-  enterprise: 'Enterprise',
+  free: "Starter",
+  pro: "Professional",
+  enterprise: "Enterprise",
 };
 
 // Subscription limits for backend compatibility

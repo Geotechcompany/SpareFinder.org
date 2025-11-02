@@ -50,6 +50,12 @@ def save_job_snapshot(filename: str, payload: Dict[str, Any]) -> None:
 
 
 def load_job_snapshot(filename: str) -> Optional[Dict[str, Any]]:
+    # Strip common image extensions if present (job snapshots are JSON files)
+    for ext in ['.png', '.jpg', '.jpeg', '.gif', '.webp']:
+        if filename.lower().endswith(ext):
+            filename = filename[:-len(ext)]
+            break
+    
     # Local first
     try:
         path = os.path.join(_jobs_dir(), f"{filename}.json")
@@ -76,7 +82,12 @@ def load_job_snapshot(filename: str) -> Optional[Dict[str, Any]]:
                 except Exception:
                     return None
     except Exception as e:
-        logger.warning(f"Supabase Storage download failed for {filename}: {e}")
+        # Parse the error to provide more context
+        error_str = str(e)
+        if "404" in error_str or "not_found" in error_str.lower():
+            logger.debug(f"Job snapshot not found in storage for {filename} (will use local cache if available)")
+        else:
+            logger.warning(f"Supabase Storage download failed for {filename}: {e}")
 
     return None
 

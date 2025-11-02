@@ -47,9 +47,14 @@ router.get('/uploads', authenticateToken, async (req: AuthRequest, res: Response
     }
 
     const totalPages = Math.ceil((count || 0) / limit);
+    // Normalize status field to ensure frontend can rely on a consistent "status" property
+    const preparedUploads = (uploads || []).map((u: any) => ({
+      ...u,
+      status: u?.status ?? u?.analysis_status ?? null,
+    }));
 
     return res.json({
-      uploads: uploads || [],
+      uploads: preparedUploads,
       pagination: {
         page,
         limit,
@@ -182,6 +187,28 @@ router.get('/export', authenticateToken, async (req: AuthRequest, res: Response)
     return res.status(500).json({
       error: 'Failed to export history'
     });
+  }
+});
+
+// Debug endpoint to inspect latest history statuses for current user
+router.get('/debug/history', authenticateToken, async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user!.userId;
+    const { data: uploads, error } = await supabase
+      .from('part_searches')
+      .select('id, analysis_status, status')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(20);
+
+    if (error) {
+      console.error('Debug history fetch error:', error);
+      return res.status(500).json({ success: false, error: 'Debug fetch failed' });
+    }
+    return res.json({ success: true, data: uploads ?? [] });
+  } catch (err: any) {
+    console.error('Debug history unexpected error:', err);
+    return res.status(500).json({ success: false, error: err?.message ?? 'Unknown' });
   }
 });
 

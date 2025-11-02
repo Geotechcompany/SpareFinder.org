@@ -21,7 +21,8 @@ from fastapi import (
     UploadFile, 
     HTTPException, 
     BackgroundTasks,
-    Query
+    Query,
+    Form
 )
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -127,6 +128,7 @@ class SupabaseJobStore:
                 'results': job_data.get('results', []),
                 'markdown': job_data.get('markdown'),
                 'query': job_data.get('query', {}),
+                'image_url': job_data.get('image_url'),  # Include Supabase Storage URL
             }
             
             # Use Supabase REST API with upsert
@@ -1211,8 +1213,10 @@ async def _run_analysis_job(
     user_email: Optional[str]
 ) -> None:
     try:
-        # Mark as processing
+        # Preserve existing data (like image_url) when marking as processing
+        existing_data = analysis_results.get(filename, {})
         analysis_results[filename] = {
+            **existing_data,
             "success": False,
             "status": "processing",
             "filename": filename
@@ -1225,8 +1229,11 @@ async def _run_analysis_job(
                 subj = analysis_started_subject(filename)
                 body = analysis_started_html(filename, keyword_list)
                 await asyncio.to_thread(_send_email, user_email, subj, body)
-            except Exception:
-                pass
+                logger.info(f"📧 Analysis started email sent to {user_email}")
+            except Exception as e:
+                logger.error(f"❌ Failed to send analysis started email: {e}")
+        else:
+            logger.warning(f"⚠️ Email not sent - user_email: {user_email}, enabled: {_email_is_enabled()}")
 
         # Perform analysis (no external await timeout here; handled by upstream timeouts inside service)
         analysis_result = await analyze_part_image(
@@ -1247,6 +1254,7 @@ async def _run_analysis_job(
         # Update status for UI and persist snapshot before supplier enrichment
         try:
             analysis_results[filename] = {
+                **existing_data,  # Preserve image_url and other initial data
                 **response_data,
                 "status": "Retrieving Supplier Info",
             }
@@ -1257,19 +1265,49 @@ async def _run_analysis_job(
         # Supplier enrichment
         await _enrich_suppliers(response_data)
 
+        # Try to fetch user_email from database if not provided
+        if not user_email:
+            try:
+                supabase_url = os.getenv("SUPABASE_URL", "").strip()
+                service_key = (
+                    os.getenv("SUPABASE_SERVICE_KEY")
+                    or os.getenv("SUPABASE_ANON_KEY", "")
+                ).strip()
+                if supabase_url and service_key:
+                    client = create_client(supabase_url, service_key)
+                    # Get user_id from jobs table using filename
+                    job_data = client.from_("jobs").select("user_id").eq("filename", filename).execute()
+                    if job_data.data and len(job_data.data) > 0:
+                        user_id = job_data.data[0].get("user_id")
+                        if user_id:
+                            # Get email from profiles table
+                            profile_data = client.from_("profiles").select("email").eq("id", user_id).execute()
+                            if profile_data.data and len(profile_data.data) > 0:
+                                user_email = profile_data.data[0].get("email")
+                                logger.info(f"📧 Fetched user_email from database for completion: {user_email}")
+            except Exception as e:
+                logger.warning(f"Failed to fetch user_email from database: {e}")
+
         # Send completion email if requested
-        if user_email:
+        if user_email and _email_is_enabled():
             try:
                 # Modern template
                 subject = analysis_completed_subject(response_data)
                 html = analysis_completed_html(response_data)
                 await asyncio.to_thread(_send_email, user_email, subject, html)
+                logger.info(f"📧 Analysis completed email sent to {user_email}")
             except Exception as e:
-                logger.error(f"Email send failed (job): {e}")
+                logger.error(f"❌ Failed to send analysis completed email: {e}")
+        elif user_email:
+            logger.warning(f"⚠️ Email not sent - email disabled. user_email: {user_email}, enabled: {_email_is_enabled()}")
+        else:
+            logger.warning(f"⚠️ No user_email provided for completion notification")
 
         # Mark as completed and persist enriched result
         response_data["status"] = "completed"
         response_data["success"] = True
+        # Preserve image_url from initial data
+        response_data["image_url"] = existing_data.get("image_url") or response_data.get("image_url")
         analysis_results[filename] = response_data
         save_job_to_database(filename, response_data)
 
@@ -1674,7 +1712,8 @@ async def analyze_part(
     keywords: Optional[str] = Query(None),
     confidence_threshold: float = Query(0.3),
     max_predictions: int = Query(3),
-    user_email: Optional[str] = Query(None),
+    user_email: Optional[str] = Form(None),  # Changed from Query to Form to receive from backend FormData
+    image_url: Optional[str] = Form(None),  # Supabase Storage URL from backend
     background_tasks: BackgroundTasks = None
 ):
     filename = None
@@ -1688,16 +1727,58 @@ async def analyze_part(
             buffer.write(await file.read())
 
         logger.info(f"File saved: {filename}")
+        logger.info(f"📸 Received image_url from backend: {image_url}")
+        logger.info(f"📧 Received user_email from backend: {user_email}")
 
         # Prepare keywords
         keyword_list = [s.strip() for s in (keywords.split(",") if keywords else []) if s.strip()]
+
+        # Upload image to Supabase Storage to get public URL if not provided by backend
+        image_public_url = image_url  # Start with URL from backend
+        if not image_public_url:
+            try:
+                supabase_url = os.getenv("SUPABASE_URL", "").strip()
+                service_key = (
+                    os.getenv("SUPABASE_SERVICE_KEY")
+                    or os.getenv("SUPABASE_ANON_KEY", "")
+                ).strip()
+                if supabase_url and service_key:
+                    client = create_client(supabase_url, service_key)
+                    bucket = os.getenv("SUPABASE_BUCKET_NAME") or os.getenv(
+                        "S3_BUCKET_NAME", "sparefinder"
+                    )
+                    try:
+                        with open(file_path, "rb") as f:
+                            storage_path = f"uploads/{filename}"
+                            client.storage.from_(bucket).upload(
+                                storage_path,
+                                f,
+                                file_options={
+                                    "content-type": file.content_type or "image/jpeg",
+                                    "x-upsert": "true",
+                                },
+                            )
+                            # Get public URL
+                            url_data = client.storage.from_(bucket).get_public_url(storage_path)
+                            # Handle both dict and string responses
+                            if isinstance(url_data, dict):
+                                image_public_url = url_data.get("publicUrl")
+                            else:
+                                image_public_url = url_data
+                            logger.info(f"📤 Uploaded image to Supabase Storage: {image_public_url}")
+                    except Exception as e:
+                        logger.error(f"Failed to upload image to Supabase: {e}")
+            except Exception as e:
+                logger.error(f"Failed to initialize Supabase client: {e}")
 
         # Initialize pending job and schedule background coroutine
         analysis_results[filename] = {
             "success": False,
             "status": "pending",
-            "filename": filename
+            "filename": filename,
+            "image_url": image_public_url  # Use Supabase Storage URL
         }
+        logger.info(f"💾 Saving job with image_url: {image_public_url}")
         save_job_to_database(filename, analysis_results[filename])
 
         # Persist initial record to database (part_searches) if Supabase is configured
@@ -1709,31 +1790,7 @@ async def analyze_part(
             ).strip()
             if supabase_url and service_key:
                 client = create_client(supabase_url, service_key)
-                image_public_url = None
-                # Upload image to storage bucket if available
-                bucket = os.getenv("SUPABASE_BUCKET_NAME") or os.getenv(
-                    "S3_BUCKET_NAME", "sparefinder"
-                )
-                try:
-                    with open(file_path, "rb") as f:
-                        storage_path = f"uploads/{filename}"
-                        client.storage.from_(bucket).upload(
-                            storage_path,
-                            f,
-                            file_options={
-                                "content-type": file.content_type or "image/jpeg",
-                                "x-upsert": "true",
-                            },
-                        )
-                        # Build public URL (assumes bucket is public)
-                        image_public_url = (
-                            client.storage.from_(bucket).get_public_url(storage_path).get(
-                                "publicUrl"
-                            )
-                        )
-                except Exception:
-                    pass
-
+                
                 metadata = {
                     "filename": filename,
                     "upload_timestamp": int(time.time()),
@@ -1744,7 +1801,7 @@ async def analyze_part(
                         "user_id": None,  # Unknown at AI service level
                         "search_term": (keywords or "Image Upload"),
                         "search_type": "image_upload",
-                        "image_url": image_public_url or f"/uploads/{filename}",
+                        "image_url": image_public_url or f"/uploads/{filename}",  # Use the URL we already got
                         "image_name": file.filename,
                         "image_size_bytes": os.path.getsize(file_path),
                         "image_format": file.content_type or "image/jpeg",
@@ -1753,6 +1810,7 @@ async def analyze_part(
                         "metadata": metadata,
                     }
                 ).execute()
+                logger.info(f"✅ Saved initial part_searches record with image_url: {image_public_url}")
         except Exception as e:
             logger.warning(f"Initial DB insert failed for {filename}: {e}")
 
@@ -1814,6 +1872,33 @@ async def get_analysis_status(
         
         # Retrieve stored result (pending/processing/final)
         result = analysis_results[filename]
+        
+        # Ensure image_url is present by fetching from Supabase Storage if needed
+        if not result.get("image_url"):
+            try:
+                supabase_url = os.getenv("SUPABASE_URL", "").strip()
+                service_key = (
+                    os.getenv("SUPABASE_SERVICE_KEY")
+                    or os.getenv("SUPABASE_ANON_KEY", "")
+                ).strip()
+                if supabase_url and service_key:
+                    client = create_client(supabase_url, service_key)
+                    bucket = os.getenv("SUPABASE_BUCKET_NAME") or os.getenv(
+                        "S3_BUCKET_NAME", "sparefinder"
+                    )
+                    storage_path = f"uploads/{filename}"
+                    url_data = client.storage.from_(bucket).get_public_url(storage_path)
+                    logger.info(f"🔍 URL data type: {type(url_data)}, content: {url_data}")
+                    if url_data:
+                        if isinstance(url_data, dict):
+                            result["image_url"] = url_data.get("publicUrl")
+                        else:
+                            # It's already a string URL
+                            result["image_url"] = url_data
+                        if result.get("image_url"):
+                            logger.info(f"🔗 Retrieved image_url from Supabase Storage: {result['image_url']}")
+            except Exception as e:
+                logger.warning(f"Failed to fetch image_url from Supabase: {e}")
         
         code = 200
         if result.get("status") in {"pending", "processing"}:
