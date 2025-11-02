@@ -44,6 +44,7 @@ import Footer from "@/components/Footer";
 import { DemoOne } from "@/components/ui/demo";
 import { DashboardScrollDemo } from "@/components/DashboardScrollDemo";
 import { HowItWorks } from "@/components/ui/how-it-works";
+import CoreValueStatsDemo from "@/components/CoreValueStatsDemo";
 import {
   Dialog,
   DialogContent,
@@ -369,50 +370,6 @@ const Landing = () => {
     featured: plan.popular,
   }));
 
-  const coreValues = [
-    {
-      icon: Target,
-      title: "Precision & Accuracy",
-      description:
-        "99.9% accurate part identification powered by state-of-the-art computer vision",
-      gradient: "from-blue-600 to-cyan-500",
-    },
-    {
-      icon: Shield,
-      title: "Enterprise Security",
-      description:
-        "Bank-grade encryption and SOC 2 Type II compliance for your data",
-      gradient: "from-purple-600 to-pink-500",
-    },
-    {
-      icon: Clock,
-      title: "Lightning Fast",
-      description:
-        "Results in milliseconds, not minutes. Time is money in manufacturing",
-      gradient: "from-orange-600 to-red-500",
-    },
-    {
-      icon: Award,
-      title: "Quality Guaranteed",
-      description:
-        "Only verified suppliers and authentic parts in our database",
-      gradient: "from-green-600 to-emerald-500",
-    },
-    {
-      icon: Users,
-      title: "Expert Support",
-      description:
-        "24/7 technical support from automotive and engineering experts",
-      gradient: "from-yellow-600 to-orange-500",
-    },
-    {
-      icon: Scale,
-      title: "Cost Effective",
-      description: "Save up to 40% on parts through our global marketplace",
-      gradient: "from-indigo-600 to-purple-500",
-    },
-  ];
-
   useEffect(() => {
     const allImages = [
       aiInterfaceImage,
@@ -429,50 +386,6 @@ const Landing = () => {
     ).catch(console.error);
   }, [features, useCases]);
 
-  function ValueCard({
-    icon: Icon,
-    title,
-    description,
-    gradient,
-    index,
-  }: {
-    icon: LucideIcon;
-    title: string;
-    description: string;
-    gradient: string;
-    index: number;
-  }) {
-    const ref = useRef(null);
-    const isInView = useInView(ref, {
-      once: true,
-      margin: "-40% 0px -40% 0px",
-    });
-
-    return (
-      <motion.div
-        ref={ref}
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: isInView ? 1 : 0, y: isInView ? 0 : 20 }}
-        transition={{ duration: 0.6, delay: index * 0.2 }}
-        className="group relative overflow-hidden rounded-2xl border border-gray-800 bg-gray-900/50 p-8 hover:bg-gray-800/50 transition-colors"
-      >
-        <div className="relative z-10">
-          <div
-            className={`mb-6 inline-block rounded-xl bg-gradient-to-r ${gradient} p-3`}
-          >
-            <Icon className="h-6 w-6 text-white" />
-          </div>
-          <h3 className="mb-2 text-xl font-semibold text-white">{title}</h3>
-          <p className="text-gray-400">{description}</p>
-        </div>
-        <motion.div
-          className={`absolute inset-0 bg-gradient-to-r ${gradient} opacity-0 group-hover:opacity-5 transition-opacity duration-500`}
-          initial={false}
-        />
-      </motion.div>
-    );
-  }
-
   return (
     <div className="min-h-screen bg-black">
       <Header />
@@ -488,59 +401,8 @@ const Landing = () => {
       </section>
 
       {/* Core Values Section */}
-      <section className="relative py-20 px-4 sm:px-6 lg:px-8 overflow-hidden">
-        <div className="absolute inset-0">
-          <div className="absolute inset-0 bg-[url('/images/grid-pattern.svg')] bg-repeat opacity-5" />
-          <div className="absolute inset-0 bg-gradient-to-b from-black via-gray-900/20 to-black" />
-        </div>
-
-        <div className="max-w-7xl mx-auto relative">
-          <div className="text-center mb-16">
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              className="inline-block"
-            >
-              <span className="inline-block px-4 py-1.5 mb-6 text-sm font-medium bg-gradient-to-r from-purple-500/10 to-blue-500/10 rounded-full border border-purple-500/20 text-purple-400">
-                Why Choose Us
-              </span>
-            </motion.div>
-            <motion.h2
-              initial={{ opacity: 0 }}
-              whileInView={{ opacity: 1 }}
-              viewport={{ once: true }}
-              className="text-4xl font-bold text-white mb-4"
-            >
-              Our Core Values
-            </motion.h2>
-            <motion.p
-              initial={{ opacity: 0 }}
-              whileInView={{ opacity: 1 }}
-              viewport={{ once: true }}
-              className="text-xl text-gray-400 max-w-2xl mx-auto"
-            >
-              Built on principles of excellence, security, and innovation
-            </motion.p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {coreValues.map((value, index) => (
-              <ValueCard key={value.title} {...value} index={index} />
-            ))}
-          </div>
-
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            className="mt-16 text-center"
-          >
-            <Button className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-lg px-8 py-6">
-              Learn More About Our Technology
-            </Button>
-          </motion.div>
-        </div>
+      <section className="relative bg-black overflow-hidden">
+        <CoreValueStatsDemo />
       </section>
 
       {/* Features Grid */}
