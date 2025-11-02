@@ -43,6 +43,7 @@ import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import { DemoOne } from "@/components/ui/demo";
 import { DashboardScrollDemo } from "@/components/DashboardScrollDemo";
+import { HowItWorks } from "@/components/ui/how-it-works";
 import {
   Dialog,
   DialogContent,
@@ -352,24 +353,6 @@ const Landing = () => {
   const aiInterfaceImage =
     "https://images.unsplash.com/photo-1639322537228-f710d8465a4d?auto=format&fit=crop&w=1920";
 
-  const howItWorks = [
-    {
-      title: "Upload Image",
-      description: "Drag & drop or capture photo of any industrial part",
-      icon: Upload,
-    },
-    {
-      title: "AI Analysis",
-      description: "Neural networks process image in milliseconds",
-      icon: Cpu,
-    },
-    {
-      title: "Get Results",
-      description: "Detailed specs, suppliers, and replacement options",
-      icon: Check,
-    },
-  ];
-
   const pricing: PricingPlan[] = getAllPlans().map((plan) => ({
     name: plan.name,
     price: {
@@ -445,42 +428,6 @@ const Landing = () => {
       )
     ).catch(console.error);
   }, [features, useCases]);
-
-  function Step({
-    title,
-    description,
-    icon: Icon,
-    index,
-  }: {
-    title: string;
-    description: string;
-    icon: LucideIcon;
-    index: number;
-  }) {
-    return (
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        whileInView={{ opacity: 1, y: 0 }}
-        viewport={{ once: true, amount: 0.3 }}
-        transition={{ duration: 0.6, delay: index * 0.2 }}
-        className="flex flex-col items-center text-center group"
-      >
-        <motion.div
-          whileHover={{ scale: 1.1, rotate: 5 }}
-          transition={{ type: "spring", stiffness: 300 }}
-          className="mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-r from-purple-600 to-blue-600 shadow-lg shadow-purple-500/50 group-hover:shadow-purple-500/80 transition-shadow duration-300"
-        >
-          <Icon className="h-10 w-10 text-white" />
-        </motion.div>
-        <h3 className="text-2xl font-bold text-white mb-3 group-hover:text-purple-300 transition-colors duration-300">
-          {title}
-        </h3>
-        <p className="mt-2 text-gray-400 text-lg leading-relaxed max-w-xs">
-          {description}
-        </p>
-      </motion.div>
-    );
-  }
 
   function ValueCard({
     icon: Icon,
@@ -912,49 +859,7 @@ const Landing = () => {
       </section>
 
       {/* How It Works section */}
-      <section className="relative py-24 px-4 sm:px-6 lg:px-8 overflow-hidden">
-        <div className="absolute inset-0 bg-black" />
-        <div className="absolute inset-0">
-          <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl" />
-          <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl" />
-        </div>
-
-        <div className="max-w-7xl mx-auto relative z-10">
-          <motion.div
-            className="text-center mb-20"
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.8 }}
-          >
-            <motion.div
-              initial={{ opacity: 0, scale: 0.5 }}
-              whileInView={{ opacity: 1, scale: 1 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.5 }}
-              className="inline-flex items-center px-4 py-2 bg-gradient-to-r from-purple-500/20 to-blue-500/20 rounded-full border border-purple-500/30 mb-8"
-            >
-              <Zap className="w-4 h-4 text-purple-400 mr-2" />
-              <span className="text-sm text-purple-300 font-medium">
-                Simple 3-Step Process
-              </span>
-            </motion.div>
-            <h2 className="text-5xl lg:text-6xl font-bold bg-gradient-to-r from-white via-purple-200 to-blue-200 bg-clip-text text-transparent mb-6">
-              How It Works
-            </h2>
-            <p className="text-xl text-gray-400 max-w-3xl mx-auto leading-relaxed">
-              Get accurate part identification in seconds with our streamlined
-              AI-powered workflow
-            </p>
-          </motion.div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-12 lg:gap-16">
-            {howItWorks.map((step, index) => (
-              <Step key={step.title} {...step} index={index} />
-            ))}
-          </div>
-        </div>
-      </section>
+      <HowItWorks />
 
       {/* Enhanced Pricing Section */}
       <section className="py-20 bg-gradient-to-b from-gray-900 to-black relative overflow-hidden">
