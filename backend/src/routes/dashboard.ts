@@ -356,12 +356,13 @@ router.get("/stats", async (req: AuthRequest, res: Response) => {
       .eq("user_id", userId);
 
     // Fetch completed crew analysis jobs
-    const { count: completedCrewJobs, error: completedCrewError } = await supabase
-      .from("crew_analysis_jobs")
-      .select("*", { count: "exact", head: true })
-      .eq("user_id", userId)
-      .eq("status", "completed");
-    
+    const { count: completedCrewJobs, error: completedCrewError } =
+      await supabase
+        .from("crew_analysis_jobs")
+        .select("*", { count: "exact", head: true })
+        .eq("user_id", userId)
+        .eq("status", "completed");
+
     // Get crew jobs processing times and progress
     const { data: crewJobsData, error: crewJobsDataError } = await supabase
       .from("crew_analysis_jobs")
@@ -386,7 +387,9 @@ router.get("/stats", async (req: AuthRequest, res: Response) => {
     // Fetch additional quality indicators from part_searches
     const { data: allUserSearches, error: searchesError } = await supabase
       .from("part_searches")
-      .select("confidence_score, ai_confidence, manufacturer, part_name, supplier_information, technical_specifications")
+      .select(
+        "confidence_score, ai_confidence, manufacturer, part_name, supplier_information, technical_specifications"
+      )
       .eq("user_id", userId)
       .eq("analysis_status", "completed")
       .not("confidence_score", "is", null)
@@ -394,45 +397,65 @@ router.get("/stats", async (req: AuthRequest, res: Response) => {
       .limit(50);
 
     let avgConfidence = 85; // More realistic default
-    
+
     if (!searchesError && allUserSearches && allUserSearches.length > 0) {
       // Calculate quality-adjusted confidence scores
       const confidenceValues = allUserSearches
-        .map(item => {
+        .map((item) => {
           let baseConf = item.ai_confidence || item.confidence_score || 0;
-          
+
           // Normalize to 0-100 range
           if (baseConf > 100) baseConf = baseConf / 100;
           else if (baseConf <= 1 && baseConf > 0) baseConf = baseConf * 100;
-          
+
           // Adjust based on quality indicators
           let qualityScore = baseConf;
-          
+
           // Penalize if missing key data
-          if (!item.manufacturer || item.manufacturer === 'Unknown' || item.manufacturer === '|') {
+          if (
+            !item.manufacturer ||
+            item.manufacturer === "Unknown" ||
+            item.manufacturer === "|"
+          ) {
             qualityScore -= 10;
           }
-          if (!item.part_name || item.part_name === 'Not identified' || item.part_name.includes('**')) {
+          if (
+            !item.part_name ||
+            item.part_name === "Not identified" ||
+            item.part_name.includes("**")
+          ) {
             qualityScore -= 8;
           }
-          if (!item.supplier_information || item.supplier_information.length < 50) {
+          if (
+            !item.supplier_information ||
+            item.supplier_information.length < 50
+          ) {
             qualityScore -= 7;
           }
-          if (!item.technical_specifications || item.technical_specifications.length < 50) {
+          if (
+            !item.technical_specifications ||
+            item.technical_specifications.length < 50
+          ) {
             qualityScore -= 5;
           }
-          
+
           // Keep in reasonable range
           return Math.max(60, Math.min(100, qualityScore));
         })
-        .filter(conf => conf > 0);
-      
+        .filter((conf) => conf > 0);
+
       if (confidenceValues.length > 0) {
-        avgConfidence = confidenceValues.reduce((sum, val) => sum + val, 0) / confidenceValues.length;
+        avgConfidence =
+          confidenceValues.reduce((sum, val) => sum + val, 0) /
+          confidenceValues.length;
       }
     }
-    
-    console.log(`📊 Calculated quality-adjusted confidence: ${Math.round(avgConfidence)}% from ${allUserSearches?.length || 0} searches`);
+
+    console.log(
+      `📊 Calculated quality-adjusted confidence: ${Math.round(
+        avgConfidence
+      )}% from ${allUserSearches?.length || 0} searches`
+    );
 
     // Calculate average processing time from crew jobs (in seconds)
     const avgProcessTime = crewJobsData?.length

@@ -79,8 +79,8 @@ export const requireSubscriptionOrTrial = async (
  * Warns if test keys are detected in production
  */
 export const validateStripeConfig = async (
-  req: AuthRequest,
-  res: Response,
+  _req: AuthRequest,
+  _res: Response,
   next: NextFunction
 ) => {
   try {

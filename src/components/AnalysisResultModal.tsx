@@ -402,7 +402,11 @@ export const AnalysisResultModal: React.FC<AnalysisResultModalProps> = ({
                 </Button>
               )}
             </div>
-            <Button onClick={onClose} variant="default" className="bg-blue-600 hover:bg-blue-700">
+            <Button
+              onClick={onClose}
+              variant="default"
+              className="bg-blue-600 hover:bg-blue-700"
+            >
               Close
             </Button>
           </div>
