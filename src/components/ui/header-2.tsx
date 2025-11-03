@@ -65,22 +65,11 @@ export function Header() {
       >
         <div className="flex items-center gap-3">
           <a href="/" className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-[12px] bg-gradient-to-r from-purple-600 to-blue-600 flex items-center justify-center shadow-lg shadow-purple-500/25">
-              <svg
-                viewBox="0 0 24 24"
-                className="w-5 h-5 text-white"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
-              </svg>
-            </div>
-            <span className="text-white font-bold text-lg hidden sm:inline">
-              SpareFinder
-            </span>
+            <img 
+              src="/sparefinderlogo.png" 
+              alt="SpareFinder Logo" 
+              className="h-8 w-auto object-contain"
+            />
           </a>
         </div>
         <div className="hidden items-center gap-1 md:flex">

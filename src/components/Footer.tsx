@@ -1,6 +1,5 @@
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
-import { Zap } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 const Footer = () => {
@@ -21,28 +20,18 @@ const Footer = () => {
             transition={{ duration: 0.8 }}
             className="mb-8"
           >
-            <div className="flex items-center justify-center space-x-4 mb-6">
+            <div className="flex items-center justify-center mb-6">
               <motion.div 
                 className="relative"
-                whileHover={{ scale: 1.1, rotate: 5 }}
+                whileHover={{ scale: 1.05 }}
                 transition={{ duration: 0.3 }}
               >
-                <div className="absolute inset-0 bg-gradient-to-r from-purple-600 to-blue-600 rounded-2xl blur opacity-60" />
-                <div className="relative w-16 h-16 bg-gradient-to-r from-purple-600 to-blue-600 rounded-2xl flex items-center justify-center">
-                  <motion.div
-                    animate={{ rotate: [0, 360] }}
-                    transition={{ duration: 8, repeat: Infinity, ease: "linear" }}
-                  >
-                    <Zap className="w-8 h-8 text-white" />
-                  </motion.div>
-                </div>
+                <img 
+                  src="/sparefinderlogo.png" 
+                  alt="SpareFinder Logo" 
+                  className="h-20 w-auto object-contain"
+                />
               </motion.div>
-              <div>
-                <h3 className="text-4xl font-bold bg-gradient-to-r from-white via-purple-200 to-blue-200 bg-clip-text text-transparent">
-                  SpareFinder
-                </h3>
-                <p className="text-gray-400 text-sm">Industrial AI Excellence</p>
-              </div>
             </div>
             <p className="text-xl text-gray-300 max-w-2xl mx-auto leading-relaxed">
               Revolutionizing industrial part identification through advanced computer vision and AI

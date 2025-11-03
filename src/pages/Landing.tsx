@@ -46,6 +46,8 @@ import { DashboardScrollDemo } from "@/components/DashboardScrollDemo";
 import { HowItWorks } from "@/components/ui/how-it-works";
 import CoreValueStatsDemo from "@/components/CoreValueStatsDemo";
 import StaggerTestimonialsDemo from "@/components/StaggerTestimonialsDemo";
+import IndustrialApplications from "@/components/IndustrialApplications";
+import FAQDemo from "@/components/FAQDemo";
 import {
   Dialog,
   DialogContent,
@@ -285,43 +287,6 @@ const Landing = () => {
     },
   ];
 
-  const useCases = [
-    {
-      title: "Industrial Manufacturing",
-      icon: Factory,
-      description: "Automated part identification for assembly lines",
-      image:
-        "https://images.unsplash.com/photo-1456735190827-d1262f71b8a3?auto=format&fit=crop&w=800",
-    },
-    {
-      title: "AI Processing",
-      icon: Cpu,
-      description: "Neural network-powered recognition systems",
-      image:
-        "https://images.unsplash.com/photo-1573164713712-03790a178651?auto=format&fit=crop&w=800",
-    },
-    {
-      title: "Quality Control",
-      icon: TestTube2,
-      description: "Automated defect detection systems",
-      image:
-        "https://images.unsplash.com/photo-1581092580497-e0d23cbdf1dc?auto=format&fit=crop&w=800",
-    },
-  ];
-
-  const faqs = [
-    {
-      question: "How accurate is the part identification?",
-      answer:
-        "Our AI models achieve 99.3% accuracy across 50+ industrial categories",
-    },
-    {
-      question: "What file formats are supported?",
-      answer:
-        "We support JPG, PNG, PDF, and CAD files with automatic conversion",
-    },
-  ];
-
   const aiInterfaceImage =
     "https://images.unsplash.com/photo-1639322537228-f710d8465a4d?auto=format&fit=crop&w=1920";
 
@@ -342,11 +307,7 @@ const Landing = () => {
   }));
 
   useEffect(() => {
-    const allImages = [
-      aiInterfaceImage,
-      ...features.map((f) => f.image),
-      ...useCases.map((u) => u.image),
-    ];
+    const allImages = [aiInterfaceImage, ...features.map((f) => f.image)];
 
     Promise.all(
       allImages.map((url) =>
@@ -355,7 +316,7 @@ const Landing = () => {
         })
       )
     ).catch(console.error);
-  }, [features, useCases]);
+  }, [features]);
 
   return (
     <div className="min-h-screen bg-black">
@@ -474,42 +435,8 @@ const Landing = () => {
         </div>
       </section>
 
-      {/* Use Cases Section */}
-      <section className="py-20 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-7xl mx-auto">
-          <h2 className="text-4xl font-bold text-white text-center mb-16">
-            Industrial Applications
-          </h2>
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            {useCases.map((useCase, index) => (
-              <motion.div
-                key={useCase.title}
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: loadedImages.has(useCase.image) ? 1 : 0 }}
-                transition={{ delay: index * 0.2 }}
-                className="group relative overflow-hidden rounded-2xl border border-gray-900"
-              >
-                <img
-                  src={useCase.image}
-                  alt={useCase.title}
-                  className="w-full h-96 object-cover opacity-90 group-hover:opacity-100 transition-opacity"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent p-8 flex items-end">
-                  <div className="space-y-4">
-                    <div className="w-12 h-12 bg-gradient-to-r from-purple-600 to-blue-600 rounded-lg flex items-center justify-center">
-                      <useCase.icon className="w-6 h-6 text-white" />
-                    </div>
-                    <h3 className="text-2xl font-semibold text-white">
-                      {useCase.title}
-                    </h3>
-                    <p className="text-gray-300">{useCase.description}</p>
-                  </div>
-                </div>
-              </motion.div>
-            ))}
-          </div>
-        </div>
-      </section>
+      {/* Industrial Applications */}
+      <IndustrialApplications />
 
       {/* Stats Section */}
       <section className="relative py-20">
@@ -552,29 +479,7 @@ const Landing = () => {
       <StaggerTestimonialsDemo />
 
       {/* FAQ Section */}
-      <section className="py-20 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-7xl mx-auto">
-          <h2 className="text-4xl font-bold text-white text-center mb-16">
-            Frequently Asked Questions
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {faqs.map((faq, index) => (
-              <motion.div
-                key={faq.question}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: index * 0.1 }}
-                className="bg-white/5 p-6 rounded-xl border border-white/10"
-              >
-                <h3 className="text-lg font-semibold text-white mb-2">
-                  {faq.question}
-                </h3>
-                <p className="text-gray-400">{faq.answer}</p>
-              </motion.div>
-            ))}
-          </div>
-        </div>
-      </section>
+      <FAQDemo />
 
       {/* How It Works section */}
       <HowItWorks />

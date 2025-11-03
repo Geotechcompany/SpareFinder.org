@@ -296,28 +296,11 @@ const AdminDesktopSidebar: React.FC<AdminSidebarProps> = ({
                   to="/admin/dashboard"
                   className="flex items-center space-x-3 group"
                 >
-                  <div className="relative">
-                    <motion.div
-                      animate={{ rotate: [0, 360] }}
-                      transition={{
-                        duration: 20,
-                        repeat: Infinity,
-                        ease: "linear",
-                      }}
-                      className="absolute inset-0 bg-gradient-to-r from-blue-600/20 to-purple-600/20 rounded-full blur-lg"
-                    />
-                    <div className="relative w-10 h-10 bg-gradient-to-r from-blue-600 to-purple-600 rounded-xl flex items-center justify-center transition-transform group-hover:scale-105">
-                      <Shield className="w-6 h-6 text-white" />
-                    </div>
-                  </div>
-                  <div>
-                    <h2 className="text-lg font-bold bg-gradient-to-r from-blue-200 to-purple-200 bg-clip-text text-transparent">
-                      Admin Console
-                    </h2>
-                    <p className="text-blue-400/60 text-xs">
-                      System Administration
-                    </p>
-                  </div>
+                  <img 
+                    src="/sparefinderlogo.png" 
+                    alt="SpareFinder Logo" 
+                    className="h-12 w-auto object-contain transition-transform group-hover:scale-105"
+                  />
                 </Link>
               </motion.div>
             ) : (
@@ -330,20 +313,11 @@ const AdminDesktopSidebar: React.FC<AdminSidebarProps> = ({
                 className="flex justify-center"
               >
                 <Link to="/admin/dashboard" className="group">
-                  <div className="relative">
-                    <motion.div
-                      animate={{ rotate: [0, 360] }}
-                      transition={{
-                        duration: 20,
-                        repeat: Infinity,
-                        ease: "linear",
-                      }}
-                      className="absolute inset-0 bg-gradient-to-r from-blue-600/20 to-purple-600/20 rounded-full blur-lg"
-                    />
-                    <div className="relative w-10 h-10 bg-gradient-to-r from-blue-600 to-purple-600 rounded-xl flex items-center justify-center transition-transform group-hover:scale-105">
-                      <Shield className="w-6 h-6 text-white" />
-                    </div>
-                  </div>
+                  <img 
+                    src="/sparefinderlogo.png" 
+                    alt="SpareFinder Logo" 
+                    className="h-10 w-auto object-contain transition-transform group-hover:scale-105"
+                  />
                 </Link>
               </motion.div>
             )}

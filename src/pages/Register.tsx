@@ -178,26 +178,17 @@ const Register = () => {
 
       {/* Logo Header */}
       <div className="absolute top-6 right-6 z-10">
-        <div className="flex items-center gap-3">
-          <motion.div
-            className="relative"
-            whileHover={{ scale: 1.05, rotate: 5 }}
-            transition={{ duration: 0.3 }}
-          >
-            <div className="absolute inset-0 bg-gradient-to-r from-purple-600 to-blue-600 rounded-xl blur opacity-60" />
-            <div className="relative w-10 h-10 bg-gradient-to-r from-purple-600 to-blue-600 rounded-xl flex items-center justify-center">
-              <motion.div
-                animate={{ rotate: [0, 360] }}
-                transition={{ duration: 8, repeat: Infinity, ease: "linear" }}
-              >
-                <Zap className="w-5 h-5 text-white" />
-              </motion.div>
-            </div>
-          </motion.div>
-          <span className="text-xl font-bold bg-gradient-to-r from-white via-purple-200 to-blue-200 bg-clip-text text-transparent">
-            SpareFinder
-          </span>
-        </div>
+        <motion.div
+          className="relative"
+          whileHover={{ scale: 1.05 }}
+          transition={{ duration: 0.3 }}
+        >
+          <img 
+            src="/sparefinderlogo.png" 
+            alt="SpareFinder Logo" 
+            className="h-10 w-auto object-contain"
+          />
+        </motion.div>
       </div>
 
       <div className="flex items-center justify-center min-h-screen p-6 relative z-10">

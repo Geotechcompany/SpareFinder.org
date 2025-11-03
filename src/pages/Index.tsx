@@ -358,12 +358,11 @@ const Index = () => {
 
                 {/* Logo */}
                 <div className="flex items-center space-x-3 mb-8">
-                  <div className="w-10 h-10 bg-gradient-to-r from-purple-500 to-blue-500 rounded-xl flex items-center justify-center shadow-lg shadow-purple-500/25">
-                    <Zap className="w-6 h-6 text-white" />
-                  </div>
-                  <span className="text-xl font-bold text-white">
-                    SpareFinder
-                  </span>
+                  <img 
+                    src="/sparefinderlogo.png" 
+                    alt="SpareFinder Logo" 
+                    className="h-10 w-auto object-contain"
+                  />
                 </div>
 
                 {/* Navigation Links */}
@@ -422,17 +421,16 @@ const Index = () => {
               transition={{ duration: 0.5 }}
             >
               <div className="relative">
-                <div className="w-10 h-10 bg-gradient-to-r from-purple-500 to-blue-500 rounded-xl flex items-center justify-center shadow-lg shadow-purple-500/25">
-                  <Zap className="w-6 h-6 text-white" />
-                </div>
+                <img 
+                  src="/sparefinderlogo.png" 
+                  alt="SpareFinder Logo" 
+                  className="h-12 w-auto object-contain"
+                />
                 <div className="absolute -top-1 -right-1 w-4 h-4 bg-gradient-to-r from-yellow-400 to-orange-500 rounded-full flex items-center justify-center">
                   <Sparkles className="w-2 h-2 text-white" />
                 </div>
               </div>
               <div>
-                <span className="text-xl font-bold bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent">
-                  SpareFinder
-                </span>
                 <div className="flex items-center space-x-1">
                   <Badge
                     variant="secondary"
@@ -926,12 +924,11 @@ const Index = () => {
           <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-12">
             <div className="col-span-1 md:col-span-2">
               <div className="flex items-center space-x-3 mb-6">
-                <div className="w-10 h-10 bg-gradient-to-r from-purple-500 to-blue-500 rounded-xl flex items-center justify-center">
-                  <Zap className="w-6 h-6 text-white" />
-                </div>
-                <span className="text-xl font-bold text-white">
-                  SpareFinder
-                </span>
+                <img 
+                  src="/sparefinderlogo.png" 
+                  alt="SpareFinder Logo" 
+                  className="h-10 w-auto object-contain"
+                />
               </div>
               <p className="text-gray-400 mb-6 max-w-md">
                 Revolutionizing automotive part identification with cutting-edge

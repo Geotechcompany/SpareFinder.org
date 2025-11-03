@@ -59,3 +59,4 @@ BEFORE UPDATE ON crew_analysis_jobs
 FOR EACH ROW
 EXECUTE FUNCTION update_crew_jobs_updated_at();
 
+

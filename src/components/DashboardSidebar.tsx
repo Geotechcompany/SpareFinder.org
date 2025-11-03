@@ -237,17 +237,11 @@ const DashboardSidebar: React.FC<SidebarProps> = ({ isCollapsed = false, onToggl
                 transition={{ duration: 0.2 }}
                 className="flex items-center space-x-3"
               >
-                <motion.div
-                  animate={{ rotate: [0, 360] }}
-                  transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
-                  className="w-10 h-10 bg-gradient-to-r from-purple-600 to-blue-600 rounded-xl flex items-center justify-center shadow-lg shadow-purple-500/25"
-                >
-                  <Zap className="w-6 h-6 text-white" />
-                </motion.div>
-                <div>
-                  <h2 className="text-white font-bold text-lg">SpareFinder</h2>
-                  <p className="text-gray-400 text-xs">AI-Powered Recognition</p>
-                </div>
+                <img 
+                  src="/sparefinderlogo.png" 
+                  alt="SpareFinder Logo" 
+                  className="h-12 w-auto object-contain"
+                />
               </motion.div>
             ) : (
               <motion.div
@@ -258,13 +252,11 @@ const DashboardSidebar: React.FC<SidebarProps> = ({ isCollapsed = false, onToggl
                 transition={{ duration: 0.2 }}
                 className="mx-auto"
               >
-                <motion.div
-                  animate={{ rotate: [0, 360] }}
-                  transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
-                  className="w-10 h-10 bg-gradient-to-r from-purple-600 to-blue-600 rounded-xl flex items-center justify-center shadow-lg shadow-purple-500/25"
-                >
-                  <Zap className="w-6 h-6 text-white" />
-                </motion.div>
+                <img 
+                  src="/sparefinderlogo.png" 
+                  alt="SpareFinder Logo" 
+                  className="h-10 w-auto object-contain"
+                />
               </motion.div>
             )}
           </AnimatePresence>
