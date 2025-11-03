@@ -37,7 +37,7 @@ import {
   LucideIcon,
 } from "lucide-react";
 import { Link } from "react-router-dom";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { useInView } from "framer-motion";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
@@ -237,56 +237,59 @@ const Landing = () => {
     setIsProcessing(false);
   };
 
-  const features = [
-    {
-      icon: Cpu,
-      title: "AI-Powered Recognition",
-      description:
-        "Advanced computer vision models identify parts with 99.9% accuracy across 50+ industrial categories",
-      image:
-        "https://images.unsplash.com/photo-1639322537228-f710d8465a4d?auto=format&fit=crop&w=800",
-    },
-    {
-      icon: Database,
-      title: "Comprehensive Database",
-      description:
-        "Over 10 million parts from 1000+ manufacturers with detailed specifications and pricing",
-      image:
-        "https://images.unsplash.com/photo-1558494949-ef010cbdcc31?auto=format&fit=crop&w=800",
-    },
-    {
-      icon: Zap,
-      title: "Instant Results",
-      description:
-        "Get complete part information, specifications, and supplier contacts in milliseconds",
-      image:
-        "https://images.unsplash.com/photo-1460925895917-afdab827c52f?auto=format&fit=crop&w=800",
-    },
-    {
-      icon: Cloud,
-      title: "Multi-Format Support",
-      description:
-        "Upload images, PDFs, CAD files, or even capture photos directly from your mobile device",
-      image:
-        "https://images.unsplash.com/photo-1573164713712-03790a178651?auto=format&fit=crop&w=800",
-    },
-    {
-      icon: Server,
-      title: "Enterprise Integration",
-      description:
-        "REST APIs, webhook support, and seamless integration with ERP systems and inventory management",
-      image:
-        "https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&w=800",
-    },
-    {
-      icon: ShieldCheck,
-      title: "Quality Assurance",
-      description:
-        "Verified suppliers, authentic parts, and comprehensive warranty information to ensure reliability",
-      image:
-        "https://images.unsplash.com/photo-1587614382340-3ec188b4e842?auto=format&fit=crop&w=800",
-    },
-  ];
+  const features = useMemo(
+    () => [
+      {
+        icon: Cpu,
+        title: "AI-Powered Recognition",
+        description:
+          "Advanced computer vision models identify parts with 99.9% accuracy across 50+ industrial categories",
+        image:
+          "https://images.unsplash.com/photo-1639322537228-f710d8465a4d?auto=format&fit=crop&w=800",
+      },
+      {
+        icon: Database,
+        title: "Comprehensive Database",
+        description:
+          "Over 10 million parts from 1000+ manufacturers with detailed specifications and pricing",
+        image:
+          "https://images.unsplash.com/photo-1558494949-ef010cbdcc31?auto=format&fit=crop&w=800",
+      },
+      {
+        icon: Zap,
+        title: "Instant Results",
+        description:
+          "Get complete part information, specifications, and supplier contacts in milliseconds",
+        image:
+          "https://images.unsplash.com/photo-1460925895917-afdab827c52f?auto=format&fit=crop&w=800",
+      },
+      {
+        icon: Cloud,
+        title: "Multi-Format Support",
+        description:
+          "Upload images, PDFs, CAD files, or even capture photos directly from your mobile device",
+        image:
+          "https://images.unsplash.com/photo-1573164713712-03790a178651?auto=format&fit=crop&w=800",
+      },
+      {
+        icon: Server,
+        title: "Enterprise Integration",
+        description:
+          "REST APIs, webhook support, and seamless integration with ERP systems and inventory management",
+        image:
+          "https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&w=800",
+      },
+      {
+        icon: ShieldCheck,
+        title: "Quality Assurance",
+        description:
+          "Verified suppliers, authentic parts, and comprehensive warranty information to ensure reliability",
+        image:
+          "https://images.unsplash.com/photo-1587614382340-3ec188b4e842?auto=format&fit=crop&w=800",
+      },
+    ],
+    []
+  );
 
   const aiInterfaceImage =
     "https://images.unsplash.com/photo-1639322537228-f710d8465a4d?auto=format&fit=crop&w=1920";
