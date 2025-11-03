@@ -65,9 +65,9 @@ export function Header() {
       >
         <div className="flex items-center gap-3">
           <a href="/" className="flex items-center gap-3">
-            <img 
-              src="/sparefinderlogo.png" 
-              alt="SpareFinder Logo" 
+            <img
+              src="/sparefinderlogo.png"
+              alt="SpareFinder Logo"
               className="h-8 w-auto object-contain"
             />
           </a>
@@ -144,7 +144,7 @@ export function Header() {
               "bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white shadow-lg shadow-purple-500/25 hover:shadow-purple-500/40 transition-all duration-300"
             )}
           >
-            Get SpareFinder
+            Get Started
           </a>
         </div>
         <Button
@@ -234,7 +234,7 @@ export function Header() {
                 "w-full text-center bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white shadow-lg shadow-purple-500/25 hover:shadow-purple-500/40 transition-all duration-300"
               )}
             >
-              Get SpareFinder
+              Get Started
             </a>
           </div>
         </div>
