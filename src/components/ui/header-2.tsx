@@ -68,7 +68,7 @@ export function Header() {
             <img
               src="/sparefinderlogo.png"
               alt="SpareFinder Logo"
-              className="h-8 w-auto object-contain"
+              className="h-12 w-auto object-contain"
             />
           </a>
         </div>
