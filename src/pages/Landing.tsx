@@ -48,6 +48,7 @@ import CoreValueStatsDemo from "@/components/CoreValueStatsDemo";
 import StaggerTestimonialsDemo from "@/components/StaggerTestimonialsDemo";
 import IndustrialApplications from "@/components/IndustrialApplications";
 import FAQDemo from "@/components/FAQDemo";
+import { FeaturesSectionWithHoverEffects } from "@/components/ui/feature-section-with-hover-effects";
 import {
   Dialog,
   DialogContent,
@@ -372,66 +373,7 @@ const Landing = () => {
             </p>
           </motion.div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {features.map((feature, index) => (
-              <motion.div
-                key={feature.title}
-                initial={{ opacity: 0, y: 30 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                transition={{ delay: index * 0.15, duration: 0.8 }}
-                className="group relative"
-              >
-                <div className="absolute -inset-px bg-gradient-to-r from-purple-600 to-blue-600 rounded-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 blur-sm" />
-                <div className="relative h-full bg-gray-900/80 backdrop-blur-xl rounded-3xl border border-gray-800/50 group-hover:border-transparent transition-all duration-500 overflow-hidden">
-                  <div className="absolute inset-0 bg-gradient-to-br from-purple-900/20 via-transparent to-blue-900/20 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-
-                  <div className="relative p-8 h-full flex flex-col">
-                    <div className="mb-8">
-                      <div className="relative">
-                        <div className="absolute inset-0 bg-gradient-to-r from-purple-600 to-blue-600 rounded-2xl blur opacity-60 group-hover:opacity-100 transition-opacity duration-300" />
-                        <div className="relative w-16 h-16 bg-gradient-to-r from-purple-600 to-blue-600 rounded-2xl flex items-center justify-center transform group-hover:scale-110 group-hover:rotate-3 transition-transform duration-300">
-                          <feature.icon className="w-8 h-8 text-white" />
-                        </div>
-                      </div>
-                    </div>
-
-                    <h3 className="text-2xl font-bold text-white mb-4 group-hover:bg-gradient-to-r group-hover:from-purple-300 group-hover:to-blue-300 group-hover:bg-clip-text group-hover:text-transparent transition-all duration-300">
-                      {feature.title}
-                    </h3>
-
-                    <p className="text-gray-400 leading-relaxed flex-grow text-lg">
-                      {feature.description}
-                    </p>
-
-                    <div className="mt-6 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                      <div className="w-full h-px bg-gradient-to-r from-transparent via-purple-500/50 to-transparent" />
-                      <div className="mt-4 flex items-center text-purple-400 text-sm font-medium">
-                        <span>Learn more</span>
-                        <motion.div
-                          animate={{ x: [0, 4, 0] }}
-                          transition={{ repeat: Infinity, duration: 1.5 }}
-                          className="ml-2"
-                        >
-                          →
-                        </motion.div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </motion.div>
-            ))}
-          </div>
-
-          <motion.div
-            className="text-center mt-16"
-            initial={{ opacity: 0 }}
-            whileInView={{ opacity: 1 }}
-            transition={{ delay: 0.8, duration: 0.8 }}
-          >
-            <Button className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white px-8 py-4 rounded-2xl text-lg font-semibold shadow-2xl shadow-purple-500/25 hover:shadow-purple-500/40 transition-all duration-300 transform hover:scale-105">
-              Explore All Features
-            </Button>
-          </motion.div>
+          <FeaturesSectionWithHoverEffects features={features} />
         </div>
       </section>
 
