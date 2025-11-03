@@ -214,7 +214,7 @@ function FAQ1({ faqs, title, subtitle, description }: FAQ1Props) {
         </div>
 
         {/* Header */}
-        <header className="flex flex-col gap-8 md:flex-row md:items-end md:justify-between">
+        <header className="flex flex-col gap-8">
           <div className="space-y-4">
             <p
               className={`text-xs uppercase tracking-[0.35em] ${palette.muted}`}
@@ -230,13 +230,6 @@ function FAQ1({ faqs, title, subtitle, description }: FAQ1Props) {
               {description || "Everything you need to know about our service."}
             </p>
           </div>
-
-          <button
-            onClick={toggleTheme}
-            className={`h-11 inline-flex items-center gap-3 rounded-full border px-5 text-sm transition-colors duration-500 ${palette.toggleSurface} ${palette.toggle}`}
-          >
-            {theme === "dark" ? "Night" : "Day"} mode
-          </button>
         </header>
 
         {/* FAQ List */}
