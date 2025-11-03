@@ -26,7 +26,7 @@ const IndustrialApplications = () => {
     {
       title: "Marine & Ship Parts",
       subtitle: "Marine engine components, navigation systems, and vessel parts identified with technical specifications.",
-      image: "https://images.unsplash.com/photo-1590508588137-a2ab0eeb3ce5?auto=format&fit=crop&w=800&h=600&q=80",
+      image: "https://images.unsplash.com/photo-1569263979104-865ab7cd8d13?auto=format&fit=crop&w=800&h=600&q=80",
     },
     {
       title: "Agricultural Equipment",
