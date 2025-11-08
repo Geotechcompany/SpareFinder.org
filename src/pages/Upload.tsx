@@ -154,11 +154,6 @@ const technicalDataStyles = `
     background: rgba(17, 24, 39, 0.7) !important;
   }
   
-  .technical-data-enhanced tr:hover td,
-  .technical-specifications-section tr:hover td {
-    background: rgba(34, 197, 94, 0.1) !important;
-  }
-  
   /* Enhanced content visibility */
   .technical-data-enhanced .prose,
   .technical-specifications-section .prose {

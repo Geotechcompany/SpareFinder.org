@@ -4,6 +4,7 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { MenuToggleIcon } from "@/components/ui/menu-toggle-icon";
 import { useScroll } from "@/components/ui/use-scroll";
+import { useLocation } from "react-router-dom";
 import {
   NavigationMenu,
   NavigationMenuList,
@@ -16,6 +17,7 @@ import {
 export function Header() {
   const [open, setOpen] = React.useState(false);
   const scrolled = useScroll(10);
+  const location = useLocation();
 
   const platform = [
     { label: "Features", href: "/#features" },
@@ -45,6 +47,8 @@ export function Header() {
     };
   }, [open]);
 
+  const isReviewsPage = location.pathname.startsWith("/reviews");
+
   return (
     <header
       className={cn(
@@ -73,67 +77,81 @@ export function Header() {
           </a>
         </div>
         <div className="hidden items-center gap-1 md:flex">
-          <NavigationMenu>
-            <NavigationMenuList>
-              <NavigationMenuItem>
-                <NavigationMenuTrigger className="bg-transparent">
-                  Platform
-                </NavigationMenuTrigger>
-                <NavigationMenuContent>
-                  <div className="grid w-[480px] gap-2 p-4 md:w-[560px] md:grid-cols-2 bg-background/95 border border-border rounded-md">
-                    {platform.map((item) => (
-                      <NavigationMenuLink asChild key={item.label}>
-                        <a
-                          href={item.href}
-                          className="block rounded-lg border border-border bg-accent/10 p-3 text-sm text-foreground hover:bg-accent/20"
-                        >
-                          {item.label}
-                        </a>
-                      </NavigationMenuLink>
-                    ))}
-                  </div>
-                </NavigationMenuContent>
-              </NavigationMenuItem>
-              <NavigationMenuItem>
-                <NavigationMenuTrigger className="bg-transparent">
-                  Solutions
-                </NavigationMenuTrigger>
-                <NavigationMenuContent>
-                  <div className="grid w-[480px] gap-2 p-4 md:w-[560px] md:grid-cols-2 bg-background/95 border border-border rounded-md">
-                    {solutions.map((item) => (
-                      <NavigationMenuLink asChild key={item.label}>
-                        <a
-                          href={item.href}
-                          className="block rounded-lg border border-border bg-accent/10 p-3 text-sm text-foreground hover:bg-accent/20"
-                        >
-                          {item.label}
-                        </a>
-                      </NavigationMenuLink>
-                    ))}
-                  </div>
-                </NavigationMenuContent>
-              </NavigationMenuItem>
-              <NavigationMenuItem>
-                <NavigationMenuTrigger className="bg-transparent">
-                  Resources
-                </NavigationMenuTrigger>
-                <NavigationMenuContent>
-                  <div className="grid w-[320px] gap-2 p-4 bg-background/95 border border-border rounded-md">
-                    {resources.map((item) => (
-                      <NavigationMenuLink asChild key={item.label}>
-                        <a
-                          href={item.href}
-                          className="block rounded-lg border border-border bg-accent/10 p-3 text-sm text-foreground hover:bg-accent/20"
-                        >
-                          {item.label}
-                        </a>
-                      </NavigationMenuLink>
-                    ))}
-                  </div>
-                </NavigationMenuContent>
-              </NavigationMenuItem>
-            </NavigationMenuList>
-          </NavigationMenu>
+          {isReviewsPage ? (
+            <div className="flex items-center gap-6 text-sm font-medium text-white/80">
+              {[...platform, ...solutions, ...resources].map((item) => (
+                <a
+                  key={`${item.label}-${item.href}`}
+                  href={item.href}
+                  className="transition-colors hover:text-white"
+                >
+                  {item.label}
+                </a>
+              ))}
+            </div>
+          ) : (
+            <NavigationMenu>
+              <NavigationMenuList>
+                <NavigationMenuItem>
+                  <NavigationMenuTrigger className="bg-transparent">
+                    Platform
+                  </NavigationMenuTrigger>
+                  <NavigationMenuContent>
+                    <div className="grid w-[480px] gap-2 p-4 md:w-[560px] md:grid-cols-2 bg-background/95 border border-border rounded-md">
+                      {platform.map((item) => (
+                        <NavigationMenuLink asChild key={item.label}>
+                          <a
+                            href={item.href}
+                            className="block rounded-lg border border-border bg-accent/10 p-3 text-sm text-foreground hover:bg-accent/20"
+                          >
+                            {item.label}
+                          </a>
+                        </NavigationMenuLink>
+                      ))}
+                    </div>
+                  </NavigationMenuContent>
+                </NavigationMenuItem>
+                <NavigationMenuItem>
+                  <NavigationMenuTrigger className="bg-transparent">
+                    Solutions
+                  </NavigationMenuTrigger>
+                  <NavigationMenuContent>
+                    <div className="grid w-[480px] gap-2 p-4 md:w-[560px] md:grid-cols-2 bg-background/95 border border-border rounded-md">
+                      {solutions.map((item) => (
+                        <NavigationMenuLink asChild key={item.label}>
+                          <a
+                            href={item.href}
+                            className="block rounded-lg border border-border bg-accent/10 p-3 text-sm text-foreground hover:bg-accent/20"
+                          >
+                            {item.label}
+                          </a>
+                        </NavigationMenuLink>
+                      ))}
+                    </div>
+                  </NavigationMenuContent>
+                </NavigationMenuItem>
+                <NavigationMenuItem>
+                  <NavigationMenuTrigger className="bg-transparent">
+                    Resources
+                  </NavigationMenuTrigger>
+                  <NavigationMenuContent>
+                    <div className="grid w-[320px] gap-2 p-4 bg-background/95 border border-border rounded-md">
+                      {resources.map((item) => (
+                        <NavigationMenuLink asChild key={item.label}>
+                          <a
+                            href={item.href}
+                            className="block rounded-lg border border-border bg-accent/10 p-3 text-sm text-foreground hover:bg-accent/20"
+                          >
+                            {item.label}
+                          </a>
+                        </NavigationMenuLink>
+                      ))}
+                    </div>
+                  </NavigationMenuContent>
+                </NavigationMenuItem>
+              </NavigationMenuList>
+            </NavigationMenu>
+          )}
           <a href="/login" className={buttonVariants({ variant: "outline" })}>
             Sign In
           </a>
