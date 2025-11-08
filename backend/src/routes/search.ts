@@ -4,7 +4,7 @@ import { authenticateToken } from "../middleware/auth";
 import { requireSubscriptionOrTrial } from "../middleware/subscription";
 import { AuthRequest } from "../types/auth";
 import { supabase } from "../server";
-import axios from "axios";
+import axios, { AxiosResponse } from "axios";
 import { creditService } from "../services/credit-service";
 import { emailService } from "../services/email-service";
 
@@ -287,7 +287,7 @@ router.post(
       );
 
       const requestData = {
-        keywords: normalized.join(" "), // Join array into a single string
+        keywords: normalized, // Pass array of keywords directly
         user_email: userEmail,
       };
 
@@ -297,18 +297,58 @@ router.post(
       console.log(`📤 Request data:`, requestData);
       console.log(`🔑 API Key present:`, !!aiServiceApiKey);
 
-      const response = await axios.post(
-        `${aiServiceUrl}/search/keywords/schedule`,
-        requestData,
-        {
-          timeout: isNaN(keywordTimeoutMs) ? 120000 : keywordTimeoutMs,
-          headers: {
-            "Content-Type": "application/json",
-            ...(aiServiceApiKey ? { "x-api-key": aiServiceApiKey } : {}),
-          },
-          validateStatus: (status) => status < 500,
+      const maxAttempts = 3;
+      let response: AxiosResponse<any> | null = null;
+
+      for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        response = await axios.post(
+          `${aiServiceUrl}/search/keywords/schedule`,
+          requestData,
+          {
+            timeout: isNaN(keywordTimeoutMs) ? 120000 : keywordTimeoutMs,
+            headers: {
+              "Content-Type": "application/json",
+              ...(aiServiceApiKey ? { "x-api-key": aiServiceApiKey } : {}),
+            },
+            validateStatus: (status) => status < 500,
+          }
+        );
+
+        if (response) {
+          console.log("🔄 AI keyword schedule response:", {
+            attempt,
+            status: response.status,
+            data: response.data,
+          });
         }
-      );
+
+        if (response && response.status !== 429) {
+          break;
+        }
+
+        if (attempt < maxAttempts) {
+          const retryAfterHeader = response?.headers?.["retry-after"];
+          const retryAfterSeconds = retryAfterHeader
+            ? parseInt(retryAfterHeader, 10)
+            : NaN;
+          const delayMs = !Number.isNaN(retryAfterSeconds)
+            ? retryAfterSeconds * 1000
+            : attempt * 1000;
+
+          console.warn(
+            `⚠️ AI service rate limited request (attempt ${attempt}/${maxAttempts}). Retrying in ${delayMs}ms.`
+          );
+          await new Promise((resolve) => setTimeout(resolve, delayMs));
+        }
+      }
+
+      if (!response) {
+        return res.status(502).json({
+          success: false,
+          error: "bad_gateway",
+          message: "No response from AI service",
+        });
+      }
 
       const duration = Date.now() - start;
       if (response.status !== 202 && response.status !== 200) {

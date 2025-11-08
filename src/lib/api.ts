@@ -363,8 +363,13 @@ export const dashboardApi = {
     };
     if (userEmail) payload.user_email = userEmail;
 
-    // Call backend instead of AI service directly
-    const response = await apiClient.post("/search/keywords", payload);
+    // Call backend instead of AI service directly. Allow longer timeout because
+    // the scheduler proxies to the AI service which can take several seconds.
+    const response = await apiClient.post<
+      ApiResponse<{ filename?: string; jobId?: string }>
+    >("/search/keywords", payload, {
+      timeout: 120000,
+    });
     return response.data;
   },
 
@@ -1002,7 +1007,7 @@ export const uploadApi = {
   deleteUpload: async (uploadId: string): Promise<ApiResponse> => {
     try {
       // Backend exposes deletion at /uploads/:uploadId
-    const response = await apiClient.delete(`/history/uploads/${uploadId}`);
+      const response = await apiClient.delete(`/history/uploads/${uploadId}`);
       return response.data;
     } catch (error) {
       console.error("Delete upload error:", error);
