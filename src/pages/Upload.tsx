@@ -1131,18 +1131,25 @@ const Upload = () => {
       setOriginalAiResponse(null);
 
       // Schedule the keyword search for background processing
-      const response = (await dashboardApi.scheduleKeywordSearch(
-        savedKeywords
-      )) as any;
+      const response = await dashboardApi.scheduleKeywordSearch(savedKeywords);
 
-      if (!response.success) {
-        throw new Error(response.message || "Keyword search scheduling failed");
+      if (!response?.success) {
+        throw new Error(response?.message || "Keyword search scheduling failed");
       }
+
+      const jobId =
+        response?.jobId ||
+        response?.filename ||
+        response?.data?.jobId ||
+        response?.data?.filename ||
+        null;
 
       // Show scheduling confirmation
       toast({
         title: "Keyword analysis scheduled",
-        description: `Your keyword search has been queued. Job ID: ${response.filename}`,
+        description: `Your keyword search has been queued. Job ID: ${
+          jobId ?? "processing..."
+        }`,
       });
 
       // Auto-redirect to history page to track the job

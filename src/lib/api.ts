@@ -7,6 +7,8 @@ export type ApiResponse<T = unknown> = {
   templates?: any[];
   error?: string;
   message?: string;
+  jobId?: string;
+  filename?: string;
   user?: {
     id: string;
     email: string;
@@ -365,12 +367,27 @@ export const dashboardApi = {
 
     // Call backend instead of AI service directly. Allow longer timeout because
     // the scheduler proxies to the AI service which can take several seconds.
-    const response = await apiClient.post<
-      ApiResponse<{ filename?: string; jobId?: string }>
-    >("/search/keywords", payload, {
+    const response = await apiClient.post("/search/keywords", payload, {
       timeout: 120000,
     });
-    return response.data;
+    const result = response.data as ApiResponse & {
+      filename?: string;
+      jobId?: string;
+      data?: { filename?: string; jobId?: string };
+    };
+
+    const jobId =
+      result?.jobId ??
+      result?.filename ??
+      result?.data?.jobId ??
+      result?.data?.filename ??
+      null;
+
+    return {
+      ...result,
+      jobId: jobId || undefined,
+      filename: jobId || undefined,
+    };
   },
 
   getRecentUploads: async (limit: number = 5): Promise<ApiResponse> => {
