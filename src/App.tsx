@@ -3,7 +3,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import { AuthProvider } from "@/contexts/AuthContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
@@ -40,6 +40,7 @@ import Unauthorized from "@/pages/Unauthorized";
 import ForgotPassword from "@/pages/ForgotPassword";
 import Contact from "@/pages/Contact";
 import Reviews from "@/pages/Reviews";
+import PublicReviews from "@/pages/PublicReviews";
 import DashboardLayout from "@/components/DashboardLayout";
 import SharedAnalysis from "@/pages/SharedAnalysis";
 
@@ -190,6 +191,7 @@ const App = () => (
               <Route path="/privacy-policy" element={<PrivacyPolicy />} />
               <Route path="/terms-of-service" element={<TermsOfService />} />
               <Route path="/contact" element={<Contact />} />
+              <Route path="/reviews" element={<PublicReviews />} />
               <Route path="/unauthorized" element={<Unauthorized />} />
               <Route path="/share/:token" element={<SharedAnalysis />} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
