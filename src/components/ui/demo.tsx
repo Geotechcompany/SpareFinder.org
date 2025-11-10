@@ -47,10 +47,16 @@ const DemoOne = () => (
             parts with 99.9% accuracy in milliseconds.
           </p>
           <div className="flex flex-col sm:flex-row gap-3 md:gap-4 items-center pt-2">
-            <Button className="w-full sm:w-auto text-sm px-6 md:px-8 py-2.5 md:py-3 rounded-xl bg-white text-black border border-white/10 hover:bg-white/90 transition-none" asChild>
+            <Button
+              className="w-full sm:w-auto text-sm px-6 md:px-8 py-2.5 md:py-3 rounded-xl bg-white text-black border border-white/10 hover:bg-white/90 transition-none"
+              asChild
+            >
               <Link to="/register">Get Started</Link>
             </Button>
-            <Button className="w-full sm:w-auto text-sm px-6 md:px-8 py-2.5 md:py-3 rounded-xl bg-transparent text-white border border-white/20 hover:bg-white/10 transition-none" asChild>
+            <Button
+              className="w-full sm:w-auto text-sm px-6 md:px-8 py-2.5 md:py-3 rounded-xl bg-transparent text-white border border-white/20 hover:bg-white/10 transition-none"
+              asChild
+            >
               <a href="/#features">Learn More</a>
             </Button>
           </div>
@@ -63,7 +69,10 @@ const DemoOne = () => (
             key={idx}
             className="backdrop-blur-sm bg-white/5 border border-white/10 rounded-lg md:rounded-xl p-3 md:p-4 lg:p-5 h-32 md:h-36 lg:h-40 flex flex-col justify-start items-start space-y-1.5 md:space-y-2"
           >
-            <feature.icon size={16} className="text-white/80 md:w-[18px] md:h-[18px]" />
+            <feature.icon
+              size={16}
+              className="text-white/80 md:w-[18px] md:h-[18px]"
+            />
             <h3 className="text-xs md:text-sm lg:text-base font-medium line-clamp-1">
               {feature.title}
             </h3>

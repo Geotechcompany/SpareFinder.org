@@ -343,7 +343,10 @@ const Landing = () => {
       </section>
 
       {/* Features Grid */}
-      <section id="features" className="relative py-24 px-4 sm:px-6 lg:px-8 overflow-hidden">
+      <section
+        id="features"
+        className="relative py-24 px-4 sm:px-6 lg:px-8 overflow-hidden"
+      >
         <div className="absolute inset-0 bg-gradient-to-b from-black via-gray-900/50 to-black" />
         <div className="absolute inset-0">
           <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl" />
@@ -422,12 +425,15 @@ const Landing = () => {
       </section>
 
       {/* Testimonials */}
-      <section id="testimonials" className="relative py-24 px-4 sm:px-6 lg:px-8 overflow-hidden bg-black">
+      <section
+        id="testimonials"
+        className="relative py-24 px-4 sm:px-6 lg:px-8 overflow-hidden bg-black"
+      >
         <div className="absolute inset-0">
           <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl" />
           <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl" />
         </div>
-        
+
         <div className="max-w-7xl mx-auto relative z-10">
           <motion.div
             className="text-center mb-16"
@@ -451,7 +457,8 @@ const Landing = () => {
               Loved by Professionals Worldwide
             </h2>
             <p className="text-xl text-gray-300 max-w-2xl mx-auto">
-              See what our customers are saying about SpareFinder. Click on any review to read more.
+              See what our customers are saying about SpareFinder. Click on any
+              review to read more.
             </p>
           </motion.div>
 
