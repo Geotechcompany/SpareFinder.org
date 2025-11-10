@@ -1024,7 +1024,7 @@ export const uploadApi = {
   deleteUpload: async (uploadId: string): Promise<ApiResponse> => {
     try {
       // Backend exposes deletion at /uploads/:uploadId
-      const response = await apiClient.delete(`/history/uploads/${uploadId}`);
+    const response = await apiClient.delete(`/history/uploads/${uploadId}`);
       return response.data;
     } catch (error) {
       console.error("Delete upload error:", error);

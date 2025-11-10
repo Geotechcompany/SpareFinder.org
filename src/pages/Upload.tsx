@@ -1156,6 +1156,25 @@ const Upload = () => {
     } catch (error: any) {
       console.error("Keyword search error:", error);
 
+      // Handle rate limiting errors (429)
+      if (axios.isAxiosError(error) && error.response?.status === 429) {
+        const errorData = error.response.data;
+        const retryAfter = errorData?.retryAfter;
+        const retrySeconds = retryAfter ? parseInt(retryAfter, 10) : null;
+        
+        toast({
+          title: "Service Busy",
+          description: errorData?.message || 
+            "The AI service is currently experiencing high demand. " +
+            (retrySeconds 
+              ? `Please try again in ${retrySeconds} seconds.`
+              : "Please try again in a few moments."),
+          variant: "destructive",
+          duration: retrySeconds ? (retrySeconds * 1000) : 5000,
+        });
+        return;
+      }
+
       // Handle subscription errors
       if (axios.isAxiosError(error) && error.response?.status === 403) {
         const errorData = error.response.data;
@@ -1178,9 +1197,31 @@ const Upload = () => {
         }
       }
 
+      // Handle insufficient credits (402)
+      if (axios.isAxiosError(error) && error.response?.status === 402) {
+        const errorData = error.response.data;
+        toast({
+          title: "Insufficient Credits",
+          description:
+            errorData?.message ||
+            "You don't have enough credits to perform this search. Please upgrade your plan.",
+          variant: "destructive",
+        });
+        setTimeout(() => {
+          window.location.href = "/dashboard/billing";
+        }, 2000);
+        return;
+      }
+
+      // Handle other errors
+      const errorMessage = 
+        error.response?.data?.message || 
+        error.message || 
+        "An error occurred. Please try again.";
+      
       toast({
         title: "Keyword search failed",
-        description: error.message || "Please try again",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
