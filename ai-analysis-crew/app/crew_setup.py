@@ -2,7 +2,7 @@
 
 import os
 import asyncio
-from typing import Callable, Optional
+from typing import Callable, Optional, Tuple
 from crewai import Agent, Task, Crew
 from langchain_openai import ChatOpenAI
 from .report_generator import generate_report
@@ -176,7 +176,7 @@ AI Spare Part Analyzer Team
         return "Failed to send email"
 
 
-def setup_crew(image_data: Optional[bytes], keywords: Optional[str], user_email: str) -> Crew:
+def setup_crew(image_data: Optional[bytes], keywords: Optional[str], user_email: str) -> Tuple[Crew, Task]:
     """
     Set up and configure the CrewAI crew for spare part analysis.
     

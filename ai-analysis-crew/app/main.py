@@ -355,10 +355,12 @@ async def websocket_progress(websocket: WebSocket):
             detailed_description = get_image_description(image_data, keywords)
             emit_progress("image_analysis", "✅ Image analyzed successfully", "completed")
             # Pass the detailed description to CrewAI instead of raw image
-            crew = setup_crew(None, detailed_description, user_email)
+            # setup_crew returns a tuple: (crew, report_task)
+            crew, report_task = setup_crew(None, detailed_description, user_email)
         else:
             emit_progress("setup", "Initializing AI agents...", "in_progress")
-            crew = setup_crew(None, keywords, user_email)
+            # setup_crew returns a tuple: (crew, report_task)
+            crew, report_task = setup_crew(None, keywords, user_email)
         
         # Emit progress for starting part identification
         emit_progress("part_identifier", "🔍 Part Identifier agent started - analyzing input...", "in_progress")
