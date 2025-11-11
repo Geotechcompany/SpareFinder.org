@@ -43,6 +43,7 @@ import Reviews from "@/pages/Reviews";
 import PublicReviews from "@/pages/PublicReviews";
 import DashboardLayout from "@/components/DashboardLayout";
 import SharedAnalysis from "@/pages/SharedAnalysis";
+import { PageSEO } from "@/components/PageSEO";
 
 const queryClient = new QueryClient();
 
@@ -55,6 +56,7 @@ const App = () => (
           <Toaster />
           <Sonner />
           <BrowserRouter>
+            <PageSEO />
             <Routes>
               <Route path="/" element={<Landing />} />
               <Route

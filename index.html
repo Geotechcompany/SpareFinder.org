@@ -57,7 +57,29 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="SpareFinder" />
 
-    <!-- Structured Data / Schema.org -->
+    <!-- Structured Data / Schema.org - Organization -->
+    <script type="application/ld+json">
+        {
+            "@context": "https://schema.org",
+            "@type": "Organization",
+            "name": "SpareFinder",
+            "url": "https://sparefinder.org",
+            "logo": "https://sparefinder.org/sparefinderlogodark.png",
+            "description": "AI-powered spare parts identification system with 99.9% accuracy for industrial, automotive, and aerospace components.",
+            "sameAs": [
+                "https://www.linkedin.com/company/sparefinder",
+                "https://twitter.com/SpareFinder",
+                "https://www.facebook.com/SpareFinder"
+            ],
+            "contactPoint": {
+                "@type": "ContactPoint",
+                "contactType": "Customer Service",
+                "url": "https://sparefinder.org/contact"
+            }
+        }
+    </script>
+    
+    <!-- Structured Data / Schema.org - SoftwareApplication -->
     <script type="application/ld+json">
         {
             "@context": "https://schema.org",
@@ -66,15 +88,58 @@
             "applicationCategory": "BusinessApplication",
             "operatingSystem": "Web",
             "description": "AI-powered spare parts identification system with 99.9% accuracy for industrial, automotive, and aerospace components.",
+            "url": "https://sparefinder.org",
+            "image": "https://sparefinder.org/sparefinderlogodark.png",
             "offers": {
                 "@type": "Offer",
                 "price": "0",
-                "priceCurrency": "USD"
+                "priceCurrency": "USD",
+                "availability": "https://schema.org/InStock"
             },
             "aggregateRating": {
                 "@type": "AggregateRating",
                 "ratingValue": "4.9",
-                "ratingCount": "1250"
+                "ratingCount": "1250",
+                "bestRating": "5",
+                "worstRating": "1"
+            },
+            "featureList": [
+                "AI-powered part identification",
+                "99.9% accuracy rate",
+                "Instant results",
+                "Multi-industry support",
+                "Supplier information",
+                "Technical specifications"
+            ],
+            "applicationSubCategory": "Industrial Automation",
+            "screenshot": "https://sparefinder.org/sparefinderlogodark.png",
+            "author": {
+                "@type": "Organization",
+                "name": "SpareFinder"
+            }
+        }
+    </script>
+    
+    <!-- Structured Data / Schema.org - WebSite -->
+    <script type="application/ld+json">
+        {
+            "@context": "https://schema.org",
+            "@type": "WebSite",
+            "name": "SpareFinder",
+            "url": "https://sparefinder.org",
+            "description": "AI-powered spare parts identification system",
+            "potentialAction": {
+                "@type": "SearchAction",
+                "target": "https://sparefinder.org/dashboard/upload?q={search_term_string}",
+                "query-input": "required name=search_term_string"
+            },
+            "publisher": {
+                "@type": "Organization",
+                "name": "SpareFinder",
+                "logo": {
+                    "@type": "ImageObject",
+                    "url": "https://sparefinder.org/sparefinderlogodark.png"
+                }
             }
         }
     </script>

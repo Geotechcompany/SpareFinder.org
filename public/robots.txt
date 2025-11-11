@@ -2,12 +2,34 @@
 
 User-agent: *
 Allow: /
+Allow: /reviews
+Allow: /contact
+Allow: /privacy-policy
+Allow: /terms-of-service
+
+# Disallow private/admin areas
+Disallow: /admin/
+Disallow: /dashboard/
+Disallow: /api/
+Disallow: /share/
+Disallow: /onboarding/
+Disallow: /reset-password
+
+# Allow important bot access
+User-agent: Googlebot
+Allow: /
 Disallow: /admin/
 Disallow: /dashboard/
 Disallow: /api/
 
-# Sitemap
+User-agent: Bingbot
+Allow: /
+Disallow: /admin/
+Disallow: /dashboard/
+Disallow: /api/
+
+# Sitemap location
 Sitemap: https://sparefinder.org/sitemap.xml
 
-# Crawl-delay for bots (optional, in seconds)
+# Crawl-delay (seconds)
 Crawl-delay: 1
