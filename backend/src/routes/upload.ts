@@ -27,10 +27,32 @@ async function startCrewAnalysis(
   userEmail: string,
   keywords: string
 ): Promise<void> {
-  const aiCrewUrl = process.env.AI_CREW_URL || "http://localhost:8000";
+  // Use AI_CREW_URL if set, otherwise fall back to AI_SERVICE_URL, or fail if neither is set
+  const aiCrewUrl =
+    process.env.AI_CREW_URL ||
+    process.env.AI_SERVICE_URL ||
+    (() => {
+      const error = new Error(
+        "AI_CREW_URL or AI_SERVICE_URL environment variable is not configured"
+      );
+      console.error("❌ Configuration error:", error.message);
+      throw error;
+    })();
+
+  // Prevent using localhost in production (basic check)
+  if (
+    process.env.NODE_ENV === "production" &&
+    (aiCrewUrl.includes("localhost") || aiCrewUrl.includes("127.0.0.1") || aiCrewUrl.includes("::1"))
+  ) {
+    const error = new Error(
+      `Invalid AI service URL for production: ${aiCrewUrl}. Please set AI_CREW_URL or AI_SERVICE_URL to a valid production URL.`
+    );
+    console.error("❌ Configuration error:", error.message);
+    throw error;
+  }
 
   try {
-    console.log(`📤 Sending analysis request to crew for job ${jobId}`);
+    console.log(`📤 Sending analysis request to crew for job ${jobId} at ${aiCrewUrl}`);
 
     const formData = new FormData();
     formData.append("file", imageBuffer, {
@@ -1880,9 +1902,7 @@ router.post(
 
       // Trigger the AI Deep Research in the background
       // Don't await this - let it run asynchronously
-      const aiCrewUrl = process.env.AI_CREW_URL || "http://localhost:8000";
-
-      console.log("🚀 Triggering AI Deep Research at:", aiCrewUrl);
+      // URL configuration is handled inside startCrewAnalysis function
 
       // Start analysis in background - don't wait for completion
       setImmediate(async () => {
