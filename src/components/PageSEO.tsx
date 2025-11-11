@@ -111,6 +111,9 @@ const pageConfigs: PageSEOConfig = {
   },
 };
 
+const DEFAULT_DESCRIPTION =
+  "Identify spare parts instantly with 99.9% accuracy using advanced AI computer vision. Upload images and get instant part identification, specifications, and supplier information.";
+
 export const PageSEO = () => {
   const location = useLocation();
 
@@ -142,9 +145,6 @@ export const PageSEO = () => {
 
   return <SEO {...config} />;
 };
-
-const DEFAULT_DESCRIPTION =
-  "Identify spare parts instantly with 99.9% accuracy using advanced AI computer vision. Upload images and get instant part identification, specifications, and supplier information.";
 
 export default PageSEO;
 
