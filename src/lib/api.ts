@@ -349,7 +349,7 @@ export const dashboardApi = {
     };
     const AI_BASE =
       (import.meta as { env?: { VITE_AI_SERVICE_URL?: string } }).env
-        ?.VITE_AI_SERVICE_URL || "http://localhost:8000";
+        ?.VITE_AI_SERVICE_URL || "https://aiagent.sparefinder.org";
     const res = await axios.post(`${AI_BASE}/search/keywords`, payload, {
       headers: { "Content-Type": "application/json" },
     });

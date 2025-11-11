@@ -375,7 +375,7 @@ const History = () => {
         try {
           const API_BASE =
             (import.meta as any).env?.VITE_AI_SERVICE_URL ||
-            "http://localhost:8000";
+            "https://aiagent.sparefinder.org";
           // Only fetch from AI service if image_url is missing
           // Images are already stored in Supabase Storage
           const toFetch = (pastAnalysis || []).filter(
@@ -876,7 +876,7 @@ const History = () => {
     try {
       const API_BASE =
         (import.meta as any).env?.VITE_AI_SERVICE_URL ||
-        "http://localhost:8000";
+        "https://aiagent.sparefinder.org";
       const id = encodeURIComponent(job.filename || job.id);
       const res = await fetch(`${API_BASE}/analyze-part/status/${id}`);
       const data = await res.json();
@@ -958,7 +958,7 @@ const History = () => {
 
       const API_BASE =
         (import.meta as any).env?.VITE_AI_SERVICE_URL ||
-        "http://localhost:8000";
+        "https://aiagent.sparefinder.org";
       const res = await fetch(
         `${API_BASE}/analyze-part/status/${encodeURIComponent(
           job.filename || job.id

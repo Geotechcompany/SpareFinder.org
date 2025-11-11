@@ -926,7 +926,8 @@ const Upload = () => {
     "image" | "keywords" | "both" | null
   >(null);
   const [wizardProgress, setWizardProgress] = useState(0);
-  const [showComprehensiveAnalysis, setShowComprehensiveAnalysis] = useState(false);
+  const [showComprehensiveAnalysis, setShowComprehensiveAnalysis] =
+    useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const keywordsInputRef = useRef<HTMLInputElement>(null);
@@ -1129,14 +1130,20 @@ const Upload = () => {
       const response = await dashboardApi.scheduleKeywordSearch(savedKeywords);
 
       if (!response?.success) {
-        throw new Error(response?.message || "Keyword search scheduling failed");
+        throw new Error(
+          response?.message || "Keyword search scheduling failed"
+        );
       }
 
+      // Extract jobId with type-safe access to nested data
+      const data = response?.data as
+        | { jobId?: string; filename?: string }
+        | undefined;
       const jobId =
         response?.jobId ||
         response?.filename ||
-        response?.data?.jobId ||
-        response?.data?.filename ||
+        data?.jobId ||
+        data?.filename ||
         null;
 
       // Show scheduling confirmation
@@ -1161,16 +1168,17 @@ const Upload = () => {
         const errorData = error.response.data;
         const retryAfter = errorData?.retryAfter;
         const retrySeconds = retryAfter ? parseInt(retryAfter, 10) : null;
-        
+
         toast({
           title: "Service Busy",
-          description: errorData?.message || 
+          description:
+            errorData?.message ||
             "The AI service is currently experiencing high demand. " +
-            (retrySeconds 
-              ? `Please try again in ${retrySeconds} seconds.`
-              : "Please try again in a few moments."),
+              (retrySeconds
+                ? `Please try again in ${retrySeconds} seconds.`
+                : "Please try again in a few moments."),
           variant: "destructive",
-          duration: retrySeconds ? (retrySeconds * 1000) : 5000,
+          duration: retrySeconds ? retrySeconds * 1000 : 5000,
         });
         return;
       }
@@ -1214,11 +1222,11 @@ const Upload = () => {
       }
 
       // Handle other errors
-      const errorMessage = 
-        error.response?.data?.message || 
-        error.message || 
+      const errorMessage =
+        error.response?.data?.message ||
+        error.message ||
         "An error occurred. Please try again.";
-      
+
       toast({
         title: "Keyword search failed",
         description: errorMessage,
@@ -1953,7 +1961,7 @@ const Upload = () => {
     try {
       const API_BASE =
         (import.meta as any).env?.VITE_AI_SERVICE_URL ||
-        "http://localhost:8000";
+        "https://aiagent.sparefinder.org";
       const form = new FormData();
       form.append("file", uploadedFile);
       if (savedKeywords.length)
@@ -4352,7 +4360,7 @@ const Upload = () => {
                 >
                   Start Over
                 </Button>
-                
+
                 <Button
                   onClick={async () => {
                     if (selectedMode === "image" || selectedMode === "both") {
@@ -4368,20 +4376,23 @@ const Upload = () => {
 
                       try {
                         setIsAnalyzing(true);
-                        
+
                         // Create Deep Research job
                         const response = await api.upload.createCrewAnalysisJob(
                           uploadedFile,
-                          savedKeywords.join(' ')
+                          savedKeywords.join(" ")
                         );
 
                         if (!response.success) {
-                          throw new Error(response.message || "Failed to create analysis job");
+                          throw new Error(
+                            response.message || "Failed to create analysis job"
+                          );
                         }
 
                         toast({
                           title: "Analysis Started! 🚀",
-                          description: "Redirecting you to history to watch progress...",
+                          description:
+                            "Redirecting you to history to watch progress...",
                         });
 
                         // Redirect to history page
@@ -4391,10 +4402,13 @@ const Upload = () => {
                       } catch (error) {
                         console.error("Deep Research error:", error);
                         setIsAnalyzing(false);
-                        
+
                         toast({
                           title: "Analysis Failed",
-                          description: error instanceof Error ? error.message : "Please try again",
+                          description:
+                            error instanceof Error
+                              ? error.message
+                              : "Please try again",
                           variant: "destructive",
                         });
                       }
@@ -4519,7 +4533,7 @@ const Upload = () => {
         open={showComprehensiveAnalysis}
         onOpenChange={setShowComprehensiveAnalysis}
         imageFile={uploadedFile}
-        keywords={savedKeywords.join(' ')}
+        keywords={savedKeywords.join(" ")}
       />
     </div>
   );
