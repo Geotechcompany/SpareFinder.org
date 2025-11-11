@@ -12,8 +12,21 @@ const supabaseKey =
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 /**
+ * Handle CORS preflight for PDF downloads
+ * OPTIONS /api/reports/pdf/:filename
+ */
+router.options("/pdf/:filename(*)", async (req: Request, res: Response) => {
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Authorization, Content-Type");
+  res.setHeader("Access-Control-Max-Age", "86400"); // 24 hours
+  return res.status(200).end();
+});
+
+/**
  * Serve PDF file
  * GET /api/reports/pdf/:filename
+ * Note: This endpoint is public (no authentication required) to support shared links
  */
 router.get("/pdf/:filename(*)", async (req: Request, res: Response) => {
   try {
@@ -71,9 +84,13 @@ router.get("/pdf/:filename(*)", async (req: Request, res: Response) => {
       return res.status(404).json({ error: "PDF file not found" });
     }
 
-    // Set headers for PDF download
+    // Set headers for PDF download with CORS support
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
+    res.setHeader("Access-Control-Allow-Headers", "Authorization, Content-Type");
+    res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
 
     // Stream the file
     const fileStream = fs.createReadStream(pdfPath);

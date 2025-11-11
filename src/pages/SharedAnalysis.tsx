@@ -55,14 +55,36 @@ const SharedAnalysis = () => {
 
     try {
       const filename = analysis.pdf_url.split('/').pop() || 'report.pdf';
-      const downloadUrl = `${import.meta.env.VITE_API_URL || 'http://localhost:4000'}/api/reports/pdf/${filename}`;
-      
+      const apiBaseUrl =
+        import.meta.env.VITE_API_URL ||
+        import.meta.env.VITE_API_BASE_URL ||
+        'http://localhost:4000';
+
+      // Fetch PDF as blob to avoid browser security warnings
+      const response = await fetch(`${apiBaseUrl}/api/reports/pdf/${filename}`, {
+        method: 'GET',
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to download PDF: ${response.statusText}`);
+      }
+
+      // Convert response to blob
+      const blob = await response.blob();
+
+      // Create blob URL and trigger download
+      const blobUrl = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
-      link.href = downloadUrl;
+      link.href = blobUrl;
       link.download = filename;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
+
+      // Clean up blob URL after a delay
+      setTimeout(() => {
+        window.URL.revokeObjectURL(blobUrl);
+      }, 100);
     } catch (error) {
       console.error('Download error:', error);
     }

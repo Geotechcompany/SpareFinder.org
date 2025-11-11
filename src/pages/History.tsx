@@ -1171,18 +1171,43 @@ const History = () => {
       // Extract filename from URL
       const filename = pdfUrl.split("/").pop() || "report.pdf";
 
-      // Use backend endpoint to serve PDF
-      const downloadUrl = `${
-        import.meta.env.VITE_API_URL || "http://localhost:4000"
-      }/api/reports/pdf/${filename}`;
+      // Get API base URL
+      const apiBaseUrl =
+        import.meta.env.VITE_API_URL ||
+        import.meta.env.VITE_API_BASE_URL ||
+        "http://localhost:4000";
 
-      // Create a temporary link and trigger download
+      // Fetch PDF as blob to avoid browser security warnings
+      const response = await fetch(
+        `${apiBaseUrl}/api/reports/pdf/${filename}`,
+        {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${sessionStorage.getItem("auth_token")}`,
+          },
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`Failed to download PDF: ${response.statusText}`);
+      }
+
+      // Convert response to blob
+      const blob = await response.blob();
+
+      // Create blob URL and trigger download
+      const blobUrl = window.URL.createObjectURL(blob);
       const link = document.createElement("a");
-      link.href = downloadUrl;
+      link.href = blobUrl;
       link.download = filename;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
+
+      // Clean up blob URL after a delay
+      setTimeout(() => {
+        window.URL.revokeObjectURL(blobUrl);
+      }, 100);
 
       toast({
         title: "Download Started",
@@ -1192,7 +1217,10 @@ const History = () => {
       console.error("Download error:", error);
       toast({
         title: "Download Failed",
-        description: "Failed to download PDF. Please try again.",
+        description:
+          error instanceof Error
+            ? error.message
+            : "Failed to download PDF. Please try again.",
         variant: "destructive",
       });
     }
