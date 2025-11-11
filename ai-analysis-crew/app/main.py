@@ -198,6 +198,18 @@ async def run_analysis_background(
         # Report Generation stage
         update_crew_job_status(analysis_id, "processing", "report_generator", 85)
         
+        # Upload PDF to Supabase Storage for persistent access
+        pdf_public_url = None
+        try:
+            from .pdf_storage import upload_pdf_to_supabase_storage
+            pdf_public_url = upload_pdf_to_supabase_storage(pdf_path, pdf_filename)
+            if pdf_public_url:
+                logger.info(f"✅ PDF uploaded to Supabase Storage: {pdf_public_url}")
+            else:
+                logger.warning("⚠️ PDF upload to Supabase Storage failed, using local path")
+        except Exception as upload_err:
+            logger.error(f"❌ Error uploading PDF: {upload_err}")
+        
         # Store to database (jobs and part_searches tables)
         import uuid
         update_crew_job_status(analysis_id, "processing", "database_storage", 90)
@@ -207,7 +219,8 @@ async def run_analysis_background(
             analysis_data={
                 'report_text': result_text,
                 'processing_time': 180,
-                'pdf_path': pdf_path
+                'pdf_path': pdf_filename,
+                'pdf_url': pdf_public_url if pdf_public_url else pdf_filename
             },
             image_url=None,
             keywords=keywords
@@ -221,12 +234,13 @@ async def run_analysis_background(
         send_email_tool_func(user_email, pdf_path)
         logger.info(f"✅ Email sent successfully")
         
-        # Complete the job
+        # Complete the job - use public URL if available, otherwise filename
         logger.info(f"🏁 Completing job {analysis_id}")
+        pdf_url_for_completion = pdf_public_url if pdf_public_url else pdf_filename
         completion_success = complete_crew_job(
             job_id=analysis_id,
             result_data={'report_text': result_text},
-            pdf_url=pdf_filename
+            pdf_url=pdf_url_for_completion
         )
         
         if completion_success:
@@ -388,12 +402,31 @@ async def websocket_progress(websocket: WebSocket):
         # Extract just the filename for URL storage
         pdf_filename = pdf_path.split('/')[-1] if '/' in pdf_path else pdf_path.split('\\')[-1]
         
+        # Upload PDF to Supabase Storage for persistent access
+        emit_progress("database_storage", "📤 Uploading PDF to cloud storage...", "in_progress")
+        pdf_public_url = None
+        try:
+            from .pdf_storage import upload_pdf_to_supabase_storage
+            pdf_public_url = upload_pdf_to_supabase_storage(pdf_path, pdf_filename)
+            if pdf_public_url:
+                emit_progress("database_storage", "✅ PDF uploaded to cloud storage", "completed")
+                logger.info(f"✅ PDF uploaded to Supabase Storage: {pdf_public_url}")
+            else:
+                emit_progress("database_storage", "⚠️ PDF upload skipped (using local file)", "completed")
+                logger.warning("⚠️ PDF upload to Supabase Storage failed, using local path")
+        except Exception as upload_err:
+            logger.error(f"❌ Error uploading PDF: {upload_err}")
+            emit_progress("database_storage", "⚠️ PDF upload failed, continuing...", "completed")
+        
         # Store to database
         emit_progress("database_storage", "💾 Storing analysis to database...", "in_progress")
         
         # Generate unique analysis ID (proper UUID format for database)
         import uuid
         analysis_id = str(uuid.uuid4())
+        
+        # Use public URL if available, otherwise use filename
+        pdf_url_for_db = pdf_public_url if pdf_public_url else pdf_filename
         
         # Store comprehensive analysis to database
         db_success = store_crew_analysis_to_database(
@@ -402,7 +435,8 @@ async def websocket_progress(websocket: WebSocket):
             analysis_data={
                 'report_text': result_text,
                 'processing_time': processing_time,
-                'pdf_path': pdf_filename
+                'pdf_path': pdf_filename,
+                'pdf_url': pdf_url_for_db
             },
             image_url=None,  # Could extract from data if available
             keywords=keywords

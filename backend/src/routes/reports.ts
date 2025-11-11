@@ -1,6 +1,7 @@
 import { Router, Request, Response } from "express";
 import path from "path";
 import fs from "fs";
+import axios from "axios";
 import { createClient } from "@supabase/supabase-js";
 
 const router = Router();
@@ -27,6 +28,11 @@ router.options("/pdf/:filename(*)", async (_req: Request, res: Response) => {
  * Serve PDF file
  * GET /api/reports/pdf/:filename
  * Note: This endpoint is public (no authentication required) to support shared links
+ * 
+ * Tries multiple sources in order:
+ * 1. Supabase Storage (production - recommended)
+ * 2. Local file system (development/fallback)
+ * 3. AI service proxy (if PDF is on AI service server)
  */
 router.get("/pdf/:filename(*)", async (req: Request, res: Response) => {
   try {
@@ -34,7 +40,7 @@ router.get("/pdf/:filename(*)", async (req: Request, res: Response) => {
 
     console.log(`📥 PDF download request for: ${filename}`);
 
-    // Handle case where filename might be a full path (legacy data)
+    // Handle case where filename might be a full path or URL
     // Extract just the filename part
     if (filename.includes("/") || filename.includes("\\")) {
       // Replace all backslashes with forward slashes and split
@@ -51,7 +57,46 @@ router.get("/pdf/:filename(*)", async (req: Request, res: Response) => {
       return res.status(400).json({ error: "Invalid filename" });
     }
 
-    // Check multiple possible locations for the PDF
+    // Remove query parameters if any
+    filename = filename.split("?")[0];
+
+    // Strategy 1: Try to get PDF from Supabase Storage (production)
+    const bucketName = process.env.SUPABASE_BUCKET_NAME || "sparefinder";
+    const storagePath = `reports/${filename}`;
+    
+    console.log(`🔍 Checking Supabase Storage: ${bucketName}/${storagePath}`);
+
+    try {
+      const { data: fileData, error: storageError } = await supabase.storage
+        .from(bucketName)
+        .download(storagePath);
+
+      if (!storageError && fileData) {
+        console.log(`✅ Found PDF in Supabase Storage: ${storagePath}`);
+        
+        // Convert blob to buffer
+        const arrayBuffer = await fileData.arrayBuffer();
+        const buffer = Buffer.from(arrayBuffer);
+
+        // Set headers for PDF download with CORS support
+        res.setHeader("Content-Type", "application/pdf");
+        res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+        res.setHeader("Content-Length", buffer.length.toString());
+        res.setHeader("Access-Control-Allow-Origin", "*");
+        res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
+        res.setHeader("Access-Control-Allow-Headers", "Authorization, Content-Type");
+        res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
+        res.setHeader("Cache-Control", "public, max-age=3600"); // Cache for 1 hour
+
+        return res.send(buffer);
+      } else {
+        console.log(`⚠️ PDF not found in Supabase Storage: ${storageError?.message || "Not found"}`);
+      }
+    } catch (storageErr) {
+      console.warn(`⚠️ Error checking Supabase Storage:`, storageErr);
+    }
+
+    // Strategy 2: Try local file system (development/fallback)
     const possiblePaths = [
       // New location: ai-analysis-crew/temp (relative to backend)
       path.join(__dirname, "../../../ai-analysis-crew/temp", filename),
@@ -67,37 +112,145 @@ router.get("/pdf/:filename(*)", async (req: Request, res: Response) => {
       // Relative tmp from project root
       path.join(process.cwd(), "tmp", filename),
       path.join(process.cwd(), "temp", filename),
+      // Reports directory in project
+      path.join(process.cwd(), "reports", filename),
     ];
 
     let pdfPath: string | null = null;
     for (const testPath of possiblePaths) {
-      if (fs.existsSync(testPath)) {
-        pdfPath = testPath;
-        console.log(`✅ Found PDF at: ${pdfPath}`);
-        break;
+      try {
+        if (fs.existsSync(testPath)) {
+          pdfPath = testPath;
+          console.log(`✅ Found PDF at local path: ${pdfPath}`);
+          break;
+        }
+      } catch (pathError) {
+        // Skip paths that cause errors (e.g., permissions)
+        continue;
       }
     }
 
-    if (!pdfPath) {
-      console.error(`❌ PDF not found: ${filename}`);
-      console.error(`Tried locations:`, possiblePaths);
-      return res.status(404).json({ error: "PDF file not found" });
+    if (pdfPath) {
+      // Set headers for PDF download with CORS support
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+      res.setHeader("Access-Control-Allow-Origin", "*");
+      res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
+      res.setHeader("Access-Control-Allow-Headers", "Authorization, Content-Type");
+      res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
+      res.setHeader("Cache-Control", "public, max-age=3600");
+
+      // Stream the file
+      const fileStream = fs.createReadStream(pdfPath);
+      return fileStream.pipe(res);
     }
 
-    // Set headers for PDF download with CORS support
-    res.setHeader("Content-Type", "application/pdf");
-    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
-    res.setHeader("Access-Control-Allow-Origin", "*");
-    res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
-    res.setHeader("Access-Control-Allow-Headers", "Authorization, Content-Type");
-    res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
+    // Strategy 3: Try to get from database - query by filename in pdf_url field
+    try {
+      // Query for jobs where pdf_url contains the filename or equals it
+      const { data: jobs, error: dbError } = await supabase
+        .from("crew_analysis_jobs")
+        .select("pdf_url")
+        .ilike("pdf_url", `%${filename}%`)
+        .limit(5);
 
-    // Stream the file
-    const fileStream = fs.createReadStream(pdfPath);
-    return fileStream.pipe(res);
+      if (!dbError && jobs && jobs.length > 0) {
+        for (const job of jobs) {
+          if (!job.pdf_url) continue;
+          
+          const pdfUrl = job.pdf_url;
+          
+          // If it's already a full URL (Supabase Storage URL), try to fetch it
+          if (pdfUrl.startsWith("http://") || pdfUrl.startsWith("https://")) {
+            console.log(`🔗 PDF is a full URL: ${pdfUrl}`);
+            
+            try {
+              const response = await axios.get(pdfUrl, {
+                responseType: "arraybuffer",
+                timeout: 10000,
+                validateStatus: (status) => status === 200,
+              });
+
+              const buffer = Buffer.from(response.data);
+
+              res.setHeader("Content-Type", "application/pdf");
+              res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+              res.setHeader("Content-Length", buffer.length.toString());
+              res.setHeader("Access-Control-Allow-Origin", "*");
+              res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
+              res.setHeader("Access-Control-Allow-Headers", "Authorization, Content-Type");
+              res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
+              res.setHeader("Cache-Control", "public, max-age=3600");
+
+              console.log(`✅ Successfully fetched PDF from URL: ${pdfUrl}`);
+              return res.send(buffer);
+            } catch (urlError: any) {
+              console.warn(`⚠️ Failed to fetch PDF from URL ${pdfUrl}: ${urlError.message}`);
+              continue; // Try next job
+            }
+          }
+          
+          // If pdf_url contains the filename but is not a URL, try alternative storage paths
+          if (pdfUrl.includes(filename) && !pdfUrl.startsWith("http")) {
+            // Try alternative storage paths in Supabase
+            const altPaths = [
+              `reports/${filename}`,
+              `pdfs/${filename}`,
+              `uploads/${filename}`,
+              filename, // Root of bucket
+              pdfUrl, // Try the exact path from database
+            ];
+            
+            for (const altPath of altPaths) {
+              try {
+                const { data: altFileData, error: altError } = await supabase.storage
+                  .from(bucketName)
+                  .download(altPath);
+
+                if (!altError && altFileData) {
+                  console.log(`✅ Found PDF in Supabase Storage at alternative path: ${altPath}`);
+                  
+                  const arrayBuffer = await altFileData.arrayBuffer();
+                  const buffer = Buffer.from(arrayBuffer);
+
+                  res.setHeader("Content-Type", "application/pdf");
+                  res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+                  res.setHeader("Content-Length", buffer.length.toString());
+                  res.setHeader("Access-Control-Allow-Origin", "*");
+                  res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
+                  res.setHeader("Access-Control-Allow-Headers", "Authorization, Content-Type");
+                  res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
+                  res.setHeader("Cache-Control", "public, max-age=3600");
+
+                  return res.send(buffer);
+                }
+              } catch (altErr) {
+                // Continue to next path
+                continue;
+              }
+            }
+          }
+        }
+      }
+    } catch (dbErr) {
+      console.warn(`⚠️ Error querying database for PDF:`, dbErr);
+    }
+
+    // If all strategies fail, return error
+    console.error(`❌ PDF not found: ${filename}`);
+    console.error(`Tried: Supabase Storage, Local paths, Database URL`);
+    
+    return res.status(404).json({
+      error: "PDF file not found",
+      message: `The requested PDF "${filename}" could not be found. It may have been deleted or not yet generated.`,
+      suggestion: "Please check if the analysis job has completed successfully.",
+    });
   } catch (error) {
     console.error("Error serving PDF:", error);
-    return res.status(500).json({ error: "Failed to serve PDF file" });
+    return res.status(500).json({
+      error: "Failed to serve PDF file",
+      message: error instanceof Error ? error.message : "Unknown error",
+    });
   }
 });
 
