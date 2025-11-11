@@ -15,7 +15,7 @@ const supabase = createClient(supabaseUrl, supabaseKey);
  * Handle CORS preflight for PDF downloads
  * OPTIONS /api/reports/pdf/:filename
  */
-router.options("/pdf/:filename(*)", async (req: Request, res: Response) => {
+router.options("/pdf/:filename(*)", async (_req: Request, res: Response) => {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Authorization, Content-Type");
