@@ -49,7 +49,7 @@ npm run dev
 ### User Flow:
 
 1. 📤 Upload a part image
-2. 🤖 Click **"🤖 AI Deep Research"** button
+2. 🤖 Click **"🤖 SpareFinder AI Research"** button
 3. 📧 Enter your email address
 4. 🚀 Click **"Start Analysis"**
 5. 👀 Watch real-time progress (7 stages)
@@ -176,13 +176,13 @@ curl http://localhost:8000/health
 ### 2. Test Frontend:
 
 - Open: http://localhost:5173/upload
-- Look for: **"🤖 AI Deep Research"** button
+- Look for: **"🤖 SpareFinder AI Research"** button
 - Should appear when image is uploaded
 
 ### 3. Test Full Flow:
 
 - Upload a car part image (brake pad, alternator, etc.)
-- Click **"🤖 AI Deep Research"**
+- Click **"🤖 SpareFinder AI Research"**
 - Enter your email
 - Watch progress in modal
 - Check email for PDF report
@@ -311,7 +311,7 @@ python run.py
 Your AI Analysis Crew is working when:
 
 - ✅ Backend starts without Supabase warning
-- ✅ Frontend shows "🤖 AI Deep Research" button
+- ✅ Frontend shows "🤖 SpareFinder AI Research" button
 - ✅ Modal opens with email input
 - ✅ Real-time progress updates appear
 - ✅ PDF report received via email

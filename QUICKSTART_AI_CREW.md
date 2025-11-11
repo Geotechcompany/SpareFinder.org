@@ -77,7 +77,7 @@ Backend will be at: `http://localhost:8000`
 
 1. Go to `http://localhost:5173/upload`
 2. Upload a part image
-3. Click **"🤖 AI Deep Research"**
+3. Click **"🤖 SpareFinder AI Research"**
 4. Enter your email
 5. Click **"🚀 Start Analysis"**
 6. Watch the magic happen! ✨

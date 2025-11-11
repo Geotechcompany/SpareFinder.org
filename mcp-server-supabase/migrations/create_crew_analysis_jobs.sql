@@ -1,4 +1,4 @@
--- Create crew_analysis_jobs table for tracking AI Deep Research progress
+-- Create crew_analysis_jobs table for tracking SpareFinder AI Research progress
 CREATE TABLE IF NOT EXISTS crew_analysis_jobs (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,

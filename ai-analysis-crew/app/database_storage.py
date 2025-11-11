@@ -1,5 +1,5 @@
 """
-Database Storage Module for AI Deep Research
+Database Storage Module for SpareFinder AI Research
 Stores comprehensive analysis results to Supabase database
 """
 
@@ -61,7 +61,7 @@ def store_crew_analysis_to_database(
     keywords: Optional[str] = None
 ) -> bool:
     """
-    Store AI Deep Research results to Supabase database
+    Store SpareFinder AI Research results to Supabase database
     
     Args:
         analysis_id: Unique identifier for this analysis
@@ -88,7 +88,7 @@ def store_crew_analysis_to_database(
             logger.warning(f"⚠️ Invalid UUID format '{analysis_id}', generating new UUID")
             analysis_id = str(uuid_lib.uuid4())
             
-        logger.info(f"📊 Storing AI Deep Research to database: {analysis_id}")
+        logger.info(f"📊 Storing SpareFinder AI Research to database: {analysis_id}")
         
         # Parse the comprehensive report text to extract structured data
         report_text = analysis_data.get('report_text', '')
@@ -151,7 +151,7 @@ def store_crew_analysis_to_database(
         search_data = {
             'id': analysis_id,
             'user_id': user_id,  # Add user_id for RLS
-            'search_term': keywords or 'AI Deep Research',
+            'search_term': keywords or 'SpareFinder AI Research',
             'search_type': 'advanced',  # Use 'advanced' as per part_searches check constraint
             'part_name': part_name,
             'manufacturer': manufacturer,
@@ -191,7 +191,7 @@ def store_crew_analysis_to_database(
         else:
             logger.info(f"✅ Stored in part_searches table successfully")
         
-        logger.info(f"🎉 Successfully stored AI Deep Research {analysis_id} to database")
+        logger.info(f"🎉 Successfully stored SpareFinder AI Research {analysis_id} to database")
         return True
         
     except Exception as e:

@@ -42,7 +42,9 @@ async function startCrewAnalysis(
   // Prevent using localhost in production (basic check)
   if (
     process.env.NODE_ENV === "production" &&
-    (aiCrewUrl.includes("localhost") || aiCrewUrl.includes("127.0.0.1") || aiCrewUrl.includes("::1"))
+    (aiCrewUrl.includes("localhost") ||
+      aiCrewUrl.includes("127.0.0.1") ||
+      aiCrewUrl.includes("::1"))
   ) {
     const error = new Error(
       `Invalid AI service URL for production: ${aiCrewUrl}. Please set AI_CREW_URL or AI_SERVICE_URL to a valid production URL.`
@@ -52,7 +54,9 @@ async function startCrewAnalysis(
   }
 
   try {
-    console.log(`📤 Sending analysis request to crew for job ${jobId} at ${aiCrewUrl}`);
+    console.log(
+      `📤 Sending analysis request to crew for job ${jobId} at ${aiCrewUrl}`
+    );
 
     const formData = new FormData();
     formData.append("file", imageBuffer, {
@@ -70,10 +74,10 @@ async function startCrewAnalysis(
       timeout: 300000, // 5 minutes timeout
     });
 
-    console.log(`✅ AI Deep Research started for job ${jobId}`);
+    console.log(`✅ SpareFinder AI Research started for job ${jobId}`);
   } catch (error) {
     console.error(
-      `❌ Failed to start AI Deep Research for job ${jobId}:`,
+      `❌ Failed to start SpareFinder AI Research for job ${jobId}:`,
       error
     );
     throw error;
@@ -1848,8 +1852,8 @@ router.post(
 
             console.log("✅ Deep Research job created:", jobId);
 
-            // Trigger the AI Deep Research in the background
-            console.log("🚀 Triggering AI Deep Research");
+            // Trigger the SpareFinder AI Research in the background
+            console.log("🚀 Triggering SpareFinder AI Research");
 
             setImmediate(async () => {
               try {
@@ -1863,7 +1867,7 @@ router.post(
                 );
               } catch (crewError) {
                 console.error(
-                  `❌ Failed to start AI Deep Research for job ${jobId}:`,
+                  `❌ Failed to start SpareFinder AI Research for job ${jobId}:`,
                   crewError
                 );
 
@@ -1900,7 +1904,7 @@ router.post(
 
       console.log("✅ Deep Research job created:", jobId);
 
-      // Trigger the AI Deep Research in the background
+      // Trigger the SpareFinder AI Research in the background
       // Don't await this - let it run asynchronously
       // URL configuration is handled inside startCrewAnalysis function
 
@@ -1917,7 +1921,7 @@ router.post(
           );
         } catch (crewError) {
           console.error(
-            `❌ Failed to start AI Deep Research for job ${jobId}:`,
+            `❌ Failed to start SpareFinder AI Research for job ${jobId}:`,
             crewError
           );
 

@@ -1,54 +1,64 @@
-import React, { useState, useEffect } from 'react';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import React, { useState, useEffect } from "react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 const SQRT_5000 = Math.sqrt(5000);
 
 const testimonials = [
   {
     tempId: 0,
-    testimonial: "SpareFinder cut our part identification time from hours to seconds. The AI accuracy is incredible!",
+    testimonial:
+      "SpareFinder cut our part identification time from hours to seconds. The AI accuracy is incredible!",
     by: "Marcus Chen, Operations Director at AutoTech Solutions",
-    imgSrc: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=300&h=300&fit=crop"
+    imgSrc:
+      "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=300&h=300&fit=crop",
   },
   {
     tempId: 1,
-    testimonial: "We've identified over 10,000 parts with 99% accuracy. This platform transformed our entire inventory process.",
+    testimonial:
+      "We've identified over 10,000 parts with 99% accuracy. This platform transformed our entire inventory process.",
     by: "Sarah Williams, Supply Chain Manager at Industrial Parts Co",
-    imgSrc: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=300&h=300&fit=crop"
+    imgSrc:
+      "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=300&h=300&fit=crop",
   },
   {
     tempId: 2,
-    testimonial: "The supplier network is exceptional. We found OEM parts we couldn't source anywhere else!",
+    testimonial:
+      "The supplier network is exceptional. We found OEM parts we couldn't source anywhere else!",
     by: "David Rodriguez, Procurement Lead at MechTech Industries",
-    imgSrc: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=300&h=300&fit=crop"
+    imgSrc:
+      "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=300&h=300&fit=crop",
   },
   {
     tempId: 3,
-    testimonial: "Game-changer for our repair shop. Customers are amazed at how quickly we identify and source parts now.",
+    testimonial:
+      "Game-changer for our repair shop. Customers are amazed at how quickly we identify and source parts now.",
     by: "Emily Johnson, Owner at Precision Auto Repair",
-    imgSrc: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=300&h=300&fit=crop"
+    imgSrc:
+      "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=300&h=300&fit=crop",
   },
   {
     tempId: 4,
-    testimonial: "The AI deep research feature saved us thousands on a critical machinery part. Paid for itself in one order!",
+    testimonial:
+      "The SpareFinder AI Research feature saved us thousands on a critical machinery part. Paid for itself in one order!",
     by: "James Mitchell, Maintenance Manager at Heavy Equipment Corp",
-    imgSrc: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=300&h=300&fit=crop"
+    imgSrc:
+      "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=300&h=300&fit=crop",
   },
 ];
 
 interface TestimonialCardProps {
   position: number;
-  testimonial: typeof testimonials[0];
+  testimonial: (typeof testimonials)[0];
   handleMove: (steps: number) => void;
   cardSize: number;
 }
 
-const TestimonialCard: React.FC<TestimonialCardProps> = ({ 
-  position, 
-  testimonial, 
-  handleMove, 
-  cardSize 
+const TestimonialCard: React.FC<TestimonialCardProps> = ({
+  position,
+  testimonial,
+  handleMove,
+  cardSize,
 }) => {
   const isCenter = position === 0;
   return (
@@ -56,8 +66,8 @@ const TestimonialCard: React.FC<TestimonialCardProps> = ({
       onClick={() => handleMove(position)}
       className={cn(
         "absolute left-1/2 top-1/2 cursor-pointer border-2 p-8 transition-all duration-500 ease-in-out rounded-2xl",
-        isCenter 
-          ? "z-10 bg-gradient-to-br from-purple-600 to-blue-600 text-white border-purple-500 shadow-2xl shadow-purple-500/50" 
+        isCenter
+          ? "z-10 bg-gradient-to-br from-purple-600 to-blue-600 text-white border-purple-500 shadow-2xl shadow-purple-500/50"
           : "z-0 bg-gray-900/80 backdrop-blur-sm text-white border-gray-800 hover:border-purple-500/50"
       )}
       style={{
@@ -70,7 +80,9 @@ const TestimonialCard: React.FC<TestimonialCardProps> = ({
           translateY(${isCenter ? -65 : position % 2 ? 15 : -15}px)
           rotate(${isCenter ? 0 : position % 2 ? 2.5 : -2.5}deg)
         `,
-        boxShadow: isCenter ? "0px 8px 0px 4px rgba(139, 92, 246, 0.3)" : "0px 0px 0px 0px transparent"
+        boxShadow: isCenter
+          ? "0px 8px 0px 4px rgba(139, 92, 246, 0.3)"
+          : "0px 0px 0px 0px transparent",
       }}
     >
       <span
@@ -82,25 +94,29 @@ const TestimonialCard: React.FC<TestimonialCardProps> = ({
           right: -2,
           top: 48,
           width: SQRT_5000,
-          height: 2
+          height: 2,
         }}
       />
       <img
         src={testimonial.imgSrc}
-        alt={`${testimonial.by.split(',')[0]}`}
+        alt={`${testimonial.by.split(",")[0]}`}
         className="mb-4 h-14 w-14 rounded-full object-cover border-2 border-white/20"
         style={{ boxShadow: "3px 3px 0px rgba(0, 0, 0, 0.3)" }}
       />
-      <h3 className={cn(
-        "text-base sm:text-lg font-medium leading-relaxed",
-        isCenter ? "text-white" : "text-gray-200"
-      )}>
+      <h3
+        className={cn(
+          "text-base sm:text-lg font-medium leading-relaxed",
+          isCenter ? "text-white" : "text-gray-200"
+        )}
+      >
         "{testimonial.testimonial}"
       </h3>
-      <p className={cn(
-        "absolute bottom-8 left-8 right-8 mt-2 text-sm italic font-medium",
-        isCenter ? "text-white/90" : "text-gray-400"
-      )}>
+      <p
+        className={cn(
+          "absolute bottom-8 left-8 right-8 mt-2 text-sm italic font-medium",
+          isCenter ? "text-white/90" : "text-gray-400"
+        )}
+      >
         - {testimonial.by}
       </p>
     </div>
@@ -145,9 +161,10 @@ export const StaggerTestimonials: React.FC = () => {
       style={{ height: 600 }}
     >
       {testimonialsList.map((testimonial, index) => {
-        const position = testimonialsList.length % 2
-          ? index - (testimonialsList.length + 1) / 2
-          : index - testimonialsList.length / 2;
+        const position =
+          testimonialsList.length % 2
+            ? index - (testimonialsList.length + 1) / 2
+            : index - testimonialsList.length / 2;
         return (
           <TestimonialCard
             key={testimonial.tempId}
@@ -183,4 +200,3 @@ export const StaggerTestimonials: React.FC = () => {
     </div>
   );
 };
-

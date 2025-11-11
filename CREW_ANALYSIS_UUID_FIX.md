@@ -2,7 +2,7 @@
 
 ## Problem
 
-The AI Deep Research backend was encountering a database error when trying to store analysis results:
+The SpareFinder AI Research backend was encountering a database error when trying to store analysis results:
 
 ```
 WARNING: ⚠️ Failed to store in part_searches table: 400 - 
@@ -72,7 +72,7 @@ Added missing required fields:
 search_data = {
     'id': analysis_id,  # Now guaranteed to be valid UUID
     'user_id': user_id,  # Added for RLS
-    'search_term': keywords or 'AI Deep Research',
+    'search_term': keywords or 'SpareFinder AI Research',
     'search_type': 'ai_crew_comprehensive',
     # ... other fields ...
     'image_name': f'crew_analysis_{analysis_id[:8]}.jpg',  # Added
@@ -107,7 +107,7 @@ To test the fix:
 
 2. **Test via Upload Page**:
    - Upload an image
-   - Click "🤖 AI Deep Research"
+   - Click "🤖 SpareFinder AI Research"
    - Check the backend logs for success messages
    - Verify no UUID errors appear
 
@@ -138,7 +138,7 @@ invalid input syntax for type uuid: "crew_5541a15da28f"
 ```
 ✅ Stored in jobs table successfully
 ✅ Stored in part_searches table successfully
-🎉 Successfully stored AI Deep Research {uuid} to database
+🎉 Successfully stored SpareFinder AI Research {uuid} to database
 ```
 
 ## Additional Notes

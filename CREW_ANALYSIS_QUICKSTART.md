@@ -60,7 +60,7 @@ useEffect(() => {
 // 5. Add crew job cards in your render (alongside existing job cards)
 {crewJobs.length > 0 && (
   <div className="mb-6">
-    <h3 className="text-xl font-bold text-white mb-4">🤖 AI Deep Research Jobs</h3>
+    <h3 className="text-xl font-bold text-white mb-4">🤖 SpareFinder AI Research Jobs</h3>
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
       {crewJobs.map((job) => (
         <Card key={job.id} className="bg-gray-800 border-gray-700">
@@ -70,7 +70,7 @@ useEffect(() => {
                 🤖
               </div>
               <div>
-                <CardTitle className="text-white text-sm">AI Deep Research</CardTitle>
+                <CardTitle className="text-white text-sm">SpareFinder AI Research</CardTitle>
                 <CardDescription className="text-xs">{job.image_name}</CardDescription>
               </div>
             </div>
@@ -108,7 +108,7 @@ useEffect(() => {
 
 1. Go to Upload page
 2. Upload an image
-3. Click "🤖 AI Deep Research"
+3. Click "🤖 SpareFinder AI Research"
 4. You'll be redirected to History page
 5. Watch the progress in real-time! ✨
 

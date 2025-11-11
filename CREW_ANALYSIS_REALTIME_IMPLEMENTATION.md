@@ -1,13 +1,13 @@
 # Deep Research Real-Time Progress Implementation
 
 ## Overview
-This implementation enables real-time Deep Research progress tracking in the History page. When users click "AI Deep Research" on the upload page, they are redirected to the History page where they can watch the analysis progress in real-time.
+This implementation enables real-time Deep Research progress tracking in the History page. When users click "SpareFinder AI Research" on the upload page, they are redirected to the History page where they can watch the analysis progress in real-time.
 
 ## What Was Implemented
 
 ### 1. **CrewAnalysisProgress Component** ✅
 - **File**: `src/components/CrewAnalysisProgress.tsx`
-- **Purpose**: Displays real-time progress of AI Deep Research in history cards
+- **Purpose**: Displays real-time progress of SpareFinder AI Research in history cards
 - **Features**:
   - Shows current stage (Image Analysis, Part ID, Research, Suppliers, Report)
   - Progress bar with percentage
@@ -45,7 +45,7 @@ This implementation enables real-time Deep Research progress tracking in the His
 ### 4. **Upload Page Modifications** ✅
 - **File**: `src/pages/Upload.tsx` (lines 4314-4367)
 - **Changes**:
-  - Modified "AI Deep Research" button to create job and redirect to history
+  - Modified "SpareFinder AI Research" button to create job and redirect to history
   - Shows toast notification when analysis starts
   - Automatically redirects to history page after 1.5 seconds
   - Displays error messages if job creation fails
@@ -158,7 +158,7 @@ Add Deep Research jobs to your existing job cards:
           🤖
         </div>
         <div className="flex-1">
-          <CardTitle className="text-white">AI Deep Research</CardTitle>
+          <CardTitle className="text-white">SpareFinder AI Research</CardTitle>
           <CardDescription className="text-gray-400">
             {job.image_name}
           </CardDescription>
@@ -212,7 +212,7 @@ When user clicks on a Deep Research job, show full progress:
 <Dialog open={isCrewJobOpen} onOpenChange={setIsCrewJobOpen}>
   <DialogContent className="max-w-2xl">
     <DialogHeader>
-      <DialogTitle>🤖 AI Deep Research Progress</DialogTitle>
+      <DialogTitle>🤖 SpareFinder AI Research Progress</DialogTitle>
       <DialogDescription>
         {selectedCrewJob?.image_name}
       </DialogDescription>
@@ -266,7 +266,7 @@ cat database-crew-analysis-jobs.sql | supabase db execute
 ## User Flow
 
 1. **Upload Page**: User uploads image and adds keywords
-2. **Click "AI Deep Research"**: Button creates job in database
+2. **Click "SpareFinder AI Research"**: Button creates job in database
 3. **Auto-Redirect**: User is redirected to History page
 4. **Real-Time Progress**: History page shows progress in card
 5. **Background Processing**: AI Crew runs analysis via WebSocket
@@ -307,7 +307,7 @@ cat database-crew-analysis-jobs.sql | supabase db execute
 
 ## Testing
 
-1. **Create Job**: Upload image and click "AI Deep Research"
+1. **Create Job**: Upload image and click "SpareFinder AI Research"
 2. **Verify Redirect**: Should redirect to History page
 3. **Check Progress**: Job should appear in history with progress
 4. **Monitor Updates**: Progress should update in real-time

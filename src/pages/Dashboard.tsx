@@ -224,17 +224,21 @@ const Dashboard = () => {
         crewJobsResponse.value.data
       ) {
         const crewJobs = crewJobsResponse.value.data.jobs || [];
-        
+
         // Show only completed jobs, sorted by most recent
         const recentCompleted = crewJobs
           .filter((job: any) => job.status === "completed")
-          .sort((a: any, b: any) => new Date(b.completed_at || b.created_at).getTime() - new Date(a.completed_at || a.created_at).getTime())
+          .sort(
+            (a: any, b: any) =>
+              new Date(b.completed_at || b.created_at).getTime() -
+              new Date(a.completed_at || a.created_at).getTime()
+          )
           .slice(0, 5); // Show top 5
-        
+
         setRecentUploads(
           recentCompleted.map((job: any) => ({
             id: job.id,
-            name: job.keywords || "AI Deep Research",
+            name: job.keywords || "SpareFinder AI Research",
             date: format(new Date(job.completed_at || job.created_at), "PPp"),
             status: job.status,
             confidence: job.progress || 100, // Use progress as confidence (completed jobs are 100%)
@@ -256,10 +260,10 @@ const Dashboard = () => {
           return activitiesData.map((activity) => {
             // Normalize confidence (9500 -> 95, 95 -> 95)
             let confidence = activity.details.confidence ?? null;
-            if (typeof confidence === 'number' && confidence > 100) {
+            if (typeof confidence === "number" && confidence > 100) {
               confidence = Math.round(confidence / 100);
             }
-            
+
             return {
               id: activity.id,
               type: activity.resource_type,
@@ -285,9 +289,9 @@ const Dashboard = () => {
           return jobs
             .filter((j) => j.status === "completed")
             .map((j) => {
-              const title = `AI Deep Research`;
+              const title = `SpareFinder AI Research`;
               const desc = j.keywords || "Analysis Complete";
-              const timeStr = j.completed_at 
+              const timeStr = j.completed_at
                 ? format(new Date(j.completed_at), "PPp")
                 : j.created_at
                 ? format(new Date(j.created_at), "PPp")
@@ -308,9 +312,11 @@ const Dashboard = () => {
 
       // Merge both activity sources and show latest 3
       const allActivities = [...activitiesMapped, ...aiJobsMapped];
-      
-      console.log(`📊 Activities mapped: ${activitiesMapped.length}, AI jobs: ${aiJobsMapped.length}, Total: ${allActivities.length}`);
-      
+
+      console.log(
+        `📊 Activities mapped: ${activitiesMapped.length}, AI jobs: ${aiJobsMapped.length}, Total: ${allActivities.length}`
+      );
+
       // Sort by time (most recent first) and take top 3
       const mergedActivities = allActivities
         .sort((a, b) => {
@@ -320,9 +326,12 @@ const Dashboard = () => {
           return timeB - timeA; // Descending order
         })
         .slice(0, 3);
-      
-      console.log(`✅ Setting ${mergedActivities.length} recent activities:`, mergedActivities);
-      
+
+      console.log(
+        `✅ Setting ${mergedActivities.length} recent activities:`,
+        mergedActivities
+      );
+
       if (!mergedActivities.length) {
         console.warn("❌ No recent activities available");
       }

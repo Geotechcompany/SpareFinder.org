@@ -19,7 +19,7 @@ You now have a powerful AI Analysis Crew integrated into your SpareFinder applic
    - Beautiful agent progress visualization
 
 3. **Updated `src/pages/Upload.tsx`** - Main integration point
-   - Replaced quick analysis with AI Deep Research
+   - Replaced quick analysis with SpareFinder AI Research
    - Integrated modal trigger
 
 ## 🚀 Features
@@ -166,7 +166,7 @@ cd ai-analysis-crew
    - Optionally add keywords
 
 2. **Start Analysis**
-   - Click "🤖 AI Deep Research" button
+   - Click "🤖 SpareFinder AI Research" button
    - Enter your email address
    - Click "🚀 Start Analysis"
 

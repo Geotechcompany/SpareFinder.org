@@ -1538,8 +1538,8 @@ const History = () => {
                       No Deep Research jobs yet
                     </p>
                     <p className="text-gray-500 text-xs md:text-sm mt-2">
-                      Start a comprehensive AI Deep Research from the upload
-                      page
+                      Start a comprehensive SpareFinder AI Research from the
+                      upload page
                     </p>
                   </div>
                 ) : (

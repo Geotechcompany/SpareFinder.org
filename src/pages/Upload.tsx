@@ -4420,7 +4420,7 @@ const Upload = () => {
                   className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 shadow-lg shadow-purple-500/25 px-8 h-12"
                 >
                   <Brain className="w-5 h-5 mr-2" />
-                  🤖 AI Deep Research
+                  🤖 SpareFinder AI Research
                 </Button>
               </div>
             </motion.div>

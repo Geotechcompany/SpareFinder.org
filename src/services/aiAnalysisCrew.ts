@@ -57,7 +57,8 @@ export type CrewProgressCallback = (update: CrewProgressUpdate) => void;
 // ============================================================================
 
 const AI_CREW_CONFIG = {
-  baseUrl: import.meta.env.VITE_AI_CREW_API_URL || "https://aiagent.sparefinder.org",
+  baseUrl:
+    import.meta.env.VITE_AI_CREW_API_URL || "https://aiagent.sparefinder.org",
   wsUrl: import.meta.env.VITE_AI_CREW_WS_URL || "wss://aiagent.sparefinder.org",
   reconnectAttempts: 3,
   reconnectDelay: 2000,
@@ -370,7 +371,7 @@ export const useAIAnalysisCrew = () => {
         return await aiAnalysisCrew.analyzePartHTTP(request);
       }
     } catch (error) {
-      console.error("AI Deep Research error:", error);
+      console.error("SpareFinder AI Research error:", error);
       return {
         status: "error",
         message: "Analysis failed",
