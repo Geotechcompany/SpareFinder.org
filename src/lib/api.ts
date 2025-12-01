@@ -1112,6 +1112,18 @@ export const statisticsApi = {
       throw error;
     }
   },
+
+  deleteUserData: async (password: string): Promise<ApiResponse> => {
+    try {
+      const response = await apiClient.delete("/statistics/user-data", {
+        data: { password },
+      });
+      return response.data;
+    } catch (error) {
+      console.error("User data deletion error:", error);
+      throw error;
+    }
+  },
 };
 
 // Notifications API

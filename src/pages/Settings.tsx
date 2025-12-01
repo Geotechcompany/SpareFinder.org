@@ -36,6 +36,7 @@ import {
   Briefcase,
   Menu,
   AlertCircle,
+  Trash2,
 } from "lucide-react";
 import DashboardSidebar from "@/components/DashboardSidebar";
 import MobileSidebar from "@/components/MobileSidebar";
@@ -111,6 +112,9 @@ const Settings = () => {
 
   const [isChangingPassword, setIsChangingPassword] = useState(false);
   const [passwordError, setPasswordError] = useState<string | null>(null);
+  const [deleteDataPassword, setDeleteDataPassword] = useState("");
+  const [isDeletingData, setIsDeletingData] = useState(false);
+  const [deleteDataError, setDeleteDataError] = useState<string | null>(null);
 
   const { inLayout } = useDashboardLayout();
   const [isCollapsed, setIsCollapsed] = useState(false);
@@ -335,6 +339,53 @@ const Settings = () => {
       ...prev,
       [field]: !prev[field],
     }));
+  };
+
+  const handleDeleteUserData = async () => {
+    setDeleteDataError(null);
+
+    if (!deleteDataPassword) {
+      setDeleteDataError("Please enter your current password to confirm.");
+      return;
+    }
+
+    try {
+      setIsDeletingData(true);
+
+      const response = await api.statistics.deleteUserData(deleteDataPassword);
+      if ((response as any).success) {
+        toast({
+          title: "Data deleted",
+          description:
+            "All of your usage data has been scheduled for permanent deletion.",
+        });
+        setDeleteDataPassword("");
+      } else {
+        const message =
+          (response as any).error ||
+          (response as any).message ||
+          "Failed to delete your data.";
+        setDeleteDataError(message);
+        toast({
+          variant: "destructive",
+          title: "Deletion failed",
+          description: message,
+        });
+      }
+    } catch (error: any) {
+      const message =
+        error?.response?.data?.error ||
+        error?.message ||
+        "Failed to delete your data.";
+      setDeleteDataError(message);
+      toast({
+        variant: "destructive",
+        title: "Deletion failed",
+        description: message,
+      });
+    } finally {
+      setIsDeletingData(false);
+    }
   };
 
   // Render the password change section
@@ -983,9 +1034,9 @@ const Settings = () => {
                 </motion.div>
               )}
 
-              {(activeTab === "security" || activeTab === "appearance") && (
+              {activeTab === "security" && (
                 <motion.div
-                  key={activeTab}
+                  key="security"
                   initial={{ opacity: 0, x: 20 }}
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: -20 }}
@@ -996,45 +1047,209 @@ const Settings = () => {
                     <Card className="relative bg-black/20 backdrop-blur-xl border-white/10">
                       <CardHeader>
                         <CardTitle className="text-white flex items-center space-x-2">
-                          {activeTab === "security" ? (
-                            <Shield className="w-5 h-5 text-green-400" />
-                          ) : (
-                            <Palette className="w-5 h-5 text-pink-400" />
-                          )}
-                          <span>
-                            {activeTab === "security"
-                              ? "Privacy Settings"
-                              : "Appearance"}
-                          </span>
+                          <Shield className="w-5 h-5 text-green-400" />
+                          <span>Privacy & Security</span>
                         </CardTitle>
                         <CardDescription className="text-gray-400">
-                          {activeTab === "security"
-                            ? "Control your privacy and data settings"
-                            : "Customize the look and feel"}
+                          Control how your data is used and manage privacy options.
                         </CardDescription>
                       </CardHeader>
-                      <CardContent>
-                        <div className="text-center py-12">
-                          <motion.div
-                            animate={{ scale: [1, 1.1, 1] }}
-                            transition={{
-                              duration: 2,
-                              repeat: Infinity,
-                              ease: "easeInOut",
-                            }}
-                          >
-                            {activeTab === "security" ? (
-                              <Shield className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                            ) : (
-                              <Palette className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                            )}
-                          </motion.div>
-                          <p className="text-gray-300 text-lg mb-2">
-                            Coming Soon
-                          </p>
-                          <p className="text-gray-400">
-                            This section is under development
-                          </p>
+                      <CardContent className="space-y-10">
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-10">
+                          <div className="space-y-4">
+                            <h3 className="text-white font-semibold flex items-center space-x-2">
+                              <Shield className="w-4 h-4 text-green-400" />
+                              <span>Privacy controls</span>
+                            </h3>
+                            <p className="text-gray-400 text-sm">
+                              Choose what data you share with SpareFinder. These settings
+                              can be changed at any time.
+                            </p>
+                            <div className="space-y-4">
+                              <div className="flex items-start justify-between gap-4">
+                                <div>
+                                  <p className="text-white font-medium">
+                                    Analytics & usage data
+                                  </p>
+                                  <p className="text-gray-400 text-sm">
+                                    Allow anonymized usage data to improve accuracy and
+                                    reliability of the service.
+                                  </p>
+                                </div>
+                                <Switch
+                                  checked={preferences.analytics}
+                                  onCheckedChange={(checked) =>
+                                    handlePreferenceChange("analytics", checked)
+                                  }
+                                  className="data-[state=checked]:bg-green-600"
+                                />
+                              </div>
+                              <Separator className="bg-white/10" />
+                              <div className="flex items-start justify-between gap-4">
+                                <div>
+                                  <p className="text-white font-medium">
+                                    Product updates & tips
+                                  </p>
+                                  <p className="text-gray-400 text-sm">
+                                    Receive occasional emails about new features and best
+                                    practices.
+                                  </p>
+                                </div>
+                                <Switch
+                                  checked={preferences.marketing}
+                                  onCheckedChange={(checked) =>
+                                    handlePreferenceChange("marketing", checked)
+                                  }
+                                  className="data-[state=checked]:bg-purple-600"
+                                />
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="space-y-4">
+                            <h3 className="text-white font-semibold flex items-center space-x-2">
+                              <AlertCircle className="w-4 h-4 text-red-400" />
+                              <span>Danger zone</span>
+                            </h3>
+                            <p className="text-gray-400 text-sm">
+                              Permanently delete your search history, statistics, and
+                              analysis data from SpareFinder. This cannot be undone.
+                            </p>
+                            <div className="space-y-3 rounded-xl border border-red-500/40 bg-red-500/5 p-4">
+                              <Label
+                                htmlFor="deleteDataPassword"
+                                className="text-gray-200 text-sm flex items-center space-x-2"
+                              >
+                                <Lock className="w-4 h-4" />
+                                <span>Confirm with password</span>
+                              </Label>
+                              <Input
+                                id="deleteDataPassword"
+                                type="password"
+                                value={deleteDataPassword}
+                                onChange={(e) =>
+                                  setDeleteDataPassword(e.target.value)
+                                }
+                                className="bg-black/40 border-red-500/40 text-white placeholder:text-gray-500 focus:border-red-500/70 focus:ring-red-500/30 h-11"
+                                placeholder="Enter your current password"
+                              />
+                              {deleteDataError && (
+                                <div className="flex items-center space-x-2 text-sm text-red-300">
+                                  <AlertCircle className="w-4 h-4" />
+                                  <span>{deleteDataError}</span>
+                                </div>
+                              )}
+                              <Button
+                                variant="destructive"
+                                onClick={handleDeleteUserData}
+                                disabled={isDeletingData}
+                                className="w-full bg-red-600 hover:bg-red-700"
+                              >
+                                {isDeletingData ? (
+                                  <>
+                                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                    Deleting data...
+                                  </>
+                                ) : (
+                                  <>
+                                    <Trash2 className="w-4 h-4 mr-2" />
+                                    Delete all my data
+                                  </>
+                                )}
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+                </motion.div>
+              )}
+
+              {activeTab === "appearance" && (
+                <motion.div
+                  key="appearance"
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -20 }}
+                  transition={{ duration: 0.3 }}
+                >
+                  <div className="relative">
+                    <div className="absolute inset-0 bg-gradient-to-r from-purple-600/10 to-blue-600/10 rounded-3xl blur-xl opacity-60" />
+                    <Card className="relative bg-black/20 backdrop-blur-xl border-white/10">
+                      <CardHeader>
+                        <CardTitle className="text-white flex items-center space-x-2">
+                          <Palette className="w-5 h-5 text-pink-400" />
+                          <span>Appearance</span>
+                        </CardTitle>
+                        <CardDescription className="text-gray-400">
+                          Customize the look and feel of your dashboard.
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent className="space-y-8">
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-10 items-start">
+                          <div className="space-y-4">
+                            <h3 className="text-white font-semibold">
+                              Theme preferences
+                            </h3>
+                            <p className="text-gray-400 text-sm">
+                              SpareFinder is optimized for a dark interface. Your
+                              preference is saved to your profile and will be used across
+                              devices.
+                            </p>
+                            <div className="relative mt-4 rounded-2xl border border-white/10 overflow-hidden bg-gradient-to-br from-slate-900 via-purple-900/60 to-blue-900/60">
+                              <div className="absolute inset-0 opacity-40 bg-[radial-gradient(circle_at_top,_rgba(244,114,182,0.3)_0,_transparent_45%),radial-gradient(circle_at_bottom,_rgba(56,189,248,0.25)_0,_transparent_45%)]" />
+                              <div className="relative p-5 space-y-3">
+                                <div className="flex items-center justify-between">
+                                  <span className="text-xs font-medium uppercase tracking-wide text-purple-200">
+                                    Preview
+                                  </span>
+                                  <Badge className="bg-white/10 text-xs text-purple-100 border-white/20">
+                                    Dark mode
+                                  </Badge>
+                                </div>
+                                <div className="h-20 rounded-xl bg-black/30 border border-white/10 flex items-center justify-center text-xs text-gray-300">
+                                  Dashboard preview
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="space-y-5">
+                            <div className="flex items-start justify-between gap-4">
+                              <div>
+                                <p className="text-white font-medium flex items-center space-x-2">
+                                  <span>Dark mode</span>
+                                </p>
+                                <p className="text-gray-400 text-sm">
+                                  When enabled, SpareFinder will use a dark theme wherever
+                                  supported.
+                                </p>
+                              </div>
+                              <Switch
+                                checked={preferences.darkMode}
+                                onCheckedChange={(checked) =>
+                                  handlePreferenceChange("darkMode", checked)
+                                }
+                                className="data-[state=checked]:bg-purple-600"
+                              />
+                            </div>
+                            <Separator className="bg-white/10" />
+                            <div className="flex items-start justify-between gap-4">
+                              <div>
+                                <p className="text-white font-medium">
+                                  Subtle animations
+                                </p>
+                                <p className="text-gray-400 text-sm">
+                                  Animations are kept light to avoid distraction. Your
+                                  browser&apos;s “reduced motion” setting is also respected.
+                                </p>
+                              </div>
+                              <Badge className="bg-white/5 text-gray-200 border-white/10">
+                                Optimized
+                              </Badge>
+                            </div>
+                          </div>
                         </div>
                       </CardContent>
                     </Card>
