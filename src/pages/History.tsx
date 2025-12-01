@@ -814,7 +814,7 @@ const History = () => {
     }
   }, [authLoading, isAuthenticated, user?.id, pollJobStatuses, pastAnalysis]);
 
-  // Export history function
+  // Export history function (downloads CSV file)
   const handleExportHistory = async () => {
     try {
       if (!hasValidToken()) {
@@ -826,13 +826,44 @@ const History = () => {
         return;
       }
 
-      const response = await dashboardApi.exportHistory("csv");
-      if (response.success) {
-        toast({
-          title: "Export Successful",
-          description: "History exported successfully",
-        });
+      const apiBaseUrl =
+        import.meta.env.VITE_API_URL ||
+        import.meta.env.VITE_API_BASE_URL ||
+        "http://localhost:4000";
+
+      const response = await fetch(
+        `${apiBaseUrl}/api/history/export?format=csv`,
+        {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${sessionStorage.getItem("auth_token")}`,
+          },
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(
+          `Failed to export history: ${response.status} ${response.statusText}`
+        );
       }
+
+      const blob = await response.blob();
+      const blobUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = blobUrl;
+      link.download = "upload_history.csv";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      setTimeout(() => {
+        window.URL.revokeObjectURL(blobUrl);
+      }, 100);
+
+      toast({
+        title: "Export Successful",
+        description: "Your history CSV is being downloaded.",
+      });
     } catch (error: any) {
       console.error("Export error:", error);
       toast({

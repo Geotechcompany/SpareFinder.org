@@ -20,7 +20,8 @@ export const SearchHistoryAnalytics: React.FC = () => {
         const response = await dashboardApi.getRecentUploads();
         
         if (response.success && response.data) {
-          setUploads(response.data.uploads || []);
+          const data = response.data as { uploads: any[] };
+          setUploads(data.uploads || []);
         } else {
           toast.error('Failed to fetch upload history');
         }
@@ -37,11 +38,44 @@ export const SearchHistoryAnalytics: React.FC = () => {
 
   const handleExportHistory = async () => {
     try {
-      const response = await dashboardApi.exportHistory('csv');
-      toast.success('History exported successfully');
+      const apiBaseUrl =
+        import.meta.env.VITE_API_URL ||
+        import.meta.env.VITE_API_BASE_URL ||
+        "http://localhost:4000";
+
+      const response = await fetch(
+        `${apiBaseUrl}/api/history/export?format=csv`,
+        {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${sessionStorage.getItem("auth_token")}`,
+          },
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(
+          `Failed to export history: ${response.status} ${response.statusText}`
+        );
+      }
+
+      const blob = await response.blob();
+      const blobUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = blobUrl;
+      link.download = "upload_history.csv";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      setTimeout(() => {
+        window.URL.revokeObjectURL(blobUrl);
+      }, 100);
+
+      toast.success("History exported successfully");
     } catch (error) {
-      console.error('Export error:', error);
-      toast.error('Failed to export history');
+      console.error("Export error:", error);
+      toast.error("Failed to export history");
     }
   };
 

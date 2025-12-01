@@ -390,7 +390,9 @@ export const dashboardApi = {
     };
   },
 
-  getRecentUploads: async (limit: number = 5): Promise<ApiResponse> => {
+  getRecentUploads: async (
+    limit: number = 5
+  ): Promise<ApiResponse<{ uploads: any[] }>> => {
     console.log("📋 Fetching recent uploads...");
     try {
       const response = await apiClient.get(
@@ -434,7 +436,8 @@ export const dashboardApi = {
   exportHistory: async (
     format: "csv" | "json" = "csv"
   ): Promise<ApiResponse> => {
-    const response = await apiClient.get(`/dashboard/export?format=${format}`);
+    // Use history export endpoint which returns CSV/JSON as attachment
+    const response = await apiClient.get(`/history/export?format=${format}`);
     return response.data;
   },
 
