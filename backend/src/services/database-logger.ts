@@ -52,6 +52,7 @@ export interface PartSearchData {
   analysis_status?: 'completed' | 'failed' | 'processing';
   error_message?: string;
   description?: string;
+  retry_count?: number;
   metadata?: any;
 }
 
@@ -126,6 +127,12 @@ export class DatabaseLogger {
           upload_source: data.upload_source || 'web',
           analysis_status: data.analysis_status || 'completed',
           error_message: data.error_message,
+          retry_count:
+            typeof data.retry_count === 'number'
+              ? data.retry_count
+              : typeof data.metadata?.retry_count === 'number'
+              ? data.metadata.retry_count
+              : 0,
           is_match: (data.confidence_score || 0) > 0.5,
           full_analysis: fullAnalysis,
           estimated_price_range: extractPriceRange(fullAnalysis),

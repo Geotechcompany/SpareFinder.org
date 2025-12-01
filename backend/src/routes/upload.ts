@@ -292,6 +292,7 @@ setInterval(async () => {
           .from("part_searches")
           .update({
             analysis_status: "pending",
+            retry_count: retryCount,
             metadata: updatedMetadata,
             updated_at: new Date().toISOString(),
           })
@@ -357,6 +358,7 @@ setInterval(async () => {
                 predictions: predictions,
                 confidence_score: primaryPrediction.confidence || responseData.confidence || 0,
                 ai_confidence: primaryPrediction.confidence || responseData.confidence || 0,
+                retry_count: retryCount,
                 part_name: primaryPrediction.class_name || primaryPrediction.name || analysis.part_name,
                 manufacturer: primaryPrediction.manufacturer || analysis.manufacturer,
                 category: primaryPrediction.category || analysis.category,
@@ -420,6 +422,7 @@ setInterval(async () => {
                   retryError instanceof Error
                     ? retryError.message
                     : "Retry failed",
+                retry_count: retryCount,
                 metadata: failedMetadata,
                 updated_at: new Date().toISOString(),
               })
