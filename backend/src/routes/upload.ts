@@ -312,8 +312,7 @@ setInterval(async () => {
           timeout: 30000,
         });
 
-        // Create form data
-        const FormData = require("form-data");
+        // Create form data (FormData is already imported at top)
         const formData = new FormData();
         formData.append("file", Buffer.from(imageResponse.data), {
           filename: analysis.image_name || "retry_image.jpg",
@@ -345,17 +344,61 @@ setInterval(async () => {
             );
 
             if (aiResponse.status >= 200 && aiResponse.status < 300) {
+              // Parse successful response and update analysis
+              const responseData = aiResponse.data;
+              
+              // Extract predictions and other data from response
+              const predictions = responseData.predictions || responseData.results || [];
+              const primaryPrediction = predictions[0] || {};
+              
+              // Prepare update data
+              const updateData: any = {
+                analysis_status: "completed",
+                predictions: predictions,
+                confidence_score: primaryPrediction.confidence || responseData.confidence || 0,
+                ai_confidence: primaryPrediction.confidence || responseData.confidence || 0,
+                part_name: primaryPrediction.class_name || primaryPrediction.name || analysis.part_name,
+                manufacturer: primaryPrediction.manufacturer || analysis.manufacturer,
+                category: primaryPrediction.category || analysis.category,
+                part_number: primaryPrediction.part_number || analysis.part_number,
+                processing_time: responseData.processing_time || responseData.processing_time_seconds || 0,
+                processing_time_ms: (responseData.processing_time || responseData.processing_time_seconds || 0) * 1000,
+                model_version: responseData.model_version || responseData.ai_model_version || "SpareFinder AI v1",
+                parts_found: predictions.length,
+                is_match: (primaryPrediction.confidence || responseData.confidence || 0) > 0.5,
+                error_message: null, // Clear error message on success
+                updated_at: new Date().toISOString(),
+                metadata: {
+                  ...(analysis.metadata || {}),
+                  retry_count: retryCount,
+                  last_retry_at: new Date().toISOString(),
+                  retry_successful: true,
+                  ai_service_response: responseData,
+                },
+              };
+              
+              // Add full analysis if available
+              if (responseData.full_analysis || responseData.analysis) {
+                updateData.full_analysis = responseData.full_analysis || responseData.analysis;
+              }
+              
+              // Add similar images if available
+              if (responseData.similar_images) {
+                updateData.similar_images = responseData.similar_images;
+              }
+              
               // Update analysis with successful result
-              await supabase
+              const { error: updateError } = await supabase
                 .from("part_searches")
-                .update({
-                  analysis_status: "completed",
-                  updated_at: new Date().toISOString(),
-                  // Update with response data if available
-                })
+                .update(updateData)
                 .eq("id", analysis.id);
+              
+              if (updateError) {
+                console.error(`❌ Failed to update analysis ${analysis.id} after retry:`, updateError);
+                throw updateError;
+              }
 
-              console.log(`✅ Retry successful for analysis ${analysis.id}`);
+              console.log(`✅ Retry successful for analysis ${analysis.id} - updated with ${predictions.length} predictions`);
             } else {
               throw new Error(`AI service returned status ${aiResponse.status}`);
             }
