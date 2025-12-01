@@ -42,9 +42,11 @@ def upload_pdf_to_supabase_storage(
         
         # Import supabase client
         try:
-            from supabase import create_client
-        except ImportError:
-            logger.error("❌ supabase-py not installed - cannot upload PDF")
+            from supabase import create_client, Client
+        except ImportError as import_error:
+            logger.warning(f"⚠️ supabase package not installed - PDF will not be uploaded to storage")
+            logger.warning(f"⚠️ Import error: {import_error}")
+            logger.warning("⚠️ Install with: pip install supabase>=2.0.0")
             return None
         
         # Create Supabase client
@@ -76,8 +78,19 @@ def upload_pdf_to_supabase_storage(
             )
             
             # Get public URL
-            public_url_data = supabase.storage.from_(bucket_name).get_public_url(storage_path)
-            public_url = public_url_data.get("publicUrl") if isinstance(public_url_data, dict) else str(public_url_data)
+            try:
+                public_url_response = supabase.storage.from_(bucket_name).get_public_url(storage_path)
+                # Handle different response formats
+                if isinstance(public_url_response, dict):
+                    public_url = public_url_response.get("publicUrl") or public_url_response.get("url")
+                elif hasattr(public_url_response, 'data'):
+                    public_url = public_url_response.data.get("publicUrl") if isinstance(public_url_response.data, dict) else str(public_url_response.data)
+                else:
+                    public_url = str(public_url_response)
+            except Exception as url_error:
+                logger.warning(f"⚠️ Could not get public URL, constructing manually: {url_error}")
+                # Construct public URL manually
+                public_url = f"{SUPABASE_URL}/storage/v1/object/public/{bucket_name}/{storage_path}"
             
             logger.info(f"✅ PDF uploaded successfully: {public_url}")
             return public_url

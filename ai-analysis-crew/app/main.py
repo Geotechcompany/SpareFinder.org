@@ -229,10 +229,18 @@ async def run_analysis_background(
         # Email sending stage
         update_crew_job_status(analysis_id, "processing", "email_agent", 95)
         
-        # Send email
-        logger.info(f"📧 Sending email to {user_email}")
-        send_email_tool_func(user_email, pdf_path)
-        logger.info(f"✅ Email sent successfully")
+        # Send email (non-blocking - don't fail analysis if email fails)
+        logger.info(f"📧 Attempting to send email to {user_email}")
+        try:
+            email_result = send_email_tool_func(user_email, pdf_path)
+            if "successfully" in email_result.lower():
+                logger.info(f"✅ Email sent successfully to {user_email}")
+            else:
+                logger.warning(f"⚠️ Email sending failed, but analysis will continue: {email_result}")
+        except Exception as email_error:
+            logger.error(f"❌ Error during email sending: {email_error}")
+            logger.warning("⚠️ Email sending failed, but analysis completed successfully")
+            # Don't re-raise - continue with job completion
         
         # Complete the job - use public URL if available, otherwise filename
         logger.info(f"🏁 Completing job {analysis_id}")
@@ -447,11 +455,18 @@ async def websocket_progress(websocket: WebSocket):
         else:
             emit_progress("database_storage", "⚠️ Database storage skipped (not configured)", "completed")
         
-        # Send email
-        email_result = send_email_tool_func(user_email, pdf_path)
-        
-        # Emit completion
-        emit_progress("completion", "✅ Analysis complete! Report sent to your email.", "completed")
+        # Send email (non-blocking - don't fail analysis if email fails)
+        try:
+            email_result = send_email_tool_func(user_email, pdf_path)
+            if "successfully" in email_result.lower():
+                emit_progress("completion", "✅ Analysis complete! Report sent to your email.", "completed")
+            else:
+                emit_progress("completion", "✅ Analysis complete! (Email sending failed, but report is available)", "completed")
+                logger.warning(f"⚠️ Email sending failed: {email_result}")
+        except Exception as email_error:
+            logger.error(f"❌ Error during email sending: {email_error}")
+            emit_progress("completion", "✅ Analysis complete! (Email sending failed, but report is available)", "completed")
+            # Don't re-raise - continue with completion
         
         # Send final message before closing
         await manager.send_personal_message({
