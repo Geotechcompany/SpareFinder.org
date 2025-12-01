@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
   Card,
@@ -81,6 +82,7 @@ const Profile = () => {
   });
 
   const { toast } = useToast();
+  const navigate = useNavigate();
   const { user } = useAuth(); // Get Google profile data from auth context
   const {
     achievements,
@@ -106,14 +108,14 @@ const Profile = () => {
       setIsLoading(true);
       setError(null);
 
-      // First, try to use Google profile data from auth context
+      // First, try to use profile data from auth context
       if (user) {
         setProfile({
           id: user.id,
           email: user.email,
           username: null,
-          full_name: user.user_metadata?.full_name || user.full_name || "",
-          avatar_url: user.user_metadata?.avatar_url || user.avatar_url || null,
+          full_name: user.full_name || "",
+          avatar_url: user.avatar_url || null,
           created_at: user.created_at,
         });
         setIsLoading(false);
@@ -123,8 +125,8 @@ const Profile = () => {
       // Fallback to API if no auth context data
       const response = await api.profile.getProfile();
 
-      if (response.success && response.data?.profile) {
-        const profileData = response.data.profile;
+      if (response.success && response.data) {
+        const profileData = (response.data as any).profile;
         setProfile({
           id: profileData.id,
           email: profileData.email,
@@ -157,7 +159,14 @@ const Profile = () => {
       const response = await api.dashboard.getStats();
 
       if (response.success && response.data) {
-        const stats = response.data;
+        const stats = response.data as {
+          totalUploads?: number;
+          successfulUploads?: number;
+          avgConfidence?: number;
+          currentStreak?: number;
+          totalSaved?: number;
+          totalAchievements?: number;
+        };
         setUserStats({
           totalUploads: stats.totalUploads || 0,
           successRate:
@@ -193,7 +202,7 @@ const Profile = () => {
   };
 
   const handleEditProfile = () => {
-    window.location.href = "/settings";
+    navigate("/dashboard/settings");
   };
 
   // Show loading state
@@ -358,7 +367,7 @@ const Profile = () => {
                       <h1 className="text-3xl lg:text-4xl font-bold bg-gradient-to-r from-white via-purple-200 to-blue-200 bg-clip-text text-transparent">
                         {profile?.full_name || "Anonymous User"}
                       </h1>
-                      {user?.user_metadata?.avatar_url && (
+                      {user?.avatar_url && (
                         <Badge className="bg-blue-600/20 text-blue-300 border-blue-500/30 text-xs">
                           <svg
                             className="w-3 h-3 mr-1"

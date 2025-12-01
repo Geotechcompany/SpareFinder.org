@@ -33,51 +33,62 @@ interface ProfileData {
   error: string | null;
 }
 
-// Mock achievements data (offline)
-const getMockAchievements = () => {
-  const mockAchievements = [
+// Build achievements from real user statistics
+const buildAchievementsFromStats = (statistics: any | null) => {
+  const totalUploads = statistics?.total_uploads ?? 0;
+  const successful = statistics?.total_successful_identifications ?? 0;
+  const avgConfidence = Number(statistics?.average_confidence_score ?? 0);
+  const webScraping = statistics?.total_web_scraping_searches ?? 0;
+
+  const achievements: Achievement[] = [
     {
-      id: 'first-upload',
-      title: 'First Upload',
-      description: 'Upload your first part image',
-      icon: '🎯',
-      color: 'from-green-600 to-emerald-600',
-      earned: true,
-      earnedAt: new Date().toISOString()
+      id: "first-upload",
+      title: "First Upload",
+      description: "Upload your first part image",
+      icon: "Trophy",
+      color: "from-green-600 to-emerald-600",
+      earned: totalUploads >= 1,
+      earnedAt: statistics?.last_upload_at || undefined,
     },
     {
-      id: 'accuracy-master',
-      title: 'Accuracy Master',
-      description: 'Achieve 95% accuracy rate',
-      icon: '🎯',
-      color: 'from-blue-600 to-cyan-600',
-      earned: false
+      id: "power-user",
+      title: "Power User",
+      description: "Complete 50 uploads",
+      icon: "TrendingUp",
+      color: "from-blue-600 to-cyan-600",
+      earned: totalUploads >= 50,
+      earnedAt: statistics?.last_upload_at || undefined,
     },
     {
-      id: 'speed-demon',
-      title: 'Speed Demon',
-      description: 'Complete 50 identifications',
-      icon: '⚡',
-      color: 'from-yellow-600 to-orange-600',
-      earned: false
+      id: "accuracy-master",
+      title: "Accuracy Master",
+      description: "Reach 90% average confidence",
+      icon: "Target",
+      color: "from-purple-600 to-indigo-600",
+      earned: avgConfidence >= 90,
     },
     {
-      id: 'streak-master',
-      title: 'Streak Master',
-      description: 'Use the app for 7 consecutive days',
-      icon: '🔥',
-      color: 'from-red-600 to-pink-600',
-      earned: false
-    }
+      id: "web-explorer",
+      title: "Web Scraping Explorer",
+      description: "Run 5 web-enhanced searches",
+      icon: "Zap",
+      color: "from-yellow-500 to-orange-500",
+      earned: webScraping >= 5,
+    },
+    {
+      id: "consistent-identifier",
+      title: "Consistent Identifier",
+      description: "Achieve 20 successful identifications",
+      icon: "Award",
+      color: "from-emerald-500 to-lime-500",
+      earned: successful >= 20,
+    },
   ];
 
-  const earned = mockAchievements.filter(a => a.earned).length;
-  
-  return {
-    achievements: mockAchievements,
-    totalEarned: earned,
-    totalAvailable: mockAchievements.length
-  };
+  const totalEarned = achievements.filter((a) => a.earned).length;
+  const totalAvailable = achievements.length;
+
+  return { achievements, totalEarned, totalAvailable };
 };
 
 export const useProfileData = () => {
@@ -108,9 +119,36 @@ export const useProfileData = () => {
       isFetchingRef.current = true;
       setData(prev => ({ ...prev, loading: true, error: null }));
 
-      // Get achievements immediately (offline mock data)
-      const achievementsData = getMockAchievements();
-      
+      // Fetch real user statistics and derive achievements from them
+      let achievements: Achievement[] = [];
+      let totalEarned = 0;
+      let totalAvailable = 0;
+
+      try {
+        const statsResponse = await api.statistics.getStats();
+        if (statsResponse.success && (statsResponse as any).statistics) {
+          const { achievements: builtAchievements, totalEarned: earned, totalAvailable: available } =
+            buildAchievementsFromStats((statsResponse as any).statistics);
+          achievements = builtAchievements;
+          totalEarned = earned;
+          totalAvailable = available;
+        } else {
+          const built = buildAchievementsFromStats(null);
+          achievements = built.achievements;
+          totalEarned = built.totalEarned;
+          totalAvailable = built.totalAvailable;
+        }
+      } catch (statsError: any) {
+        console.warn(
+          "Statistics fetch failed for achievements; using defaults:",
+          statsError?.message || statsError
+        );
+        const built = buildAchievementsFromStats(null);
+        achievements = built.achievements;
+        totalEarned = built.totalEarned;
+        totalAvailable = built.totalAvailable;
+      }
+
       // Try to fetch activities with a short timeout
       let activities = [];
       try {
@@ -129,10 +167,10 @@ export const useProfileData = () => {
         activities = [];
       }
 
-      const newData = {
-        achievements: achievementsData.achievements,
-        totalEarned: achievementsData.totalEarned,
-        totalAvailable: achievementsData.totalAvailable,
+      const newData: ProfileData = {
+        achievements,
+        totalEarned,
+        totalAvailable,
         activities,
         loading: false,
         error: null
@@ -142,17 +180,11 @@ export const useProfileData = () => {
 
     } catch (error: any) {
       console.error('Error fetching profile data:', error);
-      
-      // Still show achievements even if there's an error
-      const achievementsData = getMockAchievements();
-      
+
       setData(prev => ({
         ...prev,
-        achievements: achievementsData.achievements,
-        totalEarned: achievementsData.totalEarned,
-        totalAvailable: achievementsData.totalAvailable,
         loading: false,
-        error: 'Unable to load recent activities. Please check your connection.'
+        error: 'Unable to load profile data. Please check your connection.'
       }));
     } finally {
       isFetchingRef.current = false;

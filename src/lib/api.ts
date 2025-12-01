@@ -317,8 +317,17 @@ export const authApi = {
 };
 
 // Dashboard API
+type DashboardStats = {
+  totalUploads?: number;
+  successfulUploads?: number;
+  avgConfidence?: number;
+  currentStreak?: number;
+  totalSaved?: number;
+  totalAchievements?: number;
+};
+
 export const dashboardApi = {
-  getStats: async (): Promise<ApiResponse> => {
+  getStats: async (): Promise<ApiResponse<DashboardStats>> => {
     console.log("📊 Fetching dashboard stats...");
     try {
       const response = await apiClient.get("/dashboard/stats");
@@ -327,7 +336,7 @@ export const dashboardApi = {
       console.log("📊 Stats response status:", response.status);
       console.log("📊 Stats response headers:", response.headers);
       console.log("📊 Stats response config:", response.config);
-      return response.data;
+      return response.data as ApiResponse<DashboardStats>;
     } catch (error) {
       console.error("📊 Failed to fetch dashboard stats:", error);
       throw error;
@@ -844,62 +853,13 @@ export const profileApi = {
     return response.data;
   },
 
-  // Mock achievements since there's no backend endpoint
-  getAchievements: async (): Promise<ApiResponse> => {
-    // Mock achievements data
-    const mockAchievements = [
-      {
-        id: "first-upload",
-        title: "First Upload",
-        description: "Upload your first part image",
-        icon: "🎯",
-        color: "from-green-600 to-emerald-600",
-        earned: true,
-        earnedAt: new Date().toISOString(),
-      },
-      {
-        id: "accuracy-master",
-        title: "Accuracy Master",
-        description: "Achieve 95% accuracy rate",
-        icon: "🎯",
-        color: "from-blue-600 to-cyan-600",
-        earned: false,
-      },
-      {
-        id: "speed-demon",
-        title: "Speed Demon",
-        description: "Complete 50 identifications",
-        icon: "⚡",
-        color: "from-yellow-600 to-orange-600",
-        earned: false,
-      },
-      {
-        id: "streak-master",
-        title: "Streak Master",
-        description: "Use the app for 7 consecutive days",
-        icon: "🔥",
-        color: "from-red-600 to-pink-600",
-        earned: false,
-      },
-    ];
-
-    const earned = mockAchievements.filter((a) => a.earned).length;
-
-    return {
-      success: true,
-      data: {
-        achievements: mockAchievements,
-        totalEarned: earned,
-        totalAvailable: mockAchievements.length,
-      },
-    };
-  },
-
-  getRecentActivities: async (limit: number = 5): Promise<ApiResponse> => {
+  getRecentActivities: async (
+    limit: number = 5
+  ): Promise<ApiResponse<{ activities: any[] }>> => {
     const response = await apiClient.get(
       `/dashboard/recent-activities?limit=${limit}`
     );
-    return response.data;
+    return response.data as ApiResponse<{ activities: any[] }>;
   },
 };
 
@@ -1391,6 +1351,8 @@ export const reviewsApi = {
 // Export combined API
 export const api = {
   auth: authApi,
+  dashboard: dashboardApi,
+  profile: profileApi,
   user: {
     getProfile: () => apiClient.get("/user/profile"),
     updateProfile: (profileData: {
@@ -1422,55 +1384,6 @@ export const api = {
     deleteAccount: async (): Promise<ApiResponse> => {
       const response = await apiClient.delete("/profile/delete-account");
       return response.data;
-    },
-    getAchievements: async (): Promise<ApiResponse> => {
-      // Mock achievements data
-      const mockAchievements = [
-        {
-          id: "first-upload",
-          title: "First Upload",
-          description: "Upload your first part image",
-          icon: "🎯",
-          color: "from-green-600 to-emerald-600",
-          earned: true,
-          earnedAt: new Date().toISOString(),
-        },
-        {
-          id: "accuracy-master",
-          title: "Accuracy Master",
-          description: "Achieve 95% accuracy rate",
-          icon: "🎯",
-          color: "from-blue-600 to-cyan-600",
-          earned: false,
-        },
-        {
-          id: "speed-demon",
-          title: "Speed Demon",
-          description: "Complete 50 identifications",
-          icon: "⚡",
-          color: "from-yellow-600 to-orange-600",
-          earned: false,
-        },
-        {
-          id: "streak-master",
-          title: "Streak Master",
-          description: "Use the app for 7 consecutive days",
-          icon: "🔥",
-          color: "from-red-600 to-pink-600",
-          earned: false,
-        },
-      ];
-
-      const earned = mockAchievements.filter((a) => a.earned).length;
-
-      return {
-        success: true,
-        data: {
-          achievements: mockAchievements,
-          totalEarned: earned,
-          totalAvailable: mockAchievements.length,
-        },
-      };
     },
     getRecentActivities: async (limit: number = 5): Promise<ApiResponse> => {
       const response = await apiClient.get(
