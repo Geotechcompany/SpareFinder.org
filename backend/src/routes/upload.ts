@@ -84,21 +84,55 @@ async function startCrewAnalysis(
   }
 }
 
-// Auto-retry failed jobs (runs every 5 minutes)
+// Comprehensive auto-retry system for all failed analyses
+// Runs every 3 minutes to retry failed jobs
+
+// Helper function to determine if an error is retryable
+function isRetryableError(errorType: string, statusCode?: number): boolean {
+  // Retry transient errors: network, timeout, server errors (5xx), rate limits
+  const retryableTypes = [
+    "connection_refused",
+    "timeout",
+    "server_error",
+    "rate_limited",
+  ];
+  
+  if (retryableTypes.includes(errorType)) {
+    return true;
+  }
+  
+  // Retry 5xx server errors
+  if (statusCode && statusCode >= 500 && statusCode < 600) {
+    return true;
+  }
+  
+  // Don't retry client errors (4xx except 429), auth errors, file too large
+  if (statusCode && statusCode >= 400 && statusCode < 500 && statusCode !== 429) {
+    return false;
+  }
+  
+  return true; // Default to retryable for unknown errors
+}
+
+// Auto-retry failed Deep Research jobs (crew_analysis_jobs)
 setInterval(async () => {
   try {
     console.log("🔄 Checking for failed Deep Research jobs to retry...");
 
     // Get failed jobs that haven't exceeded retry limit
+    // Only retry jobs that failed more than 2 minutes ago (avoid immediate retries)
+    const twoMinutesAgo = new Date(Date.now() - 2 * 60 * 1000).toISOString();
+    
     const { data: failedJobs, error } = await supabase
       .from("crew_analysis_jobs")
       .select("*")
       .eq("status", "failed")
-      .or("retry_count.is.null,retry_count.lt.3") // Retry up to 3 times
-      .limit(5); // Process max 5 at a time
+      .or("retry_count.is.null,retry_count.lt.5") // Retry up to 5 times
+      .lt("updated_at", twoMinutesAgo) // Only retry jobs that failed at least 2 minutes ago
+      .limit(10); // Process max 10 at a time
 
     if (error) {
-      console.error("❌ Error fetching failed jobs:", error);
+      console.error("❌ Error fetching failed Deep Research jobs:", error);
       return;
     }
 
@@ -106,12 +140,28 @@ setInterval(async () => {
       return;
     }
 
-    console.log(`🔄 Found ${failedJobs.length} failed jobs to retry`);
+    console.log(`🔄 Found ${failedJobs.length} failed Deep Research jobs to retry`);
 
     for (const job of failedJobs) {
       try {
         const retryCount = (job.retry_count || 0) + 1;
-        console.log(`🔄 Retrying job ${job.id} (attempt ${retryCount}/3)`);
+        console.log(`🔄 Retrying Deep Research job ${job.id} (attempt ${retryCount}/5)`);
+
+        // Calculate exponential backoff delay (2^retryCount minutes, max 30 minutes)
+        const delayMinutes = Math.min(Math.pow(2, retryCount - 1), 30);
+        const lastFailedAt = new Date(job.updated_at || job.created_at);
+        const timeSinceFailure = Date.now() - lastFailedAt.getTime();
+        const requiredDelay = delayMinutes * 60 * 1000;
+
+        // Skip if not enough time has passed
+        if (timeSinceFailure < requiredDelay) {
+          console.log(
+            `⏳ Skipping job ${job.id} - need to wait ${Math.round(
+              (requiredDelay - timeSinceFailure) / 1000 / 60
+            )} more minutes`
+          );
+          continue;
+        }
 
         // Update status to pending for retry
         await supabase
@@ -126,6 +176,7 @@ setInterval(async () => {
         // Fetch image from storage
         const imageResponse = await axios.get(job.image_url, {
           responseType: "arraybuffer",
+          timeout: 30000,
         });
 
         // Start analysis in background
@@ -140,7 +191,7 @@ setInterval(async () => {
               job.keywords || ""
             );
           } catch (retryError) {
-            console.error(`❌ Retry failed for job ${job.id}:`, retryError);
+            console.error(`❌ Retry failed for Deep Research job ${job.id}:`, retryError);
 
             // Update to failed again
             await supabase
@@ -158,15 +209,191 @@ setInterval(async () => {
         });
       } catch (retryError) {
         console.error(
-          `❌ Error processing retry for job ${job.id}:`,
+          `❌ Error processing retry for Deep Research job ${job.id}:`,
           retryError
         );
       }
     }
   } catch (error) {
-    console.error("❌ Error in auto-retry process:", error);
+    console.error("❌ Error in Deep Research auto-retry process:", error);
   }
-}, 5 * 60 * 1000); // Run every 5 minutes
+}, 3 * 60 * 1000); // Run every 3 minutes
+
+// Auto-retry failed regular image analyses (part_searches)
+setInterval(async () => {
+  try {
+    console.log("🔄 Checking for failed image analyses to retry...");
+
+    // Get failed analyses that haven't exceeded retry limit
+    // Only retry analyses that failed more than 2 minutes ago
+    const twoMinutesAgo = new Date(Date.now() - 2 * 60 * 1000).toISOString();
+    
+    const { data: failedAnalyses, error } = await supabase
+      .from("part_searches")
+      .select("*")
+      .eq("analysis_status", "failed")
+      .not("image_url", "is", null) // Must have an image URL
+      .or("retry_count.is.null,retry_count.lt.5") // Retry up to 5 times
+      .lt("updated_at", twoMinutesAgo) // Only retry analyses that failed at least 2 minutes ago
+      .limit(10); // Process max 10 at a time
+
+    if (error) {
+      console.error("❌ Error fetching failed image analyses:", error);
+      return;
+    }
+
+    if (!failedAnalyses || failedAnalyses.length === 0) {
+      return;
+    }
+
+    console.log(`🔄 Found ${failedAnalyses.length} failed image analyses to retry`);
+
+    for (const analysis of failedAnalyses) {
+      try {
+        // Check if error is retryable
+        const errorType = (analysis.metadata as any)?.ai_service_error || "unknown";
+        const errorDetails = (analysis.metadata as any)?.error_details;
+        const statusCode = errorDetails?.status;
+
+        if (!isRetryableError(errorType, statusCode)) {
+          console.log(
+            `⏭️ Skipping non-retryable analysis ${analysis.id} (error: ${errorType})`
+          );
+          continue;
+        }
+
+        const retryCount = ((analysis.metadata as any)?.retry_count || 0) + 1;
+        console.log(`🔄 Retrying image analysis ${analysis.id} (attempt ${retryCount}/5)`);
+
+        // Calculate exponential backoff delay
+        const delayMinutes = Math.min(Math.pow(2, retryCount - 1), 30);
+        const lastFailedAt = new Date(analysis.updated_at || analysis.created_at);
+        const timeSinceFailure = Date.now() - lastFailedAt.getTime();
+        const requiredDelay = delayMinutes * 60 * 1000;
+
+        // Skip if not enough time has passed
+        if (timeSinceFailure < requiredDelay) {
+          console.log(
+            `⏳ Skipping analysis ${analysis.id} - need to wait ${Math.round(
+              (requiredDelay - timeSinceFailure) / 1000 / 60
+            )} more minutes`
+          );
+          continue;
+        }
+
+        // Update status to pending for retry
+        const updatedMetadata = {
+          ...(analysis.metadata || {}),
+          retry_count: retryCount,
+          last_retry_at: new Date().toISOString(),
+        };
+
+        await supabase
+          .from("part_searches")
+          .update({
+            analysis_status: "pending",
+            metadata: updatedMetadata,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", analysis.id);
+
+        // Retry the analysis by calling the AI service
+        const aiServiceUrl = process.env.AI_SERVICE_URL;
+        const aiServiceApiKey = process.env.AI_SERVICE_API_KEY;
+
+        if (!aiServiceUrl) {
+          console.error("❌ AI_SERVICE_URL not configured, cannot retry");
+          continue;
+        }
+
+        // Fetch image from storage
+        const imageResponse = await axios.get(analysis.image_url, {
+          responseType: "arraybuffer",
+          timeout: 30000,
+        });
+
+        // Create form data
+        const FormData = require("form-data");
+        const formData = new FormData();
+        formData.append("file", Buffer.from(imageResponse.data), {
+          filename: analysis.image_name || "retry_image.jpg",
+          contentType: "image/jpeg",
+        });
+
+        if (analysis.search_term) {
+          formData.append("keywords", analysis.search_term);
+        }
+
+        // Retry the analysis in background
+        setImmediate(async () => {
+          try {
+            console.log(`🔄 Retrying analysis for ${analysis.id}...`);
+            
+            const aiResponse = await axios.post(
+              `${aiServiceUrl}/analyze-part/`,
+              formData,
+              {
+                headers: {
+                  ...formData.getHeaders(),
+                  ...(aiServiceApiKey && {
+                    Authorization: `Bearer ${aiServiceApiKey}`,
+                  }),
+                },
+                timeout: 120000,
+                validateStatus: (status) => status < 500,
+              }
+            );
+
+            if (aiResponse.status >= 200 && aiResponse.status < 300) {
+              // Update analysis with successful result
+              await supabase
+                .from("part_searches")
+                .update({
+                  analysis_status: "completed",
+                  updated_at: new Date().toISOString(),
+                  // Update with response data if available
+                })
+                .eq("id", analysis.id);
+
+              console.log(`✅ Retry successful for analysis ${analysis.id}`);
+            } else {
+              throw new Error(`AI service returned status ${aiResponse.status}`);
+            }
+          } catch (retryError: any) {
+            console.error(`❌ Retry failed for analysis ${analysis.id}:`, retryError);
+
+            // Update to failed again
+            const failedMetadata = {
+              ...(analysis.metadata || {}),
+              retry_count: retryCount,
+              last_retry_error: retryError instanceof Error ? retryError.message : "Retry failed",
+            };
+
+            await supabase
+              .from("part_searches")
+              .update({
+                analysis_status: "failed",
+                error_message:
+                  retryError instanceof Error
+                    ? retryError.message
+                    : "Retry failed",
+                metadata: failedMetadata,
+                updated_at: new Date().toISOString(),
+              })
+              .eq("id", analysis.id);
+          }
+        });
+      } catch (retryError) {
+        console.error(
+          `❌ Error processing retry for analysis ${analysis.id}:`,
+          retryError
+        );
+      }
+    }
+  } catch (error) {
+    console.error("❌ Error in image analysis auto-retry process:", error);
+  }
+}, 3 * 60 * 1000); // Run every 3 minutes
 
 // Configure multer for file uploads
 const upload = multer({
@@ -472,6 +699,8 @@ router.post(
       }
 
       let aiResponse;
+      const start = Date.now();
+      
       try {
         // First check if AI service is healthy
         const healthCheck = await axios
@@ -485,23 +714,188 @@ router.post(
           throw new Error("AI service health check failed");
         }
 
-        // Send the actual prediction request
-        aiResponse = await axios.post(
-          `${aiServiceUrl}/analyze-part/`,
-          formData,
-          {
-            headers: {
-              ...formData.getHeaders(),
-              ...(aiServiceApiKey && {
-                Authorization: `Bearer ${aiServiceApiKey}`,
-              }),
-            },
-            timeout: 120000, // 120 second timeout to accommodate longer AI analysis
-            validateStatus: (status) => status < 500, // Accept 4xx as valid response
+        // Retry logic for rate limiting (429) and network errors
+        const maxAttempts = 5;
+        const baseDelayMs = 2000; // Base delay of 2 seconds
+        const maxDelayMs = 60000; // Maximum delay of 60 seconds
+        let lastError: any = null;
+
+        for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+          try {
+            console.log(`🔄 AI analyze-part request (attempt ${attempt}/${maxAttempts})`);
+            
+            aiResponse = await axios.post(
+              `${aiServiceUrl}/analyze-part/`,
+              formData,
+              {
+                headers: {
+                  ...formData.getHeaders(),
+                  ...(aiServiceApiKey && {
+                    Authorization: `Bearer ${aiServiceApiKey}`,
+                  }),
+                },
+                timeout: 120000, // 120 second timeout to accommodate longer AI analysis
+                validateStatus: (status) => status < 500, // Accept 4xx as valid response
+              }
+            );
+
+            // If successful or non-rate-limit error, break
+            if (aiResponse && aiResponse.status !== 429) {
+              console.log(`✅ AI analyze-part response: ${aiResponse.status}`);
+              break;
+            }
+
+            // Handle rate limiting (429)
+            if (aiResponse && aiResponse.status === 429) {
+              // Extract Retry-After header (case-insensitive)
+              const retryAfterHeader =
+                aiResponse.headers?.["retry-after"] ||
+                aiResponse.headers?.["Retry-After"] ||
+                aiResponse.headers?.["RETRY-AFTER"];
+              
+              let delayMs: number;
+              
+              if (retryAfterHeader) {
+                // Parse Retry-After header
+                const retryAfterSeconds = parseInt(retryAfterHeader, 10);
+                if (!Number.isNaN(retryAfterSeconds) && retryAfterSeconds > 0) {
+                  // Use Retry-After value, but cap at maxDelayMs
+                  delayMs = Math.min(retryAfterSeconds * 1000, maxDelayMs);
+                  console.log(
+                    `📅 Using Retry-After header: ${retryAfterSeconds}s (${delayMs}ms)`
+                  );
+                } else {
+                  // Invalid Retry-After, use exponential backoff
+                  delayMs = Math.min(
+                    baseDelayMs * Math.pow(2, attempt - 1) +
+                      Math.random() * 1000, // Add jitter
+                    maxDelayMs
+                  );
+                  console.log(
+                    `⚠️ Invalid Retry-After header, using exponential backoff: ${delayMs}ms`
+                  );
+                }
+              } else {
+                // No Retry-After header, use exponential backoff with jitter
+                delayMs = Math.min(
+                  baseDelayMs * Math.pow(2, attempt - 1) +
+                    Math.random() * 1000, // Add jitter (0-1000ms)
+                  maxDelayMs
+                );
+                console.log(
+                  `⏱️ No Retry-After header, using exponential backoff: ${Math.round(delayMs)}ms`
+                );
+              }
+
+              if (attempt < maxAttempts) {
+                console.warn(
+                  `⚠️ AI service rate limited (attempt ${attempt}/${maxAttempts}). Retrying in ${Math.round(delayMs / 1000)}s...`
+                );
+                await new Promise((resolve) => setTimeout(resolve, delayMs));
+              } else {
+                // Last attempt failed with 429
+                lastError = {
+                  status: 429,
+                  message: "AI service is currently rate limited. Please try again later.",
+                  retryAfter: retryAfterHeader,
+                };
+              }
+            }
+          } catch (error: any) {
+            // Network or other errors
+            lastError = error;
+            if (attempt < maxAttempts) {
+              // Exponential backoff for network errors
+              const delayMs = Math.min(
+                baseDelayMs * Math.pow(2, attempt - 1) + Math.random() * 1000,
+                maxDelayMs
+              );
+              console.warn(
+                `⚠️ Request failed (attempt ${attempt}/${maxAttempts}): ${error.message}. Retrying in ${Math.round(delayMs / 1000)}s...`
+              );
+              await new Promise((resolve) => setTimeout(resolve, delayMs));
+            }
           }
-        );
-      } catch (aiError) {
+        }
+
+        // Handle final response or error
+        if (!aiResponse) {
+          if (lastError?.status === 429) {
+            const duration = Date.now() - start;
+            return res.status(429).json({
+              success: false,
+              error: "rate_limited",
+              message:
+                "The AI service is currently experiencing high demand. Please try again in a few moments.",
+              retryAfter: lastError.retryAfter,
+              suggestion:
+                "Please wait a moment before submitting another image analysis.",
+              elapsed_ms: duration,
+            });
+          }
+          const duration = Date.now() - start;
+          return res.status(502).json({
+            success: false,
+            error: "bad_gateway",
+            message: lastError?.message || "No response from AI service",
+            elapsed_ms: duration,
+          });
+        }
+
+        // Check for rate limit in final response
+        if (aiResponse.status === 429) {
+          const retryAfter =
+            aiResponse.headers?.["retry-after"] ||
+            aiResponse.headers?.["Retry-After"] ||
+            aiResponse.headers?.["RETRY-AFTER"];
+          const duration = Date.now() - start;
+          
+          return res.status(429).json({
+            success: false,
+            error: "rate_limited",
+            message:
+              "The AI service is currently experiencing high demand. Please try again in a few moments.",
+            retryAfter: retryAfter,
+            suggestion:
+              "Please wait a moment before submitting another image analysis.",
+            elapsed_ms: duration,
+          });
+        }
+
+        // Check for other non-2xx status codes
+        if (aiResponse.status < 200 || aiResponse.status >= 300) {
+          const duration = Date.now() - start;
+          return res.status(aiResponse.status).json({
+            success: false,
+            error: "ai_service_error",
+            message: `AI service returned status ${aiResponse.status}`,
+            data: aiResponse.data,
+            elapsed_ms: duration,
+          });
+        }
+
+      } catch (aiError: any) {
         console.error("AI service error:", aiError);
+
+        // Check if this is a 429 rate limit error that wasn't handled by retry logic
+        if (axios.isAxiosError(aiError) && aiError.response?.status === 429) {
+          const retryAfter =
+            aiError.response.headers?.["retry-after"] ||
+            aiError.response.headers?.["Retry-After"] ||
+            aiError.response.headers?.["RETRY-AFTER"];
+          const duration = Date.now() - start;
+          
+          return res.status(429).json({
+            success: false,
+            error: "rate_limited",
+            message:
+              "The AI service is currently experiencing high demand. Please try again in a few moments.",
+            retryAfter: retryAfter,
+            suggestion:
+              "Please wait a moment before submitting another image analysis.",
+            elapsed_ms: duration,
+          });
+        }
 
         // Determine error type
         let errorType = "unknown";
@@ -523,7 +917,8 @@ router.post(
           } else if (
             aiError.response?.status &&
             aiError.response.status >= 400 &&
-            aiError.response.status < 500
+            aiError.response.status < 500 &&
+            aiError.response.status !== 429 // Already handled above
           ) {
             errorType = "client_error";
             errorMessage = `AI service error: ${
@@ -556,6 +951,7 @@ router.post(
           metadata: {
             ai_service_error: errorType,
             ai_service_url: aiServiceUrl,
+            retry_count: 0, // Initialize retry count for auto-retry system
             error_details: axios.isAxiosError(aiError)
               ? {
                   code: aiError.code,

@@ -1451,8 +1451,22 @@ const Upload = () => {
       if (axios.isAxiosError(error)) {
         const response = error.response;
 
+        // Handle rate limiting errors (429) - highest priority
+        if (response?.status === 429) {
+          const errorData = response.data;
+          const retryAfter = errorData?.retryAfter;
+          const retrySeconds = retryAfter ? parseInt(retryAfter, 10) : null;
+          errorTitle = "Service Busy";
+          errorMessage =
+            errorData?.message ||
+            "The AI service is currently experiencing high demand. " +
+              (retrySeconds
+                ? `Please try again in ${retrySeconds} seconds.`
+                : "Please try again in a few moments.");
+          retryable = true;
+        }
         // Handle subscription errors - redirect to billing
-        if (response?.status === 403) {
+        else if (response?.status === 403) {
           const errorData = response.data;
           if (
             errorData?.error === "subscription_required" ||
@@ -1890,8 +1904,77 @@ const Upload = () => {
           });
         }
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Upload error:", error);
+
+      // Handle rate limiting errors (429)
+      if (axios.isAxiosError(error) && error.response?.status === 429) {
+        const errorData = error.response.data;
+        const retryAfter = errorData?.retryAfter;
+        const retrySeconds = retryAfter ? parseInt(retryAfter, 10) : null;
+
+        setAnalysisProgress({
+          status: "error",
+          message: "Service is currently busy",
+          progress: 0,
+          currentStep: "Rate Limited",
+          currentStepIndex: 0,
+          totalSteps: 6,
+          details:
+            errorData?.message ||
+            "The AI service is experiencing high demand. Please try again in a few moments.",
+        });
+
+        toast({
+          title: "Service Busy",
+          description:
+            errorData?.message ||
+            "The AI service is currently experiencing high demand. " +
+              (retrySeconds
+                ? `Please try again in ${retrySeconds} seconds.`
+                : "Please try again in a few moments."),
+          variant: "destructive",
+          duration: retrySeconds ? retrySeconds * 1000 : 5000,
+        });
+        return;
+      }
+
+      // Handle subscription errors
+      if (axios.isAxiosError(error) && error.response?.status === 403) {
+        const errorData = error.response.data;
+        if (
+          errorData?.error === "subscription_required" ||
+          errorData?.error === "subscription_expired"
+        ) {
+          toast({
+            title: "Subscription Required",
+            description:
+              errorData.message ||
+              "You need an active subscription or trial to use this feature. Redirecting to billing...",
+            variant: "destructive",
+          });
+          setTimeout(() => {
+            navigate("/dashboard/billing");
+          }, 2000);
+          return;
+        }
+      }
+
+      // Handle insufficient credits errors
+      if (axios.isAxiosError(error) && error.response?.status === 402) {
+        const errorData = error.response.data;
+        toast({
+          title: "Insufficient Credits",
+          description:
+            errorData.message ||
+            "You don't have enough credits to perform this analysis. Redirecting to billing...",
+          variant: "destructive",
+        });
+        setTimeout(() => {
+          navigate("/dashboard/billing");
+        }, 2000);
+        return;
+      }
 
       // Update progress to error state
       setAnalysisProgress({
