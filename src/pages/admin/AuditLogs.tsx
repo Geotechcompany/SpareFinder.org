@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/components/ui/use-toast';
 import { api } from '@/lib/api';
+import ThemeToggle from '@/components/ThemeToggle';
 import { 
   History, 
   User, 
@@ -165,13 +166,13 @@ const AuditLogs = () => {
   const getLevelColor = (level: string) => {
     switch (level) {
       case 'error':
-        return 'bg-red-600/20 text-red-300 border-red-500/30';
+        return 'bg-red-100 text-red-700 border-red-200 dark:bg-red-600/20 dark:text-red-300 dark:border-red-500/30';
       case 'warning':
-        return 'bg-yellow-600/20 text-yellow-300 border-yellow-500/30';
+        return 'bg-amber-100 text-amber-700 border-amber-200 dark:bg-yellow-600/20 dark:text-yellow-300 dark:border-yellow-500/30';
       case 'success':
-        return 'bg-green-600/20 text-green-300 border-green-500/30';
+        return 'bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-green-600/20 dark:text-green-300 dark:border-green-500/30';
       default:
-        return 'bg-blue-600/20 text-blue-300 border-blue-500/30';
+        return 'bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-600/20 dark:text-blue-300 dark:border-blue-500/30';
     }
   };
 
@@ -282,17 +283,27 @@ const AuditLogs = () => {
         >
           {/* Header */}
           <div className="relative">
-            <div className="absolute inset-0 bg-gradient-to-r from-blue-600/10 to-purple-600/10 rounded-3xl blur-xl opacity-60" />
-            <div className="relative bg-black/20 backdrop-blur-xl rounded-3xl p-8 border border-white/10">
-              <div className="flex items-center justify-between">
+            <div className="absolute inset-0 rounded-3xl bg-gradient-to-r from-blue-500/5 to-purple-500/5 blur-xl opacity-70 dark:from-blue-600/10 dark:to-purple-600/10" />
+            <div className="relative rounded-3xl border border-border bg-card/95 backdrop-blur-xl shadow-soft-elevated px-4 py-4 sm:px-6 sm:py-6 dark:bg-black/20 dark:border-white/10">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div>
-                  <h1 className="text-4xl font-bold bg-gradient-to-r from-white via-blue-200 to-purple-200 bg-clip-text text-transparent">
+                  <h1 className="text-3xl lg:text-4xl font-bold tracking-tight text-foreground dark:bg-gradient-to-r dark:from-purple-200 dark:to-blue-200 dark:bg-clip-text dark:text-transparent">
                     Audit Logs
                   </h1>
-                  <p className="text-gray-400 text-lg mt-2">Monitor system activities and security events</p>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Monitor system activities and security events
+                  </p>
                 </div>
-                <div className="flex items-center space-x-4">
-                  <Button className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700">
+                <div className="flex items-center space-x-3">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-9 w-9 text-muted-foreground hover:text-foreground hover:bg-muted"
+                    aria-label="Toggle theme"
+                  >
+                    <ThemeToggle />
+                  </Button>
+                  <Button className="bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-soft-elevated hover:from-blue-700 hover:to-purple-700">
                     <Download className="w-4 h-4 mr-2" />
                     Export Logs
                   </Button>
@@ -317,12 +328,16 @@ const AuditLogs = () => {
                 className="relative group"
               >
                 <div className={`absolute inset-0 bg-gradient-to-r ${stat.color} opacity-10 rounded-2xl blur-xl group-hover:opacity-20 transition-opacity`} />
-                <Card className="relative bg-black/40 backdrop-blur-xl border-white/10 hover:border-white/20 transition-all duration-300">
+                <Card className="relative bg-card/95 backdrop-blur-xl border-border shadow-soft-elevated hover:border-primary/30 hover:shadow-lg dark:bg-black/40 dark:border-white/10">
                   <CardContent className="p-6">
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="text-gray-400 text-sm font-medium">{stat.title}</p>
-                        <p className="text-2xl font-bold text-white mt-1">{stat.value}</p>
+                        <p className="text-sm font-medium text-muted-foreground">
+                          {stat.title}
+                        </p>
+                        <p className="mt-1 text-2xl font-bold text-foreground dark:text-white">
+                          {stat.value}
+                        </p>
                       </div>
                       <div className={`p-3 rounded-xl bg-gradient-to-r ${stat.color} shadow-lg`}>
                         <stat.icon className="w-6 h-6 text-white" />
@@ -335,20 +350,20 @@ const AuditLogs = () => {
           </div>
 
           {/* Filters */}
-          <Card className="bg-black/20 backdrop-blur-xl border-white/10">
+          <Card className="bg-card/95 backdrop-blur-xl border-border shadow-soft-elevated dark:bg-black/20 dark:border-white/10">
             <CardContent className="p-6">
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
                   <Input
                     placeholder="Search logs..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-10 bg-white/5 border-white/10 text-white placeholder-gray-400"
+                    className="pl-10 bg-background border-border text-foreground placeholder:text-muted-foreground dark:bg-white/5 dark:border-white/10 dark:text-white"
                   />
                 </div>
                 <Select value={selectedLevel} onValueChange={setSelectedLevel}>
-                  <SelectTrigger className="bg-white/5 border-white/10 text-white">
+                  <SelectTrigger className="bg-card/80 border-border text-foreground hover:bg-muted dark:bg-white/5 dark:border-white/10 dark:text-white">
                     <SelectValue placeholder="Filter by level" />
                   </SelectTrigger>
                   <SelectContent>
@@ -360,7 +375,7 @@ const AuditLogs = () => {
                   </SelectContent>
                 </Select>
                 <Select value={selectedUser} onValueChange={setSelectedUser}>
-                  <SelectTrigger className="bg-white/5 border-white/10 text-white">
+                  <SelectTrigger className="bg-card/80 border-border text-foreground hover:bg-muted dark:bg-white/5 dark:border-white/10 dark:text-white">
                     <SelectValue placeholder="Filter by user" />
                   </SelectTrigger>
                   <SelectContent>
@@ -370,7 +385,7 @@ const AuditLogs = () => {
                   </SelectContent>
                 </Select>
                 <Select value={selectedAction} onValueChange={setSelectedAction}>
-                  <SelectTrigger className="bg-white/5 border-white/10 text-white">
+                  <SelectTrigger className="bg-card/80 border-border text-foreground hover:bg-muted dark:bg-white/5 dark:border-white/10 dark:text-white">
                     <SelectValue placeholder="Filter by category" />
                   </SelectTrigger>
                   <SelectContent>
@@ -387,37 +402,42 @@ const AuditLogs = () => {
           </Card>
 
           {/* Logs List */}
-          <Card className="bg-black/20 backdrop-blur-xl border-white/10">
+          <Card className="bg-card/95 backdrop-blur-xl border-border shadow-soft-elevated dark:bg-black/20 dark:border-white/10">
             <CardHeader>
-              <CardTitle className="text-white flex items-center space-x-2">
+              <CardTitle className="flex items-center space-x-2 text-foreground dark:text-white">
                 <History className="w-5 h-5 text-blue-400" />
                 <span>System Activity Logs</span>
-                <Badge variant="secondary" className="bg-blue-600/20 text-blue-400 border-blue-500/30">
+                <Badge
+                  variant="secondary"
+                  className="bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-600/20 dark:text-blue-300 dark:border-blue-500/30"
+                >
                   {filteredLogs.length} events
                 </Badge>
               </CardTitle>
-              <CardDescription className="text-gray-400">
+              <CardDescription className="text-muted-foreground">
                 Detailed system activity and security events
               </CardDescription>
             </CardHeader>
             <CardContent>
               {isLoading ? (
                 <div className="flex items-center justify-center py-12">
-                  <Loader2 className="w-8 h-8 animate-spin text-blue-400" />
-                  <span className="ml-2 text-gray-400">Loading audit logs...</span>
+                  <Loader2 className="w-8 h-8 animate-spin text-blue-500 dark:text-blue-400" />
+                  <span className="ml-2 text-muted-foreground">
+                    Loading audit logs...
+                  </span>
                 </div>
               ) : error ? (
                 <div className="text-center py-12">
-                  <AlertTriangle className="w-12 h-12 text-red-400 mx-auto mb-4" />
-                  <p className="text-gray-400 mb-4">{error}</p>
+                  <AlertTriangle className="w-12 h-12 text-red-500 dark:text-red-400 mx-auto mb-4" />
+                  <p className="mb-4 text-muted-foreground">{error}</p>
                   <Button onClick={fetchAuditLogs} variant="outline">
                     Try Again
                   </Button>
                 </div>
               ) : filteredLogs.length === 0 ? (
                 <div className="text-center py-12">
-                  <History className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                  <p className="text-gray-400">No audit logs found</p>
+                  <History className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                  <p className="text-muted-foreground">No audit logs found</p>
                 </div>
               ) : (
                 <div className="space-y-4">
@@ -427,7 +447,7 @@ const AuditLogs = () => {
                       initial={{ opacity: 0, y: 20 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ delay: index * 0.05 }}
-                      className="p-6 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-all duration-300"
+                      className="p-6 rounded-xl bg-muted/80 border border-border/60 hover:bg-muted transition-all duration-300 dark:bg-white/5 dark:border-white/10 dark:hover:bg-white/10"
                     >
                       <div className="flex items-start space-x-4">
                         <div className="flex items-start space-x-4 flex-1">
@@ -436,16 +456,24 @@ const AuditLogs = () => {
                           </div>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center space-x-3 mb-2">
-                              <h3 className="font-medium text-white truncate">{log.action}</h3>
-                              <Badge className={`${getLevelColor(getLevelFromAction(log.action))} text-xs font-medium`}>
+                              <h3 className="font-medium text-foreground dark:text-white truncate">
+                                {log.action}
+                              </h3>
+                              <Badge
+                                className={`${getLevelColor(
+                                  getLevelFromAction(log.action)
+                                )} text-xs font-medium`}
+                              >
                                 <div className="flex items-center space-x-1">
                                   {getLevelIcon(getLevelFromAction(log.action))}
                                   <span className="capitalize">{getLevelFromAction(log.action)}</span>
                                 </div>
                               </Badge>
                             </div>
-                            <p className="text-gray-300 text-sm mb-3">{getDetailsString(log.details)}</p>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-xs text-gray-400">
+                            <p className="mb-3 text-sm text-muted-foreground">
+                              {getDetailsString(log.details)}
+                            </p>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-xs text-muted-foreground">
                               <div className="flex items-center space-x-1">
                                 <User className="w-3 h-3" />
                                 <span>{log.profiles?.full_name || log.profiles?.email || 'Unknown User'}</span>
@@ -465,7 +493,11 @@ const AuditLogs = () => {
                             </div>
                           </div>
                         </div>
-                        <Button variant="ghost" size="sm" className="text-gray-400 hover:text-white">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-muted-foreground hover:text-foreground hover:bg-muted dark:text-gray-400 dark:hover:text-white dark:hover:bg-white/10"
+                        >
                           <Eye className="w-4 h-4" />
                         </Button>
                       </div>
@@ -476,8 +508,8 @@ const AuditLogs = () => {
 
               {/* Pagination */}
               {!isLoading && !error && totalPages > 1 && (
-                <div className="flex items-center justify-between mt-6 pt-6 border-t border-white/10">
-                  <div className="text-sm text-gray-400">
+                <div className="flex items-center justify-between mt-6 pt-6 border-t border-border dark:border-white/10">
+                  <div className="text-sm text-muted-foreground">
                     Page {page} of {totalPages}
                   </div>
                   <div className="flex items-center space-x-2">
@@ -486,7 +518,7 @@ const AuditLogs = () => {
                       size="sm"
                       onClick={() => setPage(Math.max(1, page - 1))}
                       disabled={page === 1}
-                      className="bg-white/5 border-white/10 text-white hover:bg-white/10"
+                      className="border-border bg-background/80 text-foreground hover:bg-accent hover:text-accent-foreground dark:bg-white/5 dark:text-white dark:border-white/10 dark:hover:bg-white/10"
                     >
                       Previous
                     </Button>
@@ -495,7 +527,7 @@ const AuditLogs = () => {
                       size="sm"
                       onClick={() => setPage(Math.min(totalPages, page + 1))}
                       disabled={page === totalPages}
-                      className="bg-white/5 border-white/10 text-white hover:bg-white/10"
+                      className="border-border bg-background/80 text-foreground hover:bg-accent hover:text-accent-foreground dark:bg-white/5 dark:text-white dark:border-white/10 dark:hover:bg-white/10"
                     >
                       Next
                     </Button>

@@ -190,27 +190,27 @@ const SystemSettings = () => {
         >
           {/* Header */}
           <div className="relative">
-            <div className="absolute inset-0 bg-gradient-to-r from-blue-600/10 to-purple-600/10 rounded-3xl blur-xl opacity-60" />
-            <div className="relative bg-black/20 backdrop-blur-xl rounded-3xl p-6 border border-white/10">
+            <div className="absolute inset-0 rounded-3xl bg-gradient-to-r from-blue-500/5 to-purple-500/5 blur-xl opacity-70 dark:from-blue-600/10 dark:to-purple-600/10" />
+            <div className="relative rounded-3xl border border-border bg-card/95 backdrop-blur-xl shadow-soft-elevated px-4 py-4 sm:px-6 sm:py-6 dark:bg-black/20 dark:border-white/10">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div>
                   <motion.div
                     initial={{ opacity: 0, scale: 0.8 }}
                     animate={{ opacity: 1, scale: 1 }}
                     transition={{ delay: 0.2 }}
-                    className="inline-flex items-center px-4 py-2 bg-gradient-to-r from-blue-600/20 to-purple-600/20 rounded-full border border-blue-500/30 backdrop-blur-xl mb-4"
+                    className="inline-flex items-center px-4 py-2 bg-gradient-to-r from-blue-500/10 to-purple-500/10 rounded-full border border-blue-200 text-blue-700 backdrop-blur-xl mb-4 dark:border-blue-500/30 dark:text-blue-300"
                   >
                     <motion.div
                       animate={{ rotate: [0, 360] }}
                       transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
                       className="mr-2"
                     >
-                      <Settings className="w-4 h-4 text-blue-400" />
+                      <Settings className="w-4 h-4 text-blue-500 dark:text-blue-400" />
                     </motion.div>
-                    <span className="text-blue-300 text-sm font-semibold">System Configuration</span>
+                    <span className="text-sm font-semibold">System Configuration</span>
                   </motion.div>
                   <motion.h1 
-                    className="text-3xl lg:text-4xl font-bold bg-gradient-to-r from-white via-blue-100 to-purple-100 bg-clip-text text-transparent mb-3"
+                    className="text-3xl lg:text-4xl font-bold tracking-tight text-foreground dark:bg-gradient-to-r dark:from-blue-100 dark:to-purple-200 dark:bg-clip-text dark:text-transparent mb-3"
                     initial={{ opacity: 0, x: -20 }}
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: 0.3 }}
@@ -218,7 +218,7 @@ const SystemSettings = () => {
                     System Settings
                   </motion.h1>
                   <motion.p 
-                    className="text-gray-400 text-lg"
+                    className="text-lg text-muted-foreground"
                     initial={{ opacity: 0, x: -20 }}
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: 0.4 }}
@@ -232,7 +232,7 @@ const SystemSettings = () => {
                   transition={{ delay: 0.5 }}
                   className="flex items-center space-x-3"
                 >
-                  <Badge className="bg-green-600/20 text-green-300 border-green-500/30 px-3 py-1">
+                  <Badge className="px-3 py-1 bg-emerald-100 text-emerald-700 border border-emerald-200 dark:bg-green-600/20 dark:text-green-300 dark:border-green-500/30">
                     <Server className="w-4 h-4 mr-2" />
                     System Online
                   </Badge>
@@ -250,29 +250,35 @@ const SystemSettings = () => {
               className="relative"
             >
               <div className="absolute inset-0 bg-gradient-to-r from-blue-600/5 to-purple-600/5 rounded-3xl blur-xl opacity-60" />
-              <Card className="relative bg-black/20 backdrop-blur-xl border-white/10">
+              <Card className="relative bg-card/95 backdrop-blur-xl border-border shadow-soft-elevated dark:bg-black/20 dark:border-white/10">
                 <CardHeader>
-                  <CardTitle className="text-white flex items-center space-x-2">
-                    <Shield className="w-5 h-5 text-blue-400" />
+                  <CardTitle className="flex items-center space-x-2 text-foreground dark:text-white">
+                    <Shield className="w-5 h-5 text-blue-500 dark:text-blue-400" />
                     <span>Security Settings</span>
                   </CardTitle>
-                  <CardDescription className="text-gray-400">
+                  <CardDescription className="text-muted-foreground">
                     Configure security policies and access controls
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
-                    <div className="p-4 rounded-xl bg-white/5 border border-white/10">
-                      <h4 className="text-white font-medium mb-2">Password Policy</h4>
-                      <p className="text-gray-400 text-sm">Configure minimum password requirements</p>
+                    <div className="p-4 rounded-xl bg-muted/80 border border-border/60 dark:bg-white/5 dark:border-white/10">
+                      <h4 className="mb-1 font-medium text-foreground dark:text-white">Password Policy</h4>
+                      <p className="text-sm text-muted-foreground dark:text-gray-400">
+                        Configure minimum password requirements
+                      </p>
                     </div>
-                    <div className="p-4 rounded-xl bg-white/5 border border-white/10">
-                      <h4 className="text-white font-medium mb-2">Session Management</h4>
-                      <p className="text-gray-400 text-sm">Set session timeout and security policies</p>
+                    <div className="p-4 rounded-xl bg-muted/80 border border-border/60 dark:bg-white/5 dark:border-white/10">
+                      <h4 className="mb-1 font-medium text-foreground dark:text-white">Session Management</h4>
+                      <p className="text-sm text-muted-foreground dark:text-gray-400">
+                        Set session timeout and security policies
+                      </p>
                     </div>
-                    <div className="p-4 rounded-xl bg-white/5 border border-white/10">
-                      <h4 className="text-white font-medium mb-2">Two-Factor Authentication</h4>
-                      <p className="text-gray-400 text-sm">Enable 2FA for enhanced security</p>
+                    <div className="p-4 rounded-xl bg-muted/80 border border-border/60 dark:bg-white/5 dark:border-white/10">
+                      <h4 className="mb-1 font-medium text-foreground dark:text-white">Two-Factor Authentication</h4>
+                      <p className="text-sm text-muted-foreground dark:text-gray-400">
+                        Enable 2FA for enhanced security
+                      </p>
                     </div>
                   </div>
                 </CardContent>
@@ -287,29 +293,35 @@ const SystemSettings = () => {
               className="relative"
             >
               <div className="absolute inset-0 bg-gradient-to-r from-purple-600/5 to-pink-600/5 rounded-3xl blur-xl opacity-60" />
-              <Card className="relative bg-black/20 backdrop-blur-xl border-white/10">
+              <Card className="relative bg-card/95 backdrop-blur-xl border-border shadow-soft-elevated dark:bg-black/20 dark:border-white/10">
                 <CardHeader>
-                  <CardTitle className="text-white flex items-center space-x-2">
-                    <Lock className="w-5 h-5 text-purple-400" />
+                  <CardTitle className="flex items-center space-x-2 text-foreground dark:text-white">
+                    <Lock className="w-5 h-5 text-purple-500 dark:text-purple-400" />
                     <span>Authentication</span>
                   </CardTitle>
-                  <CardDescription className="text-gray-400">
+                  <CardDescription className="text-muted-foreground">
                     Configure authentication methods and providers
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
-                    <div className="p-4 rounded-xl bg-white/5 border border-white/10">
-                      <h4 className="text-white font-medium mb-2">OAuth Providers</h4>
-                      <p className="text-gray-400 text-sm">Configure Google, GitHub, and other OAuth providers</p>
+                    <div className="p-4 rounded-xl bg-muted/80 border border-border/60 dark:bg-white/5 dark:border-white/10">
+                      <h4 className="mb-1 font-medium text-foreground dark:text-white">OAuth Providers</h4>
+                      <p className="text-sm text-muted-foreground dark:text-gray-400">
+                        Configure Google, GitHub, and other OAuth providers
+                      </p>
                     </div>
-                    <div className="p-4 rounded-xl bg-white/5 border border-white/10">
-                      <h4 className="text-white font-medium mb-2">LDAP Integration</h4>
-                      <p className="text-gray-400 text-sm">Connect to enterprise directory services</p>
+                    <div className="p-4 rounded-xl bg-muted/80 border border-border/60 dark:bg-white/5 dark:border-white/10">
+                      <h4 className="mb-1 font-medium text-foreground dark:text-white">LDAP Integration</h4>
+                      <p className="text-sm text-muted-foreground dark:text-gray-400">
+                        Connect to enterprise directory services
+                      </p>
                     </div>
-                    <div className="p-4 rounded-xl bg-white/5 border border-white/10">
-                      <h4 className="text-white font-medium mb-2">API Keys</h4>
-                      <p className="text-gray-400 text-sm">Manage API authentication tokens</p>
+                    <div className="p-4 rounded-xl bg-muted/80 border border-border/60 dark:bg-white/5 dark:border-white/10">
+                      <h4 className="mb-1 font-medium text-foreground dark:text-white">API Keys</h4>
+                      <p className="text-sm text-muted-foreground dark:text-gray-400">
+                        Manage API authentication tokens
+                      </p>
                     </div>
                   </div>
                 </CardContent>
@@ -324,29 +336,35 @@ const SystemSettings = () => {
               className="relative"
             >
               <div className="absolute inset-0 bg-gradient-to-r from-green-600/5 to-emerald-600/5 rounded-3xl blur-xl opacity-60" />
-              <Card className="relative bg-black/20 backdrop-blur-xl border-white/10">
+              <Card className="relative bg-card/95 backdrop-blur-xl border-border shadow-soft-elevated dark:bg-black/20 dark:border-white/10">
                 <CardHeader>
-                  <CardTitle className="text-white flex items-center space-x-2">
-                    <Mail className="w-5 h-5 text-green-400" />
+                  <CardTitle className="flex items-center space-x-2 text-foreground dark:text-white">
+                    <Mail className="w-5 h-5 text-emerald-500 dark:text-green-400" />
                     <span>Email Configuration</span>
                   </CardTitle>
-                  <CardDescription className="text-gray-400">
+                  <CardDescription className="text-muted-foreground">
                     Configure email server and notification settings
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
-                    <div className="p-4 rounded-xl bg-white/5 border border-white/10">
-                      <h4 className="text-white font-medium mb-2">SMTP Settings</h4>
-                      <p className="text-gray-400 text-sm">Configure outgoing email server</p>
+                    <div className="p-4 rounded-xl bg-muted/80 border border-border/60 dark:bg-white/5 dark:border-white/10">
+                      <h4 className="mb-1 font-medium text-foreground dark:text-white">SMTP Settings</h4>
+                      <p className="text-sm text-muted-foreground dark:text-gray-400">
+                        Configure outgoing email server
+                      </p>
                     </div>
-                    <div className="p-4 rounded-xl bg-white/5 border border-white/10">
-                      <h4 className="text-white font-medium mb-2">Email Templates</h4>
-                      <p className="text-gray-400 text-sm">Customize notification email templates</p>
+                    <div className="p-4 rounded-xl bg-muted/80 border border-border/60 dark:bg-white/5 dark:border-white/10">
+                      <h4 className="mb-1 font-medium text-foreground dark:text-white">Email Templates</h4>
+                      <p className="text-sm text-muted-foreground dark:text-gray-400">
+                        Customize notification email templates
+                      </p>
                     </div>
-                    <div className="p-4 rounded-xl bg-white/5 border border-white/10">
-                      <h4 className="text-white font-medium mb-2">Delivery Settings</h4>
-                      <p className="text-gray-400 text-sm">Configure email delivery preferences</p>
+                    <div className="p-4 rounded-xl bg-muted/80 border border-border/60 dark:bg-white/5 dark:border-white/10">
+                      <h4 className="mb-1 font-medium text-foreground dark:text-white">Delivery Settings</h4>
+                      <p className="text-sm text-muted-foreground dark:text-gray-400">
+                        Configure email delivery preferences
+                      </p>
                     </div>
                   </div>
                 </CardContent>
@@ -361,29 +379,35 @@ const SystemSettings = () => {
               className="relative"
             >
               <div className="absolute inset-0 bg-gradient-to-r from-orange-600/5 to-red-600/5 rounded-3xl blur-xl opacity-60" />
-              <Card className="relative bg-black/20 backdrop-blur-xl border-white/10">
+              <Card className="relative bg-card/95 backdrop-blur-xl border-border shadow-soft-elevated dark:bg-black/20 dark:border-white/10">
                 <CardHeader>
-                  <CardTitle className="text-white flex items-center space-x-2">
-                    <Bell className="w-5 h-5 text-orange-400" />
+                  <CardTitle className="flex items-center space-x-2 text-foreground dark:text-white">
+                    <Bell className="w-5 h-5 text-orange-500 dark:text-orange-400" />
                     <span>Notifications</span>
                   </CardTitle>
-                  <CardDescription className="text-gray-400">
+                  <CardDescription className="text-muted-foreground">
                     Configure system notifications and alerts
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
-                    <div className="p-4 rounded-xl bg-white/5 border border-white/10">
-                      <h4 className="text-white font-medium mb-2">Alert Thresholds</h4>
-                      <p className="text-gray-400 text-sm">Set system performance alert levels</p>
+                    <div className="p-4 rounded-xl bg-muted/80 border border-border/60 dark:bg-white/5 dark:border-white/10">
+                      <h4 className="mb-1 font-medium text-foreground dark:text-white">Alert Thresholds</h4>
+                      <p className="text-sm text-muted-foreground dark:text-gray-400">
+                        Set system performance alert levels
+                      </p>
                     </div>
-                    <div className="p-4 rounded-xl bg-white/5 border border-white/10">
-                      <h4 className="text-white font-medium mb-2">Notification Channels</h4>
-                      <p className="text-gray-400 text-sm">Configure Slack, Discord, and webhook integrations</p>
+                    <div className="p-4 rounded-xl bg-muted/80 border border-border/60 dark:bg-white/5 dark:border-white/10">
+                      <h4 className="mb-1 font-medium text-foreground dark:text-white">Notification Channels</h4>
+                      <p className="text-sm text-muted-foreground dark:text-gray-400">
+                        Configure Slack, Discord, and webhook integrations
+                      </p>
                     </div>
-                    <div className="p-4 rounded-xl bg-white/5 border border-white/10">
-                      <h4 className="text-white font-medium mb-2">User Preferences</h4>
-                      <p className="text-gray-400 text-sm">Default notification settings for users</p>
+                    <div className="p-4 rounded-xl bg-muted/80 border border-border/60 dark:bg-white/5 dark:border-white/10">
+                      <h4 className="mb-1 font-medium text-foreground dark:text-white">User Preferences</h4>
+                      <p className="text-sm text-muted-foreground dark:text-gray-400">
+                        Default notification settings for users
+                      </p>
                     </div>
                   </div>
                 </CardContent>
@@ -402,7 +426,10 @@ const SystemSettings = () => {
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
             >
-              <Button variant="outline" className="border-white/10 text-gray-300 hover:bg-white/10 hover:text-white rounded-xl">
+              <Button
+                variant="outline"
+                className="rounded-xl border-border bg-background/80 text-foreground hover:bg-muted dark:border-white/10 dark:text-white dark:hover:bg-white/10"
+              >
                 Reset to Defaults
               </Button>
             </motion.div>
@@ -410,7 +437,7 @@ const SystemSettings = () => {
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
             >
-              <Button className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 shadow-lg shadow-blue-500/25 rounded-xl">
+              <Button className="rounded-xl bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-lg shadow-blue-500/25 hover:from-blue-700 hover:to-purple-700">
                 <Settings className="w-4 h-4 mr-2" />
                 Save Settings
               </Button>

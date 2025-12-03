@@ -203,9 +203,9 @@ const SubscribersManagement: React.FC = () => {
   if (loading) {
     console.log("📊 Rendering skeleton loader");
     return (
-      <div className="min-h-screen bg-gray-900">
+      <div className="min-h-screen bg-gradient-to-br from-background via-[#F0F2F5] to-[#E8EBF1] dark:from-[#0B1026] dark:via-[#1A1033] dark:to-[#0C1226]">
         {/* Mobile Header */}
-        <div className="lg:hidden bg-gray-800 border-b border-gray-700 px-4 py-3 flex items-center justify-between">
+        <div className="lg:hidden bg-card border-b border-border px-4 py-3 flex items-center justify-between shadow-sm dark:bg-gray-800 dark:border-gray-700">
           <Button
             variant="ghost"
             size="sm"
@@ -236,13 +236,13 @@ const SubscribersManagement: React.FC = () => {
             transition={{ duration: 0.3, ease: "easeInOut" }}
           >
             {/* Desktop Header */}
-            <div className="bg-gray-800 border-b border-gray-700 px-6 py-4">
+            <div className="bg-card border-b border-border px-6 py-4 shadow-sm dark:bg-gray-800 dark:border-gray-700">
               <div className="flex items-center justify-between">
                 <div>
-                  <h1 className="text-2xl font-bold text-white">
+                  <h1 className="text-2xl font-bold text-foreground dark:text-white">
                     Subscribers Management
                   </h1>
-                  <p className="text-gray-300">
+                  <p className="text-sm text-muted-foreground dark:text-gray-300">
                     Manage user subscriptions and billing
                   </p>
                 </div>
@@ -275,9 +275,9 @@ const SubscribersManagement: React.FC = () => {
 
   console.log("📊 Rendering main content");
   return (
-    <div className="min-h-screen bg-gray-900">
+    <div className="min-h-screen bg-gradient-to-br from-background via-[#F0F2F5] to-[#E8EBF1] dark:from-[#0B1026] dark:via-[#1A1033] dark:to-[#0C1226]">
       {/* Mobile Header */}
-      <div className="lg:hidden bg-gray-800 border-b border-gray-700 px-4 py-3 flex items-center justify-between">
+      <div className="lg:hidden bg-card border-b border-border px-4 py-3 flex items-center justify-between shadow-sm dark:bg-gray-800 dark:border-gray-700">
         <Button
           variant="ghost"
           size="sm"
@@ -316,13 +316,13 @@ const SubscribersManagement: React.FC = () => {
           transition={{ duration: 0.3, ease: "easeInOut" }}
         >
           {/* Desktop Header */}
-          <div className="bg-gray-800 border-b border-gray-700 px-6 py-4">
+          <div className="bg-card border-b border-border px-6 py-4 shadow-sm dark:bg-gray-800 dark:border-gray-700">
             <div className="flex items-center justify-between">
               <div>
-                <h1 className="text-2xl font-bold text-white">
+                <h1 className="text-2xl font-bold text-foreground dark:text-white">
                   Subscribers Management
                 </h1>
-                <p className="text-gray-300">
+                <p className="text-sm text-muted-foreground dark:text-gray-300">
                   Manage user subscriptions and billing
                 </p>
               </div>
