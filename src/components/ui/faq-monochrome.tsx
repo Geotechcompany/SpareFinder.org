@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { useTheme } from "@/contexts/ThemeContext";
 
 const INTRO_STYLE_ID = "faq1-animations";
 
@@ -55,19 +56,7 @@ const palettes = {
 };
 
 function FAQ1({ faqs, title, subtitle, description }: FAQ1Props) {
-  const getRootTheme = () => {
-    if (typeof document === "undefined") return "dark";
-    if (document.documentElement.classList.contains("dark")) return "dark";
-    if (document.documentElement.classList.contains("light")) return "light";
-    if (typeof window !== "undefined" && window.matchMedia) {
-      return window.matchMedia("(prefers-color-scheme: dark)").matches
-        ? "dark"
-        : "light";
-    }
-    return "dark";
-  };
-
-  const [theme, setTheme] = useState(getRootTheme);
+  const { actualTheme } = useTheme();
   const [introReady, setIntroReady] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
   const [hasEntered, setHasEntered] = useState(false);
@@ -164,15 +153,7 @@ function FAQ1({ faqs, title, subtitle, description }: FAQ1Props) {
     return () => window.removeEventListener("load", onLoad);
   }, []);
 
-  const palette = useMemo(() => palettes[theme], [theme]);
-
-  const toggleTheme = () => {
-    const root = document.documentElement;
-    const next = root.classList.contains("dark") ? "light" : "dark";
-    root.classList.toggle("dark", next === "dark");
-    setTheme(next);
-    window.localStorage?.setItem("bento-theme", next);
-  };
+  const palette = useMemo(() => palettes[actualTheme], [actualTheme]);
 
   const toggleQuestion = (i: number) =>
     setActiveIndex((prev) => (prev === i ? -1 : i));
@@ -208,7 +189,7 @@ function FAQ1({ faqs, title, subtitle, description }: FAQ1Props) {
         <div
           className={`faq1-intro ${
             introReady ? "faq1-intro--active" : ""
-          } ${theme === "light" ? "faq1-intro--light" : ""}`}
+          } ${actualTheme === "light" ? "faq1-intro--light" : ""}`}
         >
           <span className="faq1-intro__label">{subtitle || "FAQ"}</span>
         </div>

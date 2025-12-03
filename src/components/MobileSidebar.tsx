@@ -75,7 +75,7 @@ const MobileSidebar: React.FC<MobileSidebarProps> = ({ isOpen, onClose }) => {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
-            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 md:hidden"
+            className="fixed inset-0 bg-black/40 dark:bg-black/60 backdrop-blur-sm z-40 md:hidden"
           />
 
           {/* Sidebar */}
@@ -84,10 +84,10 @@ const MobileSidebar: React.FC<MobileSidebarProps> = ({ isOpen, onClose }) => {
             animate={{ x: 0 }}
             exit={{ x: '-100%' }}
             transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-            className="fixed left-0 top-0 bottom-0 w-[280px] bg-black/95 backdrop-blur-xl border-r border-white/10 z-50 md:hidden"
+            className="fixed left-0 top-0 bottom-0 w-[280px] bg-sidebar text-sidebar-foreground border-r border-sidebar-border backdrop-blur-xl z-50 md:hidden dark:bg-black/95 dark:text-white dark:border-white/10"
           >
             {/* Header */}
-            <div className="flex items-center justify-between p-4 border-b border-white/10">
+            <div className="flex items-center justify-between p-4 border-b border-sidebar-border/80 dark:border-white/10">
               <div className="flex items-center gap-3">
                 <Avatar className="w-8 h-8">
                   <AvatarImage src={user?.avatar_url} alt={displayName} />
@@ -96,8 +96,12 @@ const MobileSidebar: React.FC<MobileSidebarProps> = ({ isOpen, onClose }) => {
                   </AvatarFallback>
                 </Avatar>
                 <div>
-                  <h3 className="text-white font-semibold text-sm">{displayName}</h3>
-                  <p className="text-xs text-gray-400">{tierDisplay}</p>
+                  <h3 className="font-semibold text-sm text-sidebar-foreground dark:text-white">
+                    {displayName}
+                  </h3>
+                  <p className="text-xs text-muted-foreground dark:text-gray-400">
+                    {tierDisplay}
+                  </p>
                 </div>
               </div>
               <Button
@@ -119,8 +123,8 @@ const MobileSidebar: React.FC<MobileSidebarProps> = ({ isOpen, onClose }) => {
                   onClick={onClose}
                   className={`flex items-center gap-3 p-3 rounded-xl transition-all ${
                     isActiveRoute(item.href)
-                      ? 'bg-gradient-to-r from-purple-600/20 to-blue-600/20 border border-purple-500/30 text-white'
-                      : 'text-gray-400 hover:text-white hover:bg-white/5'
+                      ? 'bg-sidebar-accent text-sidebar-accent-foreground border border-sidebar-border/80'
+                      : 'text-sidebar-foreground/80 hover:text-sidebar-foreground hover:bg-sidebar-accent/60 dark:text-gray-400 dark:hover:text-white dark:hover:bg-white/5'
                   }`}
                 >
                   <item.icon className="w-5 h-5" />
@@ -133,7 +137,7 @@ const MobileSidebar: React.FC<MobileSidebarProps> = ({ isOpen, onClose }) => {
             </div>
 
             {/* Footer */}
-            <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-white/10">
+            <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-sidebar-border/80 dark:border-white/10">
               <Button
                 variant="ghost"
                 className="w-full justify-start text-red-400 hover:text-red-300 hover:bg-red-500/10"

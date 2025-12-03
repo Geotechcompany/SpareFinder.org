@@ -4,6 +4,7 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { MenuToggleIcon } from "@/components/ui/menu-toggle-icon";
 import { useScroll } from "@/components/ui/use-scroll";
+import ThemeToggle from "@/components/ThemeToggle";
 import {
   NavigationMenu,
   NavigationMenuList,
@@ -47,13 +48,14 @@ export function Header() {
   return (
     <header
       className={cn(
-        "sticky top-0 z-50 mx-auto w-full max-w-5xl border-b border-transparent md:border md:transition-all md:ease-out rounded-none md:rounded-[15px]",
-        {
-          "bg-gradient-to-br from-[#000]/90 to-[#1A2428]/90 border-white/10 backdrop-blur-lg md:top-4 md:max-w-4xl md:shadow":
-            scrolled && !open,
-          "bg-gradient-to-br from-[#000]/95 to-[#1A2428]/95 border-white/10":
-            open,
-        }
+        "sticky top-0 z-50 mx-auto w-full max-w-5xl rounded-none border-b border-border/70 bg-background/90 text-foreground backdrop-blur-xl md:rounded-[15px] md:border md:transition-all md:ease-out",
+        scrolled && !open && "md:top-4 md:max-w-4xl md:shadow-soft-elevated",
+        open && "shadow-soft-elevated",
+        scrolled &&
+          !open &&
+          "dark:bg-gradient-to-br dark:from-[#000]/90 dark:to-[#1A2428]/90 dark:border-white/10",
+        open &&
+          "dark:bg-gradient-to-br dark:from-[#000]/95 dark:to-[#1A2428]/95 dark:border-white/10"
       )}
     >
       <nav
@@ -67,7 +69,7 @@ export function Header() {
             <img
               src="/sparefinderlogo.png"
               alt="SpareFinder Logo"
-              className="h-12 w-auto object-contain"
+              className="h-10 w-auto object-contain sm:h-11"
             />
           </a>
         </div>
@@ -135,10 +137,11 @@ export function Header() {
           </NavigationMenu>
           <a
             href="/reviews"
-            className="text-sm font-medium text-white/80 transition-colors hover:text-white"
+            className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground dark:text-white/80 dark:hover:text-white"
           >
             Reviews
           </a>
+          <ThemeToggle />
           <a href="/login" className={buttonVariants({ variant: "outline" })}>
             Sign In
           </a>

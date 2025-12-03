@@ -36,7 +36,7 @@ import {
   AlertCircle,
   LucideIcon,
 } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useState, useEffect, useRef, useMemo } from "react";
 import { useInView } from "framer-motion";
 import Header from "@/components/Header";
@@ -49,6 +49,10 @@ import StaggerTestimonialsDemo from "@/components/StaggerTestimonialsDemo";
 import ReviewsSphere from "@/components/ReviewsSphere";
 import IndustrialApplications from "@/components/IndustrialApplications";
 import FAQDemo from "@/components/FAQDemo";
+import Orb from "@/components/ui/Orb";
+import { Scene } from "@/components/ui/hero-section";
+import { useTheme } from "@/contexts/ThemeContext";
+import { useAuth } from "@/contexts/AuthContext";
 import { FeaturesSectionWithHoverEffects } from "@/components/ui/feature-section-with-hover-effects";
 import {
   Dialog,
@@ -108,10 +112,10 @@ const CookieConsent = () => {
       initial={{ y: 100 }}
       animate={{ y: 0 }}
       exit={{ y: 100 }}
-      className="fixed bottom-0 left-0 right-0 z-50 p-4 bg-gray-900/95 backdrop-blur-xl border-t border-gray-800"
+      className="fixed bottom-0 left-0 right-0 z-50 border-t border-border bg-background/95 p-4 text-foreground shadow-soft-elevated backdrop-blur-xl dark:border-gray-800 dark:bg-gray-900/95"
     >
-      <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
-        <p className="text-gray-300 text-sm">
+      <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-4 sm:flex-row">
+        <p className="text-sm text-muted-foreground">
           We use cookies to enhance your experience. By continuing to visit this
           site you agree to our use of cookies.
         </p>
@@ -120,14 +124,14 @@ const CookieConsent = () => {
             variant="outline"
             size="sm"
             onClick={() => setShow(false)}
-            className="text-gray-400 border-gray-700 hover:bg-gray-800"
+            className="border-border text-muted-foreground hover:bg-muted dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-800"
           >
             Decline
           </Button>
           <Button
             size="sm"
             onClick={() => setShow(false)}
-            className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
+            className="bg-gradient-to-r from-[#3A5AFE] via-[#4C5DFF] to-[#06B6D4] text-white shadow-[0_16px_40px_rgba(15,23,42,0.35)] hover:from-[#324EDC] hover:via-[#3A5AFE] hover:to-[#0891B2] dark:from-purple-600 dark:to-blue-600 dark:hover:from-purple-700 dark:hover:to-blue-700"
           >
             Accept All
           </Button>
@@ -162,6 +166,9 @@ const Landing = () => {
   const [isProcessing, setIsProcessing] = useState(false);
 
   const { toast } = useToast();
+  const { actualTheme } = useTheme();
+  const { isAuthenticated } = useAuth();
+  const navigate = useNavigate();
 
   // Stripe Checkout function
   const processStripePayment = async (plan: PricingPlan) => {
@@ -202,13 +209,24 @@ const Landing = () => {
     }
   };
 
-  // Handle plan selection with Stripe integration
-  const handlePlanSelect = async (plan: PricingPlan) => {
+  // Handle plan selection: require login first, then purchase inside app
+  const handlePlanSelect = (plan: PricingPlan) => {
+    if (!isAuthenticated) {
+      const planParam =
+        typeof plan.name === "string"
+          ? encodeURIComponent(plan.name.toLowerCase())
+          : "";
+      navigate(
+        planParam ? `/login?plan=${planParam}` : "/login"
+      );
+      return;
+    }
+
+    // Authenticated users can purchase directly via Stripe modal
     if (
       typeof plan.name === "string" &&
       plan.name.toLowerCase().includes("enterprise")
     ) {
-      // Enterprise plan - contact sales
       toast({
         title: "Enterprise Plan",
         description:
@@ -218,7 +236,6 @@ const Landing = () => {
       return;
     }
 
-    // Paid plans - show Stripe checkout confirmation
     setSelectedPlan(plan);
     setIsPaymentModalOpen(true);
   };
@@ -324,21 +341,40 @@ const Landing = () => {
   }, [features]);
 
   return (
-    <div className="min-h-screen bg-black">
+    <div className="min-h-screen bg-background text-foreground dark:bg-black">
       <Header />
 
       {/* Hero Section (DemoOne) */}
-      <section className="relative -mt-20 pt-0 pb-16 overflow-hidden w-full">
-        <DemoOne />
+      <section className="relative mt-6 w-full overflow-visible pt-4 pb-8">
+        {actualTheme === "light" && (
+          <div className="pointer-events-none absolute inset-x-0 top-10 z-0 flex justify-center">
+            <div className="h-[720px] w-full max-w-6xl">
+              <Orb
+                hoverIntensity={0.6}
+                rotateOnHover
+                hue={0}
+                className="h-full w-full"
+              />
+            </div>
+          </div>
+        )}
+        {actualTheme === "dark" && (
+          <div className="pointer-events-none absolute inset-0 z-0">
+            <Scene />
+          </div>
+        )}
+        <div className="relative z-10">
+          <DemoOne />
+        </div>
       </section>
 
       {/* Dashboard Scroll Animation */}
-      <section className="relative bg-black overflow-hidden">
+      <section className="relative overflow-hidden bg-background dark:bg-black">
         <DashboardScrollDemo />
       </section>
 
       {/* Core Values Section */}
-      <section className="relative bg-black overflow-hidden">
+      <section className="relative overflow-hidden bg-background dark:bg-black">
         <CoreValueStatsDemo />
       </section>
 
@@ -347,10 +383,10 @@ const Landing = () => {
         id="features"
         className="relative py-24 px-4 sm:px-6 lg:px-8 overflow-hidden"
       >
-        <div className="absolute inset-0 bg-gradient-to-b from-black via-gray-900/50 to-black" />
+        <div className="absolute inset-0 bg-gradient-to-b from-background via-[#F0F2F5] to-[#E8EBF1] dark:from-black dark:via-gray-900/50 dark:to-black" />
         <div className="absolute inset-0">
-          <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl" />
-          <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl" />
+          <div className="absolute top-1/4 left-1/4 h-96 w-96 rounded-full bg-[#3A5AFE1A] blur-3xl dark:bg-purple-500/10" />
+          <div className="absolute bottom-1/4 right-1/4 h-96 w-96 rounded-full bg-[#06B6D41A] blur-3xl dark:bg-blue-500/10" />
         </div>
 
         <div className="max-w-7xl mx-auto relative z-10">
@@ -364,17 +400,15 @@ const Landing = () => {
               initial={{ opacity: 0, scale: 0.5 }}
               whileInView={{ opacity: 1, scale: 1 }}
               transition={{ duration: 0.5 }}
-              className="inline-flex items-center px-4 py-2 bg-gradient-to-r from-purple-500/20 to-blue-500/20 rounded-full border border-purple-500/30 mb-8"
+              className="mb-8 inline-flex items-center rounded-full border border-border bg-gradient-to-r from-[#3A5AFE14] via-[#06B6D414] to-transparent px-4 py-2 text-xs font-medium text-muted-foreground backdrop-blur-xl dark:border-purple-500/30 dark:from-purple-500/20 dark:to-blue-500/20 dark:text-purple-300"
             >
-              <Sparkles className="w-4 h-4 text-purple-400 mr-2" />
-              <span className="text-sm text-purple-300 font-medium">
-                Powered by Advanced AI
-              </span>
+              <Sparkles className="mr-2 h-4 w-4 text-primary dark:text-purple-400" />
+              <span>Powered by Advanced AI</span>
             </motion.div>
-            <h2 className="text-5xl lg:text-6xl font-bold bg-gradient-to-r from-white via-purple-200 to-blue-200 bg-clip-text text-transparent mb-6">
+            <h2 className="mb-6 text-5xl font-bold tracking-tight text-foreground lg:text-6xl dark:bg-gradient-to-r dark:from-white dark:via-purple-200 dark:to-blue-200 dark:bg-clip-text dark:text-transparent">
               Core Capabilities
             </h2>
-            <p className="text-xl text-gray-400 max-w-3xl mx-auto leading-relaxed">
+            <p className="mx-auto max-w-3xl text-xl leading-relaxed text-muted-foreground">
               Revolutionary part identification technology that transforms how
               industrial teams work
             </p>
@@ -395,7 +429,7 @@ const Landing = () => {
             className="w-full h-full object-cover opacity-20"
             alt="Circuit board background"
           />
-          <div className="absolute inset-0 bg-gradient-to-r from-black via-black/90 to-black" />
+          <div className="absolute inset-0 bg-gradient-to-r from-background via-[#F0F2F5] to-[#E8EBF1] dark:from-black dark:via-black/90 dark:to-black" />
         </div>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
@@ -412,10 +446,10 @@ const Landing = () => {
                 transition={{ delay: index * 0.1 }}
                 className="p-6"
               >
-                <div className="text-5xl font-bold bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent mb-2">
+                <div className="mb-2 text-5xl font-bold bg-gradient-to-r from-[#3A5AFE] via-[#4C5DFF] to-[#06B6D4] bg-clip-text text-transparent">
                   {stat.value}
                 </div>
-                <div className="text-gray-300 uppercase text-sm tracking-wider">
+                <div className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
                   {stat.label}
                 </div>
               </motion.div>
@@ -427,11 +461,11 @@ const Landing = () => {
       {/* Testimonials */}
       <section
         id="testimonials"
-        className="relative py-24 px-4 sm:px-6 lg:px-8 overflow-hidden bg-black"
+        className="relative overflow-hidden bg-background py-24 px-4 sm:px-6 lg:px-8 dark:bg-black"
       >
         <div className="absolute inset-0">
-          <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl" />
-          <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl" />
+          <div className="absolute top-1/4 left-1/4 h-96 w-96 rounded-full bg-[#3A5AFE1A] blur-3xl dark:bg-purple-500/10" />
+          <div className="absolute bottom-1/4 right-1/4 h-96 w-96 rounded-full bg-[#06B6D41A] blur-3xl dark:bg-blue-500/10" />
         </div>
 
         <div className="max-w-7xl mx-auto relative z-10">
@@ -446,17 +480,15 @@ const Landing = () => {
               initial={{ opacity: 0, scale: 0.5 }}
               whileInView={{ opacity: 1, scale: 1 }}
               transition={{ duration: 0.5 }}
-              className="inline-flex items-center px-4 py-2 bg-gradient-to-r from-purple-500/20 to-blue-500/20 rounded-full border border-purple-500/30 mb-8"
+              className="mb-8 inline-flex items-center rounded-full border border-border bg-gradient-to-r from-[#3A5AFE14] via-[#06B6D414] to-transparent px-4 py-2 text-xs font-medium text-muted-foreground backdrop-blur-xl dark:border-purple-500/30 dark:from-purple-500/20 dark:to-blue-500/20 dark:text-purple-300"
             >
-              <Sparkles className="w-4 h-4 text-purple-400 mr-2" />
-              <span className="text-sm text-purple-300 font-medium">
-                Customer Reviews
-              </span>
+              <Sparkles className="mr-2 h-4 w-4 text-primary dark:text-purple-400" />
+              <span>Customer Reviews</span>
             </motion.div>
-            <h2 className="text-4xl md:text-5xl font-bold text-white mb-6">
+            <h2 className="mb-6 text-4xl font-bold tracking-tight text-foreground md:text-5xl dark:text-white">
               Loved by Professionals Worldwide
             </h2>
-            <p className="text-xl text-gray-300 max-w-2xl mx-auto">
+            <p className="mx-auto max-w-2xl text-xl text-muted-foreground">
               See what our customers are saying about SpareFinder. Click on any
               review to read more.
             </p>
@@ -481,7 +513,7 @@ const Landing = () => {
             <Button
               asChild
               variant="outline"
-              className="text-white border-purple-500/50 hover:bg-purple-500/10"
+              className="border-border text-foreground hover:bg-muted dark:border-purple-500/50 dark:text-white dark:hover:bg-purple-500/10"
             >
               <Link to="/reviews">View All Reviews</Link>
             </Button>
@@ -489,17 +521,14 @@ const Landing = () => {
         </div>
       </section>
 
-      {/* FAQ Section */}
-      <FAQDemo />
-
       {/* How It Works section */}
       <HowItWorks />
 
       {/* Enhanced Pricing Section */}
-      <section className="py-20 bg-gradient-to-b from-gray-900 to-black relative overflow-hidden">
+      <section className="relative overflow-hidden bg-gradient-to-b from-background via-[#F0F2F5] to-[#E8EBF1] py-20 dark:from-gray-900 dark:via-black dark:to-black">
         <div className="absolute inset-0">
           <div className="absolute inset-0 bg-[url('/images/grid-pattern.svg')] bg-repeat opacity-5" />
-          <div className="absolute inset-0 bg-gradient-to-b from-gray-900 via-black to-black opacity-90" />
+          <div className="absolute inset-0 bg-gradient-to-b from-background/80 via-[#F0F2F5]/90 to-[#E8EBF1]/95 opacity-95 dark:from-gray-900 dark:via-black dark:to-black" />
         </div>
 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative">
@@ -509,13 +538,13 @@ const Landing = () => {
             viewport={{ once: true }}
             className="text-center"
           >
-            <span className="inline-block px-4 py-1.5 mb-6 text-sm font-medium bg-gradient-to-r from-purple-500/10 to-blue-500/10 rounded-full border border-purple-500/20 text-purple-400">
+            <span className="mb-6 inline-block rounded-full border border-border bg-gradient-to-r from-[#3A5AFE14] via-[#06B6D414] to-transparent px-4 py-1.5 text-sm font-medium text-muted-foreground backdrop-blur-xl dark:border-purple-500/20 dark:from-purple-500/10 dark:to-blue-500/10 dark:text-purple-400">
               Flexible Pricing
             </span>
-            <h2 className="text-4xl font-bold text-white mb-4">
+            <h2 className="mb-4 text-4xl font-bold tracking-tight text-foreground dark:text-white">
               Choose Your Plan
             </h2>
-            <p className="text-gray-400 mb-12 max-w-2xl mx-auto">
+            <p className="mx-auto mb-12 max-w-2xl text-muted-foreground">
               Start with our free tier and scale as you grow. All plans include
               core AI features.
             </p>
@@ -531,27 +560,27 @@ const Landing = () => {
                 transition={{ delay: index * 0.2 }}
                 className={`relative group rounded-2xl p-8 ${
                   plan.featured
-                    ? "bg-gradient-to-b from-purple-900/30 to-blue-900/30 border-2 border-purple-500/30"
-                    : "bg-gray-800/30 border border-gray-700/50"
+                    ? "bg-gradient-to-b from-[#3A5AFE0F] via-[#4C5DFF0F] to-[#06B6D40F] border-2 border-[#3A5AFE66] shadow-soft-elevated dark:from-purple-900/30 dark:to-blue-900/30 dark:border-purple-500/30"
+                    : "bg-card/95 border border-border shadow-soft-elevated dark:bg-gray-800/30 dark:border-gray-700/50"
                 }`}
               >
                 {plan.featured && (
-                  <div className="absolute -top-4 left-1/2 -translate-x-1/2 px-4 py-1 bg-gradient-to-r from-purple-600 to-blue-600 rounded-full text-white text-sm font-medium">
+                  <div className="absolute -top-4 left-1/2 -translate-x-1/2 rounded-full bg-gradient-to-r from-[#3A5AFE] via-[#4C5DFF] to-[#06B6D4] px-4 py-1 text-sm font-medium text-white shadow-[0_12px_30px_rgba(15,23,42,0.45)] dark:from-purple-600 dark:to-blue-600">
                     Most Popular
                   </div>
                 )}
 
                 <div className="text-center">
-                  <h3 className="text-2xl font-semibold text-white mb-4">
+                  <h3 className="mb-4 text-2xl font-semibold text-foreground dark:text-white">
                     {plan.name}
                   </h3>
                   <div className="mb-6">
                     <div className="flex items-center justify-center">
-                      <span className="text-5xl font-bold bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent">
+                      <span className="text-5xl font-bold bg-gradient-to-r from-[#3A5AFE] via-[#4C5DFF] to-[#06B6D4] bg-clip-text text-transparent">
                         £{plan.price.monthly}
                       </span>
                       {plan.price.monthly !== "Custom" && (
-                        <span className="text-gray-400 ml-2">/mo</span>
+                        <span className="ml-2 text-muted-foreground">/mo</span>
                       )}
                     </div>
                   </div>
@@ -560,7 +589,7 @@ const Landing = () => {
                     {plan.features.map((feature) => (
                       <li
                         key={feature}
-                        className="flex items-center text-gray-300"
+                        className="flex items-center text-muted-foreground"
                       >
                         <div className="mr-2 rounded-full p-1 bg-green-500/10">
                           <Check className="h-4 w-4 text-green-400" />
@@ -574,8 +603,8 @@ const Landing = () => {
                     onClick={() => handlePlanSelect(plan)}
                     className={`w-full group relative overflow-hidden ${
                       plan.featured
-                        ? "bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
-                        : "bg-gray-700 hover:bg-gray-600"
+                        ? "bg-gradient-to-r from-[#3A5AFE] via-[#4C5DFF] to-[#06B6D4] text-white shadow-[0_16px_40px_rgba(15,23,42,0.35)] hover:from-[#324EDC] hover:via-[#3A5AFE] hover:to-[#0891B2] dark:from-purple-600 dark:to-blue-600 dark:hover:from-purple-700 dark:hover:to-blue-700"
+                        : "bg-muted text-foreground hover:bg-muted/80 border border-border dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-white"
                     }`}
                     size="lg"
                   >
@@ -600,14 +629,14 @@ const Landing = () => {
       <AnimatePresence>
         {isPaymentModalOpen && (
           <Dialog open={isPaymentModalOpen} onOpenChange={resetPaymentModal}>
-            <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 border border-gray-700 text-white">
+            <DialogContent className="max-h-[90vh] max-w-[600px] overflow-y-auto border border-border bg-card text-foreground shadow-soft-elevated sm:max-w-[600px] dark:border-gray-700 dark:bg-gradient-to-br dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 dark:text-white">
               <DialogHeader>
-                <DialogTitle className="text-2xl font-bold bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent">
+                <DialogTitle className="text-2xl font-bold bg-gradient-to-r from-[#3A5AFE] via-[#4C5DFF] to-[#06B6D4] bg-clip-text text-transparent dark:from-purple-400 dark:to-blue-400">
                   {selectedPlan
                     ? `Complete Your Payment for ${selectedPlan.name}`
                     : "Payment Required"}
                 </DialogTitle>
-                <DialogDescription className="text-gray-300">
+                <DialogDescription className="text-muted-foreground dark:text-gray-300">
                   {selectedPlan
                     ? `Subscribe to ${selectedPlan.name} plan for £${
                         selectedPlan.price[isAnnual ? "annual" : "monthly"]
@@ -627,16 +656,16 @@ const Landing = () => {
                     className="space-y-6 py-4"
                   >
                     {/* Plan Summary */}
-                    <div className="bg-gradient-to-r from-purple-900/20 to-blue-900/20 rounded-xl p-4 border border-purple-500/30">
-                      <h3 className="text-lg font-semibold text-purple-300 mb-2">
+                    <div className="rounded-xl border border-border bg-gradient-to-r from-[#3A5AFE0F] via-[#4C5DFF0F] to-[#06B6D40F] p-4 dark:border-purple-500/30 dark:from-purple-900/20 dark:to-blue-900/20">
+                      <h3 className="mb-2 text-lg font-semibold text-primary dark:text-purple-300">
                         Plan Summary
                       </h3>
-                      <div className="flex justify-between items-center text-gray-300">
+                      <div className="flex items-center justify-between text-muted-foreground dark:text-gray-300">
                         <span>
                           {selectedPlan?.name} Plan (
                           {isAnnual ? "Annual" : "Monthly"})
                         </span>
-                        <span className="text-xl font-bold text-white">
+                        <span className="text-xl font-bold text-foreground dark:text-white">
                           £
                           {selectedPlan?.price[isAnnual ? "annual" : "monthly"]}
                           /{isAnnual ? "year" : "month"}
@@ -651,27 +680,27 @@ const Landing = () => {
 
                     {/* Stripe Checkout Information */}
                     <div className="space-y-6">
-                      <h3 className="text-lg font-semibold text-green-300 flex items-center">
+                      <h3 className="flex items-center text-lg font-semibold text-emerald-600 dark:text-green-300">
                         <CreditCard className="w-5 h-5 mr-2" />
                         Secure Payment via Stripe
                       </h3>
 
                       {/* Stripe Benefits */}
-                      <div className="bg-gradient-to-r from-green-900/20 to-emerald-900/20 rounded-xl p-4 border border-green-500/30">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                          <div className="flex items-center text-green-300">
+                      <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-emerald-700 dark:border-green-500/30 dark:bg-gradient-to-r dark:from-green-900/20 dark:to-emerald-900/20 dark:text-green-300">
+                        <div className="grid grid-cols-1 gap-4 text-sm md:grid-cols-2">
+                          <div className="flex items-center">
                             <Shield className="w-4 h-4 mr-2" />
                             Bank-level security
                           </div>
-                          <div className="flex items-center text-green-300">
+                          <div className="flex items-center">
                             <Lock className="w-4 h-4 mr-2" />
                             PCI DSS compliant
                           </div>
-                          <div className="flex items-center text-green-300">
+                          <div className="flex items-center">
                             <CreditCard className="w-4 h-4 mr-2" />
                             Multiple payment methods
                           </div>
-                          <div className="flex items-center text-green-300">
+                          <div className="flex items-center">
                             <Globe className="w-4 h-4 mr-2" />
                             Global payment processing
                           </div>
@@ -679,11 +708,11 @@ const Landing = () => {
                       </div>
 
                       <div className="space-y-3">
-                        <p className="text-gray-300">
+                        <p className="text-muted-foreground dark:text-gray-300">
                           🔒 You will be redirected to Stripe's secure payment
                           page to complete your payment.
                         </p>
-                        <p className="text-gray-400 text-sm">
+                        <p className="text-sm text-muted-foreground/80 dark:text-gray-400">
                           ✓ Your subscription will be activated instantly upon
                           successful payment
                           <br />
@@ -698,7 +727,7 @@ const Landing = () => {
                         <Button
                           onClick={handleStripeCheckout}
                           disabled={isProcessing}
-                          className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white w-full h-12 text-lg font-semibold shadow-lg shadow-purple-500/25"
+                          className="flex h-12 w-full items-center justify-center bg-gradient-to-r from-[#3A5AFE] via-[#4C5DFF] to-[#06B6D4] text-lg font-semibold text-white shadow-[0_16px_40px_rgba(15,23,42,0.35)] hover:from-[#324EDC] hover:via-[#3A5AFE] hover:to-[#0891B2] disabled:opacity-70 dark:from-purple-600 dark:to-blue-600 dark:hover:from-purple-700 dark:hover:to-blue-700"
                         >
                           {isProcessing ? (
                             <>
@@ -718,24 +747,24 @@ const Landing = () => {
                           variant="outline"
                           onClick={resetPaymentModal}
                           disabled={isProcessing}
-                          className="border-gray-600 text-gray-300 hover:bg-gray-800 w-full"
+                          className="w-full border border-border text-muted-foreground hover:bg-muted disabled:opacity-70 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800"
                         >
                           Cancel
                         </Button>
                       </div>
 
-                      <p className="text-xs text-gray-500 text-center">
+                      <p className="text-xs text-muted-foreground/80 text-center">
                         By proceeding, you agree to our{" "}
                         <Link
                           to="/terms"
-                          className="underline hover:text-purple-400"
+                          className="underline hover:text-primary dark:hover:text-purple-400"
                         >
                           Terms of Service
                         </Link>{" "}
                         and acknowledge our{" "}
                         <Link
                           to="/privacy"
-                          className="underline hover:text-purple-400"
+                          className="underline hover:text-primary dark:hover:text-purple-400"
                         >
                           Privacy Policy
                         </Link>
@@ -752,17 +781,17 @@ const Landing = () => {
                     animate={{ opacity: 1, scale: 1 }}
                     exit={{ opacity: 0, scale: 0.9 }}
                     transition={{ duration: 0.3 }}
-                    className="text-center py-12"
+                    className="py-12 text-center"
                   >
-                    <h3 className="text-xl font-semibold text-white mb-2">
+                    <h3 className="mb-2 text-xl font-semibold text-foreground dark:text-white">
                       No Plan Selected
                     </h3>
-                    <p className="text-gray-400 mb-6">
+                    <p className="mb-6 text-muted-foreground dark:text-gray-400">
                       Please select a plan to proceed with payment.
                     </p>
                     <Button
                       onClick={() => setIsPaymentModalOpen(false)}
-                      className="bg-gray-700 hover:bg-gray-600 text-white"
+                      className="bg-muted text-foreground hover:bg-muted/80 dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-white"
                     >
                       Cancel
                     </Button>
@@ -777,24 +806,24 @@ const Landing = () => {
       {/* Final CTA */}
       <section className="py-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <div className="bg-gradient-to-r from-purple-900/50 to-blue-900/50 rounded-3xl p-16 border border-white/10 backdrop-blur-xl">
-            <h2 className="text-4xl font-bold text-white mb-6">
+          <div className="rounded-3xl border border-border bg-gradient-to-r from-[#3A5AFE0F] via-[#4C5DFF0F] to-[#06B6D40F] p-10 shadow-soft-elevated backdrop-blur-xl sm:p-16 dark:border-white/10 dark:from-purple-900/50 dark:to-blue-900/50">
+            <h2 className="mb-6 text-4xl font-bold tracking-tight text-foreground dark:text-white">
               Ready to Revolutionize Your Part Identification?
             </h2>
-            <p className="text-gray-300 mb-8 max-w-2xl mx-auto">
+            <p className="mx-auto mb-8 max-w-2xl text-muted-foreground dark:text-gray-300">
               Join hundreds of manufacturers already using our AI-powered
               platform
             </p>
             <div className="flex justify-center gap-4">
               <Button
                 asChild
-                className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-lg px-8 py-6"
+                className="bg-gradient-to-r from-[#3A5AFE] via-[#4C5DFF] to-[#06B6D4] px-8 py-6 text-lg font-semibold text-white shadow-[0_16px_40px_rgba(15,23,42,0.35)] hover:from-[#324EDC] hover:via-[#3A5AFE] hover:to-[#0891B2] dark:from-purple-600 dark:to-blue-600 dark:hover:from-purple-700 dark:hover:to-blue-700"
               >
                 <Link to="/register">Start Free Trial</Link>
               </Button>
               <Button
                 variant="outline"
-                className="text-white border-gray-600 hover:bg-white/10 text-lg px-8 py-6"
+                className="border-border px-8 py-6 text-lg font-medium text-foreground hover:bg-muted dark:border-gray-600 dark:text-white dark:hover:bg-white/10"
               >
                 Contact Sales
               </Button>
@@ -802,6 +831,9 @@ const Landing = () => {
           </div>
         </div>
       </section>
+
+      {/* FAQ Section (last content block before footer) */}
+      <FAQDemo />
 
       <Footer />
 

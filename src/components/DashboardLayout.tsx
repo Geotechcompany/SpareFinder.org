@@ -5,6 +5,8 @@ import MobileSidebar from "@/components/MobileSidebar";
 import { DashboardLayoutProvider } from "@/contexts/DashboardLayoutContext";
 import { Menu } from "lucide-react";
 import { Outlet } from "react-router-dom";
+import DashboardHeader from "@/components/DashboardHeader";
+import DashboardMobileTabs from "@/components/DashboardMobileTabs";
 
 const DashboardLayout: React.FC = () => {
   const [isCollapsed, setIsCollapsed] = useState(false);
@@ -15,7 +17,7 @@ const DashboardLayout: React.FC = () => {
 
   return (
     <DashboardLayoutProvider>
-      <div className="min-h-screen flex w-full bg-gradient-to-br from-gray-900 via-purple-900/20 to-blue-900/20 relative overflow-hidden">
+      <div className="min-h-screen flex w-full bg-gradient-to-br from-background via-[#F0F2F5] to-[#E8EBF1] dark:from-[#0B1026] dark:via-[#1A1033] dark:to-[#0C1226] relative overflow-hidden">
         {/* Animated Background Elements */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
           <motion.div
@@ -60,9 +62,10 @@ const DashboardLayout: React.FC = () => {
         {/* Mobile Menu Button */}
         <button
           onClick={handleToggleMobileMenu}
-          className="fixed top-4 right-4 z-50 p-2 rounded-lg bg-black/20 backdrop-blur-xl border border-white/10 md:hidden"
+          className="fixed top-3 right-3 z-40 flex h-9 w-9 items-center justify-center rounded-full border border-border bg-card/95 text-muted-foreground shadow-soft-elevated backdrop-blur-sm md:hidden dark:bg-black/70 dark:border-white/10 dark:text-white"
+          aria-label="Open navigation"
         >
-          <Menu className="w-5 h-5 text-white" />
+          <Menu className="w-5 h-5" />
         </button>
 
         {/* Main Content */}
@@ -77,10 +80,16 @@ const DashboardLayout: React.FC = () => {
               : "calc(100% - var(--expanded-sidebar-width, 320px))",
           }}
           transition={{ duration: 0.3, ease: "easeInOut" }}
-          className="flex-1 p-2 sm:p-4 lg:p-8 relative z-10 overflow-x-hidden md:overflow-x-visible"
+          className="flex-1 p-2 pb-16 sm:p-4 sm:pb-6 lg:p-8 relative z-10 overflow-x-hidden md:overflow-x-visible"
         >
-          <Outlet />
+          <div className="mx-auto flex h-full max-w-6xl flex-col">
+            <DashboardHeader />
+            <Outlet />
+          </div>
         </motion.div>
+
+        {/* Mobile bottom tabs */}
+        <DashboardMobileTabs />
       </div>
     </DashboardLayoutProvider>
   );

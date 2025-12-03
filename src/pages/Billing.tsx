@@ -47,7 +47,7 @@ import {
 import DashboardSidebar from "@/components/DashboardSidebar";
 import MobileSidebar from "@/components/MobileSidebar";
 import { useDashboardLayout } from "@/contexts/DashboardLayoutContext";
-import DashboardSkeleton from "@/components/DashboardSkeleton";
+import { PageSkeleton } from "@/components/skeletons";
 
 interface BillingData {
   subscription?: {
@@ -250,6 +250,17 @@ const Billing = () => {
       controller.abort(); // Cancel any ongoing requests
     };
   }, []); // Empty dependency array ensures this runs only once
+
+  // Page-level loading skeleton matching billing layout
+  if (isLoading) {
+    return (
+      <PageSkeleton
+        variant="analytics"
+        showSidebar={!inLayout}
+        showHeader={false}
+      />
+    );
+  }
 
   const handlePlanChange = async (planId: string) => {
     try {
@@ -456,7 +467,7 @@ const Billing = () => {
   const trialActive = isStarter && trialDaysLeft > 0;
 
   return (
-    <div className="min-h-screen flex w-full bg-gradient-to-br from-gray-900 via-purple-900/20 to-blue-900/20 relative overflow-hidden">
+    <div className="min-h-screen flex w-full bg-gradient-to-br from-background via-[#F0F2F5] to-[#E8EBF1] dark:from-gray-900 dark:via-purple-900/20 dark:to-blue-900/20 relative overflow-hidden">
       {/* Animated Background Elements */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <motion.div
@@ -499,9 +510,9 @@ const Billing = () => {
           />
           <button
             onClick={handleToggleMobileMenu}
-            className="fixed top-4 right-4 z-50 p-2 rounded-lg bg-black/20 backdrop-blur-xl border border-white/10 md:hidden"
+            className="fixed top-4 right-4 z-50 flex h-9 w-9 items-center justify-center rounded-full border border-border bg-card/95 text-muted-foreground shadow-soft-elevated backdrop-blur-xl md:hidden dark:bg-black/20 dark:border-white/10 dark:text-white"
           >
-            <Menu className="w-5 h-5 text-white" />
+            <Menu className="w-5 h-5" />
           </button>
         </>
       )}
@@ -524,13 +535,6 @@ const Billing = () => {
         transition={{ duration: 0.3, ease: "easeInOut" }}
         className="flex-1 p-2 sm:p-4 lg:p-8 relative z-10 overflow-x-hidden md:overflow-x-visible"
       >
-        {isLoading ? (
-          <DashboardSkeleton
-            variant="user"
-            showSidebar={!inLayout}
-            showCharts={false}
-          />
-        ) : (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -547,18 +551,18 @@ const Billing = () => {
                   exit={{ opacity: 0, y: -20 }}
                   className="relative"
                 >
-                  <div className="absolute inset-0 bg-gradient-to-r from-green-600/20 to-emerald-600/20 rounded-3xl blur-xl opacity-60" />
-                  <div className="relative bg-gradient-to-r from-green-600/10 to-emerald-600/10 backdrop-blur-xl rounded-3xl p-6 border border-green-500/30 mb-6">
+                  <div className="absolute inset-0 rounded-3xl bg-gradient-to-r from-emerald-500/10 to-green-500/10 blur-xl opacity-80 dark:from-green-600/20 dark:to-emerald-600/20" />
+                  <div className="relative mb-6 rounded-3xl border border-emerald-500/40 bg-gradient-to-r from-emerald-500/10 to-green-500/10 p-6 backdrop-blur-xl">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center space-x-4">
-                        <div className="w-12 h-12 bg-gradient-to-r from-green-600 to-emerald-600 rounded-full flex items-center justify-center">
+                        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-r from-green-500 to-emerald-500 shadow-sm shadow-emerald-500/40">
                           <CheckCircle className="w-6 h-6 text-white" />
                         </div>
                         <div>
-                          <h3 className="text-xl font-bold text-white">
+                          <h3 className="text-xl font-bold text-foreground dark:text-white">
                             Payment Successful!
                           </h3>
-                          <p className="text-green-200">
+                          <p className="text-sm text-emerald-800 dark:text-green-200">
                             Your subscription has been activated and is now
                             processing.
                           </p>
@@ -570,7 +574,7 @@ const Billing = () => {
                         onClick={() =>
                           navigate("/dashboard/billing", { replace: true })
                         }
-                        className="text-green-200 hover:text-white"
+                        className="text-sm text-emerald-800 underline-offset-2 hover:underline dark:text-green-200 dark:hover:text-white"
                       >
                         <X className="w-4 h-4" />
                       </Button>
@@ -582,8 +586,8 @@ const Billing = () => {
 
             {/* Header */}
             <div className="relative">
-              <div className="absolute inset-0 bg-gradient-to-r from-purple-600/10 to-blue-600/10 rounded-3xl blur-xl opacity-60" />
-              <div className="relative bg-black/20 backdrop-blur-xl rounded-3xl p-6 border border-white/10">
+              <div className="absolute inset-0 rounded-3xl bg-gradient-to-r from-[#3A5AFE0A] via-[#8B5CF60A] to-transparent blur-xl opacity-80 dark:from-purple-600/10 dark:to-blue-600/10" />
+              <div className="relative rounded-3xl border border-border bg-card shadow-soft-elevated backdrop-blur-xl p-6 dark:bg-black/20 dark:border-white/10">
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                   <div>
                     <motion.div
@@ -608,7 +612,7 @@ const Billing = () => {
                       </span>
                     </motion.div>
                     <motion.h1
-                      className="text-3xl lg:text-4xl font-bold bg-gradient-to-r from-white via-purple-200 to-blue-200 bg-clip-text text-transparent mb-3"
+                      className="mb-3 text-3xl font-bold text-foreground dark:bg-gradient-to-r dark:from-white dark:via-purple-200 dark:to-blue-200 dark:bg-clip-text dark:text-transparent lg:text-4xl"
                       initial={{ opacity: 0, x: -20 }}
                       animate={{ opacity: 1, x: 0 }}
                       transition={{ delay: 0.3 }}
@@ -616,7 +620,7 @@ const Billing = () => {
                       Subscription Management
                     </motion.h1>
                     <motion.p
-                      className="text-gray-400 text-lg"
+                      className="text-lg text-muted-foreground dark:text-gray-400"
                       initial={{ opacity: 0, x: -20 }}
                       animate={{ opacity: 1, x: 0 }}
                       transition={{ delay: 0.4 }}
@@ -653,10 +657,10 @@ const Billing = () => {
               >
                 {/* Current Subscription */}
                 <div className="relative">
-                  <div className="absolute inset-0 bg-gradient-to-r from-purple-600/10 to-blue-600/10 rounded-3xl blur-xl opacity-60" />
-                  <Card className="relative bg-black/20 backdrop-blur-xl border-white/10">
+                  <div className="absolute inset-0 rounded-3xl bg-gradient-to-r from-[#3A5AFE0A] via-[#8B5CF60A] to-transparent blur-xl opacity-80 dark:from-purple-600/10 dark:to-blue-600/10" />
+                  <Card className="relative rounded-3xl border border-border bg-card text-foreground shadow-soft-elevated backdrop-blur-xl dark:bg-black/20 dark:border-white/10">
                     <CardHeader>
-                      <CardTitle className="text-white flex items-center space-x-2">
+                      <CardTitle className="flex items-center space-x-2 text-foreground dark:text-white">
                         <Crown className="w-5 h-5 text-yellow-400" />
                         <span>Current Subscription</span>
                         <Badge className="bg-green-600/20 text-green-400 border-green-500/30">
@@ -665,21 +669,21 @@ const Billing = () => {
                       </CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-6">
-                      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+                      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                         <div>
-                          <h3 className="text-2xl font-bold text-white mb-2">
+                          <h3 className="mb-2 text-2xl font-bold text-foreground dark:text-white">
                             {currentSubscription.plan} Plan
                           </h3>
-                          <p className="text-gray-400">
-                            <span className="text-white font-semibold">
+                          <p className="text-muted-foreground dark:text-gray-400">
+                            <span className="font-semibold text-foreground dark:text-white">
                               £{currentSubscription.amount}/month
                             </span>{" "}
                             • Next billing in{" "}
-                            <span className="text-blue-400">
+                            <span className="text-blue-500 dark:text-blue-400">
                               {currentSubscription.daysLeft} days
                             </span>
                           </p>
-                          <p className="text-gray-500 text-sm mt-1">
+                          <p className="mt-1 text-sm text-muted-foreground/80 dark:text-gray-500">
                             Billing date: {currentSubscription.nextBilling}
                           </p>
                         </div>
@@ -697,7 +701,7 @@ const Billing = () => {
                                 }
                               }}
                               variant="outline"
-                              className="border-white/10 text-gray-300 hover:bg-white/10 hover:text-white hover:border-white/30"
+                              className="border-border text-muted-foreground hover:bg-muted hover:text-foreground dark:border-white/10 dark:text-gray-300 dark:hover:bg-white/10 dark:hover:text-white dark:hover:border-white/30"
                             >
                               Change Plan
                             </Button>
@@ -718,36 +722,36 @@ const Billing = () => {
                       </div>
 
                       {/* Usage Stats */}
-                      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 p-4 rounded-xl bg-white/5 border border-white/10">
+                      <div className="grid grid-cols-2 gap-4 rounded-xl border border-border bg-card/80 p-4 dark:bg-white/5 dark:border-white/10 lg:grid-cols-4">
                         <div className="text-center">
-                          <div className="text-2xl font-bold text-white">
+                          <div className="text-2xl font-bold text-foreground dark:text-white">
                             {usageStats.uploadsThisMonth.toLocaleString()}
                           </div>
-                          <div className="text-gray-400 text-sm">
+                          <div className="text-sm text-muted-foreground dark:text-gray-400">
                             Uploads this month
                           </div>
                         </div>
                         <div className="text-center">
-                          <div className="text-2xl font-bold text-blue-400">
+                          <div className="text-2xl font-bold text-blue-500 dark:text-blue-400">
                             {usageStats.accuracyRate}%
                           </div>
-                          <div className="text-gray-400 text-sm">
+                          <div className="text-sm text-muted-foreground dark:text-gray-400">
                             Accuracy rate
                           </div>
                         </div>
                         <div className="text-center">
-                          <div className="text-2xl font-bold text-green-400">
+                          <div className="text-2xl font-bold text-emerald-500 dark:text-green-400">
                             {usageStats.avgProcessingTime}
                           </div>
-                          <div className="text-gray-400 text-sm">
+                          <div className="text-sm text-muted-foreground dark:text-gray-400">
                             Avg processing
                           </div>
                         </div>
                         <div className="text-center">
-                          <div className="text-2xl font-bold text-purple-400">
+                          <div className="text-2xl font-bold text-purple-500 dark:text-purple-400">
                             ∞
                           </div>
-                          <div className="text-gray-400 text-sm">
+                          <div className="text-sm text-muted-foreground dark:text-gray-400">
                             Upload limit
                           </div>
                         </div>
@@ -759,10 +763,10 @@ const Billing = () => {
                 {/* Pricing Plans */}
                 <div id="plans-section" />
                 <div className="relative">
-                  <div className="absolute inset-0 bg-gradient-to-r from-indigo-600/10 to-purple-600/10 rounded-3xl blur-xl opacity-60" />
-                  <Card className="relative bg-black/20 backdrop-blur-xl border-white/10">
+                  <div className="absolute inset-0 rounded-3xl bg-gradient-to-r from-[#6366F11A] via-[#8B5CF61A] to-transparent blur-xl opacity-80 dark:from-indigo-600/10 dark:to-purple-600/10" />
+                  <Card className="relative rounded-3xl border border-border bg-card text-foreground shadow-soft-elevated backdrop-blur-xl dark:bg-black/20 dark:border-white/10">
                     <CardHeader>
-                      <CardTitle className="text-white">
+                      <CardTitle className="text-foreground dark:text-white">
                         Available Plans
                       </CardTitle>
                       <CardDescription className="text-gray-400">
@@ -804,43 +808,43 @@ const Billing = () => {
                               </div>
                             )}
 
-                            <div className="flex items-start justify-between mb-4">
+                            <div className="mb-4 flex items-start justify-between">
                               <div className="flex items-center space-x-3">
                                 <div
-                                  className={`w-12 h-12 rounded-xl flex items-center justify-center bg-gradient-to-r ${plan.color}`}
+                                  className={`flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-r ${plan.color} shadow-sm shadow-black/10`}
                                 >
-                                  <plan.icon className="w-6 h-6 text-white" />
+                                  <plan.icon className="h-6 w-6 text-white" />
                                 </div>
                                 <div>
-                                  <h3 className="text-xl font-bold text-white">
+                                  <h3 className="text-xl font-bold text-foreground dark:text-white">
                                     {plan.name}
                                   </h3>
-                                  <p className="text-gray-400 text-sm">
+                                  <p className="text-sm text-muted-foreground dark:text-gray-400">
                                     {plan.description}
                                   </p>
                                 </div>
                               </div>
                               <div className="text-right">
-                                <div className="text-3xl font-bold text-white">
+                                <div className="text-3xl font-bold text-foreground dark:text-white">
                                   £{plan.price}
-                                  <span className="text-lg text-gray-400 font-normal">
+                                  <span className="text-lg font-normal text-muted-foreground dark:text-gray-400">
                                     /{plan.period}
                                   </span>
                                 </div>
-                                <div className="text-gray-400 text-sm">
+                                <div className="text-sm text-muted-foreground dark:text-gray-400">
                                   {plan.limit}
                                 </div>
                               </div>
                             </div>
 
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-6">
+                            <div className="mb-6 grid grid-cols-1 gap-3 md:grid-cols-2">
                               {plan.features.map((feature, featureIndex) => (
                                 <div
                                   key={featureIndex}
                                   className="flex items-center space-x-2 text-sm"
                                 >
-                                  <Check className="w-4 h-4 text-green-400 flex-shrink-0" />
-                                  <span className="text-gray-300">
+                                  <Check className="h-4 w-4 flex-shrink-0 text-emerald-500 dark:text-green-400" />
+                                  <span className="text-muted-foreground dark:text-gray-300">
                                     {feature}
                                   </span>
                                 </div>
@@ -856,12 +860,12 @@ const Billing = () => {
                                   currentPlan !== plan.id &&
                                   handlePlanChange(plan.id)
                                 }
-                                className={`w-full h-12 ${
+                                className={`h-12 w-full ${
                                   currentPlan === plan.id
-                                    ? "bg-gray-600/50 text-gray-400 cursor-not-allowed"
+                                    ? "cursor-not-allowed bg-muted text-muted-foreground dark:bg-gray-600/50 dark:text-gray-400"
                                     : plan.popular
                                     ? "bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 shadow-lg shadow-purple-500/25"
-                                    : "bg-white/10 hover:bg-white/20 text-white border border-white/20 hover:border-white/30"
+                                    : "border border-border bg-card text-foreground hover:bg-muted dark:bg-white/10 dark:text-white dark:border-white/20 dark:hover:bg-white/20 dark:hover:border-white/30"
                                 }`}
                                 disabled={currentPlan === plan.id}
                               >
@@ -898,14 +902,14 @@ const Billing = () => {
                 transition={{ delay: 0.6 }}
                 className="relative"
               >
-                <div className="absolute inset-0 bg-gradient-to-r from-blue-600/10 to-green-600/10 rounded-3xl blur-xl opacity-60" />
-                <Card className="relative bg-black/20 backdrop-blur-xl border-white/10">
+                <div className="absolute inset-0 rounded-3xl bg-gradient-to-r from-[#0EA5E91A] via-[#22C55E1A] to-transparent blur-xl opacity-80 dark:from-blue-600/10 dark:to-green-600/10" />
+                <Card className="relative rounded-3xl border border-border bg-card text-foreground shadow-soft-elevated backdrop-blur-xl dark:bg-black/20 dark:border-white/10">
                   <CardHeader>
-                    <CardTitle className="text-white flex items-center space-x-2">
-                      <Receipt className="w-5 h-5 text-blue-400" />
+                    <CardTitle className="flex items-center space-x-2 text-foreground dark:text-white">
+                      <Receipt className="w-5 h-5 text-sky-500" />
                       <span>Billing History</span>
                     </CardTitle>
-                    <CardDescription className="text-gray-400">
+                    <CardDescription className="text-muted-foreground dark:text-gray-400">
                       Your recent transactions
                     </CardDescription>
                   </CardHeader>
@@ -918,29 +922,29 @@ const Billing = () => {
                             initial={{ opacity: 0, y: 20 }}
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ delay: 0.8 + index * 0.1 }}
-                            className="p-4 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-all duration-300"
+                            className="rounded-xl border border-border bg-card p-4 transition-all duration-300 hover:border-[#C7D2FE] hover:bg-[#F9FAFB] dark:bg-white/5 dark:border-white/10 dark:hover:bg-white/10"
                           >
                             <div className="flex items-start justify-between mb-2">
                               <div className="flex-1">
-                                <div className="text-white font-medium text-sm">
+                                <div className="text-sm font-medium text-foreground dark:text-white">
                                   {item.description}
                                 </div>
-                                <div className="text-gray-400 text-xs">
+                                <div className="text-xs text-muted-foreground dark:text-gray-400">
                                   {item.date}
                                 </div>
-                                <div className="text-gray-500 text-xs">
+                                <div className="text-xs text-muted-foreground/80 dark:text-gray-500">
                                   {item.invoice}
                                 </div>
                               </div>
                               <div className="text-right">
-                                <div className="text-white font-bold">
+                                <div className="font-bold text-foreground dark:text-white">
                                   {item.currency}{" "}
                                   {Number(item.amount).toFixed(2)}
                                 </div>
                                 <Badge
                                   className={`${getStatusColor(
                                     item.status
-                                  )} text-xs mt-1`}
+                                  )} mt-1 text-xs`}
                                 >
                                   <div className="flex items-center space-x-1">
                                     {getStatusIcon(item.status)}
@@ -954,7 +958,7 @@ const Billing = () => {
                                 href={item.invoice}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="text-blue-400 text-xs underline"
+                                className="text-xs text-blue-500 underline dark:text-blue-400"
                               >
                                 View invoice
                               </a>
@@ -962,10 +966,12 @@ const Billing = () => {
                           </motion.div>
                         ))
                       ) : (
-                        <div className="text-center py-8">
-                          <Receipt className="w-12 h-12 text-gray-400 mx-auto mb-3" />
-                          <p className="text-gray-400">No invoices yet</p>
-                          <p className="text-gray-500 text-sm">
+                        <div className="py-8 text-center">
+                          <Receipt className="mx-auto mb-3 h-12 w-12 text-muted-foreground dark:text-gray-400" />
+                          <p className="text-muted-foreground dark:text-gray-400">
+                            No invoices yet
+                          </p>
+                          <p className="text-sm text-muted-foreground/80 dark:text-gray-500">
                             Your billing history will appear here
                           </p>
                         </div>

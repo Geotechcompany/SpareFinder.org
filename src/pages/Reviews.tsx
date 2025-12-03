@@ -209,14 +209,14 @@ const Reviews = () => {
 
   if (authLoading) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-900">
-        <div className="text-white">Loading...</div>
+      <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-background via-[#F0F2F5] to-[#E8EBF1] dark:from-gray-900 dark:via-black dark:to-gray-900">
+        <div className="text-foreground dark:text-white">Loading...</div>
       </div>
     );
   }
 
   return (
-    <div className="flex min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-900">
+    <div className="flex min-h-screen bg-gradient-to-br from-background via-[#F0F2F5] to-[#E8EBF1] dark:from-gray-900 dark:via-black dark:to-gray-900">
       {/* Sidebar */}
       {!inLayout && (
         <DashboardSidebar
@@ -243,12 +243,12 @@ const Reviews = () => {
           {/* Mobile Menu Button */}
           {!inLayout && (
             <Button
-              variant="ghost"
-              size="sm"
-              className="md:hidden mb-4 text-white"
+              variant="outline"
+              size="icon"
+              className="mb-4 flex h-9 w-9 items-center justify-center rounded-full border border-border bg-card/95 text-muted-foreground shadow-soft-elevated backdrop-blur-xl md:hidden dark:bg-black/20 dark:border-white/10 dark:text-white"
               onClick={() => setIsMobileMenuOpen(true)}
             >
-              <Menu className="w-6 h-6" />
+              <Menu className="w-5 h-5" />
             </Button>
           )}
 
@@ -258,10 +258,10 @@ const Reviews = () => {
             animate={{ opacity: 1, y: 0 }}
             className="mb-8"
           >
-            <h1 className="text-3xl md:text-4xl font-bold text-white mb-2">
+            <h1 className="text-3xl md:text-4xl font-bold text-foreground mb-2">
               My Reviews
             </h1>
-            <p className="text-gray-400">
+            <p className="text-muted-foreground">
               View and manage your analysis feedback
             </p>
           </motion.div>
@@ -273,12 +273,14 @@ const Reviews = () => {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.1 }}
             >
-              <Card className="bg-black/20 backdrop-blur-xl border-white/10">
+              <Card className="border border-border bg-card shadow-soft-elevated backdrop-blur-xl dark:bg-black/30 dark:border-white/10">
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-gray-400 text-sm">Total Reviews</p>
-                      <p className="text-3xl font-bold text-white mt-1">
+                      <p className="text-sm text-muted-foreground">
+                        Total Reviews
+                      </p>
+                      <p className="text-3xl font-bold text-foreground dark:text-white mt-1">
                         {stats.totalReviews}
                       </p>
                     </div>
@@ -293,12 +295,14 @@ const Reviews = () => {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.2 }}
             >
-              <Card className="bg-black/20 backdrop-blur-xl border-white/10">
+              <Card className="border border-border bg-card shadow-soft-elevated backdrop-blur-xl dark:bg-black/30 dark:border-white/10">
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-gray-400 text-sm">Average Rating</p>
-                      <p className="text-3xl font-bold text-white mt-1">
+                      <p className="text-sm text-muted-foreground">
+                        Average Rating
+                      </p>
+                      <p className="text-3xl font-bold text-foreground dark:text-white mt-1">
                         {stats.averageRating.toFixed(1)}
                         <span className="text-yellow-400 text-xl ml-1">★</span>
                       </p>
@@ -314,12 +318,14 @@ const Reviews = () => {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.3 }}
             >
-              <Card className="bg-black/20 backdrop-blur-xl border-white/10">
+              <Card className="border border-border bg-card shadow-soft-elevated backdrop-blur-xl dark:bg-black/30 dark:border-white/10">
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-gray-400 text-sm">5-Star Reviews</p>
-                      <p className="text-3xl font-bold text-white mt-1">
+                      <p className="text-sm text-muted-foreground">
+                        5-Star Reviews
+                      </p>
+                      <p className="text-3xl font-bold text-foreground dark:text-white mt-1">
                         {stats.fiveStarCount}
                       </p>
                     </div>
@@ -334,12 +340,14 @@ const Reviews = () => {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.4 }}
             >
-              <Card className="bg-black/20 backdrop-blur-xl border-white/10">
+              <Card className="border border-border bg-card shadow-soft-elevated backdrop-blur-xl dark:bg-black/30 dark:border-white/10">
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-gray-400 text-sm">This Week</p>
-                      <p className="text-3xl font-bold text-white mt-1">
+                      <p className="text-sm text-muted-foreground">
+                        This Week
+                      </p>
+                      <p className="text-3xl font-bold text-foreground dark:text-white mt-1">
                         {stats.recentCount}
                       </p>
                     </div>
@@ -351,27 +359,27 @@ const Reviews = () => {
           </div>
 
           {/* Filters */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.5 }}
-            className="mb-6"
-          >
-            <Card className="bg-black/20 backdrop-blur-xl border-white/10">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.5 }}
+              className="mb-6"
+            >
+              <Card className="border border-border bg-card shadow-soft-elevated backdrop-blur-xl dark:bg-black/30 dark:border-white/10">
               <CardContent className="p-6">
                 <div className="flex flex-col md:flex-row gap-4">
                   <div className="flex-1">
-                    <label className="text-sm text-gray-400 mb-2 block">
+                    <label className="mb-2 block text-sm text-muted-foreground">
                       Filter by Rating
                     </label>
                     <Select
                       value={filterRating}
                       onValueChange={setFilterRating}
                     >
-                      <SelectTrigger className="bg-white/5 border-white/10 text-white">
+                      <SelectTrigger className="border-border bg-card text-foreground dark:bg-white/5 dark:border-white/10 dark:text-white">
                         <SelectValue />
                       </SelectTrigger>
-                      <SelectContent className="bg-black/95 border-white/10">
+                      <SelectContent className="border-border bg-card text-foreground dark:bg-black/95 dark:border-white/10 dark:text-white">
                         <SelectItem value="all">All Ratings</SelectItem>
                         <SelectItem value="5">5 Stars</SelectItem>
                         <SelectItem value="4">4 Stars</SelectItem>
@@ -383,14 +391,14 @@ const Reviews = () => {
                   </div>
 
                   <div className="flex-1">
-                    <label className="text-sm text-gray-400 mb-2 block">
+                    <label className="mb-2 block text-sm text-muted-foreground">
                       Filter by Type
                     </label>
                     <Select value={filterType} onValueChange={setFilterType}>
-                      <SelectTrigger className="bg-white/5 border-white/10 text-white">
+                      <SelectTrigger className="border-border bg-card text-foreground dark:bg-white/5 dark:border-white/10 dark:text-white">
                         <SelectValue />
                       </SelectTrigger>
-                      <SelectContent className="bg-black/95 border-white/10">
+                      <SelectContent className="border-border bg-card text-foreground dark:bg-black/95 dark:border-white/10 dark:text-white">
                         <SelectItem value="all">All Types</SelectItem>
                         <SelectItem value="image">Image Analysis</SelectItem>
                         <SelectItem value="keyword">Keyword Search</SelectItem>
@@ -409,10 +417,12 @@ const Reviews = () => {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.6 }}
           >
-            <Card className="bg-black/20 backdrop-blur-xl border-white/10">
+            <Card className="border border-border bg-card text-foreground shadow-soft-elevated backdrop-blur-xl dark:bg-black/20 dark:border-white/10">
               <CardHeader>
-                <CardTitle className="text-white">Your Reviews</CardTitle>
-                <CardDescription className="text-gray-400">
+                <CardTitle className="text-foreground dark:text-white">
+                  Your Reviews
+                </CardTitle>
+                <CardDescription className="text-muted-foreground dark:text-gray-400">
                   {filteredReviews.length} review(s) found
                 </CardDescription>
               </CardHeader>
@@ -420,14 +430,19 @@ const Reviews = () => {
                 {isLoading ? (
                   <div className="space-y-4">
                     {[1, 2, 3].map((i) => (
-                      <Skeleton key={i} className="h-32 bg-white/5" />
+                      <Skeleton
+                        key={i}
+                        className="h-32 rounded-xl bg-muted/60 dark:bg-white/5"
+                      />
                     ))}
                   </div>
                 ) : filteredReviews.length === 0 ? (
-                  <div className="text-center py-12">
-                    <MessageSquare className="w-16 h-16 text-gray-600 mx-auto mb-4" />
-                    <p className="text-gray-400 text-lg mb-2">No reviews yet</p>
-                    <p className="text-gray-500 text-sm">
+                  <div className="py-12 text-center">
+                    <MessageSquare className="mx-auto mb-4 h-16 w-16 text-muted-foreground dark:text-gray-600" />
+                    <p className="mb-2 text-lg text-muted-foreground dark:text-gray-400">
+                      No reviews yet
+                    </p>
+                    <p className="text-sm text-muted-foreground/80 dark:text-gray-500">
                       Complete an analysis and share your feedback!
                     </p>
                   </div>
@@ -440,24 +455,24 @@ const Reviews = () => {
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: index * 0.1 }}
                       >
-                        <Card className="bg-white/5 border-white/10 hover:bg-white/10 transition-all">
+                        <Card className="border border-border bg-card transition-all hover:border-[#C7D2FE] hover:bg-[#F9FAFB] dark:bg-white/5 dark:border-white/10 dark:hover:bg-white/10">
                           <CardContent className="p-6">
                             <div className="flex items-start justify-between mb-4">
                               <div className="flex-1">
-                                <div className="flex items-center space-x-3 mb-2">
+                                <div className="mb-2 flex items-center space-x-3">
                                   {renderStars(review.rating)}
-                                  <Badge className="bg-purple-600/20 text-purple-400 border-purple-500/30">
+                                  <Badge className="border border-purple-200 bg-purple-50 text-purple-700 dark:bg-purple-600/20 dark:text-purple-400 dark:border-purple-500/30">
                                     {review.job_type}
                                   </Badge>
                                   {review.feedback_type && (
-                                    <Badge className="bg-blue-600/20 text-blue-400 border-blue-500/30">
+                                    <Badge className="border border-sky-200 bg-sky-50 text-sky-700 dark:bg-blue-600/20 dark:text-blue-400 dark:border-blue-500/30">
                                       {getFeedbackIcon(review.feedback_type)}{" "}
                                       {review.feedback_type}
                                     </Badge>
                                   )}
                                 </div>
-                                <p className="text-gray-400 text-sm flex items-center">
-                                  <Calendar className="w-4 h-4 mr-2" />
+                                <p className="flex items-center text-sm text-muted-foreground dark:text-gray-400">
+                                  <Calendar className="mr-2 h-4 w-4" />
                                   {format(new Date(review.created_at), "PPP")}
                                 </p>
                               </div>
@@ -465,29 +480,31 @@ const Reviews = () => {
                                 variant="ghost"
                                 size="sm"
                                 onClick={() => handleDelete(review.id)}
-                                className="text-red-400 hover:text-red-300 hover:bg-red-600/10"
+                                className="text-red-500 hover:text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:text-red-300 dark:hover:bg-red-600/10"
                               >
-                                <Trash2 className="w-4 h-4" />
+                                <Trash2 className="h-4 w-4" />
                               </Button>
                             </div>
 
                             {review.comment && (
                               <div className="mb-4">
-                                <p className="text-white">{review.comment}</p>
+                                <p className="text-sm text-foreground dark:text-white">
+                                  {review.comment}
+                                </p>
                               </div>
                             )}
 
                             {review.helpful_features &&
                               review.helpful_features.length > 0 && (
                                 <div className="mb-4">
-                                  <p className="text-sm text-gray-400 mb-2">
+                                  <p className="mb-2 text-sm text-muted-foreground dark:text-gray-400">
                                     Helpful Features:
                                   </p>
                                   <div className="flex flex-wrap gap-2">
                                     {review.helpful_features.map((feature) => (
                                       <Badge
                                         key={feature}
-                                        className="bg-green-600/20 text-green-400 border-green-500/30"
+                                        className="border border-emerald-200 bg-emerald-50 text-emerald-700 dark:bg-green-600/20 dark:text-green-400 dark:border-green-500/30"
                                       >
                                         {feature}
                                       </Badge>
@@ -497,11 +514,11 @@ const Reviews = () => {
                               )}
 
                             {review.improvement_suggestions && (
-                              <div className="border-t border-white/10 pt-4">
-                                <p className="text-sm text-gray-400 mb-2">
+                              <div className="border-t border-border pt-4 dark:border-white/10">
+                                <p className="mb-2 text-sm text-muted-foreground dark:text-gray-400">
                                   Suggestions:
                                 </p>
-                                <p className="text-gray-300 text-sm">
+                                <p className="text-sm text-muted-foreground dark:text-gray-300">
                                   {review.improvement_suggestions}
                                 </p>
                               </div>

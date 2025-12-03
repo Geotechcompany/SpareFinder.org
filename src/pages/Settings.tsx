@@ -41,7 +41,8 @@ import {
 import DashboardSidebar from "@/components/DashboardSidebar";
 import MobileSidebar from "@/components/MobileSidebar";
 import { useDashboardLayout } from "@/contexts/DashboardLayoutContext";
-import DashboardSkeleton from "@/components/DashboardSkeleton";
+import { PageSkeleton } from "@/components/skeletons";
+import { useTheme } from "@/contexts/ThemeContext";
 
 // Define a type for API response
 interface ApiResponse {
@@ -124,6 +125,7 @@ const Settings = () => {
 
   const { toast } = useToast();
   const { user, logout } = useAuth(); // Get Google profile data from auth context
+  const { setTheme } = useTheme();
 
   useEffect(() => {
     fetchUserProfile();
@@ -180,6 +182,11 @@ const Settings = () => {
             analytics: prefs.analytics ?? true,
             marketing: prefs.marketing ?? false,
           });
+
+          // Sync UI theme with stored preference when available
+          if (typeof prefs.darkMode === "boolean") {
+            setTheme(prefs.darkMode ? "dark" : "light");
+          }
         }
       } catch (settingsError) {
         console.log("Settings not found, using defaults");
@@ -205,6 +212,11 @@ const Settings = () => {
 
   const handlePreferenceChange = (field: string, value: boolean) => {
     setPreferences((prev) => ({ ...prev, [field]: value }));
+
+    // Immediately reflect dark-mode preference in the UI theme
+    if (field === "darkMode") {
+      setTheme(value ? "dark" : "light");
+    }
   };
 
   const handleSave = async () => {
@@ -556,10 +568,10 @@ const Settings = () => {
   // Show loading state
   if (isLoading) {
     return (
-      <DashboardSkeleton
-        variant="user"
+      <PageSkeleton
+        variant="settings"
         showSidebar={!inLayout}
-        showCharts={false}
+        showHeader={false}
       />
     );
   }
@@ -567,7 +579,7 @@ const Settings = () => {
   // Show error state
   if (error) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-900 via-purple-900/20 to-blue-900/20">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-[#F0F2F5] to-[#E8EBF1] dark:from-gray-900 dark:via-purple-900/20 dark:to-blue-900/20">
         <div className="text-center">
           <AlertCircle className="w-10 h-10 text-red-500 mx-auto mb-4" />
           <p className="text-gray-400 mb-4">{error}</p>
@@ -580,7 +592,7 @@ const Settings = () => {
   }
 
   return (
-    <div className="min-h-screen flex w-full bg-gradient-to-br from-gray-900 via-purple-900/20 to-blue-900/20 relative overflow-hidden">
+    <div className="min-h-screen flex w-full bg-gradient-to-br from-background via-[#F0F2F5] to-[#E8EBF1] dark:from-gray-900 dark:via-purple-900/20 dark:to-blue-900/20 relative overflow-hidden">
       {/* Animated Background Elements */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <motion.div
@@ -623,9 +635,9 @@ const Settings = () => {
           />
           <button
             onClick={handleToggleMobileMenu}
-            className="fixed top-4 right-4 z-50 p-2 rounded-lg bg-black/20 backdrop-blur-xl border border-white/10 md:hidden"
+            className="fixed top-4 right-4 z-50 flex h-9 w-9 items-center justify-center rounded-full border border-border bg-card/95 text-muted-foreground shadow-soft-elevated backdrop-blur-xl md:hidden dark:bg-black/20 dark:border-white/10 dark:text-white"
           >
-            <Menu className="w-5 h-5 text-white" />
+            <Menu className="w-5 h-5" />
           </button>
         </>
       )}
@@ -656,8 +668,8 @@ const Settings = () => {
         >
           {/* Header */}
           <div className="relative">
-            <div className="absolute inset-0 bg-gradient-to-r from-purple-600/10 to-blue-600/10 rounded-2xl sm:rounded-3xl blur-xl opacity-60" />
-            <div className="relative bg-black/20 backdrop-blur-xl rounded-2xl sm:rounded-3xl p-4 sm:p-6 border border-white/10">
+            <div className="absolute inset-0 rounded-2xl sm:rounded-3xl bg-gradient-to-r from-[#3A5AFE0A] via-[#8B5CF60A] to-transparent blur-xl opacity-80 dark:from-purple-600/10 dark:to-blue-600/10" />
+            <div className="relative rounded-2xl sm:rounded-3xl border border-border bg-card shadow-soft-elevated backdrop-blur-xl p-4 sm:p-6 dark:bg-black/20 dark:border-white/10">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
                 <div>
                   <motion.div
@@ -682,7 +694,7 @@ const Settings = () => {
                     </span>
                   </motion.div>
                   <motion.h1
-                    className="text-3xl lg:text-4xl font-bold bg-gradient-to-r from-white via-purple-200 to-blue-200 bg-clip-text text-transparent mb-3"
+                    className="mb-3 text-3xl font-bold text-foreground dark:bg-gradient-to-r dark:from-white dark:via-purple-200 dark:to-blue-200 dark:bg-clip-text dark:text-transparent lg:text-4xl"
                     initial={{ opacity: 0, x: -20 }}
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: 0.3 }}
@@ -690,7 +702,7 @@ const Settings = () => {
                     Settings & Preferences
                   </motion.h1>
                   <motion.p
-                    className="text-gray-400 text-lg"
+                    className="text-lg text-muted-foreground dark:text-gray-400"
                     initial={{ opacity: 0, x: -20 }}
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: 0.4 }}
@@ -737,17 +749,17 @@ const Settings = () => {
             transition={{ delay: 0.6 }}
             className="relative"
           >
-            <div className="absolute inset-0 bg-gradient-to-r from-indigo-600/10 to-purple-600/10 rounded-2xl sm:rounded-3xl blur-xl opacity-60" />
-            <div className="relative bg-black/20 backdrop-blur-xl rounded-2xl sm:rounded-3xl p-2 border border-white/10 overflow-x-auto">
+            <div className="absolute inset-0 rounded-2xl sm:rounded-3xl bg-gradient-to-r from-[#6366F11A] via-[#8B5CF61A] to-transparent blur-xl opacity-80 dark:from-indigo-600/10 dark:to-purple-600/10" />
+            <div className="relative overflow-x-auto rounded-2xl border border-border bg-card/95 p-2 backdrop-blur-xl shadow-soft-elevated sm:rounded-3xl dark:bg-black/20 dark:border-white/10">
               <div className="flex flex-nowrap min-w-max sm:min-w-0 sm:flex-wrap gap-2">
                 {tabs.map((tab, index) => (
                   <motion.button
                     key={tab.id}
                     onClick={() => setActiveTab(tab.id)}
-                    className={`relative flex items-center space-x-2 px-4 sm:px-6 py-3 rounded-2xl transition-all duration-300 whitespace-nowrap ${
+                    className={`relative flex items-center space-x-2 whitespace-nowrap rounded-2xl px-4 py-3 text-sm transition-all duration-300 sm:px-6 ${
                       activeTab === tab.id
-                        ? "text-white"
-                        : "text-gray-400 hover:text-white hover:bg-white/5"
+                        ? "text-foreground dark:text-white"
+                        : "text-muted-foreground hover:text-foreground hover:bg-muted/40 dark:text-gray-400 dark:hover:text-white dark:hover:bg-white/5"
                     }`}
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
@@ -796,21 +808,24 @@ const Settings = () => {
                 >
                   {/* Personal Information */}
                   <div className="relative">
-                    <div className="absolute inset-0 bg-gradient-to-r from-purple-600/10 to-blue-600/10 rounded-3xl blur-xl opacity-60" />
-                    <Card className="relative bg-black/20 backdrop-blur-xl border-white/10 h-full">
+                    <div className="absolute inset-0 rounded-3xl bg-gradient-to-r from-[#3A5AFE0A] via-[#8B5CF60A] to-transparent blur-xl opacity-80 dark:from-purple-600/10 dark:to-blue-600/10" />
+                    <Card className="relative h-full rounded-3xl border border-border bg-card text-foreground shadow-soft-elevated backdrop-blur-xl dark:bg-black/20 dark:border-white/10">
                       <CardHeader>
-                        <CardTitle className="text-white flex items-center space-x-2">
-                          <User className="w-5 h-5 text-purple-400" />
+                        <CardTitle className="flex items-center space-x-2 text-foreground dark:text-white">
+                          <User className="w-5 h-5 text-[#8B5CF6]" />
                           <span>Personal Information</span>
                         </CardTitle>
-                        <CardDescription className="text-gray-400">
+                        <CardDescription className="text-muted-foreground dark:text-gray-400">
                           Update your personal details
                         </CardDescription>
                       </CardHeader>
                       <CardContent className="space-y-6">
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                           <div className="space-y-2">
-                            <Label htmlFor="username" className="text-gray-200">
+                            <Label
+                              htmlFor="username"
+                              className="text-muted-foreground dark:text-gray-200"
+                            >
                               Username
                             </Label>
                             <Input
@@ -819,14 +834,14 @@ const Settings = () => {
                               onChange={(e) =>
                                 handleInputChange("username", e.target.value)
                               }
-                              className="bg-white/5 border-white/10 text-white placeholder:text-gray-400 focus:border-purple-500/50 focus:ring-purple-500/20 h-12"
+                              className="h-12 border border-border bg-card text-foreground placeholder:text-muted-foreground focus:border-[#C7D2FE] focus:ring-[#C7D2FE33] dark:bg-white/5 dark:border-white/10 dark:text-white dark:placeholder:text-gray-400"
                             />
                           </div>
                           <div className="space-y-2">
                             <div className="flex items-center justify-between">
                               <Label
                                 htmlFor="fullName"
-                                className="text-gray-200"
+                                className="text-muted-foreground dark:text-gray-200"
                               >
                                 Full Name
                               </Label>
@@ -875,7 +890,7 @@ const Settings = () => {
                         <div className="space-y-2">
                           <Label
                             htmlFor="email"
-                            className="text-gray-200 flex items-center space-x-2"
+                            className="flex items-center space-x-2 text-muted-foreground dark:text-gray-200"
                           >
                             <Mail className="w-4 h-4" />
                             <span>Email</span>
@@ -885,9 +900,9 @@ const Settings = () => {
                             type="email"
                             value={formData.email}
                             disabled
-                            className="bg-white/5 border-white/10 text-white placeholder:text-gray-400 focus:border-purple-500/50 focus:ring-purple-500/20 h-12 opacity-70"
+                            className="h-12 border border-border bg-card text-foreground opacity-70 placeholder:text-muted-foreground focus:border-[#C7D2FE] focus:ring-[#C7D2FE33] dark:bg-white/5 dark:border-white/10 dark:text-white dark:placeholder:text-gray-400"
                           />
-                          <p className="text-sm text-gray-400">
+                          <p className="text-sm text-muted-foreground dark:text-gray-400">
                             Email cannot be changed. Contact support if you need
                             to update it.
                           </p>
@@ -896,7 +911,7 @@ const Settings = () => {
                         <div className="space-y-2">
                           <Label
                             htmlFor="avatarUrl"
-                            className="text-gray-200 flex items-center space-x-2"
+                            className="flex items-center space-x-2 text-muted-foreground dark:text-gray-200"
                           >
                             <User className="w-4 h-4" />
                             <span>Avatar URL</span>
@@ -907,7 +922,7 @@ const Settings = () => {
                             onChange={(e) =>
                               handleInputChange("avatar_url", e.target.value)
                             }
-                            className="bg-white/5 border-white/10 text-white placeholder:text-gray-400 focus:border-purple-500/50 focus:ring-purple-500/20 h-12"
+                            className="h-12 border border-border bg-card text-foreground placeholder:text-muted-foreground focus:border-[#C7D2FE] focus:ring-[#C7D2FE33] dark:bg-white/5 dark:border-white/10 dark:text-white dark:placeholder:text-gray-400"
                             placeholder="https://example.com/avatar.jpg"
                           />
                         </div>
@@ -917,14 +932,14 @@ const Settings = () => {
 
                   {/* Account Security */}
                   <div className="relative">
-                    <div className="absolute inset-0 bg-gradient-to-r from-orange-600/10 to-red-600/10 rounded-3xl blur-xl opacity-60" />
-                    <Card className="relative bg-black/20 backdrop-blur-xl border-white/10 h-full">
+                    <div className="absolute inset-0 rounded-3xl bg-gradient-to-r from-[#FDBA7414] to-[#F9731614] blur-xl opacity-80 dark:from-orange-600/10 dark:to-red-600/10" />
+                    <Card className="relative h-full rounded-3xl border border-border bg-card text-foreground shadow-soft-elevated backdrop-blur-xl dark:bg-black/20 dark:border-white/10">
                       <CardHeader>
-                        <CardTitle className="text-white flex items-center space-x-2">
+                        <CardTitle className="flex items-center space-x-2 text-foreground dark:text-white">
                           <Shield className="w-5 h-5 text-orange-400" />
                           <span>Account Security</span>
                         </CardTitle>
-                        <CardDescription className="text-gray-400">
+                        <CardDescription className="text-muted-foreground dark:text-gray-400">
                           Manage your security settings
                         </CardDescription>
                       </CardHeader>
@@ -945,14 +960,14 @@ const Settings = () => {
                   transition={{ duration: 0.3 }}
                 >
                   <div className="relative">
-                    <div className="absolute inset-0 bg-gradient-to-r from-purple-600/10 to-blue-600/10 rounded-3xl blur-xl opacity-60" />
-                    <Card className="relative bg-black/20 backdrop-blur-xl border-white/10">
+                    <div className="absolute inset-0 rounded-3xl bg-gradient-to-r from-[#3A5AFE0A] via-[#8B5CF60A] to-transparent blur-xl opacity-80 dark:from-purple-600/10 dark:to-blue-600/10" />
+                    <Card className="relative rounded-3xl border border-border bg-card text-foreground shadow-soft-elevated backdrop-blur-xl dark:bg-black/20 dark:border-white/10">
                       <CardHeader>
-                        <CardTitle className="text-white flex items-center space-x-2">
-                          <Bell className="w-5 h-5 text-purple-400" />
+                        <CardTitle className="flex items-center space-x-2 text-foreground dark:text-white">
+                          <Bell className="w-5 h-5 text-[#8B5CF6]" />
                           <span>Notification Preferences</span>
                         </CardTitle>
-                        <CardDescription className="text-gray-400">
+                        <CardDescription className="text-muted-foreground dark:text-gray-400">
                           Choose how you want to be notified
                         </CardDescription>
                       </CardHeader>
@@ -996,20 +1011,20 @@ const Settings = () => {
                         ].map((setting) => (
                           <div
                             key={setting.key}
-                            className="p-4 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-colors"
+                            className="p-4 rounded-xl border border-border bg-card transition-colors hover:bg-muted/60 dark:bg-white/5 dark:border-white/10 dark:hover:bg-white/10"
                           >
                             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
                               <div className="flex items-center space-x-4">
                                 <div
-                                  className={`w-12 h-12 bg-gradient-to-r ${setting.color} rounded-xl flex items-center justify-center`}
+                                  className={`flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-r ${setting.color} shadow-sm shadow-black/10`}
                                 >
-                                  <setting.icon className="w-6 h-6 text-white" />
+                                  <setting.icon className="h-6 w-6 text-white" />
                                 </div>
                                 <div>
-                                  <h4 className="text-white font-medium">
+                                  <h4 className="font-medium text-foreground dark:text-white">
                                     {setting.title}
                                   </h4>
-                                  <p className="text-gray-400 text-sm">
+                                  <p className="text-sm text-muted-foreground dark:text-gray-400">
                                     {setting.description}
                                   </p>
                                 </div>
@@ -1043,35 +1058,35 @@ const Settings = () => {
                   transition={{ duration: 0.3 }}
                 >
                   <div className="relative">
-                    <div className="absolute inset-0 bg-gradient-to-r from-purple-600/10 to-blue-600/10 rounded-3xl blur-xl opacity-60" />
-                    <Card className="relative bg-black/20 backdrop-blur-xl border-white/10">
+                    <div className="absolute inset-0 rounded-3xl bg-gradient-to-r from-[#3A5AFE0A] via-[#8B5CF60A] to-transparent blur-xl opacity-80 dark:from-purple-600/10 dark:to-blue-600/10" />
+                    <Card className="relative rounded-3xl border border-border bg-card text-foreground shadow-soft-elevated backdrop-blur-xl dark:bg-black/20 dark:border-white/10">
                       <CardHeader>
-                        <CardTitle className="text-white flex items-center space-x-2">
+                        <CardTitle className="flex items-center space-x-2 text-foreground dark:text-white">
                           <Shield className="w-5 h-5 text-green-400" />
                           <span>Privacy & Security</span>
                         </CardTitle>
-                        <CardDescription className="text-gray-400">
+                        <CardDescription className="text-muted-foreground dark:text-gray-400">
                           Control how your data is used and manage privacy options.
                         </CardDescription>
                       </CardHeader>
                       <CardContent className="space-y-10">
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-10">
                           <div className="space-y-4">
-                            <h3 className="text-white font-semibold flex items-center space-x-2">
+                            <h3 className="flex items-center space-x-2 font-semibold text-foreground dark:text-white">
                               <Shield className="w-4 h-4 text-green-400" />
                               <span>Privacy controls</span>
                             </h3>
-                            <p className="text-gray-400 text-sm">
+                            <p className="text-sm text-muted-foreground dark:text-gray-400">
                               Choose what data you share with SpareFinder. These settings
                               can be changed at any time.
                             </p>
                             <div className="space-y-4">
                               <div className="flex items-start justify-between gap-4">
                                 <div>
-                                  <p className="text-white font-medium">
+                                  <p className="font-medium text-foreground dark:text-white">
                                     Analytics & usage data
                                   </p>
-                                  <p className="text-gray-400 text-sm">
+                                  <p className="text-sm text-muted-foreground dark:text-gray-400">
                                     Allow anonymized usage data to improve accuracy and
                                     reliability of the service.
                                   </p>
@@ -1084,10 +1099,10 @@ const Settings = () => {
                                   className="data-[state=checked]:bg-green-600"
                                 />
                               </div>
-                              <Separator className="bg-white/10" />
+                              <Separator className="bg-border/60 dark:bg-white/10" />
                               <div className="flex items-start justify-between gap-4">
                                 <div>
-                                  <p className="text-white font-medium">
+                                  <p className="font-medium text-foreground dark:text-white">
                                     Product updates & tips
                                   </p>
                                   <p className="text-gray-400 text-sm">
@@ -1107,11 +1122,11 @@ const Settings = () => {
                           </div>
 
                           <div className="space-y-4">
-                            <h3 className="text-white font-semibold flex items-center space-x-2">
+                            <h3 className="flex items-center space-x-2 font-semibold text-foreground dark:text-white">
                               <AlertCircle className="w-4 h-4 text-red-400" />
                               <span>Danger zone</span>
                             </h3>
-                            <p className="text-gray-400 text-sm">
+                            <p className="text-sm text-muted-foreground dark:text-gray-400">
                               Permanently delete your search history, statistics, and
                               analysis data from SpareFinder. This cannot be undone.
                             </p>
@@ -1175,40 +1190,40 @@ const Settings = () => {
                   transition={{ duration: 0.3 }}
                 >
                   <div className="relative">
-                    <div className="absolute inset-0 bg-gradient-to-r from-purple-600/10 to-blue-600/10 rounded-3xl blur-xl opacity-60" />
-                    <Card className="relative bg-black/20 backdrop-blur-xl border-white/10">
+                    <div className="absolute inset-0 rounded-3xl bg-gradient-to-r from-[#3A5AFE0A] via-[#8B5CF60A] to-transparent blur-xl opacity-80 dark:from-purple-600/10 dark:to-blue-600/10" />
+                    <Card className="relative rounded-3xl border border-border bg-card text-foreground shadow-soft-elevated backdrop-blur-xl dark:bg-black/20 dark:border-white/10">
                       <CardHeader>
-                        <CardTitle className="text-white flex items-center space-x-2">
+                        <CardTitle className="flex items-center space-x-2 text-foreground dark:text-white">
                           <Palette className="w-5 h-5 text-pink-400" />
                           <span>Appearance</span>
                         </CardTitle>
-                        <CardDescription className="text-gray-400">
+                        <CardDescription className="text-muted-foreground dark:text-gray-400">
                           Customize the look and feel of your dashboard.
                         </CardDescription>
                       </CardHeader>
                       <CardContent className="space-y-8">
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-10 items-start">
                           <div className="space-y-4">
-                            <h3 className="text-white font-semibold">
+                            <h3 className="font-semibold text-foreground dark:text-white">
                               Theme preferences
                             </h3>
-                            <p className="text-gray-400 text-sm">
+                            <p className="text-sm text-muted-foreground dark:text-gray-400">
                               SpareFinder is optimized for a dark interface. Your
                               preference is saved to your profile and will be used across
                               devices.
                             </p>
-                            <div className="relative mt-4 rounded-2xl border border-white/10 overflow-hidden bg-gradient-to-br from-slate-900 via-purple-900/60 to-blue-900/60">
+                            <div className="relative mt-4 overflow-hidden rounded-2xl border border-border bg-gradient-to-br from-slate-50 via-purple-50 to-blue-50 dark:border-white/10 dark:from-slate-900 dark:via-purple-900/60 dark:to-blue-900/60">
                               <div className="absolute inset-0 opacity-40 bg-[radial-gradient(circle_at_top,_rgba(244,114,182,0.3)_0,_transparent_45%),radial-gradient(circle_at_bottom,_rgba(56,189,248,0.25)_0,_transparent_45%)]" />
                               <div className="relative p-5 space-y-3">
                                 <div className="flex items-center justify-between">
-                                  <span className="text-xs font-medium uppercase tracking-wide text-purple-200">
+                                  <span className="text-xs font-medium uppercase tracking-wide text-purple-700 dark:text-purple-200">
                                     Preview
                                   </span>
-                                  <Badge className="bg-white/10 text-xs text-purple-100 border-white/20">
+                                  <Badge className="bg-purple-100 text-xs text-purple-700 border-purple-200 dark:bg-white/10 dark:text-purple-100 dark:border-white/20">
                                     Dark mode
                                   </Badge>
                                 </div>
-                                <div className="h-20 rounded-xl bg-black/30 border border-white/10 flex items-center justify-center text-xs text-gray-300">
+                                <div className="h-20 rounded-xl border border-border bg-card flex items-center justify-center text-xs text-muted-foreground dark:bg-black/30 dark:border-white/10 dark:text-gray-300">
                                   Dashboard preview
                                 </div>
                               </div>
@@ -1218,10 +1233,10 @@ const Settings = () => {
                           <div className="space-y-5">
                             <div className="flex items-start justify-between gap-4">
                               <div>
-                                <p className="text-white font-medium flex items-center space-x-2">
+                                <p className="flex items-center space-x-2 font-medium text-foreground dark:text-white">
                                   <span>Dark mode</span>
                                 </p>
-                                <p className="text-gray-400 text-sm">
+                                <p className="text-sm text-muted-foreground dark:text-gray-400">
                                   When enabled, SpareFinder will use a dark theme wherever
                                   supported.
                                 </p>
@@ -1234,18 +1249,18 @@ const Settings = () => {
                                 className="data-[state=checked]:bg-purple-600"
                               />
                             </div>
-                            <Separator className="bg-white/10" />
+                            <Separator className="bg-border/60 dark:bg-white/10" />
                             <div className="flex items-start justify-between gap-4">
                               <div>
-                                <p className="text-white font-medium">
+                                <p className="font-medium text-foreground dark:text-white">
                                   Subtle animations
                                 </p>
-                                <p className="text-gray-400 text-sm">
+                                <p className="text-sm text-muted-foreground dark:text-gray-400">
                                   Animations are kept light to avoid distraction. Your
                                   browser&apos;s “reduced motion” setting is also respected.
                                 </p>
                               </div>
-                              <Badge className="bg-white/5 text-gray-200 border-white/10">
+                              <Badge className="bg-muted text-muted-foreground border-border dark:bg-white/5 dark:text-gray-200 dark:border-white/10">
                                 Optimized
                               </Badge>
                             </div>

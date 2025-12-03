@@ -53,7 +53,7 @@ import {
 import DashboardSidebar from "@/components/DashboardSidebar";
 import MobileSidebar from "@/components/MobileSidebar";
 import { useDashboardLayout } from "@/contexts/DashboardLayoutContext";
-import DashboardSkeleton from "@/components/DashboardSkeleton";
+import { PageSkeleton } from "@/components/skeletons";
 
 interface UserProfile {
   id: string;
@@ -208,10 +208,10 @@ const Profile = () => {
   // Show loading state
   if (isLoading) {
     return (
-      <DashboardSkeleton
-        variant="user"
+      <PageSkeleton
+        variant="profile"
         showSidebar={!inLayout}
-        showCharts={false}
+        showHeader={false}
       />
     );
   }
@@ -219,7 +219,7 @@ const Profile = () => {
   // Show error state
   if (error) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-900 via-purple-900/20 to-blue-900/20">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-[#F0F2F5] to-[#E8EBF1] dark:from-gray-900 dark:via-purple-900/20 dark:to-blue-900/20">
         <div className="text-center">
           <AlertCircle className="w-10 h-10 text-red-500 mx-auto mb-4" />
           <p className="text-gray-400 mb-4">{error}</p>
@@ -245,7 +245,7 @@ const Profile = () => {
   };
 
   return (
-    <div className="min-h-screen flex w-full bg-gradient-to-br from-gray-900 via-purple-900/20 to-blue-900/20 relative overflow-hidden">
+    <div className="min-h-screen flex w-full bg-gradient-to-br from-background via-[#F0F2F5] to-[#E8EBF1] dark:from-gray-900 dark:via-purple-900/20 dark:to-blue-900/20 relative overflow-hidden">
       {/* Animated Background Elements */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <motion.div
@@ -288,9 +288,9 @@ const Profile = () => {
           />
           <button
             onClick={handleToggleMobileMenu}
-            className="fixed top-4 right-4 z-50 p-2 rounded-lg bg-black/20 backdrop-blur-xl border border-white/10 md:hidden"
+            className="fixed top-4 right-4 z-50 flex h-9 w-9 items-center justify-center rounded-full border border-border bg-card/95 text-muted-foreground shadow-soft-elevated backdrop-blur-xl md:hidden dark:bg-black/20 dark:border-white/10 dark:text-white"
           >
-            <Menu className="w-5 h-5 text-white" />
+            <Menu className="w-5 h-5" />
           </button>
         </>
       )}
@@ -319,10 +319,10 @@ const Profile = () => {
           transition={{ duration: 0.5 }}
           className="space-y-4 sm:space-y-6 lg:space-y-8 max-w-6xl mx-auto"
         >
-          {/* Header */}
-          <div className="relative">
-            <div className="absolute inset-0 bg-gradient-to-r from-purple-600/10 to-blue-600/10 rounded-3xl blur-xl opacity-60" />
-            <div className="relative bg-black/20 backdrop-blur-xl rounded-3xl p-4 sm:p-6 border border-white/10">
+        {/* Header */}
+        <div className="relative">
+          <div className="absolute inset-0 rounded-3xl bg-gradient-to-r from-[#3A5AFE0A] via-[#8B5CF60A] to-transparent blur-xl opacity-80 dark:from-purple-600/10 dark:to-blue-600/10" />
+          <div className="relative rounded-3xl border border-border bg-card shadow-soft-elevated backdrop-blur-xl dark:bg-black/30 dark:border-white/10">
               <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 sm:gap-6">
                 <div className="flex flex-col sm:flex-row sm:items-center space-y-4 sm:space-y-0 sm:space-x-6">
                   <div className="relative">
@@ -346,7 +346,7 @@ const Profile = () => {
                       initial={{ opacity: 0, scale: 0.8 }}
                       animate={{ opacity: 1, scale: 1 }}
                       transition={{ delay: 0.2 }}
-                      className="inline-flex items-center px-3 py-1 bg-gradient-to-r from-purple-600/20 to-blue-600/20 rounded-full border border-purple-500/30 backdrop-blur-xl mb-2"
+                      className="inline-flex items-center px-3 py-1 rounded-full border border-border bg-gradient-to-r from-[#E0E7FF] via-[#EEF2FF] to-[#F5F3FF] text-xs font-semibold text-[#4C1D95] shadow-soft-elevated dark:border-purple-500/30 dark:from-purple-600/20 dark:to-blue-600/20 dark:text-purple-200 backdrop-blur-xl mb-2"
                     >
                       <motion.div
                         animate={{ rotate: [0, 360] }}
@@ -357,14 +357,12 @@ const Profile = () => {
                         }}
                         className="mr-2"
                       >
-                        <Sparkles className="w-3 h-3 text-purple-400" />
+                        <Sparkles className="w-3 h-3 text-[#8B5CF6]" />
                       </motion.div>
-                      <span className="text-purple-300 text-xs font-semibold">
-                        Pro Member
-                      </span>
+                      <span>Pro Member</span>
                     </motion.div>
                     <div className="flex items-center gap-3 flex-wrap">
-                      <h1 className="text-3xl lg:text-4xl font-bold bg-gradient-to-r from-white via-purple-200 to-blue-200 bg-clip-text text-transparent">
+                      <h1 className="text-3xl lg:text-4xl font-bold text-foreground dark:bg-gradient-to-r dark:from-white dark:via-purple-200 dark:to-blue-200 dark:bg-clip-text dark:text-transparent">
                         {profile?.full_name || "Anonymous User"}
                       </h1>
                       {user?.avatar_url && (
@@ -395,17 +393,17 @@ const Profile = () => {
                         </Badge>
                       )}
                     </div>
-                    <p className="text-gray-400 text-lg mt-1">
+                    <p className="mt-1 text-lg text-muted-foreground dark:text-gray-400">
                       @{profile?.username || "username"}
                     </p>
                     <div className="flex items-center space-x-4 mt-3">
-                      <div className="flex items-center space-x-1 text-gray-400">
+                      <div className="flex items-center space-x-1 text-muted-foreground dark:text-gray-400">
                         <Calendar className="w-4 h-4" />
                         <span className="text-sm">
                           Member since {userStats.memberSince}
                         </span>
                       </div>
-                      <div className="flex items-center space-x-1 text-gray-400">
+                      <div className="flex items-center space-x-1 text-muted-foreground dark:text-gray-400">
                         <Clock className="w-4 h-4" />
                         <span className="text-sm">
                           {userStats.streak} day streak
@@ -479,28 +477,28 @@ const Profile = () => {
                 <div
                   className={`absolute inset-0 bg-gradient-to-r ${stat.color} opacity-10 rounded-2xl blur-xl group-hover:opacity-20 transition-opacity`}
                 />
-                <Card className="relative bg-black/40 backdrop-blur-xl border-white/10 hover:border-white/20 transition-all duration-300">
+                <Card className="relative border border-border bg-card text-foreground shadow-soft-elevated backdrop-blur-xl transition-all duration-300 hover:border-[#C7D2FE] dark:bg-black/40 dark:border-white/10 dark:hover:border-white/20">
                   <CardContent className="p-6">
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="text-gray-400 text-sm font-medium">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground dark:text-gray-400">
                           {stat.title}
                         </p>
-                        <p className="text-2xl font-bold text-white mt-1">
+                        <p className="mt-1 text-2xl font-bold text-foreground dark:text-white">
                           {stat.value}
                         </p>
                         <p
                           className={`text-sm mt-1 ${
                             stat.change.startsWith("+")
-                              ? "text-green-400"
-                              : "text-red-400"
+                              ? "text-emerald-500 dark:text-green-400"
+                              : "text-red-500 dark:text-red-400"
                           }`}
                         >
                           {stat.change} this month
                         </p>
                       </div>
                       <div
-                        className={`p-3 rounded-xl bg-gradient-to-r ${stat.color} shadow-lg`}
+                        className={`p-3 rounded-xl bg-gradient-to-r ${stat.color} shadow-lg shadow-purple-500/20`}
                       >
                         <stat.icon className="w-6 h-6 text-white" />
                       </div>
@@ -519,22 +517,22 @@ const Profile = () => {
               transition={{ delay: 0.6 }}
               className="relative"
             >
-              <div className="absolute inset-0 bg-gradient-to-r from-purple-600/10 to-blue-600/10 rounded-3xl blur-xl opacity-60" />
-              <Card className="relative bg-black/20 backdrop-blur-xl border-white/10 h-full">
+              <div className="absolute inset-0 rounded-3xl bg-gradient-to-r from-[#3A5AFE0D] via-[#8B5CF60D] to-transparent blur-xl opacity-80 dark:from-purple-600/10 dark:to-blue-600/10" />
+              <Card className="relative h-full border border-border bg-card text-foreground shadow-soft-elevated backdrop-blur-xl dark:bg-black/20 dark:border-white/10">
                 <CardHeader>
-                  <CardTitle className="text-white flex items-center space-x-2">
-                    <Award className="w-5 h-5 text-yellow-400" />
+                  <CardTitle className="flex items-center space-x-2 text-foreground dark:text-white">
+                    <Award className="w-5 h-5 text-yellow-500" />
                     <span>Achievements</span>
                     <Badge
                       variant="secondary"
-                      className="bg-yellow-600/20 text-yellow-400 border-yellow-500/30"
+                      className="bg-amber-100 text-amber-700 border border-amber-200 dark:bg-yellow-600/20 dark:text-yellow-400 dark:border-yellow-500/30"
                     >
                       {profileDataLoading
                         ? "..."
                         : `${totalEarned}/${totalAvailable}`}
                     </Badge>
                   </CardTitle>
-                  <CardDescription className="text-gray-400">
+                  <CardDescription className="text-muted-foreground dark:text-gray-400">
                     Your milestones and accomplishments
                   </CardDescription>
                 </CardHeader>
@@ -549,9 +547,9 @@ const Profile = () => {
                         className="space-y-4"
                       />
                     ) : profileDataError ? (
-                      <div className="text-center py-8">
-                        <AlertCircle className="w-8 h-8 text-red-400 mx-auto mb-2" />
-                        <p className="text-gray-400">
+                      <div className="py-8 text-center">
+                        <AlertCircle className="w-8 h-8 mx-auto mb-2 text-red-500" />
+                        <p className="text-muted-foreground dark:text-gray-400">
                           Failed to load achievements
                         </p>
                       </div>
@@ -568,31 +566,31 @@ const Profile = () => {
                             transition={{ delay: 0.7 + index * 0.1 }}
                             className={`p-4 rounded-xl border transition-all duration-300 ${
                               achievement.earned
-                                ? "bg-white/5 border-white/10 hover:bg-white/10"
-                                : "bg-gray-500/5 border-gray-500/10 opacity-50"
+                                ? "bg-card border-border hover:border-[#C7D2FE] hover:bg-[#F9FAFB] dark:bg-white/5 dark:border-white/10 dark:hover:bg-white/10"
+                                : "bg-muted/60 border-border/60 opacity-80 dark:bg-gray-500/5 dark:border-gray-500/10"
                             }`}
                           >
                             <div className="flex items-center space-x-4">
                               <div
-                                className={`w-12 h-12 rounded-xl flex items-center justify-center ${
+                                className={`flex h-12 w-12 items-center justify-center rounded-xl ${
                                   achievement.earned
-                                    ? `bg-gradient-to-r ${achievement.color}`
-                                    : "bg-gray-600/30"
+                                    ? `bg-gradient-to-r ${achievement.color} shadow-md shadow-purple-500/20`
+                                    : "bg-muted dark:bg-gray-600/30"
                                 }`}
                               >
                                 <IconComponent className="w-6 h-6 text-white" />
                               </div>
                               <div className="flex-1">
-                                <h4 className="text-white font-medium">
+                                <h4 className="font-medium text-foreground dark:text-white">
                                   {achievement.title}
                                 </h4>
-                                <p className="text-gray-400 text-sm">
+                                <p className="text-sm text-muted-foreground dark:text-gray-400">
                                   {achievement.description}
                                 </p>
                               </div>
                               {achievement.earned && (
-                                <div className="w-6 h-6 bg-green-600 rounded-full flex items-center justify-center">
-                                  <span className="text-white text-xs">✓</span>
+                                <div className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-500 text-[10px] font-semibold text-white shadow-sm shadow-emerald-500/40">
+                                  ✓
                                 </div>
                               )}
                             </div>
@@ -600,9 +598,11 @@ const Profile = () => {
                         );
                       })
                     ) : (
-                      <div className="text-center py-8">
-                        <Award className="w-8 h-8 text-gray-400 mx-auto mb-2" />
-                        <p className="text-gray-400">No achievements yet</p>
+                      <div className="py-8 text-center">
+                        <Award className="w-8 h-8 mx-auto mb-2 text-muted-foreground dark:text-gray-400" />
+                        <p className="text-muted-foreground dark:text-gray-400">
+                          No achievements yet
+                        </p>
                       </div>
                     )}
                   </div>
@@ -617,14 +617,14 @@ const Profile = () => {
               transition={{ delay: 0.6 }}
               className="relative"
             >
-              <div className="absolute inset-0 bg-gradient-to-r from-blue-600/10 to-green-600/10 rounded-3xl blur-xl opacity-60" />
-              <Card className="relative bg-black/20 backdrop-blur-xl border-white/10 h-full">
+              <div className="absolute inset-0 rounded-3xl bg-gradient-to-r from-[#22C55E14] via-[#06B6D414] to-transparent blur-xl opacity-80 dark:from-blue-600/10 dark:to-green-600/10" />
+              <Card className="relative h-full border border-border bg-card text-foreground shadow-soft-elevated backdrop-blur-xl dark:bg-black/20 dark:border-white/10">
                 <CardHeader>
-                  <CardTitle className="text-white flex items-center space-x-2">
-                    <Activity className="w-5 h-5 text-blue-400" />
+                  <CardTitle className="flex items-center space-x-2 text-foreground dark:text-white">
+                    <Activity className="w-5 h-5 text-[#06B6D4]" />
                     <span>Recent Activity</span>
                   </CardTitle>
-                  <CardDescription className="text-gray-400">
+                  <CardDescription className="text-muted-foreground dark:text-gray-400">
                     Your latest part identification activity
                   </CardDescription>
                 </CardHeader>
@@ -635,22 +635,22 @@ const Profile = () => {
                       Array.from({ length: 4 }).map((_, index) => (
                         <div
                           key={index}
-                          className="p-4 rounded-xl bg-gray-500/5 border border-gray-500/10"
+                          className="rounded-xl border border-border bg-muted/60 p-4 dark:bg-gray-500/5 dark:border-gray-500/10"
                         >
                           <div className="flex items-center justify-between mb-2">
-                            <Skeleton className="h-4 w-40 bg-gray-600/30" />
-                            <Skeleton className="h-5 w-12 rounded-full bg-gray-600/30" />
+                            <Skeleton className="h-4 w-40 bg-muted-foreground/20 dark:bg-gray-600/30" />
+                            <Skeleton className="h-5 w-12 rounded-full bg-muted-foreground/20 dark:bg-gray-600/30" />
                           </div>
                           <div className="flex items-center justify-between">
-                            <Skeleton className="h-3 w-24 bg-gray-600/30" />
-                            <Skeleton className="h-3 w-16 bg-gray-600/30" />
+                            <Skeleton className="h-3 w-24 bg-muted-foreground/20 dark:bg-gray-600/30" />
+                            <Skeleton className="h-3 w-16 bg-muted-foreground/20 dark:bg-gray-600/30" />
                           </div>
                         </div>
                       ))
                     ) : profileDataError ? (
-                      <div className="text-center py-8">
-                        <Activity className="w-8 h-8 text-red-400 mx-auto mb-2" />
-                        <p className="text-gray-400">
+                      <div className="py-8 text-center">
+                        <Activity className="w-8 h-8 mx-auto mb-2 text-red-500" />
+                        <p className="text-muted-foreground dark:text-gray-400">
                           Failed to load recent activity
                         </p>
                       </div>
@@ -661,26 +661,26 @@ const Profile = () => {
                           initial={{ opacity: 0, y: 20 }}
                           animate={{ opacity: 1, y: 0 }}
                           transition={{ delay: 0.8 + index * 0.1 }}
-                          className="p-4 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-all duration-300"
+                          className="rounded-xl border border-border bg-card p-4 transition-all duration-300 hover:border-[#C7D2FE] hover:bg-[#F9FAFB] dark:bg-white/5 dark:border-white/10 dark:hover:bg-white/10"
                         >
                           <div className="flex items-center justify-between mb-2">
-                            <h4 className="text-white font-medium">
+                            <h4 className="font-medium text-foreground dark:text-white">
                               {activity.action}
                             </h4>
                             {activity.details.confidence && (
                               <Badge
                                 variant="secondary"
-                                className="bg-green-600/20 text-green-400 border-green-500/30 text-xs"
+                                className="border border-emerald-200 bg-emerald-100 text-xs text-emerald-700 dark:bg-green-600/20 dark:text-green-400 dark:border-green-500/30"
                               >
                                 {Math.round(activity.details.confidence)}%
                               </Badge>
                             )}
                           </div>
                           <div className="flex items-center justify-between text-sm">
-                            <span className="text-gray-400">
+                            <span className="text-sm text-muted-foreground dark:text-gray-400">
                               {activity.details.description}
                             </span>
-                            <span className="text-gray-500">
+                            <span className="text-xs text-muted-foreground/70 dark:text-gray-500">
                               {new Date(
                                 activity.created_at
                               ).toLocaleDateString()}
@@ -689,9 +689,11 @@ const Profile = () => {
                         </motion.div>
                       ))
                     ) : (
-                      <div className="text-center py-8">
-                        <Activity className="w-8 h-8 text-gray-400 mx-auto mb-2" />
-                        <p className="text-gray-400">No recent activity</p>
+                      <div className="py-8 text-center">
+                        <Activity className="w-8 h-8 mx-auto mb-2 text-muted-foreground dark:text-gray-400" />
+                        <p className="text-muted-foreground dark:text-gray-400">
+                          No recent activity
+                        </p>
                       </div>
                     )}
                   </div>
@@ -707,36 +709,42 @@ const Profile = () => {
             transition={{ delay: 0.8 }}
             className="relative"
           >
-            <div className="absolute inset-0 bg-gradient-to-r from-indigo-600/10 to-purple-600/10 rounded-3xl blur-xl opacity-60" />
-            <Card className="relative bg-black/20 backdrop-blur-xl border-white/10">
+            <div className="absolute inset-0 rounded-3xl bg-gradient-to-r from-[#3B82F614] via-[#8B5CF614] to-transparent blur-xl opacity-80 dark:from-indigo-600/10 dark:to-purple-600/10" />
+            <Card className="relative border border-border bg-card text-foreground shadow-soft-elevated backdrop-blur-xl dark:bg-black/20 dark:border-white/10">
               <CardHeader>
-                <CardTitle className="text-white flex items-center space-x-2">
-                  <User className="w-5 h-5 text-purple-400" />
+                <CardTitle className="flex items-center space-x-2 text-foreground dark:text-white">
+                  <User className="w-5 h-5 text-[#8B5CF6]" />
                   <span>Contact Information</span>
                 </CardTitle>
-                <CardDescription className="text-gray-400">
+                <CardDescription className="text-muted-foreground dark:text-gray-400">
                   Your profile and contact details
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-6">
                   <div className="space-y-4">
                     <div className="flex items-center space-x-3">
-                      <div className="w-10 h-10 bg-gradient-to-r from-blue-600/20 to-cyan-600/20 rounded-xl flex items-center justify-center border border-white/10">
-                        <Mail className="w-5 h-5 text-blue-400" />
+                      <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-border bg-gradient-to-r from-[#EFF6FF] to-[#E0F2FE] dark:border-white/10 dark:from-blue-600/20 dark:to-cyan-600/20">
+                        <Mail className="w-5 h-5 text-[#0EA5E9]" />
                       </div>
                       <div>
-                        <p className="text-gray-400 text-sm">Email</p>
-                        <p className="text-white">{profile?.email}</p>
+                        <p className="text-sm text-muted-foreground dark:text-gray-400">
+                          Email
+                        </p>
+                        <p className="text-sm font-medium text-foreground dark:text-white">
+                          {profile?.email}
+                        </p>
                       </div>
                     </div>
                     <div className="flex items-center space-x-3">
-                      <div className="w-10 h-10 bg-gradient-to-r from-purple-600/20 to-pink-600/20 rounded-xl flex items-center justify-center border border-white/10">
-                        <User className="w-5 h-5 text-purple-400" />
+                      <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-border bg-gradient-to-r from-[#F5F3FF] to-[#E9D5FF] dark:border-white/10 dark:from-purple-600/20 dark:to-pink-600/20">
+                        <User className="w-5 h-5 text-[#8B5CF6]" />
                       </div>
                       <div>
-                        <p className="text-gray-400 text-sm">Username</p>
-                        <p className="text-white">
+                        <p className="text-sm text-muted-foreground dark:text-gray-400">
+                          Username
+                        </p>
+                        <p className="text-sm font-medium text-foreground dark:text-white">
                           @{profile?.username || "username"}
                         </p>
                       </div>
@@ -744,21 +752,29 @@ const Profile = () => {
                   </div>
                   <div className="space-y-4">
                     <div className="flex items-center space-x-3">
-                      <div className="w-10 h-10 bg-gradient-to-r from-purple-600/20 to-pink-600/20 rounded-xl flex items-center justify-center border border-white/10">
-                        <Building className="w-5 h-5 text-purple-400" />
+                      <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-border bg-gradient-to-r from-[#EEF2FF] to-[#E0F2FE] dark:border-white/10 dark:from-purple-600/20 dark:to-pink-600/20">
+                        <Building className="w-5 h-5 text-[#6366F1]" />
                       </div>
                       <div>
-                        <p className="text-gray-400 text-sm">Company</p>
-                        <p className="text-white">Auto Parts Inc.</p>
+                        <p className="text-sm text-muted-foreground dark:text-gray-400">
+                          Company
+                        </p>
+                        <p className="text-sm font-medium text-foreground dark:text-white">
+                          Auto Parts Inc.
+                        </p>
                       </div>
                     </div>
                     <div className="flex items-center space-x-3">
-                      <div className="w-10 h-10 bg-gradient-to-r from-orange-600/20 to-red-600/20 rounded-xl flex items-center justify-center border border-white/10">
-                        <MapPin className="w-5 h-5 text-orange-400" />
+                      <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-border bg-gradient-to-r from-[#FEF3C7] to-[#FFE4E6] dark:border-white/10 dark:from-orange-600/20 dark:to-red-600/20">
+                        <MapPin className="w-5 h-5 text-[#F97316]" />
                       </div>
                       <div>
-                        <p className="text-gray-400 text-sm">Location</p>
-                        <p className="text-white">New York, NY</p>
+                        <p className="text-sm text-muted-foreground dark:text-gray-400">
+                          Location
+                        </p>
+                        <p className="text-sm font-medium text-foreground dark:text-white">
+                          New York, NY
+                        </p>
                       </div>
                     </div>
                   </div>

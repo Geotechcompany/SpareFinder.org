@@ -23,6 +23,15 @@
         -webkit-box-orient: vertical;
         -webkit-line-clamp: 3;
     }
+    .bg-grid-soft {
+        background-image:
+            linear-gradient(to right, rgba(148, 163, 184, 0.12) 1px, transparent 1px),
+            linear-gradient(to bottom, rgba(148, 163, 184, 0.12) 1px, transparent 1px);
+        background-size: 24px 24px;
+    }
+    .shadow-soft-elevated {
+        box-shadow: 0 22px 40px rgba(15, 23, 42, 0.08);
+    }
 }
 
 @layer base {
@@ -80,34 +89,57 @@
         --chart-5: 340 75% 55%;
     }
     .light {
-        --background: 0 0% 100%;
-        --foreground: 222.2 84% 4.9%;
-        --card: 0 0% 100%;
-        --card-foreground: 222.2 84% 4.9%;
-        --popover: 0 0% 100%;
-        --popover-foreground: 222.2 84% 4.9%;
-        --primary: 222.2 47.4% 11.2%;
-        --primary-foreground: 210 40% 98%;
-        --secondary: 210 40% 96.1%;
+        /* Light theme based on provided palette */
+        /* Neutrals / surfaces */
+        --background: 218 22% 97%;          /* #F7F8FA */
+        --foreground: 222.2 47.4% 11.2%;    /* Text strong #0F172A */
+        --card: 0 0% 100%;                  /* Surface 1 #FFFFFF */
+        --card-foreground: 222.2 47.4% 11.2%;
+        --popover: 0 0% 100%;               /* Surface 1 */
+        --popover-foreground: 222.2 47.4% 11.2%;
+
+        /* Brand / primary */
+        --primary: 230 99% 61%;             /* Primary #3A5AFE */
+        --primary-foreground: 0 0% 100%;    /* White */
+
+        /* Secondary / subtle surfaces */
+        --secondary: 216 20% 95%;           /* Surface 2 #F0F2F5 */
         --secondary-foreground: 222.2 47.4% 11.2%;
-        --muted: 210 40% 96.1%;
-        --muted-foreground: 215.4 16.3% 46.9%;
-        --accent: 210 40% 96.1%;
-        --accent-foreground: 222.2 47.4% 11.2%;
-        --destructive: 0 84.2% 60.2%;
+
+        /* Muted content + tertiary surface */
+        --muted: 220 24% 93%;               /* Surface 3 #E8EBF1 */
+        --muted-foreground: 215.4 16.3% 46.9%; /* Text muted #64748B */
+
+        /* Accent surfaces (AI purple) */
+        --accent: 258 90% 66%;              /* AI Purple #8B5CF6 */
+        --accent-foreground: 0 0% 100%;
+
+        /* Destructive actions (danger) */
+        --destructive: 0 84.2% 60.2%;       /* Danger #EF4444 */
         --destructive-foreground: 210 40% 98%;
-        --border: 214.3 31.8% 91.4%;
-        --input: 214.3 31.8% 91.4%;
-        --ring: 222.2 84% 4.9%;
+
+        /* Borders / inputs / focus ring */
+        --border: 220 15% 89%;              /* Border Light #E2E3E7 */
+        --input: 220 15% 84%;               /* Border Medium #D4D6DB */
+        --ring: 234 100% 65%;               /* Strong primary #4C5DFF */
         --radius: 0.5rem;
-        --sidebar-background: 0 0% 98%;
-        --sidebar-foreground: 240 5.3% 26.1%;
-        --sidebar-primary: 240 5.9% 10%;
-        --sidebar-primary-foreground: 0 0% 98%;
-        --sidebar-accent: 240 4.8% 95.9%;
-        --sidebar-accent-foreground: 240 5.9% 10%;
-        --sidebar-border: 220 13% 91%;
-        --sidebar-ring: 217.2 91.2% 59.8%;
+
+        /* Sidebar-specific tokens */
+        --sidebar-background: 220 25% 96%;          /* Sidebar base #F1F3F8 */
+        --sidebar-foreground: 222 30% 17%;          /* Text body #1E293B */
+        --sidebar-primary: 246 83% 59%;             /* Sidebar icon active #4F46E5 */
+        --sidebar-primary-foreground: 0 0% 100%;
+        --sidebar-accent: 225 100% 94%;             /* Sidebar active #E0E7FF */
+        --sidebar-accent-foreground: 246 83% 59%;   /* Active icon color */
+        --sidebar-border: 220 15% 84%;              /* Border Medium */
+        --sidebar-ring: 230 99% 61%;                /* Match primary */
+
+        /* Chart / status colors mapped from palette */
+        --chart-1: 142 71% 45%;    /* Success #22C55E */
+        --chart-2: 173 81% 40%;    /* AI Teal #14B8A6 */
+        --chart-3: 187 92% 48%;    /* Info #06B6D4 */
+        --chart-4: 48 96% 53%;     /* Warning #FACC15 */
+        --chart-5: 258 90% 66%;    /* AI Purple #8B5CF6 */
     }
 }
 

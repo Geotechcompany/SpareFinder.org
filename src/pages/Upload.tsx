@@ -44,7 +44,6 @@ import { Progress } from "@/components/ui/progress";
 import DashboardSidebar from "@/components/DashboardSidebar";
 import MobileSidebar from "@/components/MobileSidebar";
 import { useDashboardLayout } from "@/contexts/DashboardLayoutContext";
-import { api } from "@/lib/api";
 import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import axios from "axios";
@@ -83,7 +82,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { dashboardApi } from "@/lib/api";
+import { api, dashboardApi } from "@/lib/api";
 import KeywordMarkdownResults from "@/components/KeywordMarkdownResults";
 import OnboardingGuide from "@/components/OnboardingGuide";
 import { ComprehensiveAnalysisModal } from "@/components/ComprehensiveAnalysisModal";
@@ -928,6 +927,9 @@ const Upload = () => {
   const [wizardProgress, setWizardProgress] = useState(0);
   const [showComprehensiveAnalysis, setShowComprehensiveAnalysis] =
     useState(false);
+  const [aiOnboardingSummary, setAiOnboardingSummary] = useState<string | null>(
+    null
+  );
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const keywordsInputRef = useRef<HTMLInputElement>(null);
@@ -951,6 +953,47 @@ const Upload = () => {
       setShowOnboarding(shouldShow);
     } catch {}
   }, []);
+
+  // Fetch user statistics once to generate an AI-style onboarding summary
+  useEffect(() => {
+    const fetchStatsForOnboarding = async () => {
+      try {
+        const response = await api.statistics.getStats();
+        const stats = (response as any)?.statistics;
+        if (stats) {
+          const total = stats.total_uploads ?? 0;
+          const successful = stats.total_successful_identifications ?? 0;
+          const avgConf = Number(stats.average_confidence_score ?? 0);
+
+          const partsPhrase =
+            total === 0
+              ? "This looks like your first upload."
+              : `You've uploaded ${total} part${total === 1 ? "" : "s"} so far${
+                  successful
+                    ? `, with ${successful} successful identifications`
+                    : ""
+                }.`;
+
+          const confidencePhrase =
+            avgConf > 0
+              ? `Your current average confidence is about ${Math.round(
+                  avgConf
+                )}%.`
+              : "We don't have enough data yet to estimate your confidence.";
+
+          setAiOnboardingSummary(
+            `${partsPhrase} ${confidencePhrase} For best accuracy, combine a clear image with 3–5 precise keywords (part number, make/model/year).`
+          );
+        }
+      } catch {
+        // Silent failure – onboarding still works without AI summary
+      }
+    };
+
+    if (showOnboarding) {
+      fetchStatsForOnboarding();
+    }
+  }, [showOnboarding]);
 
   const getProgressStageColor = (stage: string) => {
     switch (stage) {
@@ -3238,11 +3281,11 @@ const Upload = () => {
   };
 
   return (
-    <div className="min-h-screen flex w-full bg-gradient-to-br from-gray-900 via-purple-900/20 to-blue-900/20 relative overflow-hidden">
+    <div className="min-h-screen flex w-full bg-gradient-to-br from-background via-[#F0F2F5] to-[#E8EBF1] dark:from-gray-900 dark:via-purple-900/20 dark:to-blue-900/20 relative overflow-hidden">
       {/* Animated Background Elements */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <motion.div
-          className="absolute -top-40 -right-40 w-80 h-80 bg-purple-600/20 rounded-full blur-3xl opacity-60"
+          className="absolute -top-40 -right-40 w-80 h-80 rounded-full blur-3xl opacity-60 bg-[#3A5AFE1A] dark:bg-purple-600/20"
           animate={{
             scale: [1, 1.3, 1],
             rotate: [0, 180, 360],
@@ -3314,8 +3357,8 @@ const Upload = () => {
         >
           {/* Header */}
           <div className="relative">
-            <div className="absolute inset-0 bg-gradient-to-r from-purple-600/10 to-blue-600/10 rounded-3xl blur-xl opacity-60" />
-            <div className="relative bg-black/20 backdrop-blur-xl rounded-3xl p-6 border border-white/10">
+            <div className="absolute inset-0 rounded-3xl bg-gradient-to-r from-[#3A5AFE0A] via-[#06B6D40A] to-transparent blur-xl opacity-80 dark:from-purple-600/10 dark:to-blue-600/10" />
+            <div className="relative rounded-3xl border border-border bg-card shadow-soft-elevated backdrop-blur-xl dark:bg-black/30 dark:border-white/10">
               {/* Credits Display - Top Right */}
               <motion.div
                 initial={{ opacity: 0, x: 20 }}
@@ -3325,7 +3368,7 @@ const Upload = () => {
               >
                 <CreditsDisplay
                   size="small"
-                  className="bg-black/30 backdrop-blur-sm border-white/20"
+                  className="bg-card/95 border border-border shadow-soft-elevated dark:bg-black/40 dark:border-white/20"
                 />
               </motion.div>
 
@@ -3334,7 +3377,7 @@ const Upload = () => {
                   initial={{ opacity: 0, scale: 0.8 }}
                   animate={{ opacity: 1, scale: 1 }}
                   transition={{ delay: 0.2 }}
-                  className="inline-flex items-center px-4 py-2 bg-gradient-to-r from-purple-600/20 to-blue-600/20 rounded-full border border-purple-500/30 backdrop-blur-xl mb-4"
+                  className="inline-flex items-center px-4 py-2 rounded-full border border-border bg-gradient-to-r from-[#3A5AFE14] via-[#06B6D414] to-transparent text-xs sm:text-sm font-medium text-foreground/80 backdrop-blur-xl mb-4 dark:border-purple-500/30 dark:from-purple-600/20 dark:to-blue-600/20 dark:text-purple-300"
                 >
                   <motion.div
                     animate={{ rotate: [0, 360] }}
@@ -3345,14 +3388,14 @@ const Upload = () => {
                     }}
                     className="mr-2"
                   >
-                    <Sparkles className="w-4 h-4 text-purple-400" />
+                    <Sparkles className="w-4 h-4 text-primary dark:text-purple-400" />
                   </motion.div>
-                  <span className="text-purple-300 text-sm font-semibold">
-                    SpareFinder AI-Powered
+                  <span className="font-semibold">
+                    SpareFinder AI‑Powered
                   </span>
                 </motion.div>
                 <motion.h1
-                  className="text-3xl lg:text-4xl font-bold bg-gradient-to-r from-white via-purple-200 to-blue-200 bg-clip-text text-transparent mb-3"
+                  className="text-3xl lg:text-4xl font-bold text-foreground dark:bg-gradient-to-r dark:from-white dark:via-purple-200 dark:to-blue-200 dark:bg-clip-text dark:text-transparent mb-3"
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.3 }}
@@ -3360,7 +3403,7 @@ const Upload = () => {
                   Upload Part Image
                 </motion.h1>
                 <motion.p
-                  className="text-gray-400 text-lg"
+                  className="text-lg text-muted-foreground"
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.4 }}
@@ -3389,8 +3432,8 @@ const Upload = () => {
               exit={{ opacity: 0, height: 0 }}
               className="relative"
             >
-              <div className="absolute inset-0 bg-gradient-to-r from-purple-600/10 to-blue-600/10 rounded-2xl blur-xl opacity-60" />
-              <div className="relative bg-black/20 backdrop-blur-xl rounded-2xl p-4 border border-white/10">
+              <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-[#3A5AFE0A] via-[#8B5CF60A] to-transparent blur-xl opacity-80 dark:from-purple-600/10 dark:to-blue-600/10" />
+              <div className="relative rounded-2xl border border-border bg-card shadow-soft-elevated backdrop-blur-xl dark:bg-black/30 dark:border-white/10">
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-sm text-gray-300 font-medium">
                     Progress
@@ -3438,7 +3481,7 @@ const Upload = () => {
                 exit={{ opacity: 0, x: -20 }}
                 transition={{ duration: 0.3 }}
               >
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-stretch">
+                <div className="grid grid-cols-1 items-stretch gap-8 md:grid-cols-2">
                   {/* Left Column - Text Content */}
                   <motion.div
                     initial={{ opacity: 0, y: 20 }}
@@ -3446,63 +3489,67 @@ const Upload = () => {
                     transition={{ delay: 0.2 }}
                     className="h-full"
                   >
-                    <Card className="bg-black/20 backdrop-blur-xl border-white/10 h-full flex flex-col">
-                      <CardHeader>
-                        <CardTitle className="text-white text-3xl mb-4">
+                    <Card className="flex h-full flex-col rounded-3xl border border-border bg-card/95 shadow-soft-elevated backdrop-blur-xl dark:bg-black/30 dark:border-white/10">
+                      <CardHeader className="space-y-3 pb-4 sm:pb-6">
+                        <div className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-muted/60 px-3 py-1 text-xs font-medium text-muted-foreground dark:bg-white/5 dark:border-white/10">
+                          <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                          Guided, AI‑assisted workflow
+                        </div>
+                        <CardTitle className="mb-4 text-2xl font-semibold text-foreground sm:text-3xl dark:text-white">
                           Get Started with SpareFinder AI
                         </CardTitle>
-                        <CardDescription className="text-gray-400 text-lg">
+                        <CardDescription className="text-lg text-muted-foreground dark:text-gray-400">
                           Identify your automotive parts in just a few simple
                           steps
                         </CardDescription>
                       </CardHeader>
-                      <CardContent className="space-y-6 flex-1 flex flex-col justify-between">
-                        <div className="space-y-4">
-                          <div className="flex items-start space-x-3">
-                            <div className="flex-shrink-0 w-8 h-8 rounded-full bg-purple-600/20 flex items-center justify-center">
-                              <span className="text-purple-400 text-lg font-bold">
+                      <CardContent className="flex flex-1 flex-col justify-between space-y-6">
+                        <div className="space-y-4" id="tour-step-choose-method">
+                          <div className="flex items-start gap-3 rounded-2xl bg-muted/60 p-3 sm:p-4 dark:bg-white/5" id="tour-step-upload-analyze">
+                            <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-primary/10 ring-1 ring-primary/20">
+                              <span className="text-sm font-bold text-primary">
                                 1
                               </span>
                             </div>
                             <div>
-                              <h3 className="text-white font-semibold text-lg mb-1">
+                              <h3 className="mb-1 text-lg font-semibold text-foreground dark:text-white">
                                 Choose Your Method
                               </h3>
-                              <p className="text-gray-400">
+                              <p className="text-sm text-muted-foreground dark:text-gray-400">
                                 Select image upload, keyword search, or both for
                                 maximum accuracy
                               </p>
                             </div>
                           </div>
 
-                          <div className="flex items-start space-x-3">
-                            <div className="flex-shrink-0 w-8 h-8 rounded-full bg-blue-600/20 flex items-center justify-center">
-                              <span className="text-blue-400 text-lg font-bold">
+                          <div className="flex items-start gap-3 rounded-2xl bg-muted/40 p-3 sm:p-4 dark:bg-white/5" id="tour-step-get-results">
+                            <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-[#3A5AFE1A] ring-1 ring-[#3A5AFE26]">
+                              <span className="text-sm font-bold text-[#3A5AFE]">
                                 2
                               </span>
                             </div>
                             <div>
-                              <h3 className="text-white font-semibold text-lg mb-1">
+                              <h3 className="mb-1 text-lg font-semibold text-foreground dark:text-white">
                                 Upload & Analyze
                               </h3>
-                              <p className="text-gray-400">
+                              <p className="text-sm text-muted-foreground dark:text-gray-400">
                                 Our AI will process your part image and provide
                                 detailed identification
                               </p>
                             </div>
                           </div>
 
-                          <div className="flex items-start space-x-3">
-                            <div className="flex-shrink-0 w-8 h-8 rounded-full bg-emerald-600/20 flex items-center justify-center">
-                              <span className="text-emerald-400 text-lg font-bold">
+                          <div className="flex items-start gap-3 rounded-2xl bg-muted/20 p-3 sm:p-4 dark:bg-white/5">
+                            <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-emerald-500/10 ring-1 ring-emerald-400/30">
+                              <span className="text-sm font-bold text-emerald-500">
                                 3
                               </span>
                             </div>
                             <div>
-                              <h3 className="text-white font-semibold text-lg mb-1">
+                              <h3 className="mb-1 text-lg font-semibold text-foreground dark:text-white">
                                 Get Results
                               </h3>
-                              <p className="text-gray-400">
+                              <p className="text-sm text-muted-foreground dark:text-gray-400">
                                 Receive comprehensive part information, pricing,
                                 and supplier details
                               </p>
@@ -3516,11 +3563,12 @@ const Upload = () => {
                             whileTap={{ scale: 0.98 }}
                           >
                             <Button
+                              id="tour-start-analyzing-button"
                               onClick={() => setWizardStep("selection")}
                               size="lg"
-                              className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-lg h-14"
+                              className="group relative flex h-14 w-full items-center justify-center gap-2 overflow-hidden rounded-2xl bg-gradient-to-r from-[#3A5AFE] via-[#4C5DFF] to-[#06B6D4] text-base font-semibold text-white shadow-[0_18px_45px_rgba(15,23,42,0.35)] transition-all duration-200 hover:scale-[1.01] hover:shadow-[0_22px_55px_rgba(15,23,42,0.45)] focus-visible:ring-2 focus-visible:ring-[#3A5AFE] focus-visible:ring-offset-2 focus-visible:ring-offset-background dark:from-purple-600 dark:via-blue-600 dark:to-cyan-500"
                             >
-                              <Zap className="w-5 h-5 mr-2" />
+                              <Zap className="mr-2 h-5 w-5" />
                               Start Analyzing Parts
                             </Button>
                           </motion.div>
@@ -3536,7 +3584,7 @@ const Upload = () => {
                     transition={{ delay: 0.3 }}
                     className="flex items-center justify-center h-full"
                   >
-                    <div className="relative w-full h-full flex items-center justify-center bg-black/20 backdrop-blur-xl border border-white/10 rounded-lg overflow-hidden">
+                <div className="relative w-full h-full flex items-center justify-center rounded-lg border border-border bg-card shadow-soft-elevated backdrop-blur-xl dark:bg-black/30 dark:border-white/10 overflow-hidden">
                       <video
                         src="/Animations/scanpart.mp4"
                         autoPlay
@@ -3561,7 +3609,7 @@ const Upload = () => {
                 exit={{ opacity: 0, x: -20 }}
                 transition={{ duration: 0.3 }}
               >
-                <Card className="bg-black/20 backdrop-blur-xl border-white/10">
+                <Card className="border border-border bg-card shadow-soft-elevated backdrop-blur-xl dark:bg-black/30 dark:border-white/10">
                   <CardHeader>
                     <CardTitle className="text-white text-center">
                       How would you like to identify your part?
@@ -3577,15 +3625,15 @@ const Upload = () => {
                         whileHover={{ scale: 1.05 }}
                         whileTap={{ scale: 0.95 }}
                         onClick={() => handleModeSelection("image")}
-                        className="p-6 bg-gradient-to-br from-purple-600/20 to-purple-800/20 border border-purple-500/30 rounded-2xl text-left hover:border-purple-400/50 transition-all group"
+                        className="p-6 rounded-2xl border border-border bg-card text-left hover:border-primary/40 hover:shadow-soft-elevated transition-all group dark:bg-gradient-to-br dark:from-purple-600/20 dark:to-purple-800/20 dark:border-purple-500/30"
                       >
                         <div className="flex items-center justify-center w-12 h-12 rounded-full bg-purple-600/30 mb-4 group-hover:bg-purple-600/50">
                           <Camera className="w-6 h-6 text-purple-300" />
                         </div>
-                        <h3 className="text-white font-semibold text-lg mb-2">
+                        <h3 className="text-lg font-semibold text-foreground dark:text-white mb-2">
                           Image Only
                         </h3>
-                        <p className="text-gray-400 text-sm">
+                        <p className="text-sm text-muted-foreground">
                           Upload an image and let AI identify the part
                           automatically
                         </p>
@@ -3596,15 +3644,15 @@ const Upload = () => {
                         whileHover={{ scale: 1.05 }}
                         whileTap={{ scale: 0.95 }}
                         onClick={() => handleModeSelection("keywords")}
-                        className="p-6 bg-gradient-to-br from-blue-600/20 to-blue-800/20 border border-blue-500/30 rounded-2xl text-left hover:border-blue-400/50 transition-all group"
+                        className="p-6 rounded-2xl border border-border bg-card text-left hover:border-primary/40 hover:shadow-soft-elevated transition-all group dark:bg-gradient-to-br dark:from-blue-600/20 dark:to-blue-800/20 dark:border-blue-500/30"
                       >
                         <div className="flex items-center justify-center w-12 h-12 rounded-full bg-blue-600/30 mb-4 group-hover:bg-blue-600/50">
                           <Search className="w-6 h-6 text-blue-300" />
                         </div>
-                        <h3 className="text-white font-semibold text-lg mb-2">
+                        <h3 className="text-lg font-semibold text-foreground dark:text-white mb-2">
                           Keywords Only
                         </h3>
-                        <p className="text-gray-400 text-sm">
+                        <p className="text-sm text-muted-foreground">
                           Describe your part using keywords for a targeted
                           search
                         </p>
@@ -3615,15 +3663,15 @@ const Upload = () => {
                         whileHover={{ scale: 1.05 }}
                         whileTap={{ scale: 0.95 }}
                         onClick={() => handleModeSelection("both")}
-                        className="p-6 bg-gradient-to-br from-emerald-600/20 to-emerald-800/20 border border-emerald-500/30 rounded-2xl text-left hover:border-emerald-400/50 transition-all group"
+                        className="p-6 rounded-2xl border border-border bg-card text-left hover:border-emerald-400/60 hover:shadow-soft-elevated transition-all group dark:bg-gradient-to-br dark:from-emerald-600/20 dark:to-emerald-800/20 dark:border-emerald-500/30"
                       >
                         <div className="flex items-center justify-center w-12 h-12 rounded-full bg-emerald-600/30 mb-4 group-hover:bg-emerald-600/50">
                           <ImagePlus className="w-6 h-6 text-emerald-300" />
                         </div>
-                        <h3 className="text-white font-semibold text-lg mb-2">
+                        <h3 className="text-lg font-semibold text-foreground dark:text-white mb-2">
                           Both
                         </h3>
-                        <p className="text-gray-400 text-sm">
+                        <p className="text-sm text-muted-foreground">
                           Upload an image and add keywords for maximum accuracy
                         </p>
                       </motion.button>
@@ -4266,6 +4314,7 @@ const Upload = () => {
                         <div className="mb-4 space-y-2">
                           <div className="flex space-x-2">
                             <Input
+                              id="tour-keywords-input"
                               ref={keywordsInputRef}
                               value={keywords}
                               onChange={(e) => setKeywords(e.target.value)}
@@ -4326,26 +4375,49 @@ const Upload = () => {
                   {showOnboarding && (
                     <OnboardingGuide
                       userId={null}
+                      force
+                      showWelcome={!skipWelcome}
+                      onStart={() => {
+                        // Ensure the tour always begins from the landing step
+                        handleResetWizard();
+                      }}
                       onDismiss={() => setShowOnboarding(false)}
                       className="mb-6"
+                      welcomeTitle="AI‑guided upload"
+                      welcomeDescription="Let SpareFinder AI walk you through capturing the best image and keywords so we can identify your part as accurately as possible."
+                      aiSummary={aiOnboardingSummary || undefined}
                       steps={[
                         {
-                          selector: "#tour-upload-dropzone",
-                          title: "Choose a file",
+                          selector: "#tour-start-analyzing-button",
+                          title: "Start the guided flow",
                           description:
-                            "Click Choose File to select a clear photo of the part (max 10MB).",
+                            "Click this button to begin the 3‑step SpareFinder AI wizard.",
+                          aiHint:
+                            "We’ll first ask how you want to search, then walk you through image upload and keywords for best accuracy.",
+                        },
+                        {
+                          selector: "#tour-upload-dropzone",
+                          title: "Choose a clear image",
+                          description:
+                            "Click Choose File and pick a sharp, well‑lit photo where the part fills most of the frame.",
+                          aiHint:
+                            "AI models work best when the part is centered, in focus, and not obstructed by packaging or clutter.",
                         },
                         {
                           selector: "#tour-keywords-input",
                           title: "Add precise keywords",
                           description:
-                            "Optionally add 3–5 precise terms like part number and vehicle make/model/year.",
+                            "Optionally add 3–5 focused terms like part number, make/model/year, and position (e.g., front‑left).",
+                          aiHint:
+                            "Keywords help the AI disambiguate visually similar parts and find the closest matches faster.",
                         },
                         {
                           selector: "#tour-search-keywords-btn",
-                          title: "Analyze Part",
+                          title: "Run the AI analysis",
                           description:
-                            "Press Analyze Part. You will be redirected to History to track progress in real time.",
+                            "Press Analyze Part. We'll process the image and keywords, then send you to History to track the job in real time.",
+                          aiHint:
+                            "Behind the scenes, SpareFinder AI combines vision, text understanding, and your past searches to improve match quality over time.",
                         },
                       ]}
                     />
@@ -4437,6 +4509,7 @@ const Upload = () => {
 
               <div className="flex gap-3">
                 <Button
+                  id="tour-search-keywords-btn"
                   variant="outline"
                   onClick={handleResetWizard}
                   className="bg-black/20 border-white/10 hover:bg-white/10"

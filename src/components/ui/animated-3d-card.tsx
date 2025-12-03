@@ -11,7 +11,12 @@ interface Animated3DCardProps {
   className?: string;
 }
 
-export function Animated3DCard({ title, subtitle, image, className }: Animated3DCardProps) {
+export function Animated3DCard({
+  title,
+  subtitle,
+  image,
+  className,
+}: Animated3DCardProps) {
   const cardRef = useRef<HTMLDivElement>(null);
   const x = useMotionValue(0);
   const y = useMotionValue(0);
@@ -34,7 +39,7 @@ export function Animated3DCard({ title, subtitle, image, className }: Animated3D
     <motion.div
       ref={cardRef}
       className={cn(
-        "relative h-full w-full rounded-xl border border-gray-800/50 bg-gray-900/80 backdrop-blur-xl shadow-xl overflow-hidden group cursor-pointer",
+        "group relative h-full w-full cursor-pointer overflow-hidden rounded-xl border border-border bg-card/95 text-foreground shadow-soft-elevated backdrop-blur-xl dark:border-gray-800/50 dark:bg-gray-900/80",
         className
       )}
       style={{
@@ -64,15 +69,15 @@ export function Animated3DCard({ title, subtitle, image, className }: Animated3D
             alt={title}
             className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
           />
-          <div className="absolute inset-0 bg-gradient-to-t from-gray-900 via-gray-900/50 to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/40 to-transparent dark:from-gray-900 dark:via-gray-900/50" />
         </div>
 
         {/* Content */}
         <div className="p-6">
-          <h3 className="text-2xl font-bold text-white mb-3 group-hover:text-orange-300 transition-colors duration-300">
+          <h3 className="mb-3 text-2xl font-bold text-foreground transition-colors duration-300 group-hover:text-orange-600 dark:text-white dark:group-hover:text-orange-300">
             {title}
           </h3>
-          <p className="text-gray-400 leading-relaxed group-hover:text-gray-300 transition-colors duration-300">
+          <p className="leading-relaxed text-muted-foreground transition-colors duration-300 group-hover:text-foreground dark:text-gray-400 dark:group-hover:text-gray-300">
             {subtitle}
           </p>
         </div>

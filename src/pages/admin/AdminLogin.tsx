@@ -203,46 +203,48 @@ const AdminLogin = () => {
   // Show loading state while checking session
   if (isCheckingSession) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-900/20 via-black to-blue-900/20">
+      <div className="flex min-h-screen items-center justify-center bg-gradient-to-b from-background via-[#F0F2F5] to-[#E8EBF1] text-foreground dark:bg-black">
         <div className="text-center">
-          <Loader2 className="w-10 h-10 animate-spin text-purple-600 mx-auto mb-4" />
-          <p className="text-gray-400">Checking admin session...</p>
+          <Loader2 className="mx-auto mb-4 h-10 w-10 animate-spin text-primary dark:text-purple-600" />
+          <p className="text-muted-foreground dark:text-gray-400">
+            Checking admin session...
+          </p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-black relative overflow-hidden">
+    <div className="relative min-h-screen overflow-hidden bg-gradient-to-b from-background via-[#F0F2F5] to-[#E8EBF1] text-foreground dark:bg-black dark:text-white">
       {/* Dynamic Background */}
-      <div className="absolute inset-0 bg-gradient-to-br from-purple-900/20 via-black to-blue-900/20" />
+      <div className="absolute inset-0 bg-gradient-to-br from-[#3A5AFE0F] via-transparent to-[#06B6D40F] dark:from-purple-900/20 dark:via-black dark:to-blue-900/20" />
       <div className="absolute inset-0">
-        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl animate-pulse" />
+        <div className="absolute top-1/4 left-1/4 h-96 w-96 rounded-full bg-[#3A5AFE14] blur-3xl animate-pulse dark:bg-purple-500/10" />
         <div
-          className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl animate-pulse"
+          className="absolute bottom-1/4 right-1/4 h-96 w-96 rounded-full bg-[#06B6D414] blur-3xl animate-pulse dark:bg-blue-500/10"
           style={{ animationDelay: "2s" }}
         />
-        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-gradient-to-r from-purple-500/5 to-blue-500/5 rounded-full blur-3xl" />
+        <div className="absolute top-1/2 left-1/2 h-[800px] w-[800px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-gradient-to-r from-[#3A5AFE0A] to-[#06B6D40A] blur-3xl dark:from-purple-500/5 dark:to-blue-500/5" />
       </div>
 
       {/* Header */}
-      <div className="absolute top-6 left-6 z-10">
+      <div className="absolute left-6 top-6 z-10">
         <Link
           to="/"
-          className="flex items-center gap-3 text-gray-400 hover:text-white transition-all duration-300 group"
+          className="group flex items-center gap-3 text-muted-foreground transition-all duration-300 hover:text-foreground dark:text-gray-400 dark:hover:text-white"
         >
           <motion.div
             whileHover={{ x: -2 }}
             className="flex items-center gap-2"
           >
-            <ArrowLeft className="w-5 h-5" />
+            <ArrowLeft className="h-5 w-5" />
             <span>Back to Home</span>
           </motion.div>
         </Link>
       </div>
 
       {/* Logo Header */}
-      <div className="absolute top-6 right-6 z-10">
+      <div className="absolute right-6 top-6 z-10">
         <motion.div
           className="relative"
           whileHover={{ scale: 1.05 }}
@@ -256,7 +258,7 @@ const AdminLogin = () => {
         </motion.div>
       </div>
 
-      <div className="flex items-center justify-center min-h-screen p-6 relative z-10">
+      <div className="relative z-10 flex min-h-screen items-center justify-center p-6">
         <motion.div
           initial={{ opacity: 0, y: 20, scale: 0.95 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}

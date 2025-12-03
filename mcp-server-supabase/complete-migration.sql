@@ -11,6 +11,7 @@ ALTER TABLE part_searches ADD COLUMN IF NOT EXISTS image_size_bytes BIGINT;
 ALTER TABLE part_searches ADD COLUMN IF NOT EXISTS image_format TEXT;
 ALTER TABLE part_searches ADD COLUMN IF NOT EXISTS upload_source TEXT DEFAULT 'web';
 ALTER TABLE part_searches ADD COLUMN IF NOT EXISTS analysis_status TEXT DEFAULT 'completed';
+ALTER TABLE part_searches ADD COLUMN IF NOT EXISTS retry_count INTEGER DEFAULT 0;
 
 -- 2. Create user_statistics table
 CREATE TABLE IF NOT EXISTS user_statistics (

@@ -57,7 +57,7 @@ import {
 } from "@/components/ui/dialog";
 import { supabase } from "@/lib/supabase/client";
 import { useDashboardLayout } from "@/contexts/DashboardLayoutContext";
-import DashboardSkeleton from "@/components/DashboardSkeleton";
+import { PageSkeleton } from "@/components/skeletons";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import jsPDF from "jspdf";
 import {
@@ -860,10 +860,10 @@ const History = () => {
         window.URL.revokeObjectURL(blobUrl);
       }, 100);
 
-      toast({
-        title: "Export Successful",
+        toast({
+          title: "Export Successful",
         description: "Your history CSV is being downloaded.",
-      });
+        });
     } catch (error: any) {
       console.error("Export error:", error);
       toast({
@@ -1318,15 +1318,21 @@ const History = () => {
     });
   };
 
-  // Show loading state (uniform skeleton)
+  // Show loading state (page-structured skeleton)
   if (authLoading || isLoading) {
-    return <DashboardSkeleton variant="user" showSidebar={!inLayout} />;
+    return (
+      <PageSkeleton
+        variant="history"
+        showSidebar={!inLayout}
+        showHeader={false}
+      />
+    );
   }
 
   // Show error state
   if (error && !isLoading && !inLayout) {
     return (
-      <div className="min-h-screen flex w-full bg-gradient-to-br from-gray-900 via-purple-900/20 to-blue-900/20 relative overflow-hidden">
+      <div className="min-h-screen flex w-full bg-gradient-to-br from-background via-[#F0F2F5] to-[#E8EBF1] dark:from-gray-900 dark:via-purple-900/20 dark:to-blue-900/20 relative overflow-hidden">
         {/* Desktop Sidebar */}
         <div className="hidden md:block">
           <DashboardSidebar
@@ -1347,17 +1353,17 @@ const History = () => {
             marginLeft: window.innerWidth >= 768 ? (isCollapsed ? 80 : 320) : 0,
           }}
           transition={{ duration: 0.3, ease: "easeInOut" }}
-          className="flex-1 p-3 md:p-4 lg:p-8 relative z-10"
+          className="relative z-10 flex-1 p-3 md:p-4 lg:p-8"
         >
           <div className="space-y-4 md:space-y-6">
-            <Card className="bg-black/20 backdrop-blur-xl border-white/10">
+            <Card className="border border-border bg-card text-foreground shadow-soft-elevated backdrop-blur-xl dark:bg-black/20 dark:border-white/10">
               <CardContent className="p-4 md:p-6">
                 <div className="text-center">
                   <AlertTriangle className="w-8 h-8 md:w-12 md:h-12 text-red-500 mx-auto mb-3 md:mb-4" />
-                  <h3 className="text-white text-base md:text-lg font-semibold mb-2">
+                  <h3 className="mb-2 text-base font-semibold text-foreground md:text-lg dark:text-white">
                     Error Loading History
                   </h3>
-                  <p className="text-gray-400 text-sm md:text-base mb-3 md:mb-4">
+                  <p className="mb-3 text-sm text-muted-foreground md:text-base md:mb-4 dark:text-gray-400">
                     {error}
                   </p>
                   <Button onClick={fetchAllData} variant="outline" size="sm">
@@ -1374,9 +1380,9 @@ const History = () => {
 
   // Main render
   return (
-    <div className="min-h-screen flex w-full bg-gradient-to-br from-gray-900 via-purple-900/20 to-blue-900/20 relative overflow-hidden">
-      {/* Animated Background Elements */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+    <div className="min-h-screen flex w-full bg-gradient-to-br from-background via-[#F0F2F5] to-[#E8EBF1] dark:from-gray-900 dark:via-purple-900/20 dark:to-blue-900/20 relative overflow-hidden">
+      {/* Animated Background Elements (dark mode only to avoid blue tint in light theme) */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none hidden dark:block">
         <motion.div
           className="absolute -top-20 md:-top-40 -left-20 md:-left-40 w-40 h-40 md:w-80 md:h-80 bg-purple-600/30 rounded-full blur-3xl opacity-70"
           animate={{
@@ -1443,13 +1449,13 @@ const History = () => {
           />
           {/* Header */}
           <div className="relative">
-            <div className="absolute inset-0 bg-gradient-to-r from-purple-600/10 to-blue-600/10 rounded-2xl md:rounded-3xl blur-xl opacity-60" />
-            <div className="relative bg-black/20 backdrop-blur-xl rounded-2xl md:rounded-3xl p-4 md:p-6 border border-white/10">
-              <div className="flex flex-col gap-3 md:gap-4">
+            <div className="absolute inset-0 rounded-2xl md:rounded-3xl bg-gradient-to-r from-[#3A5AFE0A] via-[#8B5CF60A] to-transparent blur-xl opacity-80 dark:from-purple-600/10 dark:to-blue-600/10" />
+            <div className="relative rounded-2xl md:rounded-3xl border border-border bg-card shadow-soft-elevated backdrop-blur-xl dark:bg-black/30 dark:border-white/10">
+              <div className="flex flex-col gap-3 md:gap-4 px-4 py-3 sm:px-6 sm:py-4">
                 <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 md:gap-4">
                   <div className="flex-1 min-w-0">
                     <motion.h1
-                      className="text-2xl md:text-3xl lg:text-4xl font-bold bg-gradient-to-r from-white via-purple-200 to-blue-200 bg-clip-text text-transparent mb-2 md:mb-3"
+                      className="text-2xl md:text-3xl lg:text-4xl font-bold text-foreground dark:bg-gradient-to-r dark:from-white dark:via-purple-200 dark:to-blue-200 dark:bg-clip-text dark:text-transparent mb-2 md:mb-3"
                       initial={{ opacity: 0, x: -20 }}
                       animate={{ opacity: 1, x: 0 }}
                       transition={{ delay: 0.2 }}
@@ -1457,7 +1463,7 @@ const History = () => {
                       Upload History
                     </motion.h1>
                     <motion.p
-                      className="text-gray-400 text-sm md:text-base lg:text-lg"
+                      className="text-sm md:text-base lg:text-lg text-muted-foreground"
                       initial={{ opacity: 0, x: -20 }}
                       animate={{ opacity: 1, x: 0 }}
                       transition={{ delay: 0.3 }}
@@ -1528,14 +1534,14 @@ const History = () => {
                 <div
                   className={`absolute inset-0 bg-gradient-to-r ${stat.bgColor} rounded-xl md:rounded-2xl blur-xl opacity-60 group-hover:opacity-80 transition-opacity`}
                 />
-                <Card className="relative bg-black/40 backdrop-blur-xl border-white/10 hover:border-white/20 transition-all duration-300">
+                <Card className="relative border border-border bg-card text-foreground shadow-soft-elevated backdrop-blur-xl transition-all duration-300 hover:border-[#C7D2FE] dark:bg-black/40 dark:border-white/10 dark:hover:border-white/20">
                   <CardContent className="p-3 md:p-4 lg:p-6">
                     <div className="flex items-center justify-between">
                       <div className="flex-1 min-w-0">
-                        <p className="text-gray-400 text-xs md:text-sm font-medium truncate">
+                        <p className="text-xs font-medium text-muted-foreground md:text-sm truncate dark:text-gray-400">
                           {stat.title}
                         </p>
-                        <p className="text-lg md:text-xl lg:text-2xl font-bold text-white mt-1 truncate">
+                        <p className="mt-1 text-lg font-bold text-foreground md:text-xl lg:text-2xl truncate dark:text-white">
                           {stat.value}
                         </p>
                       </div>
@@ -1559,15 +1565,15 @@ const History = () => {
             className="relative"
           >
             <div className="absolute inset-0 bg-gradient-to-r from-emerald-600/10 to-cyan-600/10 rounded-2xl md:rounded-3xl blur-xl opacity-60" />
-            <Card className="relative bg-black/20 backdrop-blur-xl border-white/10">
+            <Card className="relative border border-border bg-card text-foreground shadow-soft-elevated backdrop-blur-xl dark:bg-black/20 dark:border-white/10">
               <CardHeader className="p-4 md:p-6">
                 <div className="flex items-center justify-between">
-                  <CardTitle className="text-white flex items-center space-x-2 text-base md:text-lg">
-                    <Database className="w-4 h-4 md:w-5 md:h-5 text-emerald-400" />
+                  <CardTitle className="flex items-center space-x-2 text-base md:text-lg text-foreground dark:text-white">
+                    <Database className="w-4 h-4 md:w-5 md:h-5 text-emerald-500" />
                     <span>History</span>
                     {isPolling && (
-                      <div className="flex items-center space-x-1 text-xs text-emerald-400">
-                        <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse" />
+                      <div className="flex items-center space-x-1 text-xs text-emerald-500">
+                        <div className="h-2 w-2 animate-pulse rounded-full bg-emerald-500" />
                         <span>Live</span>
                       </div>
                     )}
@@ -1579,24 +1585,24 @@ const History = () => {
                       // Force refresh jobs data
                       pollJobStatuses();
                     }}
-                    className="text-xs bg-transparent border-white/20 hover:bg-white/10"
+                    className="text-xs border-border bg-transparent text-muted-foreground hover:bg-muted dark:border-white/20 dark:text-gray-200 dark:hover:bg-white/10"
                   >
                     <Activity className="w-3 h-3 mr-1" />
                     Refresh
                   </Button>
                 </div>
-                <CardDescription className="text-gray-400 text-xs md:text-sm">
+                <CardDescription className="text-xs text-muted-foreground md:text-sm dark:text-gray-400">
                   Completed and queued analyses from the AI service
                 </CardDescription>
               </CardHeader>
               <CardContent className="p-4 md:p-6 pt-0">
                 {uniqueCrewJobs.length === 0 ? (
                   <div className="text-center py-6 md:py-8">
-                    <Sparkles className="w-8 h-8 md:w-12 md:h-12 text-purple-400/50 mx-auto mb-3 md:mb-4" />
-                    <p className="text-gray-400 text-sm md:text-base">
+                    <Sparkles className="mx-auto mb-3 h-8 w-8 text-purple-400/70 md:mb-4 md:h-12 md:w-12" />
+                    <p className="text-sm text-muted-foreground md:text-base dark:text-gray-400">
                       No Deep Research jobs yet
                     </p>
-                    <p className="text-gray-500 text-xs md:text-sm mt-2">
+                    <p className="mt-2 text-xs text-muted-foreground/80 md:text-sm dark:text-gray-500">
                       Start a comprehensive SpareFinder AI Research from the
                       upload page
                     </p>
@@ -1674,14 +1680,14 @@ const History = () => {
                                   <div className="p-4 space-y-3">
                                     {/* Job Info */}
                                     <div>
-                                      <h3 className="text-white font-semibold line-clamp-1 group-hover:text-purple-400 transition-colors">
+                                      <h3 className="font-semibold text-foreground line-clamp-1 transition-colors group-hover:text-[#7C3AED] dark:text-white">
                                         {job.status === "completed"
-                                          ? "✅ Deep Research Complete"
+                                          ? "✅ SpareFinder AI Research"
                                           : job.status === "failed"
                                           ? "❌ Analysis Failed"
                                           : "🤖Deep research Ongoing..."}
                                       </h3>
-                                      <p className="text-xs text-gray-400 font-mono truncate mt-1">
+                                      <p className="mt-1 text-xs font-mono text-muted-foreground truncate dark:text-gray-400">
                                         ID: {job.id?.slice(0, 8)}...
                                       </p>
                                     </div>
@@ -1708,8 +1714,8 @@ const History = () => {
 
                                     {/* Timestamp */}
                                     <div className="flex items-center gap-1.5 text-xs">
-                                      <Clock className="w-4 h-4 text-blue-400" />
-                                      <span className="text-gray-300">
+                                      <Clock className="h-4 w-4 text-[#3B82F6]" />
+                                      <span className="text-muted-foreground dark:text-gray-300">
                                         {new Date(
                                           job.created_at
                                         ).toLocaleString()}

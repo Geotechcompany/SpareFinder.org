@@ -38,6 +38,10 @@ ADD COLUMN IF NOT EXISTS error_message TEXT;
 ALTER TABLE part_searches 
 ADD COLUMN IF NOT EXISTS metadata JSONB DEFAULT '{}';
 
+-- Track automatic retry attempts for failed analyses
+ALTER TABLE part_searches
+ADD COLUMN IF NOT EXISTS retry_count INTEGER DEFAULT 0;
+
 -- Rename processing_time to processing_time_ms if it exists (for consistency)
 -- But keep both for compatibility
 ALTER TABLE part_searches 

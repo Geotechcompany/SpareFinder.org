@@ -100,8 +100,8 @@ const DashboardSidebar: React.FC<SidebarProps> = ({ isCollapsed = false, onToggl
   };
 
   const renderUserSection = (isMobile = false) => (
-    <div className={`p-4 border-t border-white/10 ${isMobile ? '' : ''}`}>
-      <div className="flex items-center space-x-3 p-3 rounded-xl bg-white/5 border border-white/10">
+    <div className={`p-4 border-t border-sidebar-border/80 dark:border-white/10 ${isMobile ? '' : ''}`}>
+      <div className="flex items-center space-x-3 p-3 rounded-xl bg-sidebar-accent/40 border border-sidebar-border dark:bg-white/5 dark:border-white/10">
         <Avatar className="w-10 h-10">
           <AvatarImage src={user?.avatar_url} />
           <AvatarFallback className="bg-gradient-to-r from-green-600 to-emerald-600 text-white">
@@ -110,10 +110,10 @@ const DashboardSidebar: React.FC<SidebarProps> = ({ isCollapsed = false, onToggl
         </Avatar>
         {!isCollapsed && (
           <div className="flex-1">
-            <p className="text-white font-medium">
+            <p className="font-medium text-sidebar-foreground dark:text-white">
               {user?.full_name || user?.email?.split('@')[0] || 'User'}
             </p>
-            <p className="text-gray-400 text-sm">
+            <p className="text-sm text-muted-foreground dark:text-gray-400">
               {user?.company || 'Free Plan'}
             </p>
           </div>
@@ -141,7 +141,7 @@ const DashboardSidebar: React.FC<SidebarProps> = ({ isCollapsed = false, onToggl
         {isMobileOpen && (
           <motion.div 
             onClick={toggleMobileMenu}
-            className="md:hidden fixed inset-0 z-40 bg-black/50 backdrop-blur-sm"
+            className="md:hidden fixed inset-0 z-40 bg-black/40 dark:bg-black/60 backdrop-blur-sm"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -154,28 +154,32 @@ const DashboardSidebar: React.FC<SidebarProps> = ({ isCollapsed = false, onToggl
         initial={{ x: -320 }}
         animate={{ x: isMobileOpen ? 0 : -320 }}
         transition={{ type: "spring", damping: 20, stiffness: 100 }}
-        className="fixed md:hidden z-50 h-full w-[280px] bg-black/95 backdrop-blur-xl border-r border-white/10"
+        className="fixed md:hidden z-50 h-full w-[280px] bg-sidebar text-sidebar-foreground border-r border-sidebar-border backdrop-blur-xl dark:bg-black/95 dark:border-white/10"
       >
         {/* Mobile Header */}
-        <div className="flex items-center justify-between p-4 border-b border-white/10">
+        <div className="flex items-center justify-between p-4 border-b border-sidebar-border/80 dark:border-white/10">
           <div className="flex items-center space-x-3">
             <motion.div
               animate={{ rotate: [0, 360] }}
               transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
-              className="w-8 h-8 bg-gradient-to-r from-purple-600 to-blue-600 rounded-xl flex items-center justify-center"
+              className="w-8 h-8 rounded-xl flex items-center justify-center bg-gradient-to-r from-[#3A5AFE] to-[#4C5DFF] text-white"
             >
-              <Zap className="w-5 h-5 text-white" />
+              <Zap className="w-5 h-5" />
             </motion.div>
             <div>
-              <h2 className="text-white font-bold text-base">SpareFinder</h2>
-              <p className="text-gray-400 text-xs">Mobile Dashboard</p>
+              <h2 className="font-bold text-base text-foreground dark:text-white">
+                SpareFinder
+              </h2>
+              <p className="text-xs text-muted-foreground dark:text-gray-400">
+                Mobile Dashboard
+              </p>
             </div>
           </div>
           <Button
             variant="ghost"
             size="sm"
             onClick={toggleMobileMenu}
-            className="text-gray-400 hover:text-white hover:bg-white/10"
+            className="text-muted-foreground hover:text-foreground hover:bg-sidebar-accent/60 dark:text-gray-400 dark:hover:text-white dark:hover:bg-white/10"
           >
             <X className="w-5 h-5" />
           </Button>
@@ -195,8 +199,8 @@ const DashboardSidebar: React.FC<SidebarProps> = ({ isCollapsed = false, onToggl
                 onClick={toggleMobileMenu}
                 className={`relative flex items-center space-x-3 p-4 rounded-xl transition-all duration-300 group ${
                   isActiveRoute(item.href)
-                    ? 'bg-gradient-to-r from-purple-600/20 to-blue-600/20 border border-purple-500/30 text-white'
-                    : 'text-gray-400 hover:text-white hover:bg-white/5'
+                    ? 'bg-sidebar-accent text-sidebar-accent-foreground border border-sidebar-border/80'
+                    : 'text-sidebar-foreground/80 hover:text-sidebar-foreground hover:bg-sidebar-accent/60 dark:text-gray-400 dark:hover:text-white dark:hover:bg-white/5'
                 }`}
               >
                 <item.icon className="w-5 h-5 flex-shrink-0" />
@@ -223,10 +227,10 @@ const DashboardSidebar: React.FC<SidebarProps> = ({ isCollapsed = false, onToggl
           x: 0 
         }}
         transition={{ duration: 0.3, ease: "easeInOut" }}
-        className="hidden md:flex h-screen bg-black/95 backdrop-blur-xl border-r border-white/10 flex-col fixed left-0 top-0 z-30"
+        className="hidden md:flex h-screen bg-sidebar text-sidebar-foreground border-r border-sidebar-border backdrop-blur-xl flex-col fixed left-0 top-0 z-30 dark:bg-black/95 dark:text-white dark:border-white/10"
       >
         {/* Desktop Header */}
-        <div className="flex items-center justify-between p-6 border-b border-white/10">
+        <div className="flex items-center justify-between p-6 border-b border-sidebar-border/80 dark:border-white/10">
           <AnimatePresence mode="wait">
             {!isCollapsed ? (
               <motion.div
@@ -237,11 +241,20 @@ const DashboardSidebar: React.FC<SidebarProps> = ({ isCollapsed = false, onToggl
                 transition={{ duration: 0.2 }}
                 className="flex items-center space-x-3"
               >
-                <img 
-                  src="/sparefinderlogo.png" 
-                  alt="SpareFinder Logo" 
-                  className="h-12 w-auto object-contain"
-                />
+                <div className="flex items-center">
+                  {/* Light theme logo */}
+                  <img
+                    src="/sparefinderlogo.png"
+                    alt="SpareFinder Logo"
+                    className="h-14 w-auto object-contain dark:hidden"
+                  />
+                  {/* Dark theme logo */}
+                  <img
+                    src="/sparefinderlogodark.png"
+                    alt="SpareFinder Logo"
+                    className="hidden h-14 w-auto object-contain dark:inline-block"
+                  />
+                </div>
               </motion.div>
             ) : (
               <motion.div
@@ -253,9 +266,9 @@ const DashboardSidebar: React.FC<SidebarProps> = ({ isCollapsed = false, onToggl
                 className="mx-auto"
               >
                 <img 
-                  src="/sparefinderlogo.png" 
-                  alt="SpareFinder Logo" 
-                  className="h-10 w-auto object-contain"
+                  src="/sparefinderlogodark.png" 
+                  alt="SpareFinder Icon" 
+                  className="h-11 w-auto object-contain"
                 />
               </motion.div>
             )}
@@ -264,7 +277,7 @@ const DashboardSidebar: React.FC<SidebarProps> = ({ isCollapsed = false, onToggl
           {!isCollapsed && (
             <motion.button
               onClick={onToggle}
-              className="p-2 rounded-lg text-gray-400 hover:text-white hover:bg-white/10 transition-colors"
+              className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-sidebar-accent/60 dark:text-gray-400 dark:hover:text-white dark:hover:bg-white/10 transition-colors"
               whileHover={{ scale: 1.1 }}
               whileTap={{ scale: 0.9 }}
             >
@@ -278,7 +291,7 @@ const DashboardSidebar: React.FC<SidebarProps> = ({ isCollapsed = false, onToggl
           <div className="px-4 py-2">
             <motion.button
               onClick={onToggle}
-              className="w-full p-2 rounded-lg text-gray-400 hover:text-white hover:bg-white/10 transition-colors flex items-center justify-center"
+              className="w-full p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-sidebar-accent/60 dark:text-gray-400 dark:hover:text-white dark:hover:bg-white/10 transition-colors flex items-center justify-center"
               whileHover={{ scale: 1.1 }}
               whileTap={{ scale: 0.9 }}
               initial={{ opacity: 0 }}
@@ -304,8 +317,8 @@ const DashboardSidebar: React.FC<SidebarProps> = ({ isCollapsed = false, onToggl
                 to={item.href}
                 className={`relative flex items-center space-x-3 p-3 rounded-xl transition-all duration-300 group ${
                   isActiveRoute(item.href)
-                    ? 'bg-gradient-to-r from-purple-600/20 to-blue-600/20 border border-purple-500/30 text-white'
-                    : 'text-gray-400 hover:text-white hover:bg-white/5'
+                    ? 'bg-sidebar-accent text-sidebar-accent-foreground border border-sidebar-border/80'
+                    : 'text-sidebar-foreground/80 hover:text-sidebar-foreground hover:bg-sidebar-accent/60 dark:text-gray-400 dark:hover:text-white dark:hover:bg-white/5'
                 }`}
               >
                 {isActiveRoute(item.href) && (

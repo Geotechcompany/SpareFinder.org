@@ -148,36 +148,36 @@ const Register = () => {
   };
 
   return (
-    <div className="min-h-screen bg-black relative overflow-hidden">
+    <div className="relative min-h-screen overflow-hidden bg-gradient-to-b from-background via-[#F0F2F5] to-[#E8EBF1] text-foreground dark:bg-black dark:text-white">
       {/* Dynamic Background */}
-      <div className="absolute inset-0 bg-gradient-to-br from-purple-900/20 via-black to-blue-900/20" />
+      <div className="absolute inset-0 bg-gradient-to-br from-[#3A5AFE0F] via-transparent to-[#06B6D40F] dark:from-purple-900/20 dark:via-black dark:to-blue-900/20" />
       <div className="absolute inset-0">
-        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl animate-pulse" />
+        <div className="absolute top-1/4 left-1/4 h-96 w-96 rounded-full bg-[#3A5AFE14] blur-3xl animate-pulse dark:bg-purple-500/10" />
         <div
-          className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl animate-pulse"
+          className="absolute bottom-1/4 right-1/4 h-96 w-96 rounded-full bg-[#06B6D414] blur-3xl animate-pulse dark:bg-blue-500/10"
           style={{ animationDelay: "2s" }}
         />
-        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-gradient-to-r from-purple-500/5 to-blue-500/5 rounded-full blur-3xl" />
+        <div className="absolute top-1/2 left-1/2 h-[800px] w-[800px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-gradient-to-r from-[#3A5AFE0A] to-[#06B6D40A] blur-3xl dark:from-purple-500/5 dark:to-blue-500/5" />
       </div>
 
       {/* Header */}
-      <div className="absolute top-6 left-6 z-10">
+      <div className="absolute left-6 top-6 z-10">
         <Link
           to="/"
-          className="flex items-center gap-3 text-gray-400 hover:text-white transition-all duration-300 group"
+          className="group flex items-center gap-3 text-muted-foreground transition-all duration-300 hover:text-foreground dark:text-gray-400 dark:hover:text-white"
         >
           <motion.div
             whileHover={{ x: -2 }}
             className="flex items-center gap-2"
           >
-            <ArrowLeft className="w-5 h-5" />
+            <ArrowLeft className="h-5 w-5" />
             <span>Back to Home</span>
           </motion.div>
         </Link>
       </div>
 
       {/* Logo Header */}
-      <div className="absolute top-6 right-6 z-10">
+      <div className="absolute right-6 top-6 z-10">
         <motion.div
           className="relative"
           whileHover={{ scale: 1.05 }}
@@ -191,25 +191,25 @@ const Register = () => {
         </motion.div>
       </div>
 
-      <div className="flex items-center justify-center min-h-screen p-6 relative z-10">
+      <div className="relative z-10 flex min-h-screen items-center justify-center p-6">
         <motion.div
           initial={{ opacity: 0, y: 20, scale: 0.95 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
           transition={{ duration: 0.8, ease: "easeOut" }}
           className="w-full max-w-md"
         >
-          {/* Glassmorphism Card */}
+          {/* Auth Card */}
           <div className="relative">
-            <div className="absolute inset-0 bg-gradient-to-br from-white/[0.07] via-white/[0.02] to-transparent backdrop-blur-3xl rounded-3xl border border-white/10" />
-            <div className="relative bg-gray-900/20 backdrop-blur-3xl rounded-3xl border border-white/10 shadow-2xl shadow-purple-500/10 p-8">
+            <div className="absolute inset-0 rounded-3xl border border-border/70 bg-gradient-to-br from-white/[0.65] via-white/[0.35] to-transparent backdrop-blur-3xl shadow-soft-elevated dark:border-white/10 dark:from-white/[0.07] dark:via-white/[0.02]" />
+            <div className="relative rounded-3xl border border-border bg-card/95 p-8 text-foreground shadow-soft-elevated backdrop-blur-3xl dark:border-white/10 dark:bg-gray-900/20 dark:text-white dark:shadow-purple-500/10">
               {/* Animated Badge */}
               <motion.div
                 initial={{ opacity: 0, scale: 0.5 }}
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ duration: 0.6, delay: 0.2 }}
-                className="flex justify-center mb-8"
+                className="mb-8 flex justify-center"
               >
-                <div className="inline-flex items-center px-4 py-2 bg-gradient-to-r from-purple-600/20 to-blue-600/20 rounded-full border border-purple-500/30 backdrop-blur-xl">
+                <div className="inline-flex items-center rounded-full border border-border bg-gradient-to-r from-[#3A5AFE14] via-[#06B6D414] to-transparent px-4 py-2 text-xs font-medium text-primary shadow-soft-elevated backdrop-blur-xl dark:border-purple-500/30 dark:from-purple-600/20 dark:to-blue-600/20">
                   <motion.div
                     animate={{ rotate: [0, 360] }}
                     transition={{
@@ -219,9 +219,9 @@ const Register = () => {
                     }}
                     className="mr-2"
                   >
-                    <Sparkles className="w-4 h-4 text-purple-400" />
+                    <Sparkles className="h-4 w-4 text-primary dark:text-purple-400" />
                   </motion.div>
-                  <span className="text-purple-300 text-sm font-semibold">
+                  <span className="text-sm font-semibold">
                     Join SpareFinder
                   </span>
                 </div>
@@ -232,12 +232,12 @@ const Register = () => {
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.6, delay: 0.3 }}
-                className="text-center mb-8"
+                className="mb-8 text-center"
               >
-                <h1 className="text-4xl font-bold text-white mb-3">
+                <h1 className="mb-3 text-4xl font-bold text-foreground dark:text-white">
                   Create Account
                 </h1>
-                <p className="text-gray-300 text-lg">
+                <p className="text-lg text-muted-foreground dark:text-gray-300">
                   Start identifying parts with AI in seconds
                 </p>
               </motion.div>
@@ -271,36 +271,42 @@ const Register = () => {
                 transition={{ delay: 0.4, duration: 0.6 }}
               >
                 <div className="space-y-2">
-                  <Label htmlFor="name" className="text-gray-200 font-medium">
+                  <Label
+                    htmlFor="name"
+                    className="text-sm font-medium text-foreground dark:text-gray-200"
+                  >
                     Full Name
                   </Label>
                   <div className="relative group">
-                    <User className="absolute left-4 top-4 h-5 w-5 text-gray-400 group-focus-within:text-purple-400 transition-colors" />
+                    <User className="absolute left-4 top-4 h-5 w-5 text-muted-foreground transition-colors group-focus-within:text-primary dark:text-gray-400 dark:group-focus-within:text-purple-400" />
                     <Input
                       id="name"
                       type="text"
                       placeholder="Enter your full name"
                       value={formData.name}
                       onChange={(e) => updateFormData("name", e.target.value)}
-                      className="pl-12 h-14 bg-white/5 border-white/10 text-white placeholder:text-gray-500 focus:border-purple-500/50 focus:ring-2 focus:ring-purple-500/20 rounded-xl backdrop-blur-xl transition-all duration-300"
+                      className="h-14 rounded-xl border border-border bg-card pl-12 text-foreground placeholder:text-muted-foreground shadow-sm transition-all duration-300 focus:border-primary/60 focus:ring-2 focus:ring-primary/20 dark:bg-white/5 dark:border-white/10 dark:text-white dark:placeholder:text-gray-500 dark:focus:border-purple-500/50 dark:focus:ring-purple-500/20"
                       required
                     />
                   </div>
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="email" className="text-gray-200 font-medium">
+                  <Label
+                    htmlFor="email"
+                    className="text-sm font-medium text-foreground dark:text-gray-200"
+                  >
                     Email Address
                   </Label>
                   <div className="relative group">
-                    <Mail className="absolute left-4 top-4 h-5 w-5 text-gray-400 group-focus-within:text-purple-400 transition-colors" />
+                    <Mail className="absolute left-4 top-4 h-5 w-5 text-muted-foreground transition-colors group-focus-within:text-primary dark:text-gray-400 dark:group-focus-within:text-purple-400" />
                     <Input
                       id="email"
                       type="email"
                       placeholder="Enter your email"
                       value={formData.email}
                       onChange={(e) => updateFormData("email", e.target.value)}
-                      className="pl-12 h-14 bg-white/5 border-white/10 text-white placeholder:text-gray-500 focus:border-purple-500/50 focus:ring-2 focus:ring-purple-500/20 rounded-xl backdrop-blur-xl transition-all duration-300"
+                      className="h-14 rounded-xl border border-border bg-card pl-12 text-foreground placeholder:text-muted-foreground shadow-sm transition-all duration-300 focus:border-primary/60 focus:ring-2 focus:ring-primary/20 dark:bg-white/5 dark:border-white/10 dark:text-white dark:placeholder:text-gray-500 dark:focus:border-purple-500/50 dark:focus:ring-purple-500/20"
                       required
                     />
                   </div>
@@ -309,12 +315,12 @@ const Register = () => {
                 <div className="space-y-2">
                   <Label
                     htmlFor="company"
-                    className="text-gray-200 font-medium"
+                    className="text-sm font-medium text-foreground dark:text-gray-200"
                   >
                     Company (Optional)
                   </Label>
                   <div className="relative group">
-                    <Building className="absolute left-4 top-4 h-5 w-5 text-gray-400 group-focus-within:text-purple-400 transition-colors" />
+                    <Building className="absolute left-4 top-4 h-5 w-5 text-muted-foreground transition-colors group-focus-within:text-primary dark:text-gray-400 dark:group-focus-within:text-purple-400" />
                     <Input
                       id="company"
                       type="text"
@@ -323,7 +329,7 @@ const Register = () => {
                       onChange={(e) =>
                         updateFormData("company", e.target.value)
                       }
-                      className="pl-12 h-14 bg-white/5 border-white/10 text-white placeholder:text-gray-500 focus:border-purple-500/50 focus:ring-2 focus:ring-purple-500/20 rounded-xl backdrop-blur-xl transition-all duration-300"
+                      className="h-14 rounded-xl border border-border bg-card pl-12 text-foreground placeholder:text-muted-foreground shadow-sm transition-all duration-300 focus:border-primary/60 focus:ring-2 focus:ring-primary/20 dark:bg-white/5 dark:border-white/10 dark:text-white dark:placeholder:text-gray-500 dark:focus:border-purple-500/50 dark:focus:ring-purple-500/20"
                     />
                   </div>
                 </div>

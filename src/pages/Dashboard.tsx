@@ -29,12 +29,9 @@ import {
 import DashboardSidebar from "@/components/DashboardSidebar";
 import MobileSidebar from "@/components/MobileSidebar";
 import { useDashboardLayout } from "@/contexts/DashboardLayoutContext";
-import CreditsDisplay from "@/components/CreditsDisplay";
 import { useAuth } from "@/contexts/AuthContext";
 import { format } from "date-fns";
 import { useNavigate } from "react-router-dom";
-import { Loader2 } from "lucide-react";
-import OnboardingGuide from "@/components/OnboardingGuide";
 import { dashboardApi, tokenStorage, apiClient } from "@/lib/api";
 import { useToast } from "@/components/ui/use-toast";
 import DashboardSkeleton from "@/components/DashboardSkeleton";
@@ -89,10 +86,25 @@ const Dashboard = () => {
   ]);
 
   const { toast } = useToast();
-  // Trigger onboarding from overview
-  const [showTourNow, setShowTourNow] = useState(false);
+
+  const getMetricProgress = (raw: string) => {
+    const match = raw?.toString().match(/([\d.]+)/);
+    if (!match) return 0;
+    const value = parseFloat(match[1]);
+    if (Number.isNaN(value)) return 0;
+    if (raw.includes("%")) {
+      return Math.max(0, Math.min(100, value));
+    }
+    return 0;
+  };
+  // Trigger onboarding from overview: jump directly to Upload with forced tour
   const startOnboarding = () => {
-    setShowTourNow(true);
+    try {
+      localStorage.setItem("onboarding_force_start_v1", "1");
+    } catch (err) {
+      console.warn("Failed to persist onboarding flag:", err);
+    }
+    navigate("/dashboard/upload");
   };
 
   // Check if user has valid token and is authenticated
@@ -557,24 +569,6 @@ const Dashboard = () => {
     setIsMobileMenuOpen(!isMobileMenuOpen);
   };
 
-  const handleRefreshData = () => {
-    if (!hasValidToken()) {
-      toast({
-        title: "Authentication Required",
-        description: "Please log in to refresh data.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    isInitializedRef.current = false; // Reset initialization flag
-    fetchDashboardData();
-    toast({
-      title: "Data Refreshed",
-      description: "Dashboard data has been updated.",
-    });
-  };
-
   // Removed periodic auto-refresh to avoid repeated background requests when stats are legitimately empty
 
   if (isDataLoading) {
@@ -624,28 +618,12 @@ const Dashboard = () => {
           />
           <button
             onClick={handleToggleMobileMenu}
-            className="fixed top-4 right-4 z-50 p-2 rounded-lg bg-black/20 backdrop-blur-xl border border-white/10 md:hidden"
+            className="fixed top-3 right-3 z-40 flex h-9 w-9 items-center justify-center rounded-full border border-border bg-card/95 text-muted-foreground shadow-soft-elevated backdrop-blur-sm md:hidden dark:bg-black/70 dark:border-white/10 dark:text-white"
+            aria-label="Open navigation"
           >
-            <Menu className="w-5 h-5 text-white" />
+            <Menu className="w-5 h-5" />
           </button>
         </>
-      )}
-
-      {/* Tour welcome when triggered from dashboard */}
-      {showTourNow && (
-        <OnboardingGuide
-          showWelcome
-          force
-          steps={[]}
-          onStart={() => {
-            try {
-              localStorage.setItem("onboarding_force_start_v1", "1");
-            } catch {}
-            setShowTourNow(false);
-            navigate("/dashboard/upload");
-          }}
-          onDismiss={() => setShowTourNow(false)}
-        />
       )}
 
       {/* Main Content */}
@@ -674,13 +652,14 @@ const Dashboard = () => {
         >
           {/* Header */}
           <div className="relative">
-            <div className="relative bg-gradient-to-br from-slate-900/70 to-slate-800/40 backdrop-blur-xl rounded-2xl sm:rounded-3xl p-4 sm:p-6 border border-slate-300 dark:border-slate-700/60 shadow-[0_10px_30px_rgba(0,0,0,0.35)]">
-              <div className="flex flex-col gap-4">
+            <div className="relative rounded-2xl sm:rounded-3xl border border-border/80 bg-card shadow-soft-elevated dark:bg-card/90 dark:shadow-[0_18px_45px_rgba(15,23,42,0.55)]">
+              <div className="pointer-events-none absolute inset-0 rounded-2xl sm:rounded-3xl dark:bg-gradient-to-r dark:from-purple-500/15 dark:via-blue-500/10 dark:to-transparent" />
+              <div className="flex flex-col gap-4 px-4 py-3 sm:px-6 sm:py-4">
                 {/* Top Row - Welcome Message and Actions */}
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
                   <div>
                     <motion.h1
-                      className="text-2xl sm:text-3xl lg:text-4xl font-bold bg-gradient-to-r from-white via-purple-200 to-blue-200 bg-clip-text text-transparent"
+                      className="text-2xl sm:text-3xl lg:text-4xl font-bold text-foreground dark:bg-gradient-to-r dark:from-foreground dark:via-purple-300 dark:to-blue-300 dark:bg-clip-text dark:text-transparent"
                       initial={{ opacity: 0, x: -20 }}
                       animate={{ opacity: 1, x: 0 }}
                       transition={{ delay: 0.2 }}
@@ -689,7 +668,7 @@ const Dashboard = () => {
                       {user?.full_name || user?.email?.split("@")[0] || "User"}
                     </motion.h1>
                     <motion.p
-                      className="text-sm sm:text-base text-gray-400 mt-2"
+                      className="text-sm sm:text-base text-muted-foreground mt-2"
                       initial={{ opacity: 0, x: -20 }}
                       animate={{ opacity: 1, x: 0 }}
                       transition={{ delay: 0.3 }}
@@ -699,26 +678,11 @@ const Dashboard = () => {
                     </motion.p>
                   </div>
                   <motion.div
-                    className="flex space-x-3"
+                    className="flex flex-wrap items-center gap-2 sm:gap-3"
                     initial={{ opacity: 0, scale: 0.8 }}
                     animate={{ opacity: 1, scale: 1 }}
                     transition={{ delay: 0.4 }}
                   >
-                    <motion.div
-                      whileHover={{ scale: 1.05, y: -2 }}
-                      whileTap={{ scale: 0.95 }}
-                      className="w-full sm:w-auto"
-                    >
-                      <Button
-                        onClick={handleRefreshData}
-                        variant="outline"
-                        className="w-full sm:w-auto bg-slate-800/50 border-slate-600 text-slate-200 hover:bg-slate-700/60 focus:ring-2 focus:ring-blue-400/30 mr-2"
-                      >
-                        <Loader2 className="w-4 h-4 mr-2" />
-                        Refresh Data
-                      </Button>
-                    </motion.div>
-
                     <motion.div
                       whileHover={{ scale: 1.05, y: -2 }}
                       whileTap={{ scale: 0.95 }}
@@ -746,19 +710,6 @@ const Dashboard = () => {
                     </motion.div>
                   </motion.div>
                 </div>
-
-                {/* Bottom Row - Credits Display */}
-                <motion.div
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.5 }}
-                  className="flex justify-center sm:justify-start"
-                >
-                  <CreditsDisplay
-                    size="medium"
-                    className="w-full sm:w-auto max-w-md"
-                  />
-                </motion.div>
               </div>
             </div>
           </div>
@@ -814,32 +765,44 @@ const Dashboard = () => {
                 className="relative group"
               >
                 <div
-                  className={`absolute inset-0 bg-gradient-to-br ${stat.bgColor} rounded-xl sm:rounded-2xl shadow-[0_10px_30px_rgba(0,0,0,0.35)] opacity-100`}
+                  className="absolute inset-0 rounded-xl sm:rounded-2xl bg-card/95 shadow-[0_18px_45px_rgba(15,23,42,0.06)] dark:bg-gradient-to-br dark:from-slate-900/40 dark:to-slate-800/30 dark:shadow-[0_10px_30px_rgba(0,0,0,0.35)]"
                 />
-                <Card className="relative bg-transparent backdrop-blur-xl border border-slate-300 dark:border-slate-700/60 hover:border-slate-500/70 transition-all duration-300">
+                <Card className="relative bg-transparent backdrop-blur-xl border border-border hover:border-border/80 transition-all duration-300 dark:border-slate-700/60 dark:hover:border-slate-500/70">
                   <CardContent className="p-4 sm:p-6">
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="text-slate-400 text-xs sm:text-sm font-medium">
+                        <p className="text-xs sm:text-sm font-medium text-muted-foreground">
                           {stat.title}
                         </p>
-                        <p className="text-xl sm:text-2xl font-bold text-white mt-1">
+                        <p className="mt-1 text-xl sm:text-2xl font-bold text-foreground dark:text-white">
                           {stat.value}
                         </p>
                         <p
-                          className={`text-xs sm:text-sm mt-1 ${
+                          className={`mt-1 text-xs sm:text-sm ${
                             stat.change.startsWith("+")
-                              ? "text-emerald-400"
-                              : "text-red-400"
+                              ? "text-emerald-500"
+                              : "text-red-500"
                           }`}
                         >
                           {stat.change} from last month
                         </p>
                       </div>
-                      <div
-                        className={`p-2 sm:p-3 rounded-lg sm:rounded-xl bg-gradient-to-r ${stat.color} shadow-lg`}
-                      >
-                        <stat.icon className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
+                      <div className="flex items-center gap-3">
+                        <div
+                          className={`relative flex h-10 w-10 items-center justify-center rounded-full bg-muted/60 shadow-inner`}
+                        >
+                          <div
+                            className="absolute inset-0 rounded-full"
+                            style={{
+                              background: `conic-gradient(hsl(var(--primary)) ${getMetricProgress(
+                                stat.value
+                              )}%, rgba(148,163,184,0.18) 0)`,
+                            }}
+                          />
+                          <div className="relative h-7 w-7 rounded-full bg-card flex items-center justify-center">
+                            <stat.icon className="w-4 h-4 text-primary" />
+                          </div>
+                        </div>
                       </div>
                     </div>
                   </CardContent>
@@ -855,13 +818,13 @@ const Dashboard = () => {
             transition={{ delay: 0.6 }}
             className="relative"
           >
-            <Card className="relative bg-gradient-to-br from-slate-900/70 to-slate-800/40 backdrop-blur-xl border border-slate-300 dark:border-slate-700/60 shadow-[0_10px_30px_rgba(0,0,0,0.35)]">
+            <Card className="relative border border-border bg-card/95 backdrop-blur-xl shadow-[0_18px_45px_rgba(15,23,42,0.06)] dark:bg-gradient-to-br dark:from-slate-900/70 dark:to-slate-800/40 dark:border-slate-700/60">
               <CardHeader className="p-4 sm:p-6">
-                <CardTitle className="text-white flex items-center space-x-2 text-lg sm:text-xl">
-                  <Zap className="w-5 h-5 text-yellow-400" />
+                <CardTitle className="flex items-center space-x-2 text-lg sm:text-xl text-foreground dark:text-white">
+                  <Zap className="w-5 h-5 text-yellow-500 dark:text-yellow-400" />
                   <span>Performance Overview</span>
                 </CardTitle>
-                <CardDescription className="text-slate-400 text-sm">
+                <CardDescription className="text-sm text-muted-foreground">
                   AI model insights and system performance metrics
                 </CardDescription>
               </CardHeader>
@@ -875,13 +838,11 @@ const Dashboard = () => {
                       transition={{ delay: 0.7 + index * 0.1 }}
                       className="relative group"
                     >
-                      <div
-                        className={`absolute inset-0 bg-gradient-to-br from-slate-900/60 to-slate-800/40 rounded-2xl`}
-                      />
-                      <div className="relative p-4 rounded-2xl border border-white/10 hover:border-white/20 transition-colors">
+                      <div className="absolute inset-0 rounded-2xl bg-card/80 dark:bg-gradient-to-br dark:from-slate-900/60 dark:to-slate-800/40" />
+                      <div className="relative p-4 rounded-2xl border border-border/80 bg-background/80 backdrop-blur-sm hover:border-border transition-colors dark:border-white/10 dark:bg-transparent dark:hover:border-white/20">
                         <div className="flex items-center justify-between mb-3">
                           <div
-                            className={`p-2 rounded-xl bg-gradient-to-r from-blue-500 to-blue-600 shadow-lg`}
+                            className="p-2 rounded-xl bg-gradient-to-r from-[#3A5AFE] to-[#4C5DFF] shadow-lg"
                           >
                             <metric.icon className="w-5 h-5 text-white" />
                           </div>
@@ -893,10 +854,10 @@ const Dashboard = () => {
                           </Badge>
                         </div>
                         <div>
-                          <p className="text-slate-400 text-sm">
+                          <p className="text-sm text-muted-foreground">
                             {metric.label}
                           </p>
-                          <p className="text-2xl font-bold text-white">
+                          <p className="text-2xl font-bold text-foreground dark:text-white">
                             {metric.value}
                           </p>
                         </div>
@@ -915,13 +876,13 @@ const Dashboard = () => {
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: 0.8 }}
             >
-              <Card className="bg-gradient-to-br from-slate-900/70 to-slate-800/40 backdrop-blur-xl border border-slate-300 dark:border-slate-700/60 h-full shadow-[0_10px_30px_rgba(0,0,0,0.35)]">
+              <Card className="h-full border border-border bg-card/95 bg-grid-soft backdrop-blur-xl shadow-soft-elevated dark:bg-gradient-to-br dark:from-slate-900/70 dark:to-slate-800/40 dark:border-slate-700/60 dark:shadow-[0_18px_45px_rgba(15,23,42,0.35)]">
                 <CardHeader className="p-4 sm:p-6">
-                  <CardTitle className="text-white flex items-center space-x-2 text-lg sm:text-xl">
-                    <Activity className="w-5 h-5 text-blue-400" />
+                  <CardTitle className="flex items-center space-x-2 text-lg sm:text-xl text-foreground dark:text-white">
+                    <Activity className="w-5 h-5 text-primary" />
                     <span>Recent Activity</span>
                   </CardTitle>
-                  <CardDescription className="text-slate-400 text-sm">
+                  <CardDescription className="text-sm text-muted-foreground">
                     Your latest part identification results
                   </CardDescription>
                 </CardHeader>
@@ -929,10 +890,10 @@ const Dashboard = () => {
                   {recentActivities.length === 0 ? (
                     <div className="text-center py-8">
                       <Activity className="w-12 h-12 text-gray-500 mx-auto mb-4" />
-                      <p className="text-slate-400 text-sm">
+                      <p className="text-sm text-muted-foreground">
                         No recent activities
                       </p>
-                      <p className="text-slate-500 text-xs mt-1">
+                      <p className="mt-1 text-xs text-muted-foreground/80">
                         Upload some parts to see activity here
                       </p>
                     </div>
@@ -940,36 +901,42 @@ const Dashboard = () => {
                     recentActivities.map((activity, index) => (
                       <motion.div
                         key={activity.id}
-                        initial={{ opacity: 0, x: -20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: 0.9 + index * 0.1 }}
-                        className="flex items-start space-x-3 p-3 rounded-xl hover:bg-slate-800/40 transition-colors group"
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.9 + index * 0.08 }}
+                        className="relative flex items-start gap-3 pl-5 py-3 rounded-xl hover:bg-muted/70 dark:hover:bg-slate-800/40 transition-colors group"
                       >
-                        <div className="p-2 bg-gradient-to-r from-slate-800/60 to-slate-700/40 rounded-lg border border-slate-700/60 group-hover:border-slate-500/60 transition-colors">
+                        {index !== recentActivities.length - 1 && (
+                          <div className="pointer-events-none absolute left-4 top-8 bottom-0 w-px bg-border/70" />
+                        )}
+                        <div className="absolute left-0 top-4 flex h-3 w-3 -translate-x-1/2 items-center justify-center rounded-full bg-background ring-4 ring-muted/80 dark:ring-slate-800">
+                          <span className="block h-2 w-2 rounded-full bg-primary" />
+                        </div>
+                        <div className="flex h-9 w-9 items-center justify-center rounded-full border border-border bg-muted/80 shadow-sm group-hover:shadow-md dark:bg-gradient-to-r dark:from-slate-800/60 dark:to-slate-700/40 dark:border-slate-700/60">
                           {activity.type === "upload" ? (
-                            <Upload className="w-4 h-4 text-purple-400" />
+                            <Upload className="w-4 h-4 text-primary" />
                           ) : (
-                            <Search className="w-4 h-4 text-blue-400" />
+                            <Search className="w-4 h-4 text-primary" />
                           )}
                         </div>
                         <div className="flex-1 min-w-0">
-                          <div className="flex items-center justify-between">
-                            <p className="text-white text-sm font-medium truncate">
+                          <div className="flex items-center justify-between gap-2">
+                            <p className="text-sm font-medium truncate text-foreground dark:text-white">
                               {activity.title}
                             </p>
                             {activity.confidence !== null && (
                               <Badge
                                 variant="secondary"
-                                className="bg-emerald-600/20 text-emerald-400 border-emerald-500/30 text-xs"
+                                className="bg-emerald-50 text-emerald-600 border-emerald-200 text-[11px] px-2 py-0.5 dark:bg-emerald-600/20 dark:text-emerald-300 dark:border-emerald-500/40"
                               >
                                 {activity.confidence}%
                               </Badge>
                             )}
                           </div>
-                          <p className="text-slate-400 text-xs mt-1">
+                          <p className="mt-1 text-xs text-muted-foreground">
                             {activity.description}
                           </p>
-                          <p className="text-slate-500 text-xs mt-1">
+                          <p className="mt-1 text-[11px] text-muted-foreground/80">
                             {activity.time}
                           </p>
                         </div>
@@ -985,13 +952,13 @@ const Dashboard = () => {
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: 0.8 }}
             >
-              <Card className="bg-gradient-to-br from-slate-900/70 to-slate-800/40 backdrop-blur-xl border border-slate-300 dark:border-slate-700/60 h-full shadow-[0_10px_30px_rgba(0,0,0,0.35)]">
+              <Card className="h-full border border-border bg-card/95 backdrop-blur-xl shadow-[0_18px_45px_rgba(15,23,42,0.06)] dark:bg-gradient-to-br dark:from-slate-900/70 dark:to-slate-800/40 dark:border-slate-700/60">
                 <CardHeader className="p-4 sm:p-6">
-                  <CardTitle className="text-white flex items-center space-x-2 text-lg sm:text-xl">
-                    <TrendingUp className="w-5 h-5 text-green-400" />
+                  <CardTitle className="flex items-center space-x-2 text-lg sm:text-xl text-foreground dark:text-white">
+                    <TrendingUp className="w-5 h-5 text-emerald-500" />
                     <span>Quick Actions</span>
                   </CardTitle>
-                  <CardDescription className="text-slate-400 text-sm">
+                  <CardDescription className="text-sm text-muted-foreground">
                     Frequently used features and tools
                   </CardDescription>
                 </CardHeader>
@@ -1026,22 +993,29 @@ const Dashboard = () => {
                       key={action.label}
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: 1 + index * 0.1 }}
-                      whileHover={{ scale: 1.02, x: 5 }}
+                      transition={{ delay: 1 + index * 0.08 }}
+                      whileHover={{ y: -2, scale: 1.02 }}
                       whileTap={{ scale: 0.98 }}
                     >
-                      <Button
-                        variant="ghost"
+                      <button
+                        type="button"
                         onClick={() => navigate(action.href)}
-                        className="w-full justify-start h-12 text-slate-300 hover:text-white hover:bg-slate-800/40 group"
+                        className="flex w-full items-center justify-between rounded-2xl border border-border bg-background/80 px-3 py-2.5 text-left text-sm shadow-sm transition-all hover:border-primary/40 hover:bg-card hover:shadow-soft-elevated/60"
                       >
-                        <div
-                          className={`p-2 rounded-lg bg-gradient-to-r ${action.color} mr-3 group-hover:scale-110 transition-transform`}
-                        >
-                          <action.icon className="w-4 h-4 text-white" />
+                        <div className="flex items-center gap-3">
+                          <div
+                            className={`flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-r ${action.color} shadow-md shadow-primary/20`}
+                          >
+                            <action.icon className="w-4 h-4 text-white" />
+                          </div>
+                          <span className="font-medium text-foreground">
+                            {action.label}
+                          </span>
                         </div>
-                        <span className="font-medium">{action.label}</span>
-                      </Button>
+                        <span className="text-xs text-muted-foreground">
+                          Open
+                        </span>
+                      </button>
                     </motion.div>
                   ))}
                 </CardContent>

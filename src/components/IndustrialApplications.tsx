@@ -36,32 +36,32 @@ const IndustrialApplications = () => {
   ];
 
   return (
-    <section className="relative py-24 px-4 sm:px-6 lg:px-8 overflow-hidden bg-black">
+    <section className="relative overflow-hidden bg-background py-24 px-4 sm:px-6 lg:px-8 dark:bg-black">
       {/* Background Effects */}
       <div className="absolute inset-0">
-        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-purple-500/5 rounded-full blur-3xl" />
-        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-blue-500/5 rounded-full blur-3xl" />
+        <div className="absolute top-1/4 left-1/4 h-96 w-96 rounded-full bg-[#3A5AFE0F] blur-3xl dark:bg-purple-500/5" />
+        <div className="absolute bottom-1/4 right-1/4 h-96 w-96 rounded-full bg-[#06B6D40F] blur-3xl dark:bg-blue-500/5" />
       </div>
 
-      <div className="max-w-7xl mx-auto relative z-10">
+      <div className="relative z-10 mx-auto max-w-7xl">
         {/* Section Header */}
-        <div className="text-center mb-20">
-          <div className="inline-flex items-center px-4 py-2 bg-gradient-to-r from-orange-500/20 to-red-500/20 rounded-full border border-orange-500/30 mb-8">
-            <Factory className="w-4 h-4 text-orange-400 mr-2" />
-            <span className="text-sm text-orange-300 font-medium">
+        <div className="mb-20 text-center">
+          <div className="mb-8 inline-flex items-center rounded-full border border-orange-500/30 bg-gradient-to-r from-orange-500/10 to-red-500/10 px-4 py-2 text-sm font-medium text-orange-500 shadow-soft-elevated backdrop-blur-xl dark:text-orange-300">
+            <Factory className="mr-2 h-4 w-4 text-orange-400" />
+            <span>
               Industry Applications
             </span>
           </div>
-          <h2 className="text-5xl lg:text-6xl font-bold bg-gradient-to-r from-white via-orange-200 to-red-200 bg-clip-text text-transparent mb-6">
+          <h2 className="mb-6 text-4xl font-bold tracking-tight text-foreground sm:text-5xl lg:text-6xl dark:bg-gradient-to-r dark:from-white dark:via-orange-200 dark:to-red-200 dark:bg-clip-text dark:text-transparent">
             Serving Every Industry
           </h2>
-          <p className="text-xl text-gray-400 max-w-3xl mx-auto leading-relaxed">
+          <p className="mx-auto max-w-3xl text-xl leading-relaxed text-muted-foreground dark:text-gray-400">
             From automotive to aerospace, our AI-powered part identification works across all major industrial sectors
           </p>
         </div>
 
         {/* 3D Cards Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-3">
           {applications.map((app, index) => (
             <Animated3DCard
               key={index}
@@ -73,8 +73,8 @@ const IndustrialApplications = () => {
         </div>
 
         {/* Bottom CTA */}
-        <div className="text-center mt-20">
-          <p className="text-gray-400 text-lg">
+        <div className="mt-20 text-center">
+          <p className="text-lg text-muted-foreground dark:text-gray-400">
             Don't see your industry? Our AI recognizes parts across 50+ categories
           </p>
         </div>

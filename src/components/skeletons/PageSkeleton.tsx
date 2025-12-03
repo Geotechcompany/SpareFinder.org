@@ -215,6 +215,179 @@ const PageSkeleton: React.FC<PageSkeletonProps> = ({
     </div>
   );
 
+  const renderHistoryPage = () => (
+    <div className="space-y-8">
+      {/* History Header */}
+      <motion.div variants={itemVariants} className="space-y-2">
+        <Skeleton className="h-7 w-56" variant="text" />
+        <Skeleton className="h-4 w-80" variant="text" />
+      </motion.div>
+
+      {/* Stats Grid */}
+      <motion.div
+        variants={itemVariants}
+        className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4"
+      >
+        {Array.from({ length: 4 }).map((_, i) => (
+          <div
+            key={i}
+            className="rounded-2xl border bg-card p-4 sm:p-5 shadow-sm"
+          >
+            <div className="mb-3 flex items-center justify-between">
+              <Skeleton className="h-4 w-24" variant="text" />
+              <Skeleton className="h-9 w-9 rounded-xl" variant="avatar" />
+            </div>
+            <Skeleton className="mb-1 h-7 w-16" variant="text" />
+            <Skeleton className="h-3 w-24" variant="text" />
+          </div>
+        ))}
+      </motion.div>
+
+      {/* Deep Research Jobs Grid */}
+      <motion.div variants={itemVariants} className="space-y-4">
+        <Skeleton className="h-5 w-40" variant="text" />
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div
+              key={i}
+              className="overflow-hidden rounded-2xl border bg-card shadow-sm"
+            >
+              <Skeleton className="h-32 w-full" variant="image" />
+              <div className="space-y-2 p-4">
+                <Skeleton className="h-4 w-40" variant="text" />
+                <Skeleton className="h-3 w-32" variant="text" />
+                <Skeleton className="h-3 w-24" variant="text" />
+                <div className="flex items-center justify-between pt-2">
+                  <Skeleton className="h-8 w-24" variant="button" />
+                  <div className="flex items-center space-x-2">
+                    <Skeleton className="h-8 w-8" variant="button" />
+                    <Skeleton className="h-8 w-8" variant="button" />
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </motion.div>
+    </div>
+  );
+
+  const renderSettingsPage = () => (
+    <div className="space-y-8">
+      {/* Settings Header */}
+      <motion.div variants={itemVariants} className="space-y-2">
+        <Skeleton className="h-7 w-56" variant="text" />
+        <Skeleton className="h-4 w-80" variant="text" />
+      </motion.div>
+
+      {/* Settings Layout: sidebar tabs + content */}
+      <motion.div
+        variants={itemVariants}
+        className="grid grid-cols-1 gap-6 lg:grid-cols-4"
+      >
+        {/* Tabs column */}
+        <div className="lg:col-span-1 rounded-2xl border bg-card p-4 space-y-3">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div
+              key={i}
+              className="flex items-center justify-between rounded-xl border border-border/60 px-3 py-2"
+            >
+              <div className="flex items-center space-x-3">
+                <Skeleton className="h-5 w-5" variant="button" />
+                <Skeleton className="h-4 w-24" variant="text" />
+              </div>
+              <Skeleton className="h-4 w-8" variant="text" />
+            </div>
+          ))}
+        </div>
+
+        {/* Forms column */}
+        <div className="lg:col-span-3 space-y-6">
+          {Array.from({ length: 3 }).map((_, idx) => (
+            <div
+              key={idx}
+              className="rounded-2xl border bg-card p-4 sm:p-6 space-y-4"
+            >
+              <div className="space-y-2">
+                <Skeleton className="h-5 w-40" variant="text" />
+                <Skeleton className="h-4 w-64" variant="text" />
+              </div>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <div key={i} className="space-y-2">
+                    <Skeleton className="h-4 w-24" variant="text" />
+                    <Skeleton className="h-10 w-full" variant="input" />
+                  </div>
+                ))}
+              </div>
+              <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
+                <Skeleton className="h-8 w-24" variant="button" />
+                <Skeleton className="h-4 w-32" variant="text" />
+              </div>
+            </div>
+          ))}
+        </div>
+      </motion.div>
+    </div>
+  );
+
+  const renderAnalyticsPage = () => (
+    <div className="space-y-8">
+      {/* Billing/Analytics Header */}
+      <motion.div variants={itemVariants} className="space-y-2">
+        <Skeleton className="h-7 w-56" variant="text" />
+        <Skeleton className="h-4 w-96" variant="text" />
+      </motion.div>
+
+      {/* Plan cards */}
+      <motion.div
+        variants={itemVariants}
+        className="grid grid-cols-1 gap-4 md:grid-cols-3"
+      >
+        {Array.from({ length: 3 }).map((_, i) => (
+          <div
+            key={i}
+            className="rounded-2xl border bg-card p-5 space-y-4 shadow-sm"
+          >
+            <Skeleton className="h-5 w-32" variant="text" />
+            <div className="flex items-baseline space-x-2">
+              <Skeleton className="h-8 w-16" variant="text" />
+              <Skeleton className="h-4 w-10" variant="text" />
+            </div>
+            <SkeletonText lines={3} />
+            <Skeleton className="h-9 w-full" variant="button" />
+          </div>
+        ))}
+      </motion.div>
+
+      {/* Invoices table */}
+      <motion.div variants={itemVariants} className="rounded-2xl border bg-card">
+        <div className="flex items-center justify-between border-b px-4 py-3 sm:px-6">
+          <Skeleton className="h-5 w-40" variant="text" />
+          <Skeleton className="h-9 w-32" variant="button" />
+        </div>
+        <div className="divide-y px-4 py-3 sm:px-6">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div
+              key={i}
+              className="flex flex-col gap-2 py-3 sm:flex-row sm:items-center sm:justify-between"
+            >
+              <div className="space-y-1">
+                <Skeleton className="h-4 w-32" variant="text" />
+                <Skeleton className="h-3 w-24" variant="text" />
+              </div>
+              <div className="flex items-center gap-3">
+                <Skeleton className="h-4 w-16" variant="text" />
+                <Skeleton className="h-4 w-16" variant="text" />
+                <Skeleton className="h-8 w-24" variant="button" />
+              </div>
+            </div>
+          ))}
+        </div>
+      </motion.div>
+    </div>
+  );
+
   const renderPage = () => {
     switch (variant) {
       case "dashboard":
@@ -223,6 +396,12 @@ const PageSkeleton: React.FC<PageSkeletonProps> = ({
         return renderProfilePage();
       case "upload":
         return renderUploadPage();
+      case "history":
+        return renderHistoryPage();
+      case "settings":
+        return renderSettingsPage();
+      case "analytics":
+        return renderAnalyticsPage();
       default:
         return renderDashboardPage();
     }

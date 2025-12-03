@@ -34,7 +34,7 @@ import {
 import DashboardSidebar from "@/components/DashboardSidebar";
 import MobileSidebar from "@/components/MobileSidebar";
 import { useDashboardLayout } from "@/contexts/DashboardLayoutContext";
-import DashboardSkeleton from "@/components/DashboardSkeleton";
+import { PageSkeleton } from "@/components/skeletons";
 import { notificationsApi } from "@/lib/api";
 import { toast } from "sonner";
 
@@ -211,6 +211,17 @@ const Notifications = () => {
     }
   };
 
+  // Full-page skeleton while initial notifications + stats load
+  if (loading && !notifications.length && !stats) {
+    return (
+      <PageSkeleton
+        variant="dashboard"
+        showSidebar={!inLayout}
+        showHeader={false}
+      />
+    );
+  }
+
   const getTypeIcon = (type: string) => {
     switch (type) {
       case "success":
@@ -260,7 +271,7 @@ const Notifications = () => {
   };
 
   return (
-    <div className="min-h-screen flex w-full bg-gradient-to-br from-gray-900 via-purple-900/20 to-blue-900/20 relative overflow-hidden">
+    <div className="min-h-screen flex w-full bg-gradient-to-br from-background via-[#F0F2F5] to-[#E8EBF1] dark:from-gray-900 dark:via-purple-900/20 dark:to-blue-900/20 relative overflow-hidden">
       {/* Animated Background Elements */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <motion.div
@@ -303,9 +314,9 @@ const Notifications = () => {
           />
           <button
             onClick={handleToggleMobileMenu}
-            className="fixed top-4 right-4 z-50 p-2 rounded-lg bg-black/20 backdrop-blur-xl border border-white/10 md:hidden"
+            className="fixed top-4 right-4 z-50 flex h-9 w-9 items-center justify-center rounded-full border border-border bg-card/95 text-muted-foreground shadow-soft-elevated backdrop-blur-xl md:hidden dark:bg-black/20 dark:border-white/10 dark:text-white"
           >
-            <Menu className="w-5 h-5 text-white" />
+            <Menu className="w-5 h-5" />
           </button>
         </>
       )}
@@ -337,8 +348,8 @@ const Notifications = () => {
 
           {/* Header */}
           <div className="relative">
-            <div className="absolute inset-0 bg-gradient-to-r from-purple-600/10 to-blue-600/10 rounded-3xl blur-xl opacity-60" />
-            <div className="relative bg-black/20 backdrop-blur-xl rounded-3xl p-4 sm:p-6 border border-white/10">
+            <div className="absolute inset-0 rounded-3xl bg-gradient-to-r from-[#3A5AFE0A] via-[#8B5CF60A] to-transparent blur-xl opacity-80 dark:from-purple-600/10 dark:to-blue-600/10" />
+            <div className="relative rounded-3xl border border-border bg-card shadow-soft-elevated backdrop-blur-xl p-4 sm:p-6 dark:bg-black/20 dark:border-white/10">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div>
                   <motion.div
@@ -364,27 +375,27 @@ const Notifications = () => {
                   </motion.div>
                   <div className="flex items-center space-x-3 mb-3">
                     <motion.h1
-                      className="text-3xl lg:text-4xl font-bold bg-gradient-to-r from-white via-purple-200 to-blue-200 bg-clip-text text-transparent"
+                      className="text-3xl lg:text-4xl font-bold text-foreground dark:bg-gradient-to-r dark:from-white dark:via-purple-200 dark:to-blue-200 dark:bg-clip-text dark:text-transparent"
                       initial={{ opacity: 0, x: -20 }}
                       animate={{ opacity: 1, x: 0 }}
                       transition={{ delay: 0.3 }}
                     >
                       Notifications
                     </motion.h1>
-                    {unreadCount > 0 && (
-                      <motion.div
-                        initial={{ scale: 0 }}
-                        animate={{ scale: 1 }}
-                        className="w-8 h-8 bg-gradient-to-r from-red-600 to-orange-600 rounded-full flex items-center justify-center"
-                      >
-                        <span className="text-white text-sm font-bold">
-                          {unreadCount}
-                        </span>
-                      </motion.div>
-                    )}
+                  {unreadCount > 0 && (
+                    <motion.div
+                      initial={{ scale: 0 }}
+                      animate={{ scale: 1 }}
+                      className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-r from-red-500 to-orange-500 shadow-sm shadow-red-500/40"
+                    >
+                      <span className="text-sm font-bold text-white">
+                        {unreadCount}
+                      </span>
+                    </motion.div>
+                  )}
                   </div>
                   <motion.p
-                    className="text-gray-400 text-lg"
+                    className="text-lg text-muted-foreground dark:text-gray-400"
                     initial={{ opacity: 0, x: -20 }}
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: 0.4 }}
@@ -407,7 +418,7 @@ const Notifications = () => {
                       <Button
                         onClick={markAllAsRead}
                         variant="outline"
-                        className="w-full sm:w-auto border-white/10 text-gray-300 hover:bg-white/10 hover:text-white hover:border-white/30 h-12 px-6"
+                        className="h-12 w-full px-6 text-sm sm:w-auto border-border text-muted-foreground hover:bg-muted hover:text-foreground dark:border-white/10 dark:text-gray-300 dark:hover:bg-white/10 dark:hover:text-white dark:hover:border-white/30"
                       >
                         <CheckCheck className="w-4 h-4 mr-2" />
                         Mark All Read
@@ -436,8 +447,8 @@ const Notifications = () => {
             transition={{ delay: 0.6 }}
             className="relative"
           >
-            <div className="absolute inset-0 bg-gradient-to-r from-indigo-600/10 to-purple-600/10 rounded-3xl blur-xl opacity-60" />
-            <div className="relative bg-black/20 backdrop-blur-xl rounded-3xl p-2 border border-white/10 overflow-x-auto">
+            <div className="absolute inset-0 rounded-3xl bg-gradient-to-r from-[#6366F11A] via-[#8B5CF61A] to-transparent blur-xl opacity-80 dark:from-indigo-600/10 dark:to-purple-600/10" />
+            <div className="relative overflow-x-auto rounded-3xl border border-border bg-card/95 p-2 backdrop-blur-xl shadow-soft-elevated dark:bg-black/20 dark:border-white/10">
               <div className="flex flex-nowrap gap-2 min-w-max sm:min-w-0 sm:flex-wrap">
                 {[
                   { id: "all", label: "All", count: notifications.length },
@@ -466,10 +477,10 @@ const Notifications = () => {
                   <motion.button
                     key={filter.id}
                     onClick={() => setSelectedFilter(filter.id)}
-                    className={`relative flex items-center space-x-2 px-4 py-3 rounded-2xl transition-all duration-300 ${
+                    className={`relative flex items-center space-x-2 rounded-2xl px-4 py-3 text-sm transition-all duration-300 ${
                       selectedFilter === filter.id
-                        ? "text-white"
-                        : "text-gray-400 hover:text-white hover:bg-white/5"
+                        ? "text-foreground dark:text-white"
+                        : "text-muted-foreground hover:text-foreground hover:bg-muted/40 dark:text-gray-400 dark:hover:text-white dark:hover:bg-white/5"
                     }`}
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
@@ -493,7 +504,7 @@ const Notifications = () => {
                       <span className="font-medium">{filter.label}</span>
                       <Badge
                         variant="secondary"
-                        className="bg-white/10 text-gray-300 border-white/20"
+                        className="border border-border bg-muted/60 text-xs text-muted-foreground dark:bg-white/10 dark:text-gray-300 dark:border-white/20"
                       >
                         {filter.count}
                       </Badge>
@@ -511,14 +522,14 @@ const Notifications = () => {
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: 0.8 }}
-              className="lg:col-span-2 relative order-2 lg:order-1"
+              className="order-2 relative lg:order-1 lg:col-span-2"
             >
-              <div className="absolute inset-0 bg-gradient-to-r from-purple-600/5 to-blue-600/5 rounded-3xl blur-xl opacity-60" />
-              <Card className="relative bg-black/20 backdrop-blur-xl border-white/10">
+              <div className="absolute inset-0 rounded-3xl bg-gradient-to-r from-[#3A5AFE0A] via-[#8B5CF60A] to-transparent blur-xl opacity-80 dark:from-purple-600/5 dark:to-blue-600/5" />
+              <Card className="relative border border-border bg-card text-foreground shadow-soft-elevated backdrop-blur-xl dark:bg-black/20 dark:border-white/10">
                 <CardHeader>
-                  <CardTitle className="text-white flex items-center justify-between">
+                  <CardTitle className="flex items-center justify-between text-foreground dark:text-white">
                     <span className="flex items-center space-x-2">
-                      <Bell className="w-5 h-5 text-purple-400" />
+                      <Bell className="w-5 h-5 text-[#8B5CF6]" />
                       <span>
                         Recent Notifications ({filteredNotifications.length})
                       </span>
@@ -526,14 +537,7 @@ const Notifications = () => {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  {loading ? (
-                    <DashboardSkeleton
-                      variant="user"
-                      showSidebar={!inLayout}
-                      showCharts={false}
-                    />
-                  ) : (
-                    <div className="space-y-3">
+                  <div className="space-y-3">
                       <AnimatePresence>
                         {filteredNotifications.map((notification, index) => {
                           const Icon = getTypeIcon(notification.type);
@@ -549,11 +553,11 @@ const Notifications = () => {
                               exit={{ opacity: 0, y: -20 }}
                               transition={{ delay: index * 0.05 }}
                               whileHover={{ scale: 1.02, y: -2 }}
-                              className={`relative group p-4 rounded-xl border transition-all duration-300 cursor-pointer ${
-                                notification.read
-                                  ? "bg-white/5 border-white/10 opacity-70"
-                                  : "bg-white/10 border-white/20 hover:bg-white/15"
-                              }`}
+                            className={`relative group cursor-pointer rounded-xl border p-4 transition-all duration-300 ${
+                              notification.read
+                                ? "bg-muted/60 border-border/70 opacity-80 dark:bg-white/5 dark:border-white/10"
+                                : "bg-card border-border hover:bg-muted/60 dark:bg-white/10 dark:border-white/20 dark:hover:bg-white/15"
+                            }`}
                               onClick={() =>
                                 !notification.read &&
                                 markAsRead(notification.id)
@@ -650,14 +654,14 @@ const Notifications = () => {
               transition={{ delay: 0.8 }}
               className="relative order-1 lg:order-2"
             >
-              <div className="absolute inset-0 bg-gradient-to-r from-blue-600/10 to-green-600/10 rounded-3xl blur-xl opacity-60" />
-              <Card className="relative bg-black/20 backdrop-blur-xl border-white/10">
+              <div className="absolute inset-0 rounded-3xl bg-gradient-to-r from-[#0EA5E91A] via-[#22C55E1A] to-transparent blur-xl opacity-80 dark:from-blue-600/10 dark:to-green-600/10" />
+              <Card className="relative rounded-3xl border border-border bg-card text-foreground shadow-soft-elevated backdrop-blur-xl dark:bg-black/20 dark:border-white/10">
                 <CardHeader>
-                  <CardTitle className="text-white flex items-center space-x-2">
-                    <Settings className="w-5 h-5 text-blue-400" />
+                  <CardTitle className="flex items-center space-x-2 text-foreground dark:text-white">
+                    <Settings className="w-5 h-5 text-[#0EA5E9]" />
                     <span>Preferences</span>
                   </CardTitle>
-                  <CardDescription className="text-gray-400">
+                  <CardDescription className="text-muted-foreground dark:text-gray-400">
                     Manage your notification settings
                   </CardDescription>
                 </CardHeader>
@@ -668,20 +672,20 @@ const Notifications = () => {
                       initial={{ opacity: 0, x: 20 }}
                       animate={{ opacity: 1, x: 0 }}
                       transition={{ delay: 0.9 + index * 0.1 }}
-                      className="p-4 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-colors"
+                      className="rounded-xl border border-border bg-card p-4 transition-colors hover:bg-muted/60 dark:bg-white/5 dark:border-white/10 dark:hover:bg-white/10"
                     >
                       <div className="flex items-center justify-between">
                         <div className="flex items-center space-x-3">
                           <div
-                            className={`w-10 h-10 bg-gradient-to-r ${setting.color} rounded-xl flex items-center justify-center`}
+                            className={`flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-r ${setting.color} shadow-sm shadow-black/10`}
                           >
-                            <setting.icon className="w-5 h-5 text-white" />
+                            <setting.icon className="h-5 w-5 text-white" />
                           </div>
                           <div>
-                            <h4 className="text-white font-medium">
+                            <h4 className="font-medium text-foreground dark:text-white">
                               {setting.title}
                             </h4>
-                            <p className="text-gray-400 text-sm">
+                            <p className="text-sm text-muted-foreground dark:text-gray-400">
                               {setting.description}
                             </p>
                           </div>
@@ -695,25 +699,29 @@ const Notifications = () => {
                     </motion.div>
                   ))}
 
-                  <div className="pt-4 border-t border-white/10">
-                    <h4 className="text-white font-medium mb-4">
+                  <div className="pt-4 border-t border-border dark:border-white/10">
+                    <h4 className="mb-4 font-medium text-foreground dark:text-white">
                       Delivery Methods
                     </h4>
                     <div className="space-y-3">
-                      <div className="flex items-center justify-between p-3 rounded-lg bg-white/5 border border-white/10">
+                      <div className="flex items-center justify-between rounded-lg border border-border bg-card p-3 dark:bg-white/5 dark:border-white/10">
                         <div className="flex items-center space-x-3">
-                          <Mail className="w-5 h-5 text-blue-400" />
-                          <span className="text-white">Email</span>
+                          <Mail className="h-5 w-5 text-[#3B82F6]" />
+                          <span className="text-foreground dark:text-white">
+                            Email
+                          </span>
                         </div>
                         <Switch
                           checked={true}
                           className="data-[state=checked]:bg-purple-600"
                         />
                       </div>
-                      <div className="flex items-center justify-between p-3 rounded-lg bg-white/5 border border-white/10">
+                      <div className="flex items-center justify-between rounded-lg border border-border bg-card p-3 dark:bg-white/5 dark:border-white/10">
                         <div className="flex items-center space-x-3">
-                          <Smartphone className="w-5 h-5 text-green-400" />
-                          <span className="text-white">SMS</span>
+                          <Smartphone className="h-5 w-5 text-emerald-500 dark:text-green-400" />
+                          <span className="text-foreground dark:text-white">
+                            SMS
+                          </span>
                         </div>
                         <Switch
                           checked={false}

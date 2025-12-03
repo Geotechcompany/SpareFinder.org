@@ -13,3 +13,6 @@ tiktoken>=0.7.0
 requests>=2.31.0
 supabase>=2.0.0
 postgrest>=0.13.0
+
+
+

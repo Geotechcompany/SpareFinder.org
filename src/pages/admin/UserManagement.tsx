@@ -134,15 +134,29 @@ const UserManagement = () => {
       console.log("📋 User fetch response:", response);
 
       if (response.success && response.data) {
-        const fetchedUsers = response.data.users || [];
+        const data = response.data as any;
+        const fetchedUsers = (data.users || []) as UserData[];
+        const apiPagination = data.pagination || {};
 
         console.log("📋 Fetched users from API:", fetchedUsers);
+        console.log("📋 Pagination from API:", apiPagination);
+
+        const totalFromApi =
+          typeof apiPagination.total === "number"
+            ? apiPagination.total
+            : fetchedUsers.length;
+        const pagesFromApi =
+          typeof apiPagination.pages === "number"
+            ? apiPagination.pages
+            : typeof apiPagination.totalPages === "number"
+            ? apiPagination.totalPages
+            : Math.max(1, Math.ceil(totalFromApi / pagination.limit));
 
         setUsers(fetchedUsers);
         setPagination((prev) => ({
           ...prev,
-          total: response.data.pagination?.total || 0,
-          pages: response.data.pagination?.pages || 0,
+          total: totalFromApi,
+          pages: pagesFromApi,
         }));
       } else {
         console.warn("❌ Invalid response format:", response);
