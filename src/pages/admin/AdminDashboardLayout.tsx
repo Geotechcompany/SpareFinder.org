@@ -473,14 +473,7 @@ const AdminDashboardLayout = () => {
                   ? "Super Admin"
                   : "Administrator"}
               </Badge>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-9 w-9 text-muted-foreground hover:text-foreground hover:bg-muted"
-                aria-label="Toggle theme"
-              >
-                <ThemeToggle />
-              </Button>
+              <ThemeToggle />
               <Button
                 onClick={handleRefresh}
                 variant="outline"
