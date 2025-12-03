@@ -256,7 +256,8 @@ router.patch(
         });
       }
 
-      const { data: updatedUser, error } = await supabase
+      // Use adminSupabase to bypass RLS like the /admin/users reader endpoint
+      const { data: updatedUser, error } = await adminSupabase
         .from("profiles")
         .update({ role, updated_at: new Date().toISOString() })
         .eq("id", userId)
@@ -337,7 +338,8 @@ router.get(
     try {
       console.log("📊 Fetching admin statistics...");
 
-      // Get basic statistics without the expensive sync operation
+      // Get basic statistics using the admin client so counts
+      // are consistent with the /admin/users endpoint and bypass RLS.
       const [
         { count: userCount },
         { count: searchCount },
@@ -346,24 +348,26 @@ router.get(
         { data: topUsers },
       ] = await Promise.all([
         // Total users
-        supabase.from("profiles").select("*", { count: "exact", head: true }),
+        adminSupabase
+          .from("profiles")
+          .select("id", { count: "exact", head: true }),
 
         // Total searches
-        supabase
+        adminSupabase
           .from("part_searches")
-          .select("*", { count: "exact", head: true }),
+          .select("id", { count: "exact", head: true }),
 
         // Active users (last 30 days) - users who have updated their profile or logged in recently
-        supabase
+        adminSupabase
           .from("profiles")
-          .select("*", { count: "exact", head: true })
+          .select("id", { count: "exact", head: true })
           .gte(
             "updated_at",
             new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
           ),
 
         // Recent searches
-        supabase
+        adminSupabase
           .from("part_searches")
           .select(
             `
@@ -375,7 +379,7 @@ router.get(
           .limit(10),
 
         // Top users by search count
-        supabase
+        adminSupabase
           .from("part_searches")
           .select(
             `
@@ -389,7 +393,7 @@ router.get(
       ]);
 
       // Calculate success rate
-      const { data: successfulSearches } = await supabase
+      const { count: successfulSearchCount } = await adminSupabase
         .from("part_searches")
         .select("id", { count: "exact", head: true })
         .eq("status", "completed")
@@ -397,7 +401,7 @@ router.get(
 
       const successRate =
         searchCount && searchCount > 0
-          ? ((successfulSearches?.length || 0) / searchCount) * 100
+          ? ((successfulSearchCount || 0) / searchCount) * 100
           : 0;
 
       // Calculate additional metrics for sidebar
@@ -411,19 +415,19 @@ router.get(
         { count: newUsersToday },
         { count: searchesThisWeek },
       ] = await Promise.all([
-        supabase
+        adminSupabase
           .from("part_searches")
-          .select("*", { count: "exact", head: true })
+          .select("id", { count: "exact", head: true })
           .gte("created_at", last24Hours.toISOString()),
 
-        supabase
+        adminSupabase
           .from("profiles")
-          .select("*", { count: "exact", head: true })
+          .select("id", { count: "exact", head: true })
           .gte("created_at", last24Hours.toISOString()),
 
-        supabase
+        adminSupabase
           .from("part_searches")
-          .select("*", { count: "exact", head: true })
+          .select("id", { count: "exact", head: true })
           .gte("created_at", lastWeek.toISOString()),
       ]);
 

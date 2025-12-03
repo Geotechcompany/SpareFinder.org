@@ -45,6 +45,7 @@ import {
   ChartSkeleton,
   ListSkeleton,
 } from "@/components/skeletons";
+import ThemeToggle from "@/components/ThemeToggle";
 
 interface SystemMetrics {
   cpu_usage: number;
@@ -343,26 +344,26 @@ const SystemAnalytics = () => {
   const getStatusColor = (status: string) => {
     switch (status) {
       case "good":
-        return "text-green-400";
+        return "text-emerald-600 dark:text-green-400";
       case "warning":
-        return "text-yellow-400";
+        return "text-amber-600 dark:text-yellow-400";
       case "critical":
-        return "text-red-400";
+        return "text-red-600 dark:text-red-400";
       default:
-        return "text-gray-400";
+        return "text-muted-foreground";
     }
   };
 
   const getActivityStatusColor = (status: string) => {
     switch (status) {
       case "success":
-        return "bg-green-600/20 text-green-300 border-green-500/30";
+        return "bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-green-600/20 dark:text-green-300 dark:border-green-500/30";
       case "warning":
-        return "bg-yellow-600/20 text-yellow-300 border-yellow-500/30";
+        return "bg-amber-100 text-amber-700 border-amber-200 dark:bg-yellow-600/20 dark:text-yellow-300 dark:border-yellow-500/30";
       case "error":
-        return "bg-red-600/20 text-red-300 border-red-500/30";
+        return "bg-red-100 text-red-700 border-red-200 dark:bg-red-600/20 dark:text-red-300 dark:border-red-500/30";
       default:
-        return "bg-blue-600/20 text-blue-300 border-blue-500/30";
+        return "bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-600/20 dark:text-blue-300 dark:border-blue-500/30";
     }
   };
 
@@ -416,15 +417,15 @@ const SystemAnalytics = () => {
         >
           {/* Header */}
           <div className="relative">
-            <div className="absolute inset-0 bg-gradient-to-r from-blue-600/10 to-purple-600/10 rounded-3xl blur-xl opacity-60" />
-            <div className="relative bg-black/20 backdrop-blur-xl rounded-3xl p-6 border border-white/10">
+            <div className="absolute inset-0 rounded-3xl bg-gradient-to-r from-blue-500/5 to-purple-500/5 blur-xl opacity-70 dark:from-blue-600/10 dark:to-purple-600/10" />
+            <div className="relative rounded-3xl border border-border bg-card/95 backdrop-blur-xl shadow-soft-elevated px-4 py-4 sm:px-6 sm:py-6 dark:bg-black/20 dark:border-white/10">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div>
                   <motion.div
                     initial={{ opacity: 0, scale: 0.8 }}
                     animate={{ opacity: 1, scale: 1 }}
                     transition={{ delay: 0.2 }}
-                    className="inline-flex items-center px-4 py-2 bg-gradient-to-r from-blue-600/20 to-purple-600/20 rounded-full border border-blue-500/30 backdrop-blur-xl mb-4"
+                    className="inline-flex items-center px-4 py-2 bg-gradient-to-r from-blue-500/10 to-purple-500/10 rounded-full border border-blue-200 text-blue-700 backdrop-blur-xl mb-4 dark:border-blue-500/30 dark:text-blue-300"
                   >
                     <motion.div
                       animate={{ rotate: [0, 360] }}
@@ -435,14 +436,14 @@ const SystemAnalytics = () => {
                       }}
                       className="mr-2"
                     >
-                      <BarChart3 className="w-4 h-4 text-blue-400" />
+                      <BarChart3 className="w-4 h-4 text-blue-500 dark:text-blue-400" />
                     </motion.div>
-                    <span className="text-blue-300 text-sm font-semibold">
+                    <span className="text-sm font-semibold">
                       System Analytics
                     </span>
                   </motion.div>
                   <motion.h1
-                    className="text-3xl lg:text-4xl font-bold bg-gradient-to-r from-white via-blue-100 to-purple-100 bg-clip-text text-transparent mb-3"
+                    className="text-3xl lg:text-4xl font-bold tracking-tight text-foreground dark:bg-gradient-to-r dark:from-purple-200 dark:to-blue-200 dark:bg-clip-text dark:text-transparent mb-3"
                     initial={{ opacity: 0, x: -20 }}
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: 0.3 }}
@@ -450,7 +451,7 @@ const SystemAnalytics = () => {
                     System Analytics
                   </motion.h1>
                   <motion.p
-                    className="text-gray-400 text-lg"
+                    className="text-muted-foreground text-lg"
                     initial={{ opacity: 0, x: -20 }}
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: 0.4 }}
@@ -458,7 +459,7 @@ const SystemAnalytics = () => {
                     Real-time system performance monitoring
                   </motion.p>
                   <motion.p
-                    className="text-gray-500 text-sm"
+                    className="text-muted-foreground text-sm"
                     initial={{ opacity: 0, x: -20 }}
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: 0.5 }}
@@ -472,20 +473,28 @@ const SystemAnalytics = () => {
                   transition={{ delay: 0.5 }}
                   className="flex items-center space-x-3"
                 >
-                  <Badge className="bg-green-600/20 text-green-300 border-green-500/30 px-3 py-1">
+                  <Badge className="px-3 py-1 bg-emerald-100 text-emerald-700 border border-emerald-200 dark:bg-green-600/20 dark:text-green-300 dark:border-green-500/30">
                     <Activity className="w-4 h-4 mr-2" />
                     System Online
                   </Badge>
-                  <Badge className="bg-blue-600/20 text-blue-300 border-blue-500/30 px-3 py-1">
+                  <Badge className="px-3 py-1 bg-blue-100 text-blue-700 border border-blue-200 dark:bg-blue-600/20 dark:text-blue-300 dark:border-blue-500/30">
                     <Clock className="w-4 h-4 mr-2" />
                     {systemMetrics.uptime}
                   </Badge>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-9 w-9 text-muted-foreground hover:text-foreground hover:bg-muted"
+                    aria-label="Toggle theme"
+                  >
+                    <ThemeToggle />
+                  </Button>
                   <Button
                     onClick={fetchSystemData}
                     disabled={isLoading}
                     variant="outline"
                     size="sm"
-                    className="border-white/20 hover:border-white/40 text-white hover:bg-white/10"
+                    className="border-border bg-background/80 text-foreground hover:bg-accent hover:text-accent-foreground dark:bg-white/5 dark:text-white dark:border-white/20 dark:hover:bg-white/10"
                   >
                     {isLoading ? (
                       <Loader2 className="w-4 h-4 mr-2 animate-spin" />
@@ -495,7 +504,7 @@ const SystemAnalytics = () => {
                     Refresh Data
                   </Button>
                   <Select value={timeRange} onValueChange={setTimeRange}>
-                    <SelectTrigger className="w-32 border-white/20 hover:border-white/40 text-white bg-white/10">
+                    <SelectTrigger className="w-32 border-border bg-card/80 text-foreground hover:bg-muted dark:border-white/20 dark:text-white dark:bg-white/5">
                       <SelectValue placeholder="Time Range" />
                     </SelectTrigger>
                     <SelectContent>
@@ -518,9 +527,9 @@ const SystemAnalytics = () => {
               className="relative"
             >
               <div className="absolute inset-0 bg-gradient-to-r from-red-600/10 to-orange-600/10 rounded-3xl blur-xl opacity-60" />
-              <Card className="relative bg-black/20 backdrop-blur-xl border-red-500/30">
+              <Card className="relative bg-card/95 backdrop-blur-xl border-red-500/30 shadow-soft-elevated dark:bg-black/20">
                 <CardContent className="p-6">
-                  <div className="flex items-center space-x-3 text-red-400">
+                  <div className="flex items-center space-x-3 text-red-500 dark:text-red-400">
                     <AlertTriangle className="w-6 h-6" />
                     <div>
                       <h3 className="text-lg font-semibold">
@@ -590,14 +599,14 @@ const SystemAnalytics = () => {
                     <div
                       className={`absolute inset-0 bg-gradient-to-r ${metric.color} opacity-10 rounded-2xl blur-xl`}
                     />
-                    <Card className="relative bg-black/20 backdrop-blur-xl border-white/10 hover:border-white/20 transition-all duration-300">
+                    <Card className="relative bg-card/95 backdrop-blur-xl border-border shadow-soft-elevated hover:border-primary/30 hover:shadow-lg dark:bg-black/20 dark:border-white/10">
                       <CardContent className="p-6">
                         <div className="flex items-center justify-between">
                           <div>
-                            <p className="text-gray-400 text-sm">
+                            <p className="text-sm text-muted-foreground">
                               {metric.label}
                             </p>
-                            <p className="text-2xl font-bold text-white">
+                            <p className="mt-1 text-2xl font-bold text-foreground dark:text-white">
                               {metric.value}
                             </p>
                           </div>
@@ -624,13 +633,13 @@ const SystemAnalytics = () => {
               {/* System Performance */}
               <div className="relative">
                 <div className="absolute inset-0 bg-gradient-to-r from-blue-600/5 to-purple-600/5 rounded-3xl blur-xl opacity-60" />
-                <Card className="relative bg-black/20 backdrop-blur-xl border-white/10">
+                <Card className="relative bg-card/95 backdrop-blur-xl border-border shadow-soft-elevated dark:bg-black/20 dark:border-white/10">
                   <CardHeader>
-                    <CardTitle className="text-white flex items-center space-x-2">
+                    <CardTitle className="flex items-center space-x-2 text-foreground dark:text-white">
                       <Server className="w-5 h-5 text-blue-400" />
                       <span>System Performance</span>
                     </CardTitle>
-                    <CardDescription className="text-gray-400">
+                    <CardDescription className="text-muted-foreground">
                       Real-time system resource monitoring
                     </CardDescription>
                   </CardHeader>
@@ -642,7 +651,7 @@ const SystemAnalytics = () => {
                           initial={{ opacity: 0, scale: 0.8 }}
                           animate={{ opacity: 1, scale: 1 }}
                           transition={{ delay: 0.9 + index * 0.1 }}
-                          className="relative p-4 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-all duration-300"
+                          className="relative p-4 rounded-xl bg-muted/80 border border-border/60 hover:bg-muted transition-all duration-300 dark:bg-white/5 dark:border-white/10 dark:hover:bg-white/10"
                         >
                           <div className="flex items-center justify-between mb-3">
                             <div className="flex items-center space-x-3">
@@ -652,7 +661,7 @@ const SystemAnalytics = () => {
                                 <item.icon className="w-5 h-5 text-white" />
                               </div>
                               <div>
-                                <div className="font-medium text-white">
+                                <div className="font-medium text-foreground dark:text-white">
                                   {item.label}
                                 </div>
                                 <div
@@ -706,13 +715,13 @@ const SystemAnalytics = () => {
               {/* Traffic Statistics */}
               <div className="relative">
                 <div className="absolute inset-0 bg-gradient-to-r from-blue-600/5 to-purple-600/5 rounded-3xl blur-xl opacity-60" />
-                <Card className="relative bg-black/20 backdrop-blur-xl border-white/10">
+                <Card className="relative bg-card/95 backdrop-blur-xl border-border shadow-soft-elevated dark:bg-black/20 dark:border-white/10">
                   <CardHeader>
-                    <CardTitle className="text-white flex items-center space-x-2">
+                    <CardTitle className="flex items-center space-x-2 text-foreground dark:text-white">
                       <Globe className="w-5 h-5 text-blue-400" />
                       <span>Traffic Statistics</span>
                     </CardTitle>
-                    <CardDescription className="text-gray-400">
+                    <CardDescription className="text-muted-foreground">
                       API and upload traffic analytics
                     </CardDescription>
                   </CardHeader>
@@ -724,14 +733,14 @@ const SystemAnalytics = () => {
                           initial={{ opacity: 0, y: 20 }}
                           animate={{ opacity: 1, y: 0 }}
                           transition={{ delay: 1.1 + index * 0.1 }}
-                          className="p-4 rounded-xl bg-white/5 border border-white/10"
+                          className="p-4 rounded-xl bg-muted/80 border border-border/60 dark:bg-white/5 dark:border-white/10"
                         >
                           <div className="flex items-center justify-between">
                             <div>
-                              <div className="text-gray-400 text-sm">
+                              <div className="text-sm text-muted-foreground">
                                 {stat.label}
                               </div>
-                              <div className="text-xl font-bold text-white">
+                              <div className="text-xl font-bold text-foreground dark:text-white">
                                 {stat.value}
                               </div>
                             </div>
@@ -744,8 +753,8 @@ const SystemAnalytics = () => {
                               <span
                                 className={`text-sm font-medium ${
                                   stat.trend === "up"
-                                    ? "text-green-400"
-                                    : "text-red-400"
+                                    ? "text-emerald-600 dark:text-green-400"
+                                    : "text-red-600 dark:text-red-400"
                                 }`}
                               >
                                 {stat.change}
@@ -768,13 +777,13 @@ const SystemAnalytics = () => {
               className="relative"
             >
               <div className="absolute inset-0 bg-gradient-to-r from-green-600/5 to-emerald-600/5 rounded-3xl blur-xl opacity-60" />
-              <Card className="relative bg-black/20 backdrop-blur-xl border-white/10">
+              <Card className="relative bg-card/95 backdrop-blur-xl border-border shadow-soft-elevated dark:bg-black/20 dark:border-white/10">
                 <CardHeader>
-                  <CardTitle className="text-white flex items-center space-x-2">
+                  <CardTitle className="flex items-center space-x-2 text-foreground dark:text-white">
                     <Activity className="w-5 h-5 text-green-400" />
                     <span>Recent Activity</span>
                   </CardTitle>
-                  <CardDescription className="text-gray-400">
+                  <CardDescription className="text-muted-foreground">
                     System events and alerts
                   </CardDescription>
                 </CardHeader>
@@ -786,7 +795,7 @@ const SystemAnalytics = () => {
                         initial={{ opacity: 0, x: 20 }}
                         animate={{ opacity: 1, x: 0 }}
                         transition={{ delay: 1.2 + index * 0.1 }}
-                        className="flex items-start space-x-3 p-3 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-colors"
+                        className="flex items-start space-x-3 p-3 rounded-xl bg-muted/80 border border-border/60 hover:bg-muted transition-colors dark:bg-white/5 dark:border-white/10 dark:hover:bg-white/10"
                       >
                         <div className="flex-shrink-0">
                           <Badge
@@ -798,10 +807,10 @@ const SystemAnalytics = () => {
                           </Badge>
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="text-white text-sm font-medium">
+                          <p className="text-sm font-medium text-foreground dark:text-white">
                             {activity.action}
                           </p>
-                          <p className="text-gray-400 text-xs">
+                          <p className="text-xs text-muted-foreground dark:text-gray-400">
                             {activity.time}
                           </p>
                         </div>

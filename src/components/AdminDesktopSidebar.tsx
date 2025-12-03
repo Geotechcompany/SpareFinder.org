@@ -62,6 +62,17 @@ interface AdminUser {
   last_login?: string;
 }
 
+type AdminStatsApiResponse = {
+  statistics?: {
+    total_users?: number;
+    active_users?: number;
+    total_searches?: number;
+    system_health?: "healthy" | "warning" | "critical";
+    pending_tasks?: number;
+    recent_alerts?: number;
+  };
+};
+
 const AdminDesktopSidebar: React.FC<AdminSidebarProps> = ({
   isCollapsed = false,
   onToggle,
@@ -92,8 +103,11 @@ const AdminDesktopSidebar: React.FC<AdminSidebarProps> = ({
 
       // Fetch admin stats
       const statsResponse = await api.admin.getAdminStats();
-      if (statsResponse.success && statsResponse.data?.statistics) {
-        const stats = statsResponse.data.statistics;
+      const statsData = (statsResponse.data as AdminStatsApiResponse | undefined)
+        ?.statistics;
+
+      if (statsResponse.success && statsData) {
+        const stats = statsData;
         setAdminStats({
           totalUsers: stats.total_users || 0,
           activeUsers: stats.active_users || 0,
@@ -108,8 +122,8 @@ const AdminDesktopSidebar: React.FC<AdminSidebarProps> = ({
 
       // Fetch current admin user info
       const userResponse = await api.auth.getCurrentUser();
-      if (userResponse.success && userResponse.data?.user) {
-        setAdminUser(userResponse.data.user);
+      if (userResponse.success && userResponse.user) {
+        setAdminUser(userResponse.user as AdminUser);
       }
     } catch (error) {
       console.error("Failed to fetch admin data:", error);
