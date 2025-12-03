@@ -295,14 +295,7 @@ const AuditLogs = () => {
                   </p>
                 </div>
                 <div className="flex items-center space-x-3">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-9 w-9 text-muted-foreground hover:text-foreground hover:bg-muted"
-                    aria-label="Toggle theme"
-                  >
-                    <ThemeToggle />
-                  </Button>
+                  <ThemeToggle />
                   <Button className="bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-soft-elevated hover:from-blue-700 hover:to-purple-700">
                     <Download className="w-4 h-4 mr-2" />
                     Export Logs
