@@ -41,6 +41,15 @@ import {
   Database,
   Server,
 } from "lucide-react";
+import ThemeToggle from "@/components/ThemeToggle";
+import {
+  Breadcrumb,
+  BreadcrumbList,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from "@/components/ui/breadcrumb";
 
 interface AdminStats {
   total_users: number;
@@ -360,7 +369,7 @@ const AdminDashboardLayout = () => {
   ];
 
   return (
-    <div className="min-h-screen flex w-full bg-gradient-to-br from-gray-900 via-purple-900/20 to-blue-900/20 relative overflow-hidden">
+    <div className="min-h-screen flex w-full bg-gradient-to-br from-background via-[#F0F2F5] to-[#E8EBF1] dark:from-[#0B1026] dark:via-[#1A1033] dark:to-[#0C1226] relative overflow-hidden">
       {/* Animated Background Elements */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <motion.div
@@ -426,19 +435,38 @@ const AdminDashboardLayout = () => {
           className="space-y-4 sm:space-y-6 lg:space-y-8 max-w-7xl mx-auto"
         >
           {/* Header */}
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div>
-              <h1 className="text-3xl lg:text-4xl font-bold bg-gradient-to-r from-purple-200 to-blue-200 bg-clip-text text-transparent">
-                Admin Dashboard
-              </h1>
-              <p className="text-gray-400 mt-2">
-                Welcome back, {adminUser?.full_name || "Administrator"}
-              </p>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="space-y-2">
+              <Breadcrumb>
+                <BreadcrumbList>
+                  <BreadcrumbItem>
+                    <BreadcrumbLink href="/">Home</BreadcrumbLink>
+                  </BreadcrumbItem>
+                  <BreadcrumbSeparator />
+                  <BreadcrumbItem>
+                    <BreadcrumbLink href="/admin/dashboard">
+                      Admin
+                    </BreadcrumbLink>
+                  </BreadcrumbItem>
+                  <BreadcrumbSeparator />
+                  <BreadcrumbItem>
+                    <BreadcrumbPage>Overview</BreadcrumbPage>
+                  </BreadcrumbItem>
+                </BreadcrumbList>
+              </Breadcrumb>
+              <div>
+                <h1 className="text-3xl lg:text-4xl font-bold tracking-tight text-foreground dark:bg-gradient-to-r dark:from-purple-200 dark:to-blue-200 dark:bg-clip-text dark:text-transparent">
+                  Admin Dashboard
+                </h1>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Welcome back, {adminUser?.full_name || "Administrator"}
+                </p>
+              </div>
             </div>
             <div className="flex items-center space-x-2">
               <Badge
                 variant="secondary"
-                className="bg-purple-600/20 text-purple-400 border-purple-500/30"
+                className="bg-purple-100 text-purple-700 border-purple-200 dark:bg-purple-600/20 dark:text-purple-400 dark:border-purple-500/30"
               >
                 <Shield className="w-3 h-3 mr-1" />
                 {adminUser?.role === "super_admin"
@@ -446,10 +474,18 @@ const AdminDashboardLayout = () => {
                   : "Administrator"}
               </Badge>
               <Button
+                variant="ghost"
+                size="icon"
+                className="h-9 w-9 text-muted-foreground hover:text-foreground hover:bg-muted"
+                aria-label="Toggle theme"
+              >
+                <ThemeToggle />
+              </Button>
+              <Button
                 onClick={handleRefresh}
                 variant="outline"
                 size="sm"
-                className="bg-white/5 border-white/20 text-white hover:bg-white/10"
+                className="border-border bg-background/80 text-foreground hover:bg-accent hover:text-accent-foreground dark:bg-white/5 dark:text-white dark:border-white/20 dark:hover:bg-white/10"
               >
                 <RefreshCw className="w-4 h-4 mr-2" />
                 Refresh
@@ -458,7 +494,7 @@ const AdminDashboardLayout = () => {
                 onClick={handleLogout}
                 variant="ghost"
                 size="sm"
-                className="text-gray-400 hover:text-white hover:bg-white/10"
+                className="text-muted-foreground hover:text-foreground hover:bg-muted dark:text-gray-400 dark:hover:text-white dark:hover:bg-white/10"
               >
                 Logout
               </Button>
@@ -479,17 +515,17 @@ const AdminDashboardLayout = () => {
                 <div
                   className={`absolute inset-0 bg-gradient-to-r ${stat.color} opacity-10 rounded-2xl blur-xl group-hover:opacity-20 transition-opacity`}
                 />
-                <Card className="relative bg-black/40 backdrop-blur-xl border-white/10 hover:border-white/20 transition-all duration-300">
+                <Card className="relative bg-card/90 backdrop-blur-xl border-border shadow-soft-elevated hover:border-primary/30 hover:shadow-lg dark:bg-black/40 dark:border-white/10">
                   <CardContent className="p-6">
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="text-gray-400 text-sm font-medium">
+                        <p className="text-sm font-medium text-muted-foreground">
                           {stat.title}
                         </p>
-                        <p className="text-2xl font-bold text-white mt-1">
+                        <p className="mt-1 text-2xl font-bold text-foreground dark:text-white">
                           {stat.value}
                         </p>
-                        <p className="text-sm mt-1 text-gray-400">
+                        <p className="mt-1 text-sm text-muted-foreground">
                           {stat.change}
                         </p>
                       </div>
@@ -514,14 +550,14 @@ const AdminDashboardLayout = () => {
               transition={{ delay: 0.6 }}
               className="relative"
             >
-              <div className="absolute inset-0 bg-gradient-to-r from-purple-600/10 to-blue-600/10 rounded-3xl blur-xl opacity-60" />
-              <Card className="relative bg-black/20 backdrop-blur-xl border-white/10 h-full">
+              <div className="absolute inset-0 rounded-3xl bg-gradient-to-r from-purple-500/5 to-blue-500/5 blur-xl opacity-70 dark:from-purple-600/10 dark:to-blue-600/10" />
+              <Card className="relative h-full bg-card/95 backdrop-blur-xl border-border shadow-soft-elevated dark:bg-black/20 dark:border-white/10">
                 <CardHeader>
-                  <CardTitle className="text-white flex items-center space-x-2">
-                    <Server className="w-5 h-5 text-purple-400" />
+                  <CardTitle className="flex items-center space-x-2 text-foreground dark:text-white">
+                    <Server className="w-5 h-5 text-purple-500 dark:text-purple-400" />
                     <span>System Performance</span>
                   </CardTitle>
-                  <CardDescription className="text-gray-400">
+                  <CardDescription className="text-muted-foreground">
                     Real-time system metrics
                   </CardDescription>
                 </CardHeader>
@@ -530,13 +566,13 @@ const AdminDashboardLayout = () => {
                     {systemMetrics.map((metric, index) => (
                       <div
                         key={metric.title}
-                        className="flex items-center justify-between p-3 rounded-xl bg-white/5"
+                        className="flex items-center justify-between p-3 rounded-xl bg-muted/70 text-sm text-foreground dark:bg-white/5"
                       >
                         <div className="flex items-center space-x-3">
                           <metric.icon className={`w-5 h-5 ${metric.color}`} />
                           <span className="text-gray-300">{metric.title}</span>
                         </div>
-                        <span className="text-white font-semibold">
+                        <span className="font-semibold text-foreground dark:text-white">
                           {metric.value}
                         </span>
                       </div>
@@ -553,14 +589,14 @@ const AdminDashboardLayout = () => {
               transition={{ delay: 0.6 }}
               className="relative"
             >
-              <div className="absolute inset-0 bg-gradient-to-r from-blue-600/10 to-purple-600/10 rounded-3xl blur-xl opacity-60" />
-              <Card className="relative bg-black/20 backdrop-blur-xl border-white/10 h-full">
+              <div className="absolute inset-0 rounded-3xl bg-gradient-to-r from-blue-500/5 to-purple-500/5 blur-xl opacity-70 dark:from-blue-600/10 dark:to-purple-600/10" />
+              <Card className="relative h-full bg-card/95 backdrop-blur-xl border-border shadow-soft-elevated dark:bg-black/20 dark:border-white/10">
                 <CardHeader>
-                  <CardTitle className="text-white flex items-center space-x-2">
-                    <Activity className="w-5 h-5 text-purple-400" />
+                  <CardTitle className="flex items-center space-x-2 text-foreground dark:text-white">
+                    <Activity className="w-5 h-5 text-purple-500 dark:text-purple-400" />
                     <span>Recent Activity</span>
                   </CardTitle>
-                  <CardDescription className="text-gray-400">
+                  <CardDescription className="text-muted-foreground">
                     Latest system activity
                   </CardDescription>
                 </CardHeader>

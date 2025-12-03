@@ -242,13 +242,13 @@ const AdminDesktopSidebar: React.FC<AdminSidebarProps> = ({
   const getSystemHealthColor = (health: string) => {
     switch (health) {
       case "healthy":
-        return "text-green-400";
+        return "text-emerald-500 dark:text-green-400";
       case "warning":
-        return "text-yellow-400";
+        return "text-amber-500 dark:text-yellow-400";
       case "critical":
-        return "text-red-400";
+        return "text-red-500";
       default:
-        return "text-gray-400";
+        return "text-muted-foreground";
     }
   };
 
@@ -277,12 +277,12 @@ const AdminDesktopSidebar: React.FC<AdminSidebarProps> = ({
       initial={false}
       animate={{ width: isCollapsed ? 80 : 320 }}
       transition={{ duration: 0.3, ease: "easeInOut" }}
-      className="hidden lg:flex h-screen bg-gray-900/95 backdrop-blur-xl border-r border-blue-800/50 flex-col fixed left-0 top-0 z-30"
+      className="hidden lg:flex h-screen bg-sidebar text-sidebar-foreground border-r border-sidebar-border backdrop-blur-xl flex-col fixed left-0 top-0 z-30 dark:bg-black/95 dark:text-white dark:border-white/10"
     >
       {/* Header */}
       <div className="relative">
-        <div className="absolute inset-0 bg-gradient-to-r from-blue-900/30 to-purple-900/20 opacity-60" />
-        <div className="relative p-6 border-b border-blue-800/30">
+        <div className="absolute inset-0 bg-gradient-to-r from-sidebar-accent/40 to-purple-500/20 opacity-70 dark:from-blue-900/30 dark:to-purple-900/20" />
+        <div className="relative p-6 border-b border-sidebar-border/80 dark:border-blue-800/30">
           <AnimatePresence mode="wait">
             {!isCollapsed ? (
               <motion.div
@@ -296,10 +296,17 @@ const AdminDesktopSidebar: React.FC<AdminSidebarProps> = ({
                   to="/admin/dashboard"
                   className="flex items-center space-x-3 group"
                 >
-                  <img 
-                    src="/sparefinderlogo.png" 
-                    alt="SpareFinder Logo" 
-                    className="h-12 w-auto object-contain transition-transform group-hover:scale-105"
+                  {/* Light theme logo */}
+                  <img
+                    src="/sparefinderlogo.png"
+                    alt="SpareFinder Logo"
+                    className="h-12 w-auto object-contain transition-transform group-hover:scale-105 dark:hidden"
+                  />
+                  {/* Dark theme logo */}
+                  <img
+                    src="/sparefinderlogodark.png"
+                    alt="SpareFinder Logo"
+                    className="hidden h-12 w-auto object-contain transition-transform group-hover:scale-105 dark:inline-block"
                   />
                 </Link>
               </motion.div>
@@ -313,10 +320,15 @@ const AdminDesktopSidebar: React.FC<AdminSidebarProps> = ({
                 className="flex justify-center"
               >
                 <Link to="/admin/dashboard" className="group">
-                  <img 
-                    src="/sparefinderlogo.png" 
-                    alt="SpareFinder Logo" 
-                    className="h-10 w-auto object-contain transition-transform group-hover:scale-105"
+                  <img
+                    src="/sparefinderlogo.png"
+                    alt="SpareFinder Logo"
+                    className="h-10 w-auto object-contain transition-transform group-hover:scale-105 dark:hidden"
+                  />
+                  <img
+                    src="/sparefinderlogodark.png"
+                    alt="SpareFinder Logo"
+                    className="hidden h-10 w-auto object-contain transition-transform group-hover:scale-105 dark:inline-block"
                   />
                 </Link>
               </motion.div>
@@ -327,7 +339,7 @@ const AdminDesktopSidebar: React.FC<AdminSidebarProps> = ({
           {onToggle && (
             <motion.button
               onClick={onToggle}
-              className="absolute -right-3 top-1/2 transform -translate-y-1/2 w-6 h-6 bg-blue-600 rounded-full flex items-center justify-center border-2 border-gray-900 hover:bg-blue-700 transition-colors"
+              className="absolute -right-3 top-1/2 transform -translate-y-1/2 w-6 h-6 rounded-full flex items-center justify-center border bg-sidebar-accent text-sidebar-accent-foreground shadow-sm hover:bg-sidebar-accent/90 transition-colors dark:bg-blue-600 dark:text-white dark:border-gray-900 dark:hover:bg-blue-700"
               whileHover={{ scale: 1.1 }}
               whileTap={{ scale: 0.9 }}
             >
@@ -343,7 +355,7 @@ const AdminDesktopSidebar: React.FC<AdminSidebarProps> = ({
 
       {/* System Status */}
       {!isCollapsed && (
-        <div className="p-4 border-b border-blue-800/30">
+        <div className="p-4 border-b border-sidebar-border/80 dark:border-blue-800/30">
           <div className="space-y-3">
             {isLoading ? (
               <>
@@ -355,11 +367,11 @@ const AdminDesktopSidebar: React.FC<AdminSidebarProps> = ({
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-2 text-xs">
-                  <div className="bg-blue-900/20 rounded-lg p-2">
+                  <div className="rounded-lg p-2 bg-muted/80 border border-border/60 dark:bg-blue-900/20 dark:border-blue-800/40">
                     <Skeleton className="h-3 w-8 mb-1" />
                     <Skeleton className="h-4 w-12" />
                   </div>
-                  <div className="bg-blue-900/20 rounded-lg p-2">
+                  <div className="rounded-lg p-2 bg-muted/80 border border-border/60 dark:bg-blue-900/20 dark:border-blue-800/40">
                     <Skeleton className="h-3 w-8 mb-1" />
                     <Skeleton className="h-4 w-12" />
                   </div>
@@ -390,15 +402,15 @@ const AdminDesktopSidebar: React.FC<AdminSidebarProps> = ({
                 </div>
 
                 <div className="grid grid-cols-2 gap-2 text-xs">
-                  <div className="bg-blue-900/20 rounded-lg p-2">
-                    <div className="text-gray-400">Users</div>
-                    <div className="text-white font-semibold">
+                  <div className="rounded-lg p-2 bg-muted/80 border border-border/60 dark:bg-blue-900/20 dark:border-blue-800/40">
+                    <div className="text-muted-foreground">Users</div>
+                    <div className="text-foreground font-semibold dark:text-white">
                       {adminStats.totalUsers.toLocaleString()}
                     </div>
                   </div>
-                  <div className="bg-blue-900/20 rounded-lg p-2">
-                    <div className="text-gray-400">Active</div>
-                    <div className="text-green-400 font-semibold">
+                  <div className="rounded-lg p-2 bg-muted/80 border border-border/60 dark:bg-blue-900/20 dark:border-blue-800/40">
+                    <div className="text-muted-foreground">Active</div>
+                    <div className="text-emerald-500 font-semibold dark:text-green-400">
                       {adminStats.activeUsers.toLocaleString()}
                     </div>
                   </div>
@@ -418,19 +430,19 @@ const AdminDesktopSidebar: React.FC<AdminSidebarProps> = ({
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: index * 0.05 }}
           >
-            <Link
-              to={item.href}
-              className={`flex items-center space-x-4 p-3 rounded-xl transition-all duration-200 group relative ${
-                location.pathname === item.href
-                  ? "bg-gradient-to-r from-blue-600/20 to-purple-600/20 border border-blue-500/30 text-blue-100"
-                  : "hover:bg-blue-800/10 text-gray-300 hover:text-blue-200"
-              }`}
-            >
+              <Link
+                to={item.href}
+                className={`flex items-center space-x-4 p-3 rounded-xl transition-all duration-200 group relative ${
+                  location.pathname === item.href
+                    ? "bg-sidebar-accent text-sidebar-accent-foreground border border-sidebar-border shadow-soft-elevated dark:bg-gradient-to-r dark:from-blue-600/20 dark:to-purple-600/20 dark:border-blue-500/30 dark:text-blue-100"
+                    : "text-sidebar-foreground/80 hover:text-sidebar-foreground hover:bg-sidebar-accent/60 border border-transparent dark:text-gray-300 dark:hover:text-blue-200 dark:hover:bg-blue-800/10"
+                }`}
+              >
               <div
                 className={`p-2 rounded-lg transition-colors ${
                   location.pathname === item.href
-                    ? "bg-blue-600/20 text-blue-300"
-                    : "bg-gray-800/50 text-gray-400 group-hover:bg-blue-800/20 group-hover:text-blue-400"
+                    ? "bg-sidebar-accent/80 text-sidebar-accent-foreground dark:bg-blue-600/20 dark:text-blue-300"
+                    : "bg-muted text-muted-foreground group-hover:bg-sidebar-accent/60 group-hover:text-sidebar-accent-foreground dark:bg-gray-800/50 dark:text-gray-400 dark:group-hover:bg-blue-800/20 dark:group-hover:text-blue-400"
                 }`}
               >
                 <item.icon className="w-5 h-5" />
@@ -438,7 +450,7 @@ const AdminDesktopSidebar: React.FC<AdminSidebarProps> = ({
 
               {!isCollapsed && (
                 <div className="flex-1 min-w-0">
-                  <div className="font-medium truncate flex items-center justify-between">
+                  <div className="font-medium truncate flex items-center justify-between text-foreground dark:text-white">
                     <span>{item.label}</span>
                     {item.badge && (
                       <Badge
@@ -449,15 +461,15 @@ const AdminDesktopSidebar: React.FC<AdminSidebarProps> = ({
                       </Badge>
                     )}
                   </div>
-                  <div className="text-xs opacity-60 truncate">
+                  <div className="text-xs opacity-70 truncate text-muted-foreground dark:text-gray-400">
                     {item.description}
                   </div>
                 </div>
               )}
 
               {isCollapsed && item.badge && (
-                <div className="absolute -top-1 -right-1 w-5 h-5 bg-blue-600 rounded-full flex items-center justify-center">
-                  <span className="text-white text-xs">{item.badge}</span>
+                <div className="absolute -top-1 -right-1 w-5 h-5 bg-sidebar-accent rounded-full flex items-center justify-center text-sidebar-accent-foreground dark:bg-blue-600 dark:text-white">
+                  <span className="text-xs">{item.badge}</span>
                 </div>
               )}
             </Link>
@@ -466,11 +478,11 @@ const AdminDesktopSidebar: React.FC<AdminSidebarProps> = ({
       </div>
 
       {/* Admin User Section */}
-      <div className="p-4 border-t border-blue-800/30">
+      <div className="p-4 border-t border-sidebar-border/80 dark:border-blue-800/30">
         {isLoading ? (
           !isCollapsed ? (
             <div className="space-y-3">
-              <div className="flex items-center space-x-3 p-3 rounded-xl bg-blue-900/30">
+              <div className="flex items-center space-x-3 p-3 rounded-xl bg-muted/80 border border-border/60 dark:bg-blue-900/30 dark:border-blue-800/40">
                 <SkeletonAvatar size="md" />
                 <div className="flex-1 min-w-0 space-y-2">
                   <Skeleton className="h-4 w-24" />
@@ -488,8 +500,8 @@ const AdminDesktopSidebar: React.FC<AdminSidebarProps> = ({
             </div>
           )
         ) : !isCollapsed ? (
-          <div className="space-y-3">
-            <div className="flex items-center space-x-3 p-3 rounded-xl bg-blue-900/30">
+              <div className="space-y-3">
+                <div className="flex items-center space-x-3 p-3 rounded-xl bg-muted/80 border border-border/60 dark:bg-blue-900/30 dark:border-blue-800/40">
               <Avatar className="w-10 h-10">
                 <AvatarImage src={adminUser?.avatar_url} />
                 <AvatarFallback className="bg-gradient-to-r from-blue-600 to-purple-600 text-white">
@@ -499,10 +511,10 @@ const AdminDesktopSidebar: React.FC<AdminSidebarProps> = ({
                 </AvatarFallback>
               </Avatar>
               <div className="flex-1 min-w-0">
-                <div className="font-medium text-blue-100 truncate">
+                <div className="font-medium text-foreground truncate dark:text-blue-100">
                   {adminUser?.full_name || "Administrator"}
                 </div>
-                <div className="text-xs text-blue-400/60 truncate flex items-center space-x-1">
+                <div className="text-xs text-muted-foreground truncate flex items-center space-x-1 dark:text-blue-400/60">
                   <Crown className="w-3 h-3" />
                   <span>
                     {adminUser?.role === "super_admin"
@@ -517,7 +529,7 @@ const AdminDesktopSidebar: React.FC<AdminSidebarProps> = ({
               <Button
                 onClick={handleLogout}
                 variant="ghost"
-                className="w-full justify-start text-blue-300 hover:text-blue-100 hover:bg-blue-800/20 rounded-xl h-12"
+                className="w-full justify-start text-muted-foreground hover:text-foreground hover:bg-muted rounded-xl h-12 dark:text-blue-300 dark:hover:text-blue-100 dark:hover:bg-blue-800/20"
               >
                 <LogOut className="w-5 h-5 mr-3" />
                 <span className="font-medium">Logout</span>
@@ -545,7 +557,7 @@ const AdminDesktopSidebar: React.FC<AdminSidebarProps> = ({
                 onClick={handleLogout}
                 variant="ghost"
                 size="sm"
-                className="text-blue-300 hover:text-blue-100 hover:bg-blue-800/20 rounded-xl p-2"
+                className="text-muted-foreground hover:text-foreground hover:bg-muted rounded-xl p-2 dark:text-blue-300 dark:hover:text-blue-100 dark:hover:bg-blue-800/20"
               >
                 <LogOut className="w-5 h-5" />
               </Button>

@@ -267,7 +267,7 @@ const UserManagement = () => {
   };
 
   return (
-    <div className="min-h-screen flex w-full bg-gradient-to-br from-gray-900 via-purple-900/20 to-blue-900/20 relative overflow-hidden">
+    <div className="min-h-screen flex w-full bg-gradient-to-br from-background via-[#F0F2F5] to-[#E8EBF1] dark:from-[#0B1026] dark:via-[#1A1033] dark:to-[#0C1226] relative overflow-hidden">
       {/* Animated Background Elements */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <motion.div
@@ -311,9 +311,9 @@ const UserManagement = () => {
       {/* Mobile Menu Button */}
       <button
         onClick={handleToggleMobileMenu}
-        className="fixed top-4 right-4 z-50 p-2 rounded-lg bg-black/20 backdrop-blur-xl border border-white/10 md:hidden"
+        className="fixed top-4 right-4 z-50 p-2 rounded-lg border border-border bg-card/90 text-muted-foreground shadow-soft-elevated backdrop-blur-xl hover:bg-accent hover:text-accent-foreground md:hidden dark:bg-black/70 dark:border-white/10 dark:text-white"
       >
-        <Menu className="w-5 h-5 text-white" />
+        <Menu className="w-5 h-5" />
       </button>
 
       {/* Main Content */}
@@ -335,10 +335,10 @@ const UserManagement = () => {
           {/* Header */}
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
-              <h1 className="text-3xl lg:text-4xl font-bold bg-gradient-to-r from-purple-200 to-blue-200 bg-clip-text text-transparent">
+              <h1 className="text-3xl lg:text-4xl font-bold tracking-tight text-foreground dark:bg-gradient-to-r dark:from-purple-200 dark:to-blue-200 dark:bg-clip-text dark:text-transparent">
                 User Management
               </h1>
-              <p className="text-gray-400 mt-2">
+              <p className="mt-2 text-sm text-muted-foreground">
                 Manage system users and their permissions
               </p>
             </div>
@@ -354,23 +354,23 @@ const UserManagement = () => {
           </div>
 
           {/* Filters */}
-          <Card className="bg-black/20 backdrop-blur-xl border-white/10">
+          <Card className="bg-card/95 backdrop-blur-xl border-border shadow-soft-elevated dark:bg-black/20 dark:border-white/10">
             <CardContent className="p-6">
               <div className="flex flex-col sm:flex-row gap-4">
                 <div className="flex-1">
                   <div className="relative">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                    <Search className="absolute left-3 top-1/2 w-4 h-4 -translate-y-1/2 transform text-muted-foreground" />
                     <Input
                       placeholder="Search users by name, email, or company..."
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
-                      className="pl-10 bg-white/5 border-white/10 text-white placeholder-gray-400"
+                      className="pl-10 bg-background/80 border-border text-foreground placeholder-muted-foreground dark:bg-white/5 dark:border-white/10 dark:text-white dark:placeholder-gray-400"
                     />
                   </div>
                 </div>
                 <div className="w-full sm:w-48">
                   <Select value={roleFilter} onValueChange={setRoleFilter}>
-                    <SelectTrigger className="bg-white/5 border-white/10 text-white">
+                    <SelectTrigger className="bg-background/80 border-border text-foreground dark:bg-white/5 dark:border-white/10 dark:text-white">
                       <Filter className="w-4 h-4 mr-2" />
                       <SelectValue placeholder="Filter by role" />
                     </SelectTrigger>
@@ -387,13 +387,13 @@ const UserManagement = () => {
           </Card>
 
           {/* Users Table */}
-          <Card className="bg-black/20 backdrop-blur-xl border-white/10">
+          <Card className="bg-card/95 backdrop-blur-xl border-border shadow-soft-elevated dark:bg-black/20 dark:border-white/10">
             <CardHeader>
-              <CardTitle className="text-white flex items-center space-x-2">
-                <Users className="w-5 h-5 text-purple-400" />
+              <CardTitle className="flex items-center space-x-2 text-foreground dark:text-white">
+                <Users className="w-5 h-5 text-purple-500 dark:text-purple-400" />
                 <span>System Users</span>
               </CardTitle>
-              <CardDescription className="text-gray-400">
+              <CardDescription className="text-muted-foreground">
                 Manage user accounts and permissions
               </CardDescription>
             </CardHeader>
@@ -405,19 +405,23 @@ const UserManagement = () => {
                   <div className="overflow-x-auto">
                     <Table>
                       <TableHeader>
-                        <TableRow className="border-white/10">
-                          <TableHead className="text-gray-300">User</TableHead>
-                          <TableHead className="text-gray-300">
+                        <TableRow className="border-border/60 dark:border-white/10">
+                          <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                            User
+                          </TableHead>
+                          <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                             Company
                           </TableHead>
-                          <TableHead className="text-gray-300">Role</TableHead>
-                          <TableHead className="text-gray-300">
+                          <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                            Role
+                          </TableHead>
+                          <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                             Activity
                           </TableHead>
-                          <TableHead className="text-gray-300">
+                          <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                             Joined
                           </TableHead>
-                          <TableHead className="text-gray-300">
+                          <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                             Actions
                           </TableHead>
                         </TableRow>
@@ -425,8 +429,8 @@ const UserManagement = () => {
                       <TableBody>
                         {users.length === 0 ? (
                           <TableRow>
-                            <TableCell colSpan={6} className="text-center py-8">
-                              <div className="text-gray-400">
+                              <TableCell colSpan={6} className="py-8 text-center">
+                              <div className="text-muted-foreground">
                                 {searchTerm || roleFilter !== "all" ? (
                                   <div>
                                     <Users className="w-8 h-8 mx-auto mb-2 opacity-50" />
@@ -450,21 +454,21 @@ const UserManagement = () => {
                           users.map((user) => {
                             const RoleIcon = getRoleIcon(user.role);
                             return (
-                              <TableRow
+                                <TableRow
                                 key={user.id}
-                                className="border-white/10 hover:bg-white/5"
+                                className="hover:bg-muted/60 border-border/40 dark:border-white/10 dark:hover:bg-white/5"
                               >
                                 <TableCell>
                                   <div>
-                                    <div className="font-medium text-white">
+                                    <div className="font-medium text-foreground dark:text-white">
                                       {user.full_name}
                                     </div>
-                                    <div className="text-sm text-gray-400">
+                                    <div className="text-sm text-muted-foreground dark:text-gray-400">
                                       {user.email}
                                     </div>
                                   </div>
                                 </TableCell>
-                                <TableCell className="text-gray-300">
+                                <TableCell className="text-sm text-muted-foreground dark:text-gray-300">
                                   {user.company || "N/A"}
                                 </TableCell>
                                 <TableCell>
@@ -476,18 +480,18 @@ const UserManagement = () => {
                                     {user.role.replace("_", " ").toUpperCase()}
                                   </Badge>
                                 </TableCell>
-                                <TableCell className="text-gray-300">
+                                <TableCell className="text-sm text-muted-foreground dark:text-gray-300">
                                   <div className="text-sm">
                                     <div className="flex items-center space-x-2">
-                                      <span className="text-blue-400">
+                                        <span className="font-semibold text-blue-500 dark:text-blue-400">
                                         {user.search_count || 0}
                                       </span>
-                                      <span className="text-gray-500">
+                                      <span className="text-muted-foreground dark:text-gray-500">
                                         searches
                                       </span>
                                     </div>
                                     {user.last_sign_in_at && (
-                                      <div className="text-xs text-gray-500 mt-1">
+                                      <div className="mt-1 text-xs text-muted-foreground dark:text-gray-500">
                                         Last seen:{" "}
                                         {new Date(
                                           user.last_sign_in_at
@@ -496,7 +500,7 @@ const UserManagement = () => {
                                     )}
                                   </div>
                                 </TableCell>
-                                <TableCell className="text-gray-300">
+                                <TableCell className="text-sm text-muted-foreground dark:text-gray-300">
                                   <div className="text-sm">
                                     <div>
                                       {new Date(
@@ -504,7 +508,7 @@ const UserManagement = () => {
                                       ).toLocaleDateString()}
                                     </div>
                                     {user.is_verified && (
-                                      <div className="text-xs text-green-400 mt-1">
+                                      <div className="mt-1 text-xs text-emerald-500 dark:text-green-400">
                                         ✓ Verified
                                       </div>
                                     )}
@@ -521,7 +525,7 @@ const UserManagement = () => {
                                         )
                                       }
                                     >
-                                      <SelectTrigger className="w-32 h-8 bg-white/5 border-white/10 text-white text-xs">
+                                      <SelectTrigger className="w-32 h-8 text-xs bg-background/80 border-border text-foreground dark:bg-white/5 dark:border-white/10 dark:text-white">
                                         <SelectValue />
                                       </SelectTrigger>
                                       <SelectContent>
@@ -547,19 +551,19 @@ const UserManagement = () => {
                                           <Trash2 className="w-4 h-4" />
                                         </Button>
                                       </AlertDialogTrigger>
-                                      <AlertDialogContent className="bg-gray-900 border-white/10">
+                                      <AlertDialogContent className="border border-border bg-background/95 text-foreground dark:bg-gray-900 dark:border-white/10 dark:text-white">
                                         <AlertDialogHeader>
-                                          <AlertDialogTitle className="text-white">
+                                          <AlertDialogTitle className="text-foreground dark:text-white">
                                             Delete User
                                           </AlertDialogTitle>
-                                          <AlertDialogDescription className="text-gray-400">
+                                          <AlertDialogDescription className="text-muted-foreground dark:text-gray-400">
                                             Are you sure you want to delete{" "}
                                             {user.full_name}? This action cannot
                                             be undone.
                                           </AlertDialogDescription>
                                         </AlertDialogHeader>
                                         <AlertDialogFooter>
-                                          <AlertDialogCancel className="bg-white/5 border-white/10 text-white hover:bg-white/10">
+                                          <AlertDialogCancel className="border border-border bg-background/80 text-foreground hover:bg-accent hover:text-accent-foreground dark:bg-white/5 dark:border-white/10 dark:text-white dark:hover:bg-white/10">
                                             Cancel
                                           </AlertDialogCancel>
                                           <AlertDialogAction
@@ -586,7 +590,7 @@ const UserManagement = () => {
                   {/* Pagination */}
                   {pagination.pages > 1 && (
                     <div className="flex items-center justify-between mt-6">
-                      <div className="text-sm text-gray-400">
+                      <div className="text-sm text-muted-foreground dark:text-gray-400">
                         Showing {(pagination.page - 1) * pagination.limit + 1}{" "}
                         to{" "}
                         {Math.min(
@@ -606,12 +610,12 @@ const UserManagement = () => {
                             }))
                           }
                           disabled={pagination.page <= 1}
-                          className="bg-white/5 border-white/10 text-white hover:bg-white/10"
+                          className="border-border bg-background/80 text-foreground hover:bg-accent hover:text-accent-foreground dark:bg-white/5 dark:border-white/10 dark:text-white dark:hover:bg-white/10"
                         >
                           <ChevronLeft className="w-4 h-4" />
                           Previous
                         </Button>
-                        <span className="text-sm text-gray-400">
+                        <span className="text-sm text-muted-foreground dark:text-gray-400">
                           Page {pagination.page} of {pagination.pages}
                         </span>
                         <Button
@@ -624,7 +628,7 @@ const UserManagement = () => {
                             }))
                           }
                           disabled={pagination.page >= pagination.pages}
-                          className="bg-white/5 border-white/10 text-white hover:bg-white/10"
+                          className="border-border bg-background/80 text-foreground hover:bg-accent hover:text-accent-foreground dark:bg-white/5 dark:border-white/10 dark:text-white dark:hover:bg-white/10"
                         >
                           Next
                           <ChevronRight className="w-4 h-4" />
