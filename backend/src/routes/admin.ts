@@ -183,8 +183,8 @@ router.get(
       // Skip the expensive sync operation for now
       // await syncAuthUsersToProfiles();
 
-      // Use direct profiles table query for better performance
-      let query = supabase
+      // Use adminSupabase to bypass RLS and fetch all profiles
+      let query = adminSupabase
         .from("profiles")
         .select("*", { count: "exact" })
         .order("created_at", { ascending: false });
