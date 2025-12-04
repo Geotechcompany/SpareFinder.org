@@ -760,158 +760,48 @@ router.post(
           throw new Error("AI service health check failed");
         }
 
-        // Retry logic for rate limiting (429) and network errors
-        const maxAttempts = 5;
-        const baseDelayMs = 2000; // Base delay of 2 seconds
-        const maxDelayMs = 60000; // Maximum delay of 60 seconds
-        let lastError: any = null;
+        // Single-call logic for AI analysis (no client-side retry loop)
+        console.log(
+          `🚀 Calling AI analyze-part endpoint: ${aiServiceUrl}/analyze-part/`
+        );
 
-        for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-          try {
-            console.log(`🔄 AI analyze-part request (attempt ${attempt}/${maxAttempts})`);
-            
-            aiResponse = await axios.post(
-              `${aiServiceUrl}/analyze-part/`,
-              formData,
-              {
-                headers: {
-                  ...formData.getHeaders(),
-                  ...(aiServiceApiKey && {
-                    Authorization: `Bearer ${aiServiceApiKey}`,
-                  }),
-                },
-                timeout: 120000, // 120 second timeout to accommodate longer AI analysis
-                validateStatus: (status) => status < 500, // Accept 4xx as valid response
-              }
-            );
-
-            // If successful or non-rate-limit error, break
-            if (aiResponse && aiResponse.status !== 429) {
-              console.log(`✅ AI analyze-part response: ${aiResponse.status}`);
-              break;
-            }
-
-            // Handle rate limiting (429)
-            if (aiResponse && aiResponse.status === 429) {
-              // Extract Retry-After header (case-insensitive)
-              const retryAfterHeader =
-                aiResponse.headers?.["retry-after"] ||
-                aiResponse.headers?.["Retry-After"] ||
-                aiResponse.headers?.["RETRY-AFTER"];
-              
-              let delayMs: number;
-              
-              if (retryAfterHeader) {
-                // Parse Retry-After header
-                const retryAfterSeconds = parseInt(retryAfterHeader, 10);
-                if (!Number.isNaN(retryAfterSeconds) && retryAfterSeconds > 0) {
-                  // Use Retry-After value, but cap at maxDelayMs
-                  delayMs = Math.min(retryAfterSeconds * 1000, maxDelayMs);
-                  console.log(
-                    `📅 Using Retry-After header: ${retryAfterSeconds}s (${delayMs}ms)`
-                  );
-                } else {
-                  // Invalid Retry-After, use exponential backoff
-                  delayMs = Math.min(
-                    baseDelayMs * Math.pow(2, attempt - 1) +
-                      Math.random() * 1000, // Add jitter
-                    maxDelayMs
-                  );
-                  console.log(
-                    `⚠️ Invalid Retry-After header, using exponential backoff: ${delayMs}ms`
-                  );
-                }
-              } else {
-                // No Retry-After header, use exponential backoff with jitter
-                delayMs = Math.min(
-                  baseDelayMs * Math.pow(2, attempt - 1) +
-                    Math.random() * 1000, // Add jitter (0-1000ms)
-                  maxDelayMs
-                );
-                console.log(
-                  `⏱️ No Retry-After header, using exponential backoff: ${Math.round(delayMs)}ms`
-                );
-              }
-
-              if (attempt < maxAttempts) {
-                console.warn(
-                  `⚠️ AI service rate limited (attempt ${attempt}/${maxAttempts}). Retrying in ${Math.round(delayMs / 1000)}s...`
-                );
-                await new Promise((resolve) => setTimeout(resolve, delayMs));
-              } else {
-                // Last attempt failed with 429
-                lastError = {
-                  status: 429,
-                  message: "AI service is currently rate limited. Please try again later.",
-                  retryAfter: retryAfterHeader,
-                };
-              }
-            }
-          } catch (error: any) {
-            // Network or other errors
-            lastError = error;
-            if (attempt < maxAttempts) {
-              // Exponential backoff for network errors
-              const delayMs = Math.min(
-                baseDelayMs * Math.pow(2, attempt - 1) + Math.random() * 1000,
-                maxDelayMs
-              );
-              console.warn(
-                `⚠️ Request failed (attempt ${attempt}/${maxAttempts}): ${error.message}. Retrying in ${Math.round(delayMs / 1000)}s...`
-              );
-              await new Promise((resolve) => setTimeout(resolve, delayMs));
-            }
+        aiResponse = await axios.post(
+          `${aiServiceUrl}/analyze-part/`,
+          formData,
+          {
+            headers: {
+              ...formData.getHeaders(),
+              ...(aiServiceApiKey && {
+                Authorization: `Bearer ${aiServiceApiKey}`,
+              }),
+            },
+            timeout: 120000, // 120 second timeout to accommodate longer AI analysis
+            // Let us see 4xx responses (including 429) without throwing
+            validateStatus: (status) => status < 500,
           }
-        }
+        );
 
-        // Handle final response or error
-        if (!aiResponse) {
-          if (lastError?.status === 429) {
-            const duration = Date.now() - start;
-            return res.status(429).json({
-              success: false,
-              error: "rate_limited",
-              message:
-                "The AI service is currently experiencing high demand. Please try again in a few moments.",
-              retryAfter: lastError.retryAfter,
-              suggestion:
-                "Please wait a moment before submitting another image analysis.",
-              elapsed_ms: duration,
-            });
-          }
-          const duration = Date.now() - start;
+        console.log("🔄 AI analyze-part response:", {
+          status: aiResponse.status,
+          data: aiResponse.data,
+        });
+
+        const duration = Date.now() - start;
+
+        // Handle rate limit response in a single, non-retrying pass
+        if (aiResponse.status === 429) {
           return res.status(502).json({
             success: false,
-            error: "bad_gateway",
-            message: lastError?.message || "No response from AI service",
-            elapsed_ms: duration,
-          });
-        }
-
-        // Check for rate limit in final response
-        if (aiResponse.status === 429) {
-          const retryAfter =
-            aiResponse.headers?.["retry-after"] ||
-            aiResponse.headers?.["Retry-After"] ||
-            aiResponse.headers?.["RETRY-AFTER"];
-          const duration = Date.now() - start;
-          
-          return res.status(429).json({
-            success: false,
-            error: "rate_limited",
+            error: "ai_service_rate_limited",
             message:
-              "The AI service is currently experiencing high demand. Please try again in a few moments.",
-            retryAfter: retryAfter,
-            suggestion:
-              "Please wait a moment before submitting another image analysis.",
+              "The AI analysis service is temporarily rate limited by its provider. Please try again shortly.",
             elapsed_ms: duration,
           });
         }
 
-        // Check for other non-2xx status codes
+        // Handle other non-success responses
         if (aiResponse.status < 200 || aiResponse.status >= 300) {
-          const duration = Date.now() - start;
-          return res.status(aiResponse.status).json({
+          return res.status(502).json({
             success: false,
             error: "ai_service_error",
             message: `AI service returned status ${aiResponse.status}`,
@@ -923,22 +813,15 @@ router.post(
       } catch (aiError: any) {
         console.error("AI service error:", aiError);
 
-        // Check if this is a 429 rate limit error that wasn't handled by retry logic
+        // Check if this is a 429 rate limit error
         if (axios.isAxiosError(aiError) && aiError.response?.status === 429) {
-          const retryAfter =
-            aiError.response.headers?.["retry-after"] ||
-            aiError.response.headers?.["Retry-After"] ||
-            aiError.response.headers?.["RETRY-AFTER"];
           const duration = Date.now() - start;
-          
-          return res.status(429).json({
+
+          return res.status(502).json({
             success: false,
-            error: "rate_limited",
+            error: "ai_service_rate_limited",
             message:
-              "The AI service is currently experiencing high demand. Please try again in a few moments.",
-            retryAfter: retryAfter,
-            suggestion:
-              "Please wait a moment before submitting another image analysis.",
+              "The AI analysis service is temporarily rate limited by its provider. Please try again shortly.",
             elapsed_ms: duration,
           });
         }

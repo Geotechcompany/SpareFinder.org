@@ -1,7 +1,12 @@
 fastapi==0.104.1
 uvicorn[standard]==0.24.0
 python-multipart==0.0.6
-websockets==12.0
+
+# Pin websockets to 11.x because websockets 12 removed the `websockets.asyncio`
+# module that `supabase-py` still imports, which causes:
+#   ImportError: No module named 'websockets.asyncio'
+websockets==11.0.3
+
 setuptools>=65.5.0
 crewai==0.80.0
 langchain-openai==0.2.0
@@ -11,8 +16,8 @@ pillow==10.1.0
 python-dotenv==1.0.0
 tiktoken>=0.7.0
 requests>=2.31.0
-supabase>=2.0.0
+
+# Storage and database integration
+supabase==2.3.0
 postgrest>=0.13.0
-
-
 
