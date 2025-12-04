@@ -48,6 +48,10 @@ interface AIModel {
   updated_at: string;
 }
 
+interface AIModelsApiResponse {
+  models?: any[];
+}
+
 const AIModelsManagement = () => {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [showApiKeys, setShowApiKeys] = useState<{[key: string]: boolean}>({});
@@ -76,10 +80,13 @@ const AIModelsManagement = () => {
       setError(null);
 
       const response = await api.admin.getAIModels();
-      
-      if (response.success && response.data?.models) {
+
+      const apiData = response.data as AIModelsApiResponse | undefined;
+      const apiModels = apiData?.models;
+
+      if (response.success && Array.isArray(apiModels)) {
         // Transform the database models to ensure they have all required fields with defaults
-        const transformedModels: AIModel[] = response.data.models.map((model: any) => ({
+        const transformedModels: AIModel[] = apiModels.map((model: any) => ({
           id: model.id,
           provider: model.provider || 'Unknown',
           model_name: model.model_name || 'Unknown Model',

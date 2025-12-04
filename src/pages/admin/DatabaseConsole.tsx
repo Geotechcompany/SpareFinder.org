@@ -25,6 +25,13 @@ interface QueryHistory {
   executionTime?: number;
 }
 
+interface AdminStatsApiResponse {
+  statistics?: {
+    total_users?: number;
+    total_searches?: number;
+  };
+}
+
 const DatabaseConsole = () => {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [query, setQuery] = useState('');
@@ -52,10 +59,11 @@ const DatabaseConsole = () => {
       setError(null);
 
       // Fetch admin stats to get database information
-      const response = await apiClient.getAdminStats();
-      
-      if (response.success && response.data?.statistics) {
-        const stats = response.data.statistics;
+      const response = await api.admin.getAdminStats();
+      const statsData = (response.data as AdminStatsApiResponse | undefined)?.statistics;
+
+      if (response.success && statsData) {
+        const stats = statsData;
         setDbStats({
           totalTables: 12, // This would come from actual database metadata
           totalRecords: stats.total_users + stats.total_searches,
