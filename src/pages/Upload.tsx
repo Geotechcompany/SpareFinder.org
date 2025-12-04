@@ -4300,12 +4300,12 @@ const Upload = () => {
                     animate={{ opacity: 1, x: 0 }}
                     className="w-full"
                   >
-                    <Card className="bg-black/20 backdrop-blur-xl border-white/10">
+                    <Card className="bg-card/95 text-foreground border border-border shadow-soft-elevated backdrop-blur-xl dark:bg-black/30 dark:border-white/10">
                       <CardHeader>
-                        <CardTitle className="text-white">
+                        <CardTitle className="text-foreground dark:text-white">
                           Add Keywords
                         </CardTitle>
-                        <CardDescription className="text-gray-400">
+                        <CardDescription className="text-muted-foreground dark:text-gray-400">
                           Describe your automotive part using keywords
                         </CardDescription>
                       </CardHeader>
@@ -4344,7 +4344,7 @@ const Upload = () => {
                                   initial={{ opacity: 0, scale: 0.8 }}
                                   animate={{ opacity: 1, scale: 1 }}
                                   exit={{ opacity: 0, scale: 0.8 }}
-                                  className="flex items-center bg-blue-600/20 text-blue-300 px-3 py-1 rounded-full text-sm"
+                                  className="flex items-center px-3 py-1 text-sm rounded-full bg-blue-50 text-blue-700 dark:bg-blue-600/20 dark:text-blue-300"
                                 >
                                   {keyword}
                                   <Button
@@ -4422,26 +4422,26 @@ const Upload = () => {
                       ]}
                     />
                   )}
-                  <Card className="bg-black/20 backdrop-blur-xl border-white/10">
+                  <Card className="bg-card/95 text-foreground border border-border shadow-soft-elevated backdrop-blur-xl dark:bg-black/30 dark:border-white/10">
                     <CardHeader>
-                      <CardTitle className="text-white flex items-center">
-                        <Target className="w-4 h-4 mr-2 text-blue-400" />
+                      <CardTitle className="flex items-center text-foreground dark:text-white">
+                        <Target className="w-4 h-4 mr-2 text-sky-500" />
                         Tips for Better Results
                       </CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <ul className="text-gray-400 text-sm space-y-1">
+                      <ul className="text-sm space-y-1 text-muted-foreground dark:text-gray-300">
                         <li>• Use clear, well-lit images</li>
                         <li>• Capture the part from multiple angles</li>
                         <li>• Ensure the part number is visible if possible</li>
                         <li>• Remove any packaging or covers</li>
                       </ul>
-                      <div className="border-t border-white/10 my-4" />
+                      <div className="my-4 border-t border-border/80 dark:border-white/10" />
                       <div>
-                        <div className="text-white font-medium mb-2">
+                        <div className="mb-2 font-medium text-foreground dark:text-white">
                           Keyword Search Guidance
                         </div>
-                        <ul className="text-gray-400 text-sm space-y-1">
+                        <ul className="text-sm space-y-1 text-muted-foreground dark:text-gray-300">
                           <li>
                             • Image analysis is recommended for the most
                             accurate results.
