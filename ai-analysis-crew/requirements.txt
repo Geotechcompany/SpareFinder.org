@@ -10,8 +10,9 @@ websockets==11.0.3
 setuptools>=65.5.0
 crewai==0.80.0
 langchain-openai==0.2.0
-# Pin heavy AI dependencies to avoid long dependency resolution during builds
-openai==1.0.0
+# Pin heavy AI dependencies to avoid long dependency resolution during builds.
+# crewai 0.80.0 requires openai>=1.13.3 so we pin to a compatible floor version.
+openai==1.13.3
 litellm==1.72.3
 stagehand==0.5.5
 langsmith==0.4.52
