@@ -642,7 +642,6 @@ const Notifications = () => {
                         </motion.div>
                       )}
                     </div>
-                  )}
                 </CardContent>
               </Card>
             </motion.div>
