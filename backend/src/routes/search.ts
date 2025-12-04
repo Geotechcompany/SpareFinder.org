@@ -193,7 +193,10 @@ router.post(
         }
       }
 
-      const aiServiceUrl = process.env.AI_SERVICE_URL;
+      const aiServiceUrl =
+        process.env.AI_SERVICE_INTERNAL_URL ||
+        process.env.AI_SERVICE_URL ||
+        process.env.AI_CREW_URL;
       const aiServiceApiKey = process.env.AI_SERVICE_API_KEY;
       if (!aiServiceUrl) {
         return res.status(500).json({
@@ -245,11 +248,18 @@ router.post(
                   currentTime: currentTime,
                 },
               })
-              .then(() => {
-                console.log(
-                  "📧 Keyword search started email sent to:",
-                  userProfile.email
-                );
+              .then((success) => {
+                if (success) {
+                  console.log(
+                    "📧 Keyword search started email sent to:",
+                    userProfile.email
+                  );
+                } else {
+                  console.warn(
+                    "⚠️ Keyword search started email NOT sent (email service not configured or disabled) for:",
+                    userProfile.email
+                  );
+                }
               })
               .catch((error) => {
                 console.error(
@@ -297,156 +307,71 @@ router.post(
       console.log(`📤 Request data:`, requestData);
       console.log(`🔑 API Key present:`, !!aiServiceApiKey);
 
-      // Improved retry logic with exponential backoff and better rate limit handling
-      const maxAttempts = 5; // Increased from 3 to 5
-      const baseDelayMs = 2000; // Base delay of 2 seconds
-      const maxDelayMs = 60000; // Maximum delay of 60 seconds
       let response: AxiosResponse<any> | null = null;
-      let lastError: any = null;
 
-      for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-        try {
-          response = await axios.post(
-            `${aiServiceUrl}/search/keywords/schedule`,
-            requestData,
-            {
-              timeout: isNaN(keywordTimeoutMs) ? 120000 : keywordTimeoutMs,
-              headers: {
-                "Content-Type": "application/json",
-                ...(aiServiceApiKey ? { "x-api-key": aiServiceApiKey } : {}),
-              },
-              validateStatus: (status) => status < 500,
-            }
-          );
-
-          if (response) {
-            console.log("🔄 AI keyword schedule response:", {
-              attempt,
-              status: response.status,
-              data: response.data,
-            });
+      try {
+        const axiosResponse = await axios.post(
+          `${aiServiceUrl}/search/keywords/schedule`,
+          requestData,
+          {
+            timeout: isNaN(keywordTimeoutMs) ? 120000 : keywordTimeoutMs,
+            headers: {
+              "Content-Type": "application/json",
+              ...(aiServiceApiKey ? { "x-api-key": aiServiceApiKey } : {}),
+            },
+            // Let us see 4xx responses (including 429) without throwing
+            validateStatus: (status) => status < 500,
           }
+        );
 
-          // If successful or non-rate-limit error, break
-          if (response && response.status !== 429) {
-            break;
-          }
+        response = axiosResponse;
 
-          // Handle rate limiting (429)
-          if (response && response.status === 429) {
-            // Extract Retry-After header (case-insensitive)
-            const retryAfterHeader =
-              response.headers?.["retry-after"] ||
-              response.headers?.["Retry-After"] ||
-              response.headers?.["RETRY-AFTER"];
+        console.log("🔄 AI keyword schedule response:", {
+          status: axiosResponse.status,
+          data: axiosResponse.data,
+        });
+      } catch (error: any) {
+        // Network or unexpected errors (connection reset, DNS, etc.)
+        console.error("❌ AI keyword schedule request failed:", {
+          message: error.message,
+          status: error.response?.status,
+          data: error.response?.data,
+        });
 
-            let delayMs: number;
-
-            if (retryAfterHeader) {
-              // Parse Retry-After header
-              const retryAfterSeconds = parseInt(retryAfterHeader, 10);
-              if (!Number.isNaN(retryAfterSeconds) && retryAfterSeconds > 0) {
-                // Use Retry-After value, but cap at maxDelayMs
-                delayMs = Math.min(retryAfterSeconds * 1000, maxDelayMs);
-                console.log(
-                  `📅 Using Retry-After header: ${retryAfterSeconds}s (${delayMs}ms)`
-                );
-              } else {
-                // Invalid Retry-After, use exponential backoff
-                delayMs = Math.min(
-                  baseDelayMs * Math.pow(2, attempt - 1) + Math.random() * 1000, // Add jitter
-                  maxDelayMs
-                );
-                console.log(
-                  `⚠️ Invalid Retry-After header, using exponential backoff: ${delayMs}ms`
-                );
-              }
-            } else {
-              // No Retry-After header, use exponential backoff with jitter
-              delayMs = Math.min(
-                baseDelayMs * Math.pow(2, attempt - 1) + Math.random() * 1000, // Add jitter (0-1000ms)
-                maxDelayMs
-              );
-              console.log(
-                `⏱️ No Retry-After header, using exponential backoff: ${Math.round(
-                  delayMs
-                )}ms`
-              );
-            }
-
-            if (attempt < maxAttempts) {
-              console.warn(
-                `⚠️ AI service rate limited (attempt ${attempt}/${maxAttempts}). Retrying in ${Math.round(
-                  delayMs / 1000
-                )}s...`
-              );
-              await new Promise((resolve) => setTimeout(resolve, delayMs));
-            } else {
-              // Last attempt failed with 429
-              lastError = {
-                status: 429,
-                message:
-                  "AI service is currently rate limited. Please try again later.",
-                retryAfter: retryAfterHeader,
-              };
-            }
-          }
-        } catch (error: any) {
-          // Network or other errors
-          lastError = error;
-          if (attempt < maxAttempts) {
-            // Exponential backoff for network errors
-            const delayMs = Math.min(
-              baseDelayMs * Math.pow(2, attempt - 1) + Math.random() * 1000,
-              maxDelayMs
-            );
-            console.warn(
-              `⚠️ Request failed (attempt ${attempt}/${maxAttempts}): ${
-                error.message
-              }. Retrying in ${Math.round(delayMs / 1000)}s...`
-            );
-            await new Promise((resolve) => setTimeout(resolve, delayMs));
-          }
-        }
-      }
-
-      // Handle final response or error
-      if (!response) {
-        if (lastError?.status === 429) {
-          return res.status(429).json({
+        if (axios.isAxiosError(error) && error.response?.status === 429) {
+          // Upstream (e.g. Cloudflare) is rate limiting the AI agent service
+          return res.status(502).json({
             success: false,
-            error: "rate_limited",
+            error: "ai_service_rate_limited",
             message:
-              "The AI service is currently experiencing high demand. Please try again in a few moments.",
-            retryAfter: lastError.retryAfter,
-            suggestion:
-              "Please wait a moment before submitting another keyword search.",
+              "The AI analysis service is temporarily rate limited by its provider. Please try again shortly.",
           });
         }
+
+        return res.status(502).json({
+          success: false,
+          error: "ai_service_unavailable",
+          message: error.message || "Failed to call AI keyword service",
+        });
+      }
+
+      if (!response) {
         return res.status(502).json({
           success: false,
           error: "bad_gateway",
-          message: lastError?.message || "No response from AI service",
+          message: "No response from AI keyword service",
         });
       }
 
       const duration = Date.now() - start;
 
-      // Handle rate limit response
+      // Handle rate limit response in a single, non-retrying pass
       if (response.status === 429) {
-        const retryAfter =
-          response.headers?.["retry-after"] ||
-          response.headers?.["Retry-After"] ||
-          response.headers?.["RETRY-AFTER"];
-
-        return res.status(429).json({
+        return res.status(502).json({
           success: false,
-          error: "rate_limited",
+          error: "ai_service_rate_limited",
           message:
-            "The AI service is currently experiencing high demand. Please try again in a few moments.",
-          retryAfter: retryAfter,
-          suggestion:
-            "Please wait a moment before submitting another keyword search.",
+            "The AI analysis service is temporarily rate limited by its provider. Please try again shortly.",
           elapsed_ms: duration,
         });
       }
@@ -497,7 +422,10 @@ router.get(
   async (req: AuthRequest, res: Response) => {
     try {
       const { jobId } = req.params;
-      const aiServiceUrl = process.env.AI_SERVICE_URL;
+      const aiServiceUrl =
+        process.env.AI_SERVICE_INTERNAL_URL ||
+        process.env.AI_SERVICE_URL ||
+        process.env.AI_CREW_URL;
       const aiServiceApiKey = process.env.AI_SERVICE_API_KEY;
 
       if (!aiServiceUrl) {

@@ -40,7 +40,10 @@ import {
   Zap,
   Database,
   Server,
+  CreditCard,
+  DollarSign,
 } from "lucide-react";
+import { PLAN_CONFIG } from "@/lib/plans";
 import ThemeToggle from "@/components/ThemeToggle";
 import {
   Breadcrumb,
@@ -70,6 +73,22 @@ interface AdminStats {
   disk_usage: number;
 }
 
+interface SubscriptionStatistics {
+  total?: number;
+  by_tier?: {
+    free?: number;
+    pro?: number;
+    enterprise?: number;
+  };
+  by_status?: {
+    active?: number;
+    canceled?: number;
+    past_due?: number;
+    unpaid?: number;
+    trialing?: number;
+  };
+}
+
 interface AdminUser {
   id: string;
   email: string;
@@ -82,6 +101,9 @@ const AdminDashboardLayout = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [stats, setStats] = useState<AdminStats | null>(null);
+  const [subscriptionStats, setSubscriptionStats] =
+    useState<SubscriptionStatistics | null>(null);
+  const [estimatedRevenue, setEstimatedRevenue] = useState<number | null>(null);
   const [adminUser, setAdminUser] = useState<AdminUser | null>(null);
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -186,12 +208,51 @@ const AdminDashboardLayout = () => {
           "✅ Admin stats fetched successfully:",
           statsResponse.data.statistics
         );
-        setStats(statsResponse.data.statistics);
+        setStats(statsResponse.data.statistics as AdminStats);
       } else {
         console.warn("❌ Failed to fetch admin stats:", statsResponse);
         throw new Error(
           statsResponse.error || "Failed to fetch admin statistics"
         );
+      }
+
+      // Best-effort fetch of subscriber statistics for revenue analytics
+      try {
+        const subscribersResponse = await api.admin.getSubscribers(
+          1,
+          1,
+          "all",
+          "all"
+        );
+
+        const statsData = (subscribersResponse.data as any)?.statistics;
+
+        if (subscribersResponse.success && statsData) {
+          const subsStats = statsData as SubscriptionStatistics;
+          setSubscriptionStats(subsStats);
+
+          const byTier = subsStats.by_tier || {};
+          const freeCount = byTier.free || 0;
+          const proCount = byTier.pro || 0;
+          const enterpriseCount = byTier.enterprise || 0;
+
+          const totalRevenue =
+            freeCount * PLAN_CONFIG.free.price +
+            proCount * PLAN_CONFIG.pro.price +
+            enterpriseCount * PLAN_CONFIG.enterprise.price;
+
+          setEstimatedRevenue(totalRevenue);
+        } else {
+          setSubscriptionStats(null);
+          setEstimatedRevenue(null);
+        }
+      } catch (subErr) {
+        console.error(
+          "⚠️ Failed to fetch subscriber statistics for dashboard revenue:",
+          subErr
+        );
+        setSubscriptionStats(null);
+        setEstimatedRevenue(null);
       }
     } catch (err: any) {
       console.error("❌ Error fetching admin data:", err);
@@ -368,6 +429,49 @@ const AdminDashboardLayout = () => {
     },
   ];
 
+  const revenueStats = [
+    {
+      title: "Estimated Monthly Revenue",
+      value:
+        estimatedRevenue !== null
+          ? `£${estimatedRevenue.toLocaleString()}`
+          : "£0",
+      change: "Based on current subscriptions",
+      icon: DollarSign,
+      color: "from-emerald-600 to-green-600",
+    },
+    {
+      title: "Total Subscribers",
+      value:
+        subscriptionStats?.total !== undefined
+          ? subscriptionStats.total.toLocaleString()
+          : "0",
+      change: "All plans",
+      icon: Users,
+      color: "from-blue-600 to-cyan-600",
+    },
+    {
+      title: "Active Subscriptions",
+      value:
+        subscriptionStats?.by_status?.active !== undefined
+          ? subscriptionStats.by_status.active.toLocaleString()
+          : "0",
+      change: "Currently billed",
+      icon: CreditCard,
+      color: "from-purple-600 to-pink-600",
+    },
+    {
+      title: "Canceled / Churned",
+      value:
+        subscriptionStats?.by_status?.canceled !== undefined
+          ? subscriptionStats.by_status.canceled.toLocaleString()
+          : "0",
+      change: "Total cancellations",
+      icon: TrendingUp,
+      color: "from-orange-600 to-red-600",
+    },
+  ];
+
   return (
     <div className="min-h-screen flex w-full bg-gradient-to-br from-background via-[#F0F2F5] to-[#E8EBF1] dark:from-[#0B1026] dark:via-[#1A1033] dark:to-[#0C1226] relative overflow-hidden">
       {/* Animated Background Elements */}
@@ -502,13 +606,13 @@ const AdminDashboardLayout = () => {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.1 * index, duration: 0.5 }}
-                whileHover={{ y: -5, scale: 1.02 }}
+                whileHover={{ y: -8, scale: 1.03 }}
                 className="relative group"
               >
                 <div
                   className={`absolute inset-0 bg-gradient-to-r ${stat.color} opacity-10 rounded-2xl blur-xl group-hover:opacity-20 transition-opacity`}
                 />
-                <Card className="relative bg-card/90 backdrop-blur-xl border-border shadow-soft-elevated hover:border-primary/30 hover:shadow-lg dark:bg-black/40 dark:border-white/10">
+                <Card className="relative bg-card/95 backdrop-blur-xl border border-border/80 shadow-soft-elevated hover:border-primary/40 hover:shadow-lg transition-colors duration-300 dark:bg-black/40 dark:border-white/10">
                   <CardContent className="p-6">
                     <div className="flex items-center justify-between">
                       <div>
@@ -522,11 +626,69 @@ const AdminDashboardLayout = () => {
                           {stat.change}
                         </p>
                       </div>
-                      <div
-                        className={`p-3 rounded-xl bg-gradient-to-r ${stat.color} shadow-lg`}
+                      <motion.div
+                        initial={{ scale: 1, rotate: 0 }}
+                        animate={{ scale: [1, 1.05, 1], rotate: [0, 2, -2, 0] }}
+                        transition={{
+                          duration: 4,
+                          repeat: Infinity,
+                          repeatType: "reverse",
+                          ease: "easeInOut",
+                          delay: index * 0.15,
+                        }}
+                        className={`p-3 rounded-xl bg-gradient-to-r ${stat.color} shadow-lg ring-1 ring-white/10 dark:ring-white/20 transition-transform duration-300 group-hover:scale-110 group-hover:rotate-3`}
                       >
                         <stat.icon className="w-6 h-6 text-white" />
+                      </motion.div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </motion.div>
+            ))}
+          </div>
+
+          {/* Revenue & Subscribers */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-6">
+            {revenueStats.map((stat, index) => (
+              <motion.div
+                key={stat.title}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.15 + 0.1 * index, duration: 0.5 }}
+                whileHover={{ y: -8, scale: 1.03 }}
+                className="relative group"
+              >
+                <div
+                  className={`absolute inset-0 bg-gradient-to-r ${stat.color} opacity-10 rounded-2xl blur-xl group-hover:opacity-20 transition-opacity`}
+                />
+                <Card className="relative bg-card/95 backdrop-blur-xl border border-border/80 shadow-soft-elevated hover:border-primary/40 hover:shadow-lg transition-colors duration-300 dark:bg-black/40 dark:border-white/10">
+                  <CardContent className="p-6">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-muted-foreground">
+                          {stat.title}
+                        </p>
+                        <p className="mt-1 text-2xl font-bold text-foreground dark:text-white">
+                          {stat.value}
+                        </p>
+                        <p className="mt-1 text-sm text-muted-foreground">
+                          {stat.change}
+                        </p>
                       </div>
+                      <motion.div
+                        initial={{ scale: 1, rotate: 0 }}
+                        animate={{ scale: [1, 1.05, 1], rotate: [0, -2, 2, 0] }}
+                        transition={{
+                          duration: 4,
+                          repeat: Infinity,
+                          repeatType: "reverse",
+                          ease: "easeInOut",
+                          delay: 0.3 + index * 0.15,
+                        }}
+                        className={`p-3 rounded-xl bg-gradient-to-r ${stat.color} shadow-lg ring-1 ring-white/10 dark:ring-white/20 transition-transform duration-300 group-hover:scale-110 group-hover:-rotate-3`}
+                      >
+                        <stat.icon className="w-6 h-6 text-white" />
+                      </motion.div>
                     </div>
                   </CardContent>
                 </Card>

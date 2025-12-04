@@ -314,13 +314,13 @@ const AdminDesktopSidebar: React.FC<AdminSidebarProps> = ({
                   <img
                     src="/sparefinderlogo.png"
                     alt="SpareFinder Logo"
-                    className="h-12 w-auto object-contain transition-transform group-hover:scale-105 dark:hidden"
+                    className="h-14 w-auto object-contain transition-transform group-hover:scale-105 dark:hidden"
                   />
                   {/* Dark theme logo */}
                   <img
                     src="/sparefinderlogodark.png"
                     alt="SpareFinder Logo"
-                    className="hidden h-12 w-auto object-contain transition-transform group-hover:scale-105 dark:inline-block"
+                    className="hidden h-14 w-auto object-contain transition-transform group-hover:scale-105 dark:inline-block"
                   />
                 </Link>
               </motion.div>
@@ -337,12 +337,12 @@ const AdminDesktopSidebar: React.FC<AdminSidebarProps> = ({
                   <img
                     src="/sparefinderlogo.png"
                     alt="SpareFinder Logo"
-                    className="h-10 w-auto object-contain transition-transform group-hover:scale-105 dark:hidden"
+                    className="h-12 w-auto object-contain transition-transform group-hover:scale-105 dark:hidden"
                   />
                   <img
                     src="/sparefinderlogodark.png"
                     alt="SpareFinder Logo"
-                    className="hidden h-10 w-auto object-contain transition-transform group-hover:scale-105 dark:inline-block"
+                    className="hidden h-12 w-auto object-contain transition-transform group-hover:scale-105 dark:inline-block"
                   />
                 </Link>
               </motion.div>
