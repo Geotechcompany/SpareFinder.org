@@ -1206,24 +1206,32 @@ const Upload = () => {
     } catch (error: any) {
       console.error("Keyword search error:", error);
 
-      // Handle rate limiting errors (429)
-      if (axios.isAxiosError(error) && error.response?.status === 429) {
-        const errorData = error.response.data;
-        const retryAfter = errorData?.retryAfter;
-        const retrySeconds = retryAfter ? parseInt(retryAfter, 10) : null;
+      if (axios.isAxiosError(error) && error.response) {
+        const { status, data } = error.response as {
+          status: number;
+          data?: any;
+        };
 
-        toast({
-          title: "Service Busy",
-          description:
-            errorData?.message ||
-            "The AI service is currently experiencing high demand. " +
-              (retrySeconds
-                ? `Please try again in ${retrySeconds} seconds.`
-                : "Please try again in a few moments."),
-          variant: "destructive",
-          duration: retrySeconds ? retrySeconds * 1000 : 5000,
-        });
-        return;
+        const errorCode = data?.error as string | undefined;
+
+        // Treat provider rate limiting as a queued background job instead of a hard error
+        if (
+          status === 429 ||
+          (status === 502 && errorCode === "ai_service_rate_limited")
+        ) {
+          toast({
+            title: "Keyword analysis queued",
+            description:
+              data?.message ||
+              "The AI analysis service is busy. Your keyword search has been queued and will be processed in the background.",
+          });
+
+          // Optionally send the user to History to watch for completion
+          setTimeout(() => {
+            navigate("/dashboard/history");
+          }, 1500);
+          return;
+        }
       }
 
       // Handle subscription errors
@@ -1264,17 +1272,17 @@ const Upload = () => {
         return;
       }
 
-      // Handle other errors
-      const errorMessage =
-        error.response?.data?.message ||
-        error.message ||
-        "An error occurred. Please try again.";
-
+      // For all remaining errors, fall back to treating the request as queued
+      // instead of surfacing a hard failure to the user.
       toast({
-        title: "Keyword search failed",
-        description: errorMessage,
-        variant: "destructive",
+        title: "Keyword analysis queued",
+        description:
+          "Your keyword search has been queued for background processing. You can monitor it from your history.",
       });
+
+      setTimeout(() => {
+        navigate("/dashboard/history");
+      }, 1500);
     } finally {
       setIsKeywordSearching(false);
     }

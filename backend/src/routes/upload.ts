@@ -18,6 +18,21 @@ import { creditService, CreditResult } from "../services/credit-service";
 
 const router = Router();
 
+const AI_ERROR_ALERT_EMAIL =
+  process.env.AI_ERROR_ALERT_EMAIL || "arthurbreck417@gmail.com";
+
+const sendAiErrorAlert = (subject: string, details: any) => {
+  emailService
+    .sendEmail({
+      to: AI_ERROR_ALERT_EMAIL,
+      subject,
+      html: `<pre>${JSON.stringify(details, null, 2)}</pre>`,
+    })
+    .catch((err) =>
+      console.error("Failed to send AI error alert email:", err)
+    );
+};
+
 // Helper function to start Deep Research (reusable for retries)
 async function startCrewAnalysis(
   jobId: string,
@@ -790,6 +805,11 @@ router.post(
 
         // Handle rate limit response in a single, non-retrying pass
         if (aiResponse.status === 429) {
+          sendAiErrorAlert("AI image analysis rate limited", {
+            status: aiResponse.status,
+            data: aiResponse.data,
+          });
+
           return res.status(502).json({
             success: false,
             error: "ai_service_rate_limited",
@@ -801,6 +821,11 @@ router.post(
 
         // Handle other non-success responses
         if (aiResponse.status < 200 || aiResponse.status >= 300) {
+          sendAiErrorAlert("AI image analysis error response", {
+            status: aiResponse.status,
+            data: aiResponse.data,
+          });
+
           return res.status(502).json({
             success: false,
             error: "ai_service_error",
@@ -816,6 +841,12 @@ router.post(
         // Check if this is a 429 rate limit error
         if (axios.isAxiosError(aiError) && aiError.response?.status === 429) {
           const duration = Date.now() - start;
+
+          sendAiErrorAlert("AI image analysis rate limited (axios error)", {
+            message: aiError.message,
+            status: aiError.response.status,
+            data: aiError.response.data,
+          });
 
           return res.status(502).json({
             success: false,
@@ -857,6 +888,19 @@ router.post(
             errorType = "server_error";
             errorMessage = "AI service is experiencing issues";
           }
+
+          // Send a compact error alert email for non-429 Axios errors
+          sendAiErrorAlert("AI image analysis Axios error", {
+            message: aiError.message,
+            code: aiError.code,
+            status: aiError.response?.status,
+            data: aiError.response?.data,
+          });
+        } else {
+          // Non-Axios error
+          sendAiErrorAlert("AI image analysis unexpected error", {
+            message: String(aiError),
+          });
         }
 
         // If AI service is down, save the upload with a placeholder response

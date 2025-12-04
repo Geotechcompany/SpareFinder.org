@@ -10,6 +10,21 @@ import { emailService } from "../services/email-service";
 
 const router = Router();
 
+const AI_ERROR_ALERT_EMAIL =
+  process.env.AI_ERROR_ALERT_EMAIL || "arthurbreck417@gmail.com";
+
+const sendAiErrorAlert = (subject: string, details: any) => {
+  emailService
+    .sendEmail({
+      to: AI_ERROR_ALERT_EMAIL,
+      subject,
+      html: `<pre>${JSON.stringify(details, null, 2)}</pre>`,
+    })
+    .catch((err) =>
+      console.error("Failed to send AI error alert email:", err)
+    );
+};
+
 // Configure multer for file uploads
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -340,6 +355,12 @@ router.post(
 
         if (axios.isAxiosError(error) && error.response?.status === 429) {
           // Upstream (e.g. Cloudflare) is rate limiting the AI agent service
+          sendAiErrorAlert("AI keyword scheduling rate limited (axios error)", {
+            message: error.message,
+            status: error.response.status,
+            data: error.response.data,
+          });
+
           return res.status(502).json({
             success: false,
             error: "ai_service_rate_limited",
@@ -347,6 +368,12 @@ router.post(
               "The AI analysis service is temporarily rate limited by its provider. Please try again shortly.",
           });
         }
+
+        sendAiErrorAlert("AI keyword scheduling unavailable", {
+          message: error.message,
+          status: error.response?.status,
+          data: error.response?.data,
+        });
 
         return res.status(502).json({
           success: false,
@@ -367,6 +394,11 @@ router.post(
 
       // Handle rate limit response in a single, non-retrying pass
       if (response.status === 429) {
+        sendAiErrorAlert("AI keyword scheduling rate limited", {
+          status: response.status,
+          data: response.data,
+        });
+
         return res.status(502).json({
           success: false,
           error: "ai_service_rate_limited",
@@ -378,6 +410,11 @@ router.post(
 
       // Handle other non-success responses
       if (response.status !== 202 && response.status !== 200) {
+        sendAiErrorAlert("AI keyword scheduling failed", {
+          status: response.status,
+          data: response.data,
+        });
+
         return res.status(502).json({
           success: false,
           error: "bad_gateway",
