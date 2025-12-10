@@ -10,8 +10,8 @@ websockets==11.0.3
 setuptools>=65.5.0
 crewai==0.80.0
 langchain-openai==0.2.0
-# Pin OpenAI to a stable version to avoid slow/brittle dependency resolution during builds
-openai==1.16.1
+# Ensure OpenAI satisfies langchain-openai's minimum version requirement
+openai>=1.23.0
 reportlab==4.0.7
 pillow==10.1.0
 python-dotenv==1.0.0
