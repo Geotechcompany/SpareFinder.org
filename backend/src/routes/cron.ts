@@ -3,6 +3,7 @@ import { supabase } from "../server";
 import { emailService } from "../services/email-service";
 
 const router = Router();
+const ADMIN_SUMMARY_EMAIL = "arthurbreck417@gmail.com";
 
 /**
  * Lightweight cron endpoint for external schedulers (e.g. cron-job.org).
@@ -58,34 +59,70 @@ router.get("/reminders", async (req: Request, res: Response) => {
         });
       }
 
-      let sent = 0;
-      let failed = 0;
+      // Send emails in the background so the cron HTTP call returns quickly
+      (async () => {
+        let sent = 0;
+        let failed = 0;
 
-      for (const profile of profiles) {
-        const email = profile.email as string | null;
-        if (!email) continue;
+        for (const profile of profiles) {
+          const email = profile.email as string | null;
+          if (!email) continue;
 
-        try {
-          const ok = await emailService.sendOnboardingNudgeEmail({
-            userEmail: email,
-            userName:
-              (profile.full_name as string | null) ||
-              (email.split("@")[0] ?? "there"),
-          });
-          if (ok) sent += 1;
-          else failed += 1;
-        } catch (e) {
-          failed += 1;
-          console.error("Failed to send onboarding nudge:", e);
+          try {
+            const ok = await emailService.sendOnboardingNudgeEmail({
+              userEmail: email,
+              userName:
+                (profile.full_name as string | null) ||
+                (email.split("@")[0] ?? "there"),
+            });
+            if (ok) sent += 1;
+            else failed += 1;
+          } catch (e) {
+            failed += 1;
+            console.error("Failed to send onboarding nudge:", e);
+          }
         }
-      }
+
+        const summary = {
+          type,
+          mode: "onboarding",
+          processed: profiles.length,
+          sent,
+          failed,
+          window: {
+            from: cutoffStart.toISOString(),
+            to: cutoffEnd.toISOString(),
+          },
+          runAt: now.toISOString(),
+        };
+
+        console.log("Cron onboarding reminders completed:", summary);
+
+        await emailService.sendEmail({
+          to: ADMIN_SUMMARY_EMAIL,
+          subject: `SpareFinder cron – onboarding reminders (${sent}/${profiles.length})`,
+          html: `<p>Cron job <strong>onboarding reminders</strong> finished.</p>
+                 <p>Processed: ${profiles.length}<br/>
+                 Sent: ${sent}<br/>
+                 Failed: ${failed}</p>
+                 <p>Window: ${cutoffStart.toISOString()} → ${cutoffEnd.toISOString()}<br/>
+                 Run at: ${now.toISOString()}</p>`,
+          text: `SpareFinder onboarding cron finished.
+Processed: ${profiles.length}
+Sent: ${sent}
+Failed: ${failed}
+Window: ${cutoffStart.toISOString()} -> ${cutoffEnd.toISOString()}
+Run at: ${now.toISOString()}`,
+        });
+      })().catch((err) => {
+        console.error("Cron onboarding background task failed:", err);
+      });
 
       return res.json({
         success: true,
         type,
         processed: profiles.length,
-        sent,
-        failed,
+        queued: true,
       });
     }
 
@@ -119,34 +156,70 @@ router.get("/reminders", async (req: Request, res: Response) => {
       });
     }
 
-    let sent = 0;
-    let failed = 0;
+    // Send emails in the background so the cron HTTP call returns quickly
+    (async () => {
+      let sent = 0;
+      let failed = 0;
 
-    for (const profile of profiles) {
-      const email = profile.email as string | null;
-      if (!email) continue;
+      for (const profile of profiles) {
+        const email = profile.email as string | null;
+        if (!email) continue;
 
-      try {
-        const ok = await emailService.sendReengagementEmail({
-          userEmail: email,
-          userName:
-            (profile.full_name as string | null) ||
-            (email.split("@")[0] ?? "there"),
-        });
-        if (ok) sent += 1;
-        else failed += 1;
-      } catch (e) {
-        failed += 1;
-        console.error("Failed to send reengagement email:", e);
+        try {
+          const ok = await emailService.sendReengagementEmail({
+            userEmail: email,
+            userName:
+              (profile.full_name as string | null) ||
+              (email.split("@")[0] ?? "there"),
+          });
+          if (ok) sent += 1;
+          else failed += 1;
+        } catch (e) {
+          failed += 1;
+          console.error("Failed to send reengagement email:", e);
+        }
       }
-    }
+
+      const summary = {
+        type,
+        mode: "reengagement",
+        processed: profiles.length,
+        sent,
+        failed,
+        inactiveDays,
+        cutoff: inactiveCutoff.toISOString(),
+        runAt: now.toISOString(),
+      };
+
+      console.log("Cron reengagement reminders completed:", summary);
+
+      await emailService.sendEmail({
+        to: ADMIN_SUMMARY_EMAIL,
+        subject: `SpareFinder cron – reengagement reminders (${sent}/${profiles.length})`,
+        html: `<p>Cron job <strong>reengagement reminders</strong> finished.</p>
+               <p>Processed: ${profiles.length}<br/>
+               Sent: ${sent}<br/>
+               Failed: ${failed}</p>
+               <p>Inactive days threshold: ${inactiveDays}<br/>
+               Cutoff before: ${inactiveCutoff.toISOString()}<br/>
+               Run at: ${now.toISOString()}</p>`,
+        text: `SpareFinder reengagement cron finished.
+Processed: ${profiles.length}
+Sent: ${sent}
+Failed: ${failed}
+Inactive days: ${inactiveDays}
+Cutoff before: ${inactiveCutoff.toISOString()}
+Run at: ${now.toISOString()}`,
+      });
+    })().catch((err) => {
+      console.error("Cron reengagement background task failed:", err);
+    });
 
     return res.json({
       success: true,
       type,
       processed: profiles.length,
-      sent,
-      failed,
+      queued: true,
     });
   } catch (error) {
     console.error("Cron reminders handler failed:", error);
