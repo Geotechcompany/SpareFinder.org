@@ -113,7 +113,8 @@ class EmailService {
       } as const;
 
       this.senderName = "SpareFinder";
-      this.senderEmail = user;
+      // Force visible "From" address to use the SpareFinder domain
+      this.senderEmail = "noreply.sparefinder.org";
 
       this.transporter = nodemailer.createTransport(smtpConfig);
       await this.transporter.verify();
