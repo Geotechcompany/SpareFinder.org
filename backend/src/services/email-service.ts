@@ -56,6 +56,13 @@ interface AnalysisProcessingEmailData {
   processingTimeMinutes?: number;
 }
 
+interface ReferralInviteEmailData {
+  userEmail: string;
+  userName: string;
+  referralUrl?: string;
+  rewardCredits?: number;
+}
+
 interface SubscriptionEmailData {
   userEmail: string;
   userName: string;
@@ -277,11 +284,15 @@ class EmailService {
       const html = `
 <!doctype html>
 <html>
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  </head>
   <body style="margin:0;padding:0;background:#020617;color:#e2e8f0;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica,Arial,sans-serif;">
     <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:radial-gradient(circle at top,#1d4ed8 0,#020617 55%,#000 100%);padding:32px 0;">
       <tr>
         <td>
-          <table role="presentation" width="600" align="center" cellspacing="0" cellpadding="0" style="background:#020617;border-radius:18px;overflow:hidden;box-shadow:0 22px 60px rgba(15,23,42,.9);border:1px solid rgba(148,163,184,.22);">
+          <table role="presentation" width="600" align="center" cellspacing="0" cellpadding="0" style="width:100%;max-width:600px;background:#020617;border-radius:18px;overflow:hidden;box-shadow:0 22px 60px rgba(15,23,42,.9);border:1px solid rgba(148,163,184,.22);">
             <tr>
               <td style="padding:18px 30px 16px 30px;background:#020617;color:#f9fafb;border-bottom:1px solid rgba(15,23,42,.9);">
                 <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
@@ -497,11 +508,15 @@ class EmailService {
       const html = `
 <!doctype html>
 <html>
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  </head>
   <body style="margin:0;padding:0;background:#020617;color:#e2e8f0;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica,Arial,sans-serif;">
     <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:radial-gradient(circle at top,#22c55e 0,#020617 55%,#000 100%);padding:32px 0;">
       <tr>
         <td>
-          <table role="presentation" width="600" align="center" cellspacing="0" cellpadding="0" style="background:#020617;border-radius:18px;overflow:hidden;box-shadow:0 22px 60px rgba(15,23,42,.9);border:1px solid rgba(34,197,94,.4);">
+          <table role="presentation" width="600" align="center" cellspacing="0" cellpadding="0" style="width:100%;max-width:600px;background:#020617;border-radius:18px;overflow:hidden;box-shadow:0 22px 60px rgba(15,23,42,.9);border:1px solid rgba(34,197,94,.4);">
             <tr>
               <td style="padding:18px 28px 14px 28px;background:#020617;color:#f9fafb;border-bottom:1px solid rgba(15,23,42,.9);">
                 <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
@@ -637,11 +652,15 @@ class EmailService {
       const html = `
 <!doctype html>
 <html>
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  </head>
   <body style="margin:0;padding:0;background:#020617;color:#e2e8f0;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica,Arial,sans-serif;">
     <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:radial-gradient(circle at top,#0ea5e9 0,#020617 55%,#000 100%);padding:32px 0;">
       <tr>
         <td>
-          <table role="presentation" width="600" align="center" cellspacing="0" cellpadding="0" style="background:#020617;border-radius:18px;overflow:hidden;box-shadow:0 22px 60px rgba(15,23,42,.9);border:1px solid rgba(56,189,248,.4);">
+          <table role="presentation" width="600" align="center" cellspacing="0" cellpadding="0" style="width:100%;max-width:600px;background:#020617;border-radius:18px;overflow:hidden;box-shadow:0 22px 60px rgba(15,23,42,.9);border:1px solid rgba(56,189,248,.4);">
             <tr>
               <td style="padding:18px 28px 14px 28px;background:#020617;color:#f9fafb;border-bottom:1px solid rgba(15,23,42,.9);">
                 <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
@@ -747,6 +766,152 @@ class EmailService {
       return ok;
     } catch (e) {
       console.error("Failed to send reengagement email:", e);
+      return false;
+    }
+  }
+
+  /**
+   * Referral campaign email – invite friends / colleagues and earn bonus credits
+   */
+  async sendReferralInviteEmail(
+    data: ReferralInviteEmailData
+  ): Promise<boolean> {
+    try {
+      const emailEnabled = await this.isEmailEnabled();
+      if (!emailEnabled) return false;
+
+      const frontendUrl =
+        process.env.FRONTEND_URL || "https://sparefinder.org";
+      const baseUrl = frontendUrl.replace(/\/$/, "");
+      const logoUrl = `${baseUrl}/sparefinderlogo.png`;
+      const defaultReferralUrl = `${frontendUrl}/register`;
+      const referralUrl = data.referralUrl || defaultReferralUrl;
+      const rewardCredits = data.rewardCredits ?? 3;
+
+      const subject = `Invite your team to SpareFinder & earn ${rewardCredits} credits`;
+
+      const html = `
+<!doctype html>
+<html>
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  </head>
+  <body style="margin:0;padding:0;background:#020617;color:#e2e8f0;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica,Arial,sans-serif;">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:radial-gradient(circle at top,#4c1d95 0,#020617 55%,#000 100%);padding:32px 0;">
+      <tr>
+        <td>
+          <table role="presentation" width="600" align="center" cellspacing="0" cellpadding="0" style="width:100%;max-width:600px;background:#020617;border-radius:18px;overflow:hidden;box-shadow:0 22px 60px rgba(15,23,42,.9);border:1px solid rgba(147,51,234,.5);">
+            <tr>
+              <td style="padding:18px 28px 14px 28px;background:#020617;color:#f9fafb;border-bottom:1px solid rgba(15,23,42,.9);">
+                <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
+                  <tr>
+                    <td style="text-align:left;vertical-align:middle;">
+                      <img src="${logoUrl}" alt="SpareFinder" style="max-height:28px;width:auto;display:block;border-radius:6px;" />
+                    </td>
+                    <td style="text-align:right;vertical-align:middle;font-size:11px;color:#c4b5fd;">
+                      Referral program · Bonus credits
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+
+            <tr>
+              <td style="padding:24px 28px 18px 28px;background:linear-gradient(135deg,#7e22ce,#4f46e5);color:#f9fafb;">
+                <h1 style="margin:0;font-size:22px;line-height:1.3;">
+                  ${data.userName || "There"}, earn extra searches by inviting your team
+                </h1>
+                <p style="margin:6px 0 0 0;font-size:13px;opacity:.95;">
+                  Share SpareFinder with colleagues and get <strong>${rewardCredits} bonus credits</strong> for every new account that completes a first analysis.
+                </p>
+              </td>
+            </tr>
+
+            <tr>
+              <td style="padding:22px 28px 6px 28px;">
+                <p style="margin:0 0 10px 0;font-size:14px;color:#cbd5e1;">
+                  Here’s how the referral program works:
+                </p>
+                <ol style="margin:0 0 10px 0;padding-left:18px;font-size:13px;color:#9ca3af;line-height:1.7;">
+                  <li>Share your invite link with your colleagues and partners.</li>
+                  <li>They sign up and run their <strong>first successful analysis</strong>.</li>
+                  <li>You automatically receive <strong>${rewardCredits} spare part search credits</strong> in your account.</li>
+                </ol>
+
+                <div style="margin:18px 0 8px 0;text-align:left;">
+                  <a href="${referralUrl}" style="display:inline-block;background:linear-gradient(135deg,#8b5cf6,#6366f1);color:#f9fafb;text-decoration:none;padding:11px 22px;border-radius:999px;font-weight:600;font-size:14px;box-shadow:0 12px 30px rgba(88,28,135,.55);">
+                    Copy or share your invite link
+                  </a>
+                </div>
+
+                <p style="margin:10px 0 0 0;font-size:12px;color:#9ca3af;">
+                  Invite your maintenance team, stores team, and preferred suppliers so everyone can identify parts in the same place.
+                </p>
+              </td>
+            </tr>
+
+            <tr>
+              <td style="padding:14px 28px 12px 28px;">
+                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="font-size:12px;color:#9ca3af;">
+                  <tr>
+                    <td style="padding-right:10px;vertical-align:top;width:50%;border-right:1px solid rgba(31,41,55,.8);">
+                      <p style="margin:0 0 4px 0;color:#e5e7eb;font-weight:600;">Who to invite</p>
+                      <ul style="margin:0;padding-left:16px;line-height:1.6;">
+                        <li>Maintenance &amp; reliability engineers.</li>
+                        <li>Stores / inventory controllers.</li>
+                        <li>Procurement and buyer teams.</li>
+                      </ul>
+                    </td>
+                    <td style="padding-left:14px;vertical-align:top;width:50%;">
+                      <p style="margin:0 0 4px 0;color:#e5e7eb;font-weight:600;">Why it helps</p>
+                      <ul style="margin:0;padding-left:16px;line-height:1.6;">
+                        <li>Reduce duplicate work identifying the same part.</li>
+                        <li>Share one clean history of confirmed identifications.</li>
+                        <li>Earn extra credits to cover your next set of jobs.</li>
+                      </ul>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+
+            <tr>
+              <td style="padding:12px 28px 18px 28px;border-top:1px solid rgba(31,41,55,.9);font-size:11px;color:#9ca3af;">
+                <p style="margin:0;">
+                  You can manage referrals and see your credit balance any time from your SpareFinder dashboard.
+                </p>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>`;
+
+      const ok = await this.sendEmail({
+        to: data.userEmail,
+        subject,
+        html,
+      });
+
+      if (ok) {
+        await supabase.from("notifications").insert({
+          user_id: await this.getUserIdByEmail(data.userEmail),
+          title: "Invite friends & earn bonus credits",
+          message: `You can earn ${rewardCredits} extra credits for each new user you invite who completes their first analysis.`,
+          type: "info",
+          metadata: {
+            referral_url_used: referralUrl,
+            reward_credits: rewardCredits,
+          },
+        });
+      }
+
+      return ok;
+    } catch (e) {
+      console.error("Failed to send referral invite email:", e);
       return false;
     }
   }
