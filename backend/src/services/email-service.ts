@@ -260,80 +260,134 @@ class EmailService {
 
   async sendWelcomeEmail(data: WelcomeEmailData): Promise<boolean> {
     try {
-      // Respect global email enabled setting
-      const { data: notificationSettings } = await supabase
-        .from("system_settings")
-        .select("setting_value")
-        .eq("category", "notifications")
-        .eq("setting_key", "email_enabled")
-        .single();
-
-      const emailEnabled =
-        notificationSettings?.setting_value === "true" ||
-        process.env.EMAIL_ENABLED === "true";
+      const emailEnabled = await this.isEmailEnabled();
       if (!emailEnabled) return false;
 
       const subject = "Welcome to SpareFinder AI – Let’s get you started";
-      const dashboardUrl = `${
-        process.env.FRONTEND_URL || "https://app.sparefinder.org"
-      }/dashboard`;
-      const uploadUrl = `${
-        process.env.FRONTEND_URL || "https://app.sparefinder.org"
-      }/dashboard/upload`;
-      const docsUrl = `${
-        process.env.FRONTEND_URL || "https://app.sparefinder.org"
-      }/help`;
+      const frontendUrl =
+        process.env.FRONTEND_URL || "https://sparefinder.org";
+      const dashboardUrl = `${frontendUrl}/dashboard`;
+      const uploadUrl = `${frontendUrl}/dashboard/upload`;
+      const docsUrl = `${frontendUrl}/help`;
+      const billingUrl = `${frontendUrl}/dashboard/billing`;
 
       const html = `
 <!doctype html>
 <html>
-<body style="margin:0;padding:0;background:#0b1026;color:#edf2f7;font-family:Segoe UI,Arial,sans-serif;">
-  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:linear-gradient(135deg,#0b1026,#1a1033,#0c1226);padding:32px 0;">
-    <tr>
-      <td>
-        <table role="presentation" width="600" align="center" cellspacing="0" cellpadding="0" style="background:#0f172a;border-radius:14px;overflow:hidden;box-shadow:0 20px 50px rgba(0,0,0,.35);">
-          <tr>
-            <td style="padding:28px 32px;background:linear-gradient(135deg,#3b82f6,#1d4ed8);color:#fff;">
-              <h1 style="margin:0;font-size:24px;">Welcome, ${
-                data.userName || "there"
-              } 👋</h1>
-              <p style="margin:6px 0 0 0;opacity:.9;">Your SpareFinder AI account is ready.</p>
-            </td>
-          </tr>
-          <tr>
-            <td style="padding:28px 32px;">
-              <h2 style="margin:0 0 12px 0;color:#e2e8f0;font-size:18px;">Quick start</h2>
-              <ol style="margin:0;padding-left:18px;color:#cbd5e1;line-height:1.6;">
-                <li>Go to Upload and add a clear photo of the part.</li>
-                <li>Review the identification, confidence and details.</li>
-                <li>Save to history and export or share results.</li>
-              </ol>
-              <div style="margin:22px 0 8px 0;">
-                <a href="${uploadUrl}" style="display:inline-block;background:#3b82f6;color:#fff;text-decoration:none;padding:12px 18px;border-radius:10px;font-weight:600;">Upload your first part</a>
-              </div>
-              <p style="margin:16px 0 0;color:#94a3b8;">Need help? See tips and best practices in our guide.</p>
-              <a href="${docsUrl}" style="color:#60a5fa;text-decoration:none;">Read the getting‑started guide →</a>
-              <hr style="border:none;border-top:1px solid #223047;margin:24px 0;" />
-              <h3 style="margin:0 0 8px 0;color:#e2e8f0;font-size:16px;">What’s included</h3>
-              <ul style="margin:0;padding-left:18px;color:#cbd5e1;line-height:1.6;">
-                <li>AI identification with confidence scoring</li>
-                <li>History, sharing and export</li>
-                <li>Email notifications when analyses finish</li>
-              </ul>
-            </td>
-          </tr>
-          <tr>
-            <td style="padding:18px 32px;color:#94a3b8;border-top:1px solid #223047;font-size:12px;">
-              You can manage email preferences in Settings anytime. Visit your dashboard: <a href="${dashboardUrl}" style="color:#60a5fa;text-decoration:none;">${dashboardUrl}</a>
-            </td>
-          </tr>
-        </table>
-      </td>
-    </tr>
-  </table>
-  
+  <body style="margin:0;padding:0;background:#020617;color:#e2e8f0;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica,Arial,sans-serif;">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:radial-gradient(circle at top,#1d4ed8 0,#020617 55%,#000 100%);padding:32px 0;">
+      <tr>
+        <td>
+          <table role="presentation" width="600" align="center" cellspacing="0" cellpadding="0" style="background:#020617;border-radius:18px;overflow:hidden;box-shadow:0 22px 60px rgba(15,23,42,.9);border:1px solid rgba(148,163,184,.22);">
+            <tr>
+              <td style="padding:26px 30px 22px 30px;background:linear-gradient(135deg,#10b981,#06b6d4,#3b82f6);color:#f9fafb;">
+                <div style="font-size:12px;letter-spacing:.16em;text-transform:uppercase;opacity:.9;margin-bottom:4px;">SpareFinder AI</div>
+                <h1 style="margin:0;font-size:24px;line-height:1.2;">Welcome, ${data.userName || "there"} 👋</h1>
+                <p style="margin:6px 0 0 0;font-size:14px;opacity:.9;">
+                  Your account is live – you’re ready to identify industrial spare parts in seconds.
+                </p>
+              </td>
+            </tr>
+
+            <tr>
+              <td style="padding:26px 30px 6px 30px;">
+                <h2 style="margin:0 0 10px 0;font-size:18px;color:#e5e7eb;">How to use SpareFinder in 3 steps</h2>
+                <ol style="margin:4px 0 0 0;padding-left:20px;color:#cbd5e1;font-size:14px;line-height:1.7;">
+                  <li style="margin-bottom:6px;">
+                    <strong>Upload a clear photo of the part</strong> – one part per image, good lighting, and minimal background.
+                  </li>
+                  <li style="margin-bottom:6px;">
+                    <strong>Review the match</strong> – see the identified part, confidence score, key specs, and compatible alternatives.
+                  </li>
+                  <li style="margin-bottom:2px;">
+                    <strong>Save, share, and export</strong> – keep a history of searches, export PDFs, or share results with your team.
+                  </li>
+                </ol>
+
+                <div style="margin:22px 0 8px 0;text-align:left;">
+                  <a href="${uploadUrl}" style="display:inline-block;background:linear-gradient(135deg,#3b82f6,#2563eb);color:#f9fafb;text-decoration:none;padding:11px 22px;border-radius:999px;font-weight:600;font-size:14px;box-shadow:0 12px 30px rgba(37,99,235,.55);">
+                    Upload your first part
+                  </a>
+                </div>
+
+                <p style="margin:12px 0 0 0;font-size:13px;color:#9ca3af;">
+                  Each analysis uses one credit. You can see your remaining credits at the top of your dashboard.
+                </p>
+              </td>
+            </tr>
+
+            <tr>
+              <td style="padding:10px 30px 4px 30px;">
+                <div style="background:radial-gradient(circle at top left,#0f172a,#020617);border-radius:14px;padding:16px 18px;border:1px solid rgba(148,163,184,.28);">
+                  <h3 style="margin:0 0 6px 0;font-size:15px;color:#e5e7eb;">Where everything lives</h3>
+                  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="font-size:13px;color:#cbd5e1;">
+                    <tr>
+                      <td style="padding:4px 0;vertical-align:top;width:34%;">
+                        <strong>Dashboard</strong>
+                      </td>
+                      <td style="padding:4px 0;vertical-align:top;">
+                        Overview of your recent analyses and credit balance.
+                      </td>
+                    </tr>
+                    <tr>
+                      <td style="padding:4px 0;vertical-align:top;width:34%;">
+                        <strong>Upload</strong>
+                      </td>
+                      <td style="padding:4px 0;vertical-align:top;">
+                        Start a new search by dragging &amp; dropping part photos.
+                      </td>
+                    </tr>
+                    <tr>
+                      <td style="padding:4px 0;vertical-align:top;width:34%;">
+                        <strong>History</strong>
+                      </td>
+                      <td style="padding:4px 0;vertical-align:top;">
+                        Revisit, export, or share previous identifications.
+                      </td>
+                    </tr>
+                    <tr>
+                      <td style="padding:4px 0;vertical-align:top;width:34%;">
+                        <strong>Billing &amp; plans</strong>
+                      </td>
+                      <td style="padding:4px 0;vertical-align:top;">
+                        Manage your subscription, invoices, and upgrade options.
+                      </td>
+                    </tr>
+                  </table>
+                </div>
+              </td>
+            </tr>
+
+            <tr>
+              <td style="padding:10px 30px 6px 30px;">
+                <div style="background:#020617;border-radius:14px;padding:14px 18px;border:1px dashed rgba(148,163,184,.4);">
+                  <h3 style="margin:0 0 4px 0;font-size:15px;color:#e5e7eb;">Need help or best practices?</h3>
+                  <p style="margin:0 0 6px 0;font-size:13px;color:#9ca3af;">
+                    We’ve put together a short guide with example photos, do’s &amp; don’ts, and tips for getting the highest accuracy.
+                  </p>
+                  <a href="${docsUrl}" style="font-size:13px;color:#60a5fa;text-decoration:none;font-weight:500;">
+                    Open the getting-started guide →
+                  </a>
+                </div>
+              </td>
+            </tr>
+
+            <tr>
+              <td style="padding:18px 30px 20px 30px;border-top:1px solid rgba(31,41,55,.9);font-size:11px;color:#9ca3af;">
+                <p style="margin:0 0 4px 0;">
+                  You can update your email preferences anytime from <a href="${dashboardUrl}" style="color:#60a5fa;text-decoration:none;">Settings &gt; Notifications</a>.
+                </p>
+                <p style="margin:0;">
+                  Go to your dashboard: <a href="${dashboardUrl}" style="color:#60a5fa;text-decoration:none;">${dashboardUrl}</a> · Manage billing: <a href="${billingUrl}" style="color:#60a5fa;text-decoration:none;">Billing &amp; plans</a>
+                </p>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
   </body>
-  </html>`;
+</html>`;
 
       const ok = await this.sendEmail({
         to: data.userEmail,
@@ -345,7 +399,8 @@ class EmailService {
         await supabase.from("notifications").insert({
           user_id: await this.getUserIdByEmail(data.userEmail),
           title: "Welcome to SpareFinder AI",
-          message: "Your account is ready. Start by uploading your first part.",
+          message:
+            "Your account is ready. Start by uploading your first part from the dashboard.",
           type: "success",
           action_url: uploadUrl,
         });
