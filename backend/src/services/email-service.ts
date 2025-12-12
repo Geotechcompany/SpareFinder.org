@@ -275,11 +275,11 @@ class EmailService {
         process.env.FRONTEND_URL || "https://sparefinder.org";
       const baseUrl = frontendUrl.replace(/\/$/, "");
       const logoUrl = `${baseUrl}/sparefinderlogo.png`;
-      const dashboardUrl = `${frontendUrl}/dashboard`;
-      const uploadUrl = `${frontendUrl}/dashboard/upload`;
-      const docsUrl = `${frontendUrl}/help`;
-      const contactUrl = `${frontendUrl}/contact`;
-      const billingUrl = `${frontendUrl}/dashboard/billing`;
+      const dashboardUrl = `${baseUrl}/dashboard`;
+      const uploadUrl = `${baseUrl}/dashboard/upload`;
+      const docsUrl = `${baseUrl}/help`;
+      const contactUrl = `${baseUrl}/contact`;
+      const billingUrl = `${baseUrl}/dashboard/billing`;
 
       const html = `
 <!doctype html>
@@ -501,9 +501,9 @@ class EmailService {
         process.env.FRONTEND_URL || "https://sparefinder.org";
       const baseUrl = frontendUrl.replace(/\/$/, "");
       const logoUrl = `${baseUrl}/sparefinderlogo.png`;
-      const dashboardUrl = `${frontendUrl}/dashboard`;
-      const uploadUrl = `${frontendUrl}/dashboard/upload`;
-      const docsUrl = `${frontendUrl}/help`;
+      const dashboardUrl = `${baseUrl}/dashboard`;
+      const uploadUrl = `${baseUrl}/dashboard/upload`;
+      const docsUrl = `${baseUrl}/help`;
 
       const html = `
 <!doctype html>
@@ -646,8 +646,8 @@ class EmailService {
         process.env.FRONTEND_URL || "https://sparefinder.org";
       const baseUrl = frontendUrl.replace(/\/$/, "");
       const logoUrl = `${baseUrl}/sparefinderlogo.png`;
-      const dashboardUrl = `${frontendUrl}/dashboard`;
-      const uploadUrl = `${frontendUrl}/dashboard/upload`;
+      const dashboardUrl = `${baseUrl}/dashboard`;
+      const uploadUrl = `${baseUrl}/dashboard/upload`;
 
       const html = `
 <!doctype html>
@@ -784,7 +784,7 @@ class EmailService {
         process.env.FRONTEND_URL || "https://sparefinder.org";
       const baseUrl = frontendUrl.replace(/\/$/, "");
       const logoUrl = `${baseUrl}/sparefinderlogo.png`;
-      const defaultReferralUrl = `${frontendUrl}/register`;
+      const defaultReferralUrl = `${baseUrl}/register`;
       const referralUrl = data.referralUrl || defaultReferralUrl;
       const rewardCredits = data.rewardCredits ?? 3;
 
@@ -935,6 +935,10 @@ class EmailService {
     template: string,
     data: AnalysisEmailData
   ): string {
+    const frontendUrl =
+      process.env.FRONTEND_URL || "https://sparefinder.org";
+    const baseUrl = frontendUrl.replace(/\/$/, "");
+
     return template
       .replace(/{{userName}}/g, data.userName || "User")
       .replace(/{{partName}}/g, data.partName)
@@ -945,13 +949,17 @@ class EmailService {
       .replace(/{{imageUrl}}/g, data.imageUrl || "")
       .replace(
         /{{dashboardUrl}}/g,
-        `${process.env.FRONTEND_URL || "https://sparefinder.org"}/history`
+        `${baseUrl}/history`
       )
       .replace(/{{currentDate}}/g, new Date().toLocaleDateString())
       .replace(/{{currentTime}}/g, new Date().toLocaleTimeString());
   }
 
   private getDefaultAnalysisTemplate(data: AnalysisEmailData): string {
+    const frontendUrl =
+      process.env.FRONTEND_URL || "https://sparefinder.org";
+    const baseUrl = frontendUrl.replace(/\/$/, "");
+
     const confidenceColor =
       data.confidence > 0.8
         ? "#10B981"
@@ -1046,9 +1054,7 @@ class EmailService {
 
             <!-- Call to Action -->
             <div style="text-align: center; margin: 35px 0;">
-                <a href="${
-                  process.env.FRONTEND_URL || "https://app.sparefinder.org"
-                }/history" 
+                <a href="${baseUrl}/history" 
                    style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; text-decoration: none; padding: 14px 28px; border-radius: 8px; font-weight: 600; display: inline-block; box-shadow: 0 4px 6px rgba(16, 185, 129, 0.25);">
                     📊 View Full Report
                 </a>
@@ -1157,9 +1163,10 @@ class EmailService {
       // Replace template variables
       const currentDate = new Date().toLocaleDateString();
       const currentTime = new Date().toLocaleTimeString();
-      const dashboardUrl = `${
-        process.env.FRONTEND_URL || "https://app.sparefinder.org"
-      }/dashboard`;
+      const rawFrontendUrl =
+        process.env.FRONTEND_URL || "https://sparefinder.org";
+      const baseFrontendUrl = rawFrontendUrl.replace(/\/$/, "");
+      const dashboardUrl = `${baseFrontendUrl}/dashboard`;
 
       const html = template.html_content
         .replace(/\{\{userName\}\}/g, data.userName)
@@ -1241,9 +1248,10 @@ class EmailService {
       // Replace template variables
       const currentDate = new Date().toLocaleDateString();
       const currentTime = new Date().toLocaleTimeString();
-      const dashboardUrl = `${
-        process.env.FRONTEND_URL || "https://app.sparefinder.org"
-      }/dashboard`;
+      const rawFrontendUrl =
+        process.env.FRONTEND_URL || "https://sparefinder.org";
+      const baseFrontendUrl = rawFrontendUrl.replace(/\/$/, "");
+      const dashboardUrl = `${baseFrontendUrl}/dashboard`;
 
       const html = template.html_content
         .replace(/\{\{userName\}\}/g, data.userName)
@@ -1328,9 +1336,10 @@ class EmailService {
       // Replace template variables
       const currentDate = new Date().toLocaleDateString();
       const currentTime = new Date().toLocaleTimeString();
-      const dashboardUrl = `${
-        process.env.FRONTEND_URL || "https://app.sparefinder.org"
-      }/dashboard`;
+      const rawFrontendUrl =
+        process.env.FRONTEND_URL || "https://sparefinder.org";
+      const baseFrontendUrl = rawFrontendUrl.replace(/\/$/, "");
+      const dashboardUrl = `${baseFrontendUrl}/dashboard`;
 
       const html = template.html_content
         .replace(/\{\{userName\}\}/g, data.userName)
