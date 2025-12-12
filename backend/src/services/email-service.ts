@@ -88,74 +88,34 @@ class EmailService {
 
   private async initializeTransporter() {
     try {
-      // Get SMTP settings from system_settings table
-      const { data: smtpSettings, error } = await supabase
-        .from("system_settings")
-        .select("setting_key, setting_value")
-        .eq("category", "email");
+      // Private SMTP configuration for SpareFinder emails.
+      // Uses environment variables if present, otherwise falls back to hardcoded defaults.
+      const host = process.env.SMTP_HOST || "smtp.gmail.com";
+      const port = parseInt(process.env.SMTP_PORT || "587", 10);
+      const user =
+        process.env.SMTP_USER || "noreply.tpsinternational@gmail.com";
+      const pass =
+        process.env.SMTP_PASSWORD ||
+        process.env.SMTP_PASS ||
+        "sozc aysd lbqw kewg";
 
-      if (error) {
-        console.error("Failed to fetch SMTP settings:", error);
-        return;
-      }
-
-      // Convert settings to object
-      const settings: Record<string, any> = {};
-      smtpSettings?.forEach((setting) => {
-        settings[setting.setting_key] = setting.setting_value;
-      });
-
-      // Check if email notifications are enabled
-      const { data: notificationSettings } = await supabase
-        .from("system_settings")
-        .select("setting_value")
-        .eq("category", "notifications")
-        .eq("setting_key", "email_enabled")
-        .single();
-
-      const emailEnabled =
-        notificationSettings?.setting_value === true ||
-        notificationSettings?.setting_value === "true" ||
-        process.env.EMAIL_ENABLED === "true";
-      if (!emailEnabled) {
-        console.log("Email notifications are disabled in system settings");
-        return;
-      }
-
-      // Prioritize database settings over environment variables
-      const envHost = process.env.SMTP_HOST || "smtp.gmail.com";
-      const envPort = parseInt(process.env.SMTP_PORT || "587");
-      const envSecure = process.env.SMTP_SECURE === "true" || envPort === 465;
-
-      // Create transporter with SMTP settings - database settings take priority
       const smtpConfig = {
-        host: settings.smtp_host || envHost,
-        port: parseInt(settings.smtp_port) || envPort,
-        secure: settings.smtp_secure === "true" || envSecure, // true for 465 (SSL)
+        host,
+        port,
+        // Use TLS on port 465, otherwise use STARTTLS on 587/other ports
+        secure: port === 465,
         auth: {
-          user: settings.smtp_user || process.env.SMTP_USER,
-          pass:
-            settings.smtp_password ||
-            process.env.SMTP_PASS ||
-            process.env.SMTP_PASSWORD,
+          user,
+          pass,
         },
+        // Lower timeout so connection failures return quickly
+        connectionTimeout: 10000,
       } as const;
 
-      // Store sender information for use in emails
-      this.senderName = settings.smtp_from_name || "SpareFinder";
-      this.senderEmail = settings.smtp_user || process.env.SMTP_USER;
-
-      // Validate required settings
-      if (!smtpConfig.auth.user || !smtpConfig.auth.pass) {
-        console.error(
-          "SMTP credentials not configured. Please set SMTP_USER and SMTP_PASS environment variables."
-        );
-        return;
-      }
+      this.senderName = "SpareFinder";
+      this.senderEmail = user;
 
       this.transporter = nodemailer.createTransport(smtpConfig);
-
-      // Verify connection
       await this.transporter.verify();
 
       this.isConfigured = true;
