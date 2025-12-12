@@ -173,6 +173,26 @@ const Footer = () => {
               <p className="text-sm text-muted-foreground dark:text-gray-500">
                 Join 25,000+ professionals • No spam, unsubscribe anytime
               </p>
+
+              {/* Company contact details */}
+              <div className="pt-2 text-xs text-muted-foreground dark:text-gray-400 space-y-1 sm:text-sm">
+                <div className="font-medium text-foreground dark:text-white">
+                  Durham Workspace – Abbey Road
+                </div>
+                <div>Durham DH1 5JZ, UK</div>
+                <div>
+                  Call Us: +44 1916499741 · +44 7415892946
+                </div>
+                <div>
+                  Email:{' '}
+                  <a
+                    href="mailto:tps@tpsinternational.co.uk"
+                    className="underline-offset-2 hover:underline"
+                  >
+                    tps@tpsinternational.co.uk
+                  </a>
+                </div>
+              </div>
               
               {/* Social Links */}
               <div className="flex space-x-4 pt-4">
