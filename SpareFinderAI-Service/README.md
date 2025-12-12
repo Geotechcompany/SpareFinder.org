@@ -1,10 +1,10 @@
 # SpareFinder AI Service
 
-Production-ready AI service for Manufacturing part identification and analysis.
+Production-ready AI service for Engineering spares part identification and analysis.
 
 ## Features
 
-- **AI-Powered Part Analysis**: Advanced image recognition for Manufacturing parts
+- **AI-Powered Part Analysis**: Advanced image recognition for Engineering spares parts
 - **Database Storage**: All jobs stored in Supabase database
 - **Real-time Processing**: Fast analysis with progress tracking
 - **Email Notifications**: Automated email updates for analysis results

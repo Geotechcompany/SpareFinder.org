@@ -14,7 +14,7 @@ export function DashboardScrollDemo() {
               </span>
             </h1>
             <p className="mx-auto mt-6 max-w-3xl text-xl text-muted-foreground dark:text-gray-400">
-              Instantly identify any Manufacturing or industrial part with our advanced AI technology
+              Instantly identify any Engineering spares or industrial part with our advanced AI technology
             </p>
           </>
         }

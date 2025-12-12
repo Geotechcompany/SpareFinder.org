@@ -12,7 +12,8 @@
         "test:health": "node test-health.js",
         "migrate": "node scripts/migrate-to-supabase.js",
         "migrate:manual": "node scripts/migrate-to-supabase.js --manual",
-        "test:migration": "node scripts/test-migration.js"
+        "test:migration": "node scripts/test-migration.js",
+        "email:test:welcome": "tsx src/scripts/send-test-welcome-email.ts"
     },
     "dependencies": {
         "@supabase/supabase-js": "^2.38.5",
@@ -65,7 +66,7 @@
         "ai",
         "authentication",
         "api",
-        "Manufacturing"
+        "Engineering spares"
     ],
     "author": "GeoTech Company",
     "license": "MIT"

@@ -16,8 +16,8 @@ Based on the issues with difficult sites (403 errors, timeouts, anti-bot protect
 ## Kept Reliable Sites Only
 - ✅ `ebay.com` (eBay Motors - very reliable)
 - ✅ `ebay.co.uk` (eBay UK Motors - very reliable)
-- ✅ `jegs.com` (JEGS Performance - Manufacturing focused)
-- ✅ `summitracing.com` (Summit Racing - Manufacturing focused)
+- ✅ `jegs.com` (JEGS Performance - Engineering spares focused)
+- ✅ `summitracing.com` (Summit Racing - Engineering spares focused)
 - ✅ `buyautoparts.com` (BuyAutoParts - simple structure)
 - ✅ `fcpeuro.com` (FCP Euro - European parts, good API)
 
@@ -52,8 +52,8 @@ The frontend now shows realistic site names:
 ### Site-Specific Success Rates
 - **eBay Motors**: 95%+ (excellent API, reliable)
 - **eBay UK**: 95%+ (same as eBay Motors)
-- **JEGS**: 90%+ (Manufacturing focused, good structure)
-- **Summit Racing**: 90%+ (Manufacturing focused, reliable)
+- **JEGS**: 90%+ (Engineering spares focused, good structure)
+- **Summit Racing**: 90%+ (Engineering spares focused, reliable)
 - **BuyAutoParts**: 85%+ (simple structure)
 - **FCPEuro**: 85%+ (good European coverage)
 
@@ -69,7 +69,7 @@ The frontend now shows realistic site names:
 2. **Faster Execution**: Reduced delays and timeouts
 3. **Better User Experience**: More reliable results, faster response
 4. **Easier Maintenance**: Fewer sites to monitor and maintain
-5. **Higher Quality Results**: Focus on Manufacturing-specific sites
+5. **Higher Quality Results**: Focus on Engineering spares-specific sites
 
 ## Monitoring
 
@@ -84,11 +84,11 @@ docker logs sparefinder-ai -f | grep -E "(ebay|jegs|summit|fcpeuro|buyauto)"
 
 ## Summary
 
-This simplified approach trades breadth for reliability. Instead of trying to scrape 12+ sites with mixed success, we now focus on 6 highly reliable Manufacturing parts sources that consistently deliver results. This should provide:
+This simplified approach trades breadth for reliability. Instead of trying to scrape 12+ sites with mixed success, we now focus on 6 highly reliable Engineering spares parts sources that consistently deliver results. This should provide:
 
 - **Much higher success rates** (85-95% vs 20-30%)
 - **Faster response times** (1-3s delays vs 3-15s)
 - **More reliable results** for users
 - **Better user experience** overall
 
-The scraper is now optimized for reliability and speed rather than trying to cover every possible Manufacturing parts website. 
+The scraper is now optimized for reliability and speed rather than trying to cover every possible Engineering spares parts website. 

@@ -39,7 +39,7 @@ def emit_progress(stage: str, message: str, status: str = "in_progress"):
 def create_part_identifier_agent(llm, has_vision=False):
     """Create the Part Identifier agent."""
     if has_vision:
-        backstory = "You are an expert industrial and manufacturer parts identification specialist with advanced analytical capabilities. You can identify components from various industries including Manufacturing, industrial machinery, electronics, appliances, and mechanical equipment. You excel at recognizing brands, part numbers, and specific features from detailed descriptions."
+        backstory = "You are an expert industrial and manufacturer parts identification specialist with advanced analytical capabilities. You can identify components from various industries including Engineering spares, industrial machinery, electronics, appliances, and mechanical equipment. You excel at recognizing brands, part numbers, and specific features from detailed descriptions."
     else:
         backstory = "You are an expert industrial and manufacturer parts identification specialist with years of experience recognizing components from textual descriptions, keywords, and part numbers across multiple industries."
     
@@ -58,7 +58,7 @@ def create_research_agent(llm):
     return Agent(
         role="Technical Research Specialist",
         goal="Find detailed technical specifications, compatibility information, materials, and known issues for identified parts across all industries",
-        backstory="You are a meticulous technical researcher with expertise across multiple industries including Manufacturing, industrial equipment, electronics, and mechanical systems. You gather comprehensive technical data, specifications, and compatibility information for any manufacturer part.",
+        backstory="You are a meticulous technical researcher with expertise across multiple industries including Engineering spares, industrial equipment, electronics, and mechanical systems. You gather comprehensive technical data, specifications, and compatibility information for any manufacturer part.",
         llm=llm,
         verbose=True,
         allow_delegation=False
@@ -70,7 +70,7 @@ def create_supplier_finder_agent(llm):
     return Agent(
         role="Supplier Finder",
         goal="Locate 2-3 reliable suppliers with complete contact information including addresses, websites, and phone numbers",
-        backstory="You are a procurement specialist with extensive knowledge of industrial and manufacturer part suppliers across multiple industries. You have contacts for Manufacturing, electronics, industrial equipment, mechanical components, and aftermarket parts distributors worldwide.",
+        backstory="You are a procurement specialist with extensive knowledge of industrial and manufacturer part suppliers across multiple industries. You have contacts for Engineering spares, electronics, industrial equipment, mechanical components, and aftermarket parts distributors worldwide.",
         llm=llm,
         verbose=True,
         allow_delegation=False
@@ -225,7 +225,7 @@ def setup_crew(image_data: Optional[bytes], keywords: Optional[str], user_email:
         elif image_data[:2] == b'\xff\xd8':
             image_type = "image/jpeg"
         
-        input_desc.append(f"An image of a car part has been provided. Please analyze this image carefully and identify the specific Manufacturing part shown.")
+        input_desc.append(f"An image of a car part has been provided. Please analyze this image carefully and identify the specific Engineering spares part shown.")
     
     if keywords:
         if image_data:
@@ -264,7 +264,7 @@ def setup_crew(image_data: Optional[bytes], keywords: Optional[str], user_email:
         - Brand/manufacturer (if visible/known)
         - Part number, model number, or serial number (if available)
         - Application/compatibility (what equipment, machinery, or products it fits)
-        - Industry category (Manufacturing, industrial, electronics, appliances, etc.)
+        - Industry category (Engineering spares, industrial, electronics, appliances, etc.)
         
         Format your response as a clear structured description.
         """,

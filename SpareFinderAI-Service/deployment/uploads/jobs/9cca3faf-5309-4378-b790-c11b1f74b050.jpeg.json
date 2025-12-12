@@ -2,9 +2,9 @@
     "filename": "9cca3faf-5309-4378-b790-c11b1f74b050.jpeg",
     "success": true,
     "status": "completed",
-    "class_name": "Manufacturing Component",
-    "category": "Manufacturing Parts",
-    "precise_part_name": "Manufacturing Component",
+    "class_name": "Engineering spares Component",
+    "category": "Engineering spares Parts",
+    "precise_part_name": "Engineering spares Component",
     "material_composition": "Unknown",
     "manufacturer": "Not Specified",
     "confidence_score": 70,
@@ -16,7 +16,7 @@
     },
     "description": "Technical description not available",
     "technical_data_sheet": {
-        "part_type": "Manufacturing Component",
+        "part_type": "Engineering spares Component",
         "material": "Unknown",
         "common_specs": "Varies by application",
         "load_rating": "Standard",
@@ -35,7 +35,7 @@
     "suppliers": [],
     "fitment_tips": "Verify compatibility with your specific vehicle before purchase",
     "additional_instructions": "Upload clearer images with visible part numbers for better accuracy",
-    "full_analysis": "I'm unable to provide a detailed analysis of this image. However, I can guide you on how to identify and source Manufacturing parts. Please provide additional details or context if available.",
+    "full_analysis": "I'm unable to provide a detailed analysis of this image. However, I can guide you on how to identify and source Engineering spares parts. Please provide additional details or context if available.",
     "processing_time_seconds": 5.0,
     "model_version": "SpareFinderAI Part Analysis v1.0"
 }

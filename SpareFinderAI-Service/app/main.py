@@ -323,7 +323,7 @@ load_dotenv()
 # Initialize FastAPI app with explicit lifespan management
 app = FastAPI(
     title="SpareFinderAI Service",
-    description="AI-powered Manufacturing part identification service",
+    description="AI-powered Engineering spares part identification service",
     version="1.0.0"
 )
 
@@ -817,7 +817,7 @@ async def _analyze_part_by_name(part_name: str, category: str, confidence: float
         
         # Create a comprehensive analysis prompt for the identified part
         system_prompt = (
-            "You are an expert Manufacturing parts analyst. Given a specific part name and category, "
+            "You are an expert Engineering spares parts analyst. Given a specific part name and category, "
             "provide a comprehensive analysis in JSON format. Return ONLY valid JSON with this exact structure: "
             '{"precise_part_name": "exact name", "class_name": "technical name", "category": "category", '
             '"manufacturer": "common manufacturer", "confidence_score": 0.95, "confidence_explanation": "explanation", '
@@ -832,7 +832,7 @@ async def _analyze_part_by_name(part_name: str, category: str, confidence: float
             '"full_analysis": "comprehensive markdown analysis", "processing_time_seconds": 2.5}'
         )
 
-        user_prompt = f"Analyze this Manufacturing part: {part_name} (Category: {category})"
+        user_prompt = f"Analyze this Engineering spares part: {part_name} (Category: {category})"
 
         def call_openai() -> Dict[str, Any]:
             resp = client.chat.completions.create(
@@ -915,13 +915,13 @@ async def search_by_keywords(payload: KeywordSearchRequest):
 
         # Step 1: Identify the most likely part name from keywords
         part_identification_prompt = (
-            "You are an expert Manufacturing parts identification assistant. Given keywords, "
-            "identify the SINGLE most likely Manufacturing part the user is looking for. "
+            "You are an expert Engineering spares parts identification assistant. Given keywords, "
+            "identify the SINGLE most likely Engineering spares part the user is looking for. "
             "Return ONLY a JSON object with this exact structure: "
             '{"part_name": "exact part name", "category": "part category", "confidence": 0.95}'
         )
 
-        user_prompt = f"Keywords: {', '.join(normalized)}\n\nIdentify the most likely Manufacturing part:"
+        user_prompt = f"Keywords: {', '.join(normalized)}\n\nIdentify the most likely Engineering spares part:"
 
         client = OpenAI(api_key=api_key)
 
@@ -1452,7 +1452,7 @@ async def _process_keyword_job_internal(job_id: str, keyword_list: List[str], us
 
         # Part identification prompt
         identification_prompt = (
-            "You are an expert Manufacturing parts identifier. Given keywords, identify the SINGLE most likely Manufacturing part the user is looking for. "
+            "You are an expert Engineering spares parts identifier. Given keywords, identify the SINGLE most likely Engineering spares part the user is looking for. "
             "Return ONLY a JSON object with this exact structure: "
             '{"part_name": "exact part name", "category": "part category", "confidence": 0.95}'
         )

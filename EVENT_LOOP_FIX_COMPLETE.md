@@ -22,12 +22,12 @@ File "/app/app/services/web_scraper.py", line 49, in __init__
 - **Method**: Check `_google_api_tested` flag and test API when needed
 
 ### 3. **Fixed Module-Level Instantiation**
-- **Before**: `Manufacturing_scraper = ManufacturingPartsScraper()` at module level
-- **After**: Lazy instantiation with `get_Manufacturing_scraper()` function
+- **Before**: `Engineering spares_scraper = Engineering sparesPartsScraper()` at module level
+- **After**: Lazy instantiation with `get_Engineering spares_scraper()` function
 - **Benefit**: Prevents initialization during import
 
 ### 4. **Updated AI Service Integration**
-- **Changed**: Import from `WebScraper` to `get_Manufacturing_scraper`
+- **Changed**: Import from `WebScraper` to `get_Engineering spares_scraper`
 - **Updated**: Use lazy getter in `load_model()` method
 - **Result**: No more module-level async task creation
 
@@ -47,26 +47,26 @@ File "/app/app/services/web_scraper.py", line 49, in __init__
 +     self._google_api_tested = True
 
 # At module level:
-- Manufacturing_scraper = ManufacturingPartsScraper()
-+ Manufacturing_scraper = None
+- Engineering spares_scraper = Engineering sparesPartsScraper()
++ Engineering spares_scraper = None
 + 
-+ def get_Manufacturing_scraper():
-+     """Get or create the global Manufacturing scraper instance."""
-+     global Manufacturing_scraper
-+     if Manufacturing_scraper is None:
-+         Manufacturing_scraper = ManufacturingPartsScraper()
-+     return Manufacturing_scraper
++ def get_Engineering spares_scraper():
++     """Get or create the global Engineering spares scraper instance."""
++     global Engineering spares_scraper
++     if Engineering spares_scraper is None:
++         Engineering spares_scraper = Engineering sparesPartsScraper()
++     return Engineering spares_scraper
 ```
 
 ### `ai-service/app/services/ai_service.py`
 ```diff
 # Import change:
 - from .web_scraper import WebScraper
-+ from .web_scraper import get_Manufacturing_scraper
++ from .web_scraper import get_Engineering spares_scraper
 
 # In load_model method:
 - self.web_scraper = WebScraper()
-+ self.web_scraper = get_Manufacturing_scraper()
++ self.web_scraper = get_Engineering spares_scraper()
 ```
 
 ## 🧪 Why This Fixes The Issue
@@ -107,7 +107,7 @@ After this fix, the deployment should:
 ```bash
 # Test the fix locally
 cd ai-service
-python -c "from app.services.web_scraper import get_Manufacturing_scraper; print('✅ Import successful')"
+python -c "from app.services.web_scraper import get_Engineering spares_scraper; print('✅ Import successful')"
 python -c "from app.services.ai_service import AIService; print('✅ AI Service import successful')"
 ```
 

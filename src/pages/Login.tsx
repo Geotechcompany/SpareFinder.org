@@ -122,7 +122,7 @@ const Login = () => {
             <div className="mb-8 space-y-3">
             <div className="inline-flex items-center rounded-full border border-border bg-card/80 px-3 py-1 text-xs font-medium text-muted-foreground shadow-sm backdrop-blur dark:border-white/10 dark:bg-slate-900/80 dark:text-slate-200">
                 <Sparkles className="mr-1.5 h-3.5 w-3.5 text-primary" />
-                Purpose-built for Manufacturing parts teams
+                Purpose-built for Engineering spares parts teams
               </div>
               <h1 className="text-balance text-3xl font-semibold tracking-tight sm:text-4xl">
                 Sign in to{" "}
@@ -260,7 +260,7 @@ const Login = () => {
           <div className="hidden gap-3 text-muted-foreground sm:flex">
             <span className="hidden sm:inline">ISO-grade security</span>
             <span className="h-1 w-1 rounded-full bg-border" />
-            <span>Optimized for Manufacturing teams</span>
+            <span>Optimized for Engineering spares teams</span>
           </div>
         </div>
       </div>
@@ -270,7 +270,7 @@ const Login = () => {
         <div className="absolute inset-0">
           <img
             src="https://images.pexels.com/photos/4489732/pexels-photo-4489732.jpeg?auto=compress&cs=tinysrgb&w=1600&q=80"
-            alt="Technician using an AI-powered platform to identify Manufacturing parts"
+            alt="Technician using an AI-powered platform to identify Engineering spares parts"
             className="h-full w-full object-cover"
           />
           <div className="absolute inset-0 bg-gradient-to-l from-slate-950 via-slate-950/80 to-transparent opacity-90" />

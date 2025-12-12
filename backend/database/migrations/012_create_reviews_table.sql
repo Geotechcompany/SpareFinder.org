@@ -58,7 +58,7 @@ CREATE TRIGGER update_reviews_updated_at
 INSERT INTO reviews (name, email, company, rating, title, message, verified) VALUES
 ('Sarah Johnson', 'sarah@autoparts.com', 'AutoParts Pro', 5, 'Outstanding AI Accuracy', 'The part recognition is incredibly accurate. Saved us hours of manual identification work and improved our workflow significantly.', true),
 ('Michael Chen', 'mike@techsolutions.com', 'Industrial Tech Solutions', 5, 'Game Changer for Our Business', 'Revolutionized our inventory management. The speed and accuracy are unmatched in the industry.', true),
-('Emily Rodriguez', 'emily@manufacturing.com', 'Advanced Manufacturing', 4, 'Excellent Platform', 'Really impressed with the functionality. The AI recognition works great for our Manufacturing parts database.', true),
+('Emily Rodriguez', 'emily@Engineering spares.com', 'Advanced Engineering spares', 4, 'Excellent Platform', 'Really impressed with the functionality. The AI recognition works great for our Engineering spares parts database.', true),
 ('David Kumar', 'david@repairshop.com', 'Kumar Auto Repair', 5, 'Saves Time and Money', 'This platform has transformed how we identify parts. What used to take hours now takes minutes.', true),
 ('Lisa Thompson', 'lisa@logistics.com', 'Global Logistics Corp', 4, 'Impressive Technology', 'The AI capabilities are remarkable. Great tool for our parts procurement team.', true);
 

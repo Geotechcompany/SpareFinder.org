@@ -23,7 +23,7 @@ const pageConfigs: PageSEOConfig = {
     description:
       "Identify industrial spare parts instantly with AI vision. Upload a part image to get accurate identification, specifications, and supplier options in seconds.",
     keywords:
-      "spare parts identification, AI parts recognition, industrial part finder, Manufacturing parts, aerospace components, machine vision, part identification system",
+      "spare parts identification, AI parts recognition, industrial part finder, Engineering spares parts, aerospace components, machine vision, part identification system",
     type: "website",
     schema: {
       "@context": "https://schema.org",
@@ -31,7 +31,7 @@ const pageConfigs: PageSEOConfig = {
       name: "SpareFinder",
       url: "https://sparefinder.org",
       description:
-        "AI-powered spare parts identification system with 99.9% accuracy for industrial, Manufacturing, and aerospace components.",
+        "AI-powered spare parts identification system with 99.9% accuracy for industrial, Engineering spares, and aerospace components.",
       potentialAction: {
         "@type": "SearchAction",
         target: "https://sparefinder.org/dashboard/upload?q={search_term_string}",

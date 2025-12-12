@@ -4,7 +4,7 @@
 
 > Upload a picture of any auto spare part and get accurate details powered by AI and real-time web scraping.
 
-SparePart AI is a modern SaaS platform that allows users to identify and learn about Manufacturing spare parts using image uploads. It combines OpenAI’s GPT-4 vision capabilities with live web scraping and a user-friendly dashboard. Subscriptions are handled via Stripe, with a modern, minimalist UX design.
+SparePart AI is a modern SaaS platform that allows users to identify and learn about Engineering spares spare parts using image uploads. It combines OpenAI’s GPT-4 vision capabilities with live web scraping and a user-friendly dashboard. Subscriptions are handled via Stripe, with a modern, minimalist UX design.
 
 ---
 

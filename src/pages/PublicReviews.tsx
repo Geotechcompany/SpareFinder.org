@@ -78,7 +78,7 @@ const PublicReviews = () => {
           <header className="text-center">
             <div className="inline-flex items-center gap-2 rounded-full border border-border bg-gradient-to-r from-[#3A5AFE14] via-[#06B6D414] to-transparent px-4 py-1 text-sm font-medium text-primary shadow-soft-elevated backdrop-blur-xl dark:border-white/10 dark:bg-white/5 dark:text-blue-200">
               <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-              Loved by Manufacturing professionals worldwide
+              Loved by Engineering spares professionals worldwide
             </div>
             <h1 className="mt-6 text-4xl font-bold tracking-tight text-foreground md:text-5xl dark:text-white">
               Customer Reviews &amp; Success Stories

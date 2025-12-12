@@ -70,7 +70,7 @@ export const HowItWorks: React.FC<HowItWorksProps> = ({
       icon: <Upload className="h-8 w-8 text-white" />,
       title: "Upload Part Image",
       description:
-        "Simply drag & drop or capture a photo of any Manufacturing or industrial part from your device.",
+        "Simply drag & drop or capture a photo of any Engineering spares or industrial part from your device.",
       benefits: [
         "Supports JPG, PNG, PDF, and CAD files",
         "Mobile camera integration",

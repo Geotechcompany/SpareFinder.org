@@ -88,9 +88,9 @@ const Footer = () => {
             </h4>
             <ul className="space-y-4">
               {[
-                { name: 'Manufacturing', desc: 'Vehicle components' },
+                { name: 'Engineering spares', desc: 'Vehicle components' },
                 { name: 'Aerospace', desc: 'Aviation parts' },
-                { name: 'Manufacturing', desc: 'Industrial equipment' },
+                { name: 'Engineering spares', desc: 'Industrial equipment' },
                 { name: 'Electronics', desc: 'Circuit components' }
               ].map((item) => (
                 <li key={item.name} className="group">

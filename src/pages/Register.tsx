@@ -194,7 +194,7 @@ const Register = () => {
             <div className="mb-4 space-y-3">
               <div className="inline-flex items-center rounded-full border border-border bg-card/80 px-3 py-1 text-xs font-medium text-muted-foreground shadow-sm backdrop-blur dark:border-white/10 dark:bg-slate-900/80 dark:text-slate-200">
                 <Sparkles className="mr-1.5 h-3.5 w-3.5 text-primary" />
-                Designed for Manufacturing parts teams
+                Designed for Engineering spares parts teams
               </div>
               <h1 className="text-balance text-3xl font-semibold tracking-tight sm:text-4xl">
                 Create your{" "}

@@ -88,8 +88,8 @@ class OpenAIImageAnalyzer:
             
             # Comprehensive system prompt
             system_prompt = """
-You are an expert, production-grade Manufacturing parts analyst and technical documentation AI. 
-When given an image (and optional textual context) of an Manufacturing component, you must analyze the part 
+You are an expert, production-grade Engineering spares parts analyst and technical documentation AI. 
+When given an image (and optional textual context) of an Engineering spares component, you must analyze the part 
 visually and generate a comprehensive, structured, and machine- and human-readable response. Your outputs
 must be technically precise, auditable, and safe for use in parts-lookup apps, e-commerce, and field-support tools.
 
@@ -282,7 +282,7 @@ Return a JSON object named `response_json` with the following top-level keys:
             # Prepare additional context keywords
             context_keywords = keywords or []
             context_keywords.extend([
-                "Manufacturing parts", 
+                "Engineering spares parts", 
                 "technical analysis", 
                 "global sourcing", 
                 "parts identification"
@@ -299,7 +299,7 @@ Return a JSON object named `response_json` with the following top-level keys:
                             "content": [
                                 {
                                     "type": "text", 
-                                    "text": f"Analyze this Manufacturing part image. Additional context keywords: {', '.join(context_keywords)}"
+                                    "text": f"Analyze this Engineering spares part image. Additional context keywords: {', '.join(context_keywords)}"
                                 },
                                 {
                                     "type": "image_url",
@@ -415,7 +415,7 @@ Return a JSON object named `response_json` with the following top-level keys:
                 r'- Part name:\s*(.+)',
                 r'Precise part name:\s*(.+)',
                 r'\*\*Precise Part Name\*\*:\s*(.+)'
-            ], "Manufacturing Component")
+            ], "Engineering spares Component")
             
             category = extract_field(part_name_text, [
                 r'- \*\*\*Category\*\*:\s*(.+)',
@@ -424,7 +424,7 @@ Return a JSON object named `response_json` with the following top-level keys:
                 r'- Category:\s*(.+)',
                 r'Category.*?:\s*(.+)',
                 r'\*\*Category\*\*:\s*(.+)'
-            ], "Manufacturing Parts")
+            ], "Engineering spares Parts")
             
             material_composition = extract_field(part_name_text, [
                 r'- \*\*Material Composition\*\*:\s*(.+)',
@@ -683,9 +683,9 @@ Return a JSON object named `response_json` with the following top-level keys:
         except Exception as e:
             self.logger.error(f"Flat parsing error: {e}")
             return {
-                "class_name": "Manufacturing Component",
+                "class_name": "Engineering spares Component",
                 "category": "Unknown",
-                "precise_part_name": "Manufacturing Component", 
+                "precise_part_name": "Engineering spares Component", 
                 "material_composition": "Unknown",
                 "manufacturer": "Unknown",
                 "confidence_score": 50,
@@ -723,7 +723,7 @@ Return a JSON object named `response_json` with the following top-level keys:
         manufacturer: str
     ) -> Dict[str, Any]:
         """
-        Generate a comprehensive technical data sheet for the Manufacturing part
+        Generate a comprehensive technical data sheet for the Engineering spares part
         
         :param analysis_text: Full analysis text from OpenAI
         :param part_name: Name of the part
@@ -910,8 +910,8 @@ def analyze_image(
         
         # Comprehensive system prompt
         system_prompt = """
-You are an expert, production-grade Manufacturing parts analyst and technical documentation AI. 
-When given an image (and optional textual context) of an Manufacturing component, you must analyze the part 
+You are an expert, production-grade Engineering spares parts analyst and technical documentation AI. 
+When given an image (and optional textual context) of an Engineering spares component, you must analyze the part 
 visually and generate a comprehensive, structured, and machine- and human-readable response. Your outputs
 must be technically precise, auditable, and safe for use in parts-lookup apps, e-commerce, and field-support tools.
 
@@ -1103,7 +1103,7 @@ End of system prompt.
         # Prepare additional context keywords
         context_keywords = keywords or []
         context_keywords.extend([
-            "Manufacturing parts", 
+            "Engineering spares parts", 
             "technical analysis", 
             "global sourcing", 
             "parts identification"
@@ -1119,7 +1119,7 @@ End of system prompt.
                     "content": [
                         {
                             "type": "text", 
-                            "text": f"Analyze this Manufacturing part image. Additional context keywords: {', '.join(context_keywords)}"
+                            "text": f"Analyze this Engineering spares part image. Additional context keywords: {', '.join(context_keywords)}"
                         },
                         {
                             "type": "image_url",

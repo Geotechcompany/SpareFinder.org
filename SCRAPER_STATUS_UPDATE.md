@@ -7,7 +7,7 @@ Based on your feedback that eBay UK has better results, I've now simplified the 
 ## Current Configuration
 
 ### ✅ **Single Site (Maximum Reliability)**
-- `ebay.co.uk` (eBay UK Motors - Premium Manufacturing parts)
+- `ebay.co.uk` (eBay UK Motors - Premium Engineering spares parts)
 
 ### 🚫 **Removed Sites**
 - `ebay.com` (US eBay - removed per your request)
@@ -38,7 +38,7 @@ https://www.ebay.co.uk/sch/i.html?_nkw={query}&_sacat=9889&_sop=15&_ipg=60
 
 1. **Ultra-Fast Performance**: Single site = minimal delays
 2. **Maximum Reliability**: eBay UK rarely blocks requests
-3. **Excellent Coverage**: Massive UK Manufacturing parts inventory
+3. **Excellent Coverage**: Massive UK Engineering spares parts inventory
 4. **Quality Results**: As you noted, better results than other sites
 5. **Clean Data**: Well-structured product information
 6. **Price Transparency**: Clear pricing in GBP with shipping info
@@ -49,7 +49,7 @@ https://www.ebay.co.uk/sch/i.html?_nkw={query}&_sacat=9889&_sop=15&_ipg=60
 - **Speed**: Very fast (1-2 second response)
 - **Results Quality**: High (as confirmed by your testing)
 - **Consistency**: Extremely consistent
-- **Coverage**: Excellent UK Manufacturing parts coverage
+- **Coverage**: Excellent UK Engineering spares parts coverage
 
 ## Frontend Updates
 
@@ -62,7 +62,7 @@ https://www.ebay.co.uk/sch/i.html?_nkw={query}&_sacat=9889&_sop=15&_ipg=60
 
 eBay UK is ideal because:
 - ✅ **Proven better results** (per your feedback)
-- ✅ **Massive UK Manufacturing inventory**
+- ✅ **Massive UK Engineering spares inventory**
 - ✅ **No anti-bot protection**
 - ✅ **Excellent data structure**
 - ✅ **Clear pricing in GBP**

@@ -429,7 +429,7 @@ export const MarkdownCard: React.FC<MarkdownCardProps> = (props) => {
     level = 1
   } = props;
 
-  // Enhanced emoji mapping with more Manufacturing and technical emojis
+  // Enhanced emoji mapping with more Engineering spares and technical emojis
   const getEmojiIcon = React.useCallback((emoji?: string) => {
     const emojiMap: { [key: string]: string } = {
       '🛞': '🛞', // Part Identification

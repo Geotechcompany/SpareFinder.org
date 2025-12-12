@@ -10,18 +10,18 @@ export default function CoreValueStatsDemo() {
     {
       value: "10M+",
       label: "Parts Database",
-      description: "Comprehensive catalog of Manufacturing and industrial parts from over 1,000 verified manufacturers worldwide.",
+      description: "Comprehensive catalog of Engineering spares and industrial parts from over 1,000 verified manufacturers worldwide.",
     },
     {
       value: "50+",
       label: "Industrial Categories",
-      description: "From Manufacturing to heavy machinery, our AI recognizes parts across all major industrial sectors.",
+      description: "From Engineering spares to heavy machinery, our AI recognizes parts across all major industrial sectors.",
       image: "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=800",
     },
     {
       value: "24/7",
       label: "Expert Support",
-      description: "Round-the-clock technical support from Manufacturing engineers and part identification specialists.",
+      description: "Round-the-clock technical support from Engineering spares engineers and part identification specialists.",
     },
     {
       value: "500+",

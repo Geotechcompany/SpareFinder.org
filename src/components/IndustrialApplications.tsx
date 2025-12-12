@@ -4,7 +4,7 @@ import { Factory } from "lucide-react";
 const IndustrialApplications = () => {
   const applications = [
     {
-      title: "Manufacturing Manufacturing",
+      title: "Engineering spares Engineering spares",
       subtitle: "Streamline assembly lines with instant part identification for vehicles, engines, and transmission systems.",
       image: "https://images.unsplash.com/photo-1486262715619-67b85e0b08d3?auto=format&fit=crop&w=800&h=600&q=80",
     },
@@ -20,7 +20,7 @@ const IndustrialApplications = () => {
     },
     {
       title: "Industrial Machinery",
-      subtitle: "Manufacturing equipment, CNC machines, and industrial automation parts sourced from verified suppliers.",
+      subtitle: "Engineering spares equipment, CNC machines, and industrial automation parts sourced from verified suppliers.",
       image: "https://images.unsplash.com/photo-1565793298595-6a879b1d9492?auto=format&fit=crop&w=800&h=600&q=80",
     },
     {
@@ -56,7 +56,7 @@ const IndustrialApplications = () => {
             Serving Every Industry
           </h2>
           <p className="mx-auto max-w-3xl text-xl leading-relaxed text-muted-foreground dark:text-gray-400">
-            From Manufacturing to aerospace, our AI-powered part identification works across all major industrial sectors
+            From Engineering spares to aerospace, our AI-powered part identification works across all major industrial sectors
           </p>
         </div>
 

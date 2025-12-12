@@ -25,7 +25,7 @@ export function Header() {
     { label: "Analytics", href: "/#analytics" },
   ];
   const solutions = [
-    { label: "Manufacturing", href: "/#industries" },
+    { label: "Engineering spares", href: "/#industries" },
     { label: "Quality Control", href: "/#industries" },
     { label: "Maintenance", href: "/#industries" },
   ];
