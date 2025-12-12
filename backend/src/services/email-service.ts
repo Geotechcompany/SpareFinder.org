@@ -630,7 +630,7 @@ class EmailService {
       const frontendUrl =
         process.env.FRONTEND_URL || "https://sparefinder.org";
       const baseUrl = frontendUrl.replace(/\/$/, "");
-      const logoUrl = `${baseUrl}/sparefinderlogodark.png`;
+      const logoUrl = `${baseUrl}/sparefinderlogo.png`;
       const dashboardUrl = `${frontendUrl}/dashboard`;
       const uploadUrl = `${frontendUrl}/dashboard/upload`;
 
