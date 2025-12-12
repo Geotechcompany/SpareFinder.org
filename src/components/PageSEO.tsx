@@ -19,9 +19,9 @@ interface PageSEOConfig {
 
 const pageConfigs: PageSEOConfig = {
   "/": {
-    title: "SpareFinder - AI-Powered Industrial Spare Parts Identification System",
+    title: "SpareFinder – AI Powered Spare Parts Identification Platform",
     description:
-      "Identify spare parts instantly with 99.9% accuracy using advanced AI computer vision. Upload images and get instant part identification, specifications, and supplier information for Manufacturing, aerospace, and industrial equipment.",
+      "Identify industrial spare parts instantly with AI vision. Upload a part image to get accurate identification, specifications, and supplier options in seconds.",
     keywords:
       "spare parts identification, AI parts recognition, industrial part finder, Manufacturing parts, aerospace components, machine vision, part identification system",
     type: "website",
@@ -112,7 +112,7 @@ const pageConfigs: PageSEOConfig = {
 };
 
 const DEFAULT_DESCRIPTION =
-  "Identify spare parts instantly with 99.9% accuracy using advanced AI computer vision. Upload images and get instant part identification, specifications, and supplier information.";
+  "Identify industrial spare parts instantly with AI computer vision. Upload a part image to get accurate identification, specifications, and supplier options in seconds.";
 
 export const PageSEO = () => {
   const location = useLocation();

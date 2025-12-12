@@ -15,13 +15,17 @@ Disallow: /share/
 Disallow: /onboarding/
 Disallow: /reset-password
 
-# Allow important bot access
+# General crawl-delay hint (mainly respected by Bing/Yandex)
+Crawl-delay: 1
+
+# Googlebot-specific rules
 User-agent: Googlebot
 Allow: /
 Disallow: /admin/
 Disallow: /dashboard/
 Disallow: /api/
 
+# Bingbot-specific rules
 User-agent: Bingbot
 Allow: /
 Disallow: /admin/
@@ -30,6 +34,3 @@ Disallow: /api/
 
 # Sitemap location
 Sitemap: https://sparefinder.org/sitemap.xml
-
-# Crawl-delay (seconds)
-Crawl-delay: 1

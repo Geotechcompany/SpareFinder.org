@@ -344,6 +344,11 @@ const Landing = () => {
     <div className="min-h-screen bg-background text-foreground dark:bg-black">
       <Header />
 
+      {/* Primary H1 for SEO */}
+      <h1 className="sr-only">
+        SpareFinder – AI-powered industrial spare parts identification platform
+      </h1>
+
       {/* Hero Section (DemoOne) */}
       <section className="relative mt-6 w-full overflow-visible pt-4 pb-8">
         {actualTheme === "light" && (
