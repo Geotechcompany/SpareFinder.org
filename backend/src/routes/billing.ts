@@ -244,11 +244,13 @@ router.get("/", authenticateToken, async (req: AuthRequest, res: Response) => {
         id: "inv_001",
         amount:
           userSubscription.tier === "pro"
-            ? 29.99
+            ? PLAN_PRICING.pro.amount
             : userSubscription.tier === "enterprise"
-            ? 99.99
+            ? PLAN_PRICING.enterprise.amount
+            : userSubscription.tier === "free"
+            ? PLAN_PRICING.free.amount
             : 0,
-        currency: "USD",
+        currency: "GBP",
         status: "paid",
         created_at: new Date().toISOString(),
         invoice_url: "#",
@@ -1144,9 +1146,19 @@ async function handleCheckoutSessionCompleted(
         SUBSCRIPTION_LIMITS[tier as keyof typeof SUBSCRIPTION_LIMITS];
 
       if (isTrialing || zeroTotal) {
-        // Grant monthly credits based on plan limits for trial activation
-        if (planLimits && planLimits.searches > 0) {
-          const creditAmount = planLimits.searches; // Grant full month's credits
+        // Trial activation credits
+        if (tier === "free") {
+          // Starter / Basic trial should only grant 5 credits
+          const creditAmount = 5;
+          const result = await creditService.addCredits(
+            userId,
+            creditAmount,
+            "Starter trial activation - 5 credits"
+          );
+          console.log("free tier (Starter) trial credits grant result:", result);
+        } else if (planLimits && planLimits.searches > 0) {
+          // Other tiers get full month's credits on trial activation
+          const creditAmount = planLimits.searches;
           const result = await creditService.addCredits(
             userId,
             creditAmount,

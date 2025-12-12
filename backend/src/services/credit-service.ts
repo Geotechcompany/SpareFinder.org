@@ -174,8 +174,15 @@ class CreditService {
   /**
    * Grant free credits to new users (called during registration)
    */
-  async grantNewUserCredits(userId: string, amount: number = 10): Promise<CreditResult> {
-    return this.addCredits(userId, amount, 'Welcome bonus - Free credits for new user');
+  async grantNewUserCredits(
+    userId: string,
+    amount: number = 5
+  ): Promise<CreditResult> {
+    return this.addCredits(
+      userId,
+      amount,
+      "Welcome bonus - Free credits for new user"
+    );
   }
 
   /**

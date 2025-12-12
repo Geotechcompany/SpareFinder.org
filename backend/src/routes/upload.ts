@@ -2090,6 +2090,41 @@ router.post(
 
       console.log("🤖 Creating Deep Research job for user:", userId);
 
+      // Credits: admins have unlimited access, others must have at least 1 credit
+      if (req.user?.role === "admin" || req.user?.role === "super_admin") {
+        console.log(
+          "Admin Deep Research detected - bypassing credits for user:",
+          userId
+        );
+      } else {
+        console.log("Checking user credits for Deep Research analysis...");
+        const creditResult: CreditResult =
+          await creditService.processAnalysisCredits(userId);
+
+        if (!creditResult.success) {
+          console.log(
+            "Insufficient credits for Deep Research user:",
+            userId,
+            creditResult
+          );
+          return res.status(402).json({
+            success: false,
+            error: "insufficient_credits",
+            message:
+              "You do not have enough credits to start a Deep Research analysis",
+            current_credits: creditResult.current_credits || 0,
+            required_credits: creditResult.required_credits || 1,
+            upgrade_required: true,
+          });
+        }
+
+        console.log("Deep Research credits deducted successfully:", {
+          userId,
+          credits_before: creditResult.credits_before,
+          credits_after: creditResult.credits_after,
+        });
+      }
+
       // Upload image to Supabase Storage
       const fileExt = file.originalname.split(".").pop();
       const fileName = `${uuidv4()}.${fileExt}`;
