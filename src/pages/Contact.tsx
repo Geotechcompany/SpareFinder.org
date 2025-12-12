@@ -176,7 +176,25 @@ const Contact: React.FC = () => {
                         Email
                       </p>
                       <p className="text-sm text-muted-foreground dark:text-gray-300">
+                        tps@tpsinternational.co.uk
+                      </p>
+                      <p className="text-sm text-muted-foreground dark:text-gray-300">
                         sales@tpsinternational.co.uk
+                      </p>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center gap-3 text-muted-foreground dark:text-gray-300">
+                    <Phone className="h-5 w-5 text-[#06B6D4] dark:text-blue-300" />
+                    <div>
+                      <p className="font-medium text-foreground dark:text-white">
+                        Call Us
+                      </p>
+                      <p className="text-sm text-muted-foreground dark:text-gray-300">
+                        +44 1916499741
+                      </p>
+                      <p className="text-sm text-muted-foreground dark:text-gray-300">
+                        +44 7415892946
                       </p>
                     </div>
                   </div>
@@ -200,7 +218,10 @@ const Contact: React.FC = () => {
                         Location
                       </p>
                       <p className="text-sm text-muted-foreground dark:text-gray-300">
-                        United Kingdom
+                        Durham Workspace – Abbey Road
+                      </p>
+                      <p className="text-sm text-muted-foreground dark:text-gray-300">
+                        Durham DH1 5JZ, UK
                       </p>
                     </div>
                   </div>
