@@ -413,6 +413,196 @@ class EmailService {
     }
   }
 
+  /**
+   * Gentle nudge a few days after signup to encourage first use
+   */
+  async sendOnboardingNudgeEmail(
+    data: WelcomeEmailData
+  ): Promise<boolean> {
+    try {
+      const emailEnabled = await this.isEmailEnabled();
+      if (!emailEnabled) return false;
+
+      const subject = "You still have SpareFinder credits waiting for you";
+      const frontendUrl =
+        process.env.FRONTEND_URL || "https://sparefinder.org";
+      const dashboardUrl = `${frontendUrl}/dashboard`;
+      const uploadUrl = `${frontendUrl}/dashboard/upload`;
+
+      const html = `
+<!doctype html>
+<html>
+  <body style="margin:0;padding:0;background:#020617;color:#e2e8f0;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica,Arial,sans-serif;">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:radial-gradient(circle at top,#22c55e 0,#020617 55%,#000 100%);padding:32px 0;">
+      <tr>
+        <td>
+          <table role="presentation" width="600" align="center" cellspacing="0" cellpadding="0" style="background:#020617;border-radius:18px;overflow:hidden;box-shadow:0 22px 60px rgba(15,23,42,.9);border:1px solid rgba(34,197,94,.4);">
+            <tr>
+              <td style="padding:24px 28px 18px 28px;background:linear-gradient(135deg,#16a34a,#22c55e);color:#f9fafb;">
+                <h1 style="margin:0;font-size:22px;line-height:1.3;">
+                  Hey ${data.userName || "there"}, your first search is one click away ⚡
+                </h1>
+                <p style="margin:6px 0 0 0;font-size:13px;opacity:.95;">
+                  SpareFinder is ready whenever you are – upload a part photo and we’ll handle the rest.
+                </p>
+              </td>
+            </tr>
+
+            <tr>
+              <td style="padding:22px 28px 6px 28px;">
+                <p style="margin:0 0 10px 0;font-size:14px;color:#cbd5e1;">
+                  Here’s a quick reminder of what you can do in under a minute:
+                </p>
+                <ul style="margin:0;padding-left:18px;font-size:13px;color:#9ca3af;line-height:1.7;">
+                  <li><strong>Snap or upload</strong> a clear photo of any spare part.</li>
+                  <li><strong>See the match instantly</strong> with confidence scores and key specs.</li>
+                  <li><strong>Compare alternatives</strong> and save results to your history.</li>
+                </ul>
+
+                <div style="margin:20px 0 8px 0;">
+                  <a href="${uploadUrl}" style="display:inline-block;background:linear-gradient(135deg,#22c55e,#15803d);color:#f9fafb;text-decoration:none;padding:11px 22px;border-radius:999px;font-weight:600;font-size:14px;box-shadow:0 12px 30px rgba(34,197,94,.55);">
+                    Run a quick test search
+                  </a>
+                </div>
+
+                <p style="margin:10px 0 0 0;font-size:12px;color:#9ca3af;">
+                  Try it with a low-risk part from your stores or workshop and see how it fits into your workflow.
+                </p>
+              </td>
+            </tr>
+
+            <tr>
+              <td style="padding:12px 28px 18px 28px;border-top:1px solid rgba(31,41,55,.9);font-size:11px;color:#9ca3af;">
+                <p style="margin:0 0 4px 0;">
+                  You can see your recent analyses and remaining credits anytime from your <a href="${dashboardUrl}" style="color:#4ade80;text-decoration:none;">SpareFinder dashboard</a>.
+                </p>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>`;
+
+      const ok = await this.sendEmail({
+        to: data.userEmail,
+        subject,
+        html,
+      });
+
+      if (ok) {
+        await supabase.from("notifications").insert({
+          user_id: await this.getUserIdByEmail(data.userEmail),
+          title: "Reminder to try SpareFinder",
+          message:
+            "You still have credits available. Upload a part photo to see your first identification.",
+          type: "info",
+          action_url: uploadUrl,
+        });
+      }
+
+      return ok;
+    } catch (e) {
+      console.error("Failed to send onboarding nudge email:", e);
+      return false;
+    }
+  }
+
+  /**
+   * Re‑engagement email for inactive users who used the app before
+   */
+  async sendReengagementEmail(
+    data: WelcomeEmailData
+  ): Promise<boolean> {
+    try {
+      const emailEnabled = await this.isEmailEnabled();
+      if (!emailEnabled) return false;
+
+      const subject = "See what SpareFinder can do for your next job";
+      const frontendUrl =
+        process.env.FRONTEND_URL || "https://sparefinder.org";
+      const dashboardUrl = `${frontendUrl}/dashboard`;
+      const uploadUrl = `${frontendUrl}/dashboard/upload`;
+
+      const html = `
+<!doctype html>
+<html>
+  <body style="margin:0;padding:0;background:#020617;color:#e2e8f0;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica,Arial,sans-serif;">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:radial-gradient(circle at top,#0ea5e9 0,#020617 55%,#000 100%);padding:32px 0;">
+      <tr>
+        <td>
+          <table role="presentation" width="600" align="center" cellspacing="0" cellpadding="0" style="background:#020617;border-radius:18px;overflow:hidden;box-shadow:0 22px 60px rgba(15,23,42,.9);border:1px solid rgba(56,189,248,.4);">
+            <tr>
+              <td style="padding:24px 28px 16px 28px;background:linear-gradient(135deg,#0ea5e9,#6366f1);color:#f9fafb;">
+                <h1 style="margin:0;font-size:22px;line-height:1.3;">
+                  ${data.userName || "There"}, spare parts shouldn’t slow your team down
+                </h1>
+                <p style="margin:6px 0 0 0;font-size:13px;opacity:.95;">
+                  Drop in a photo, get the part, move on with the work – that’s it.
+                </p>
+              </td>
+            </tr>
+
+            <tr>
+              <td style="padding:22px 28px 10px 28px;">
+                <h2 style="margin:0 0 10px 0;font-size:15px;color:#e5e7eb;">Perfect for those “what part is this?” moments</h2>
+                <ul style="margin:0 0 8px 0;padding-left:18px;font-size:13px;color:#9ca3af;line-height:1.7;">
+                  <li>Field engineers needing fast identification from site.</li>
+                  <li>Stores teams dealing with unlabelled or legacy stock.</li>
+                  <li>Maintenance teams logging parts for repeat orders.</li>
+                </ul>
+
+                <div style="margin:18px 0 4px 0;">
+                  <a href="${uploadUrl}" style="display:inline-block;background:linear-gradient(135deg,#0ea5e9,#2563eb);color:#f9fafb;text-decoration:none;padding:11px 22px;border-radius:999px;font-weight:600;font-size:14px;box-shadow:0 12px 30px rgba(37,99,235,.55);">
+                    Open SpareFinder and upload a part
+                  </a>
+                </div>
+
+                <p style="margin:10px 0 0 0;font-size:12px;color:#9ca3af;">
+                  It takes seconds to run a search, and every result is saved to your history so your team can reuse it later.
+                </p>
+              </td>
+            </tr>
+
+            <tr>
+              <td style="padding:12px 28px 18px 28px;border-top:1px solid rgba(31,41,55,.9);font-size:11px;color:#9ca3af;">
+                <p style="margin:0;">
+                  Log in any time at <a href="${dashboardUrl}" style="color:#38bdf8;text-decoration:none;">${dashboardUrl}</a> to see your analyses and credit balance.
+                </p>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>`;
+
+      const ok = await this.sendEmail({
+        to: data.userEmail,
+        subject,
+        html,
+      });
+
+      if (ok) {
+        await supabase.from("notifications").insert({
+          user_id: await this.getUserIdByEmail(data.userEmail),
+          title: "We’d love to see you back in SpareFinder",
+          message:
+            "Jump back in to upload a part photo and continue where you left off.",
+          type: "info",
+          action_url: uploadUrl,
+        });
+      }
+
+      return ok;
+    } catch (e) {
+      console.error("Failed to send reengagement email:", e);
+      return false;
+    }
+  }
+
   private async getUserIdByEmail(email: string): Promise<string | null> {
     try {
       const { data: profile } = await supabase
@@ -442,7 +632,7 @@ class EmailService {
       .replace(/{{imageUrl}}/g, data.imageUrl || "")
       .replace(
         /{{dashboardUrl}}/g,
-        `${process.env.FRONTEND_URL || "https://app.sparefinder.org"}/history`
+        `${process.env.FRONTEND_URL || "https://sparefinder.org"}/history`
       )
       .replace(/{{currentDate}}/g, new Date().toLocaleDateString())
       .replace(/{{currentTime}}/g, new Date().toLocaleTimeString());
