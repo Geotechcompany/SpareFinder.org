@@ -2111,7 +2111,7 @@ router.post(
             success: false,
             error: "insufficient_credits",
             message:
-              "You do not have enough credits to start a Deep Research analysis",
+              "You do not have enough credits to start a Sparefinder Research analysis",
             current_credits: creditResult.current_credits || 0,
             required_credits: creditResult.required_credits || 1,
             upgrade_required: true,
