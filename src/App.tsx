@@ -8,7 +8,7 @@ import { ThemeProvider } from "@/contexts/ThemeContext";
 import { AuthProvider } from "@/contexts/AuthContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import DebugEnv from "@/components/DebugEnv";
-import Index from "./pages/Index";
+
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Dashboard from "./pages/Dashboard";
@@ -35,6 +35,7 @@ import AdminProtectedRoute from "@/components/AdminProtectedRoute";
 import Landing from "@/pages/Landing";
 import PrivacyPolicy from "@/pages/PrivacyPolicy";
 import TermsOfService from "@/pages/TermsOfService";
+import Help from "@/pages/Help";
 import Trial from "@/pages/Trial";
 import Unauthorized from "@/pages/Unauthorized";
 import ForgotPassword from "@/pages/ForgotPassword";
@@ -192,6 +193,7 @@ const App = () => (
               <Route path="/admin/login" element={<AdminLogin />} />
               <Route path="/privacy-policy" element={<PrivacyPolicy />} />
               <Route path="/terms-of-service" element={<TermsOfService />} />
+              <Route path="/help" element={<Help />} />
               <Route path="/contact" element={<Contact />} />
               <Route path="/reviews" element={<PublicReviews />} />
               <Route path="/unauthorized" element={<Unauthorized />} />

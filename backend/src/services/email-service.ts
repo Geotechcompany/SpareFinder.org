@@ -266,9 +266,12 @@ class EmailService {
       const subject = "Welcome to SpareFinder AI – Let’s get you started";
       const frontendUrl =
         process.env.FRONTEND_URL || "https://sparefinder.org";
+      const baseUrl = frontendUrl.replace(/\/$/, "");
+      const logoUrl = `${baseUrl}/sparefinderlogo.png`;
       const dashboardUrl = `${frontendUrl}/dashboard`;
       const uploadUrl = `${frontendUrl}/dashboard/upload`;
       const docsUrl = `${frontendUrl}/help`;
+      const contactUrl = `${frontendUrl}/contact`;
       const billingUrl = `${frontendUrl}/dashboard/billing`;
 
       const html = `
@@ -280,8 +283,22 @@ class EmailService {
         <td>
           <table role="presentation" width="600" align="center" cellspacing="0" cellpadding="0" style="background:#020617;border-radius:18px;overflow:hidden;box-shadow:0 22px 60px rgba(15,23,42,.9);border:1px solid rgba(148,163,184,.22);">
             <tr>
-              <td style="padding:26px 30px 22px 30px;background:linear-gradient(135deg,#10b981,#06b6d4,#3b82f6);color:#f9fafb;">
-                <div style="font-size:12px;letter-spacing:.16em;text-transform:uppercase;opacity:.9;margin-bottom:4px;">SpareFinder AI</div>
+              <td style="padding:18px 30px 16px 30px;background:#020617;color:#f9fafb;border-bottom:1px solid rgba(15,23,42,.9);">
+                <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
+                  <tr>
+                    <td style="text-align:left;vertical-align:middle;">
+                      <img src="${logoUrl}" alt="SpareFinder" style="max-height:30px;width:auto;display:block;border-radius:6px;" />
+                    </td>
+                    <td style="text-align:right;vertical-align:middle;font-size:11px;color:#94a3b8;">
+                      AI-powered industrial spare parts identification
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:22px 30px 22px 30px;background:linear-gradient(135deg,#10b981,#06b6d4,#3b82f6);color:#f9fafb;">
+                <div style="font-size:12px;letter-spacing:.16em;text-transform:uppercase;opacity:.9;margin-bottom:4px;">Welcome to SpareFinder AI</div>
                 <h1 style="margin:0;font-size:24px;line-height:1.2;">Welcome, ${data.userName || "there"} 👋</h1>
                 <p style="margin:6px 0 0 0;font-size:14px;opacity:.9;">
                   Your account is live – you’re ready to identify industrial spare parts in seconds.
@@ -313,6 +330,48 @@ class EmailService {
                 <p style="margin:12px 0 0 0;font-size:13px;color:#9ca3af;">
                   Each analysis uses one credit. You can see your remaining credits at the top of your dashboard.
                 </p>
+              </td>
+            </tr>
+
+            <!-- Use cases with imagery -->
+            <tr>
+              <td style="padding:10px 30px 10px 30px;">
+                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="font-size:13px;color:#cbd5e1;">
+                  <tr>
+                    <td style="width:50%;padding-right:10px;vertical-align:top;">
+                      <div style="border-radius:14px;overflow:hidden;border:1px solid rgba(30,64,175,.6);background:#020617;">
+                        <img src="https://images.unsplash.com/photo-1581090700227-1e37b190418e?auto=format&fit=crop&w=900&q=80" alt="Engineers working around industrial equipment" style="display:block;width:100%;height:auto;border-bottom:1px solid rgba(15,23,42,.9);" />
+                        <div style="padding:10px 12px;">
+                          <strong style="display:block;color:#e5e7eb;margin-bottom:2px;">For maintenance teams</strong>
+                          <span>Identify unknown parts during shutdowns without waiting on paperwork or old catalogues.</span>
+                        </div>
+                      </div>
+                    </td>
+                    <td style="width:50%;padding-left:10px;vertical-align:top;">
+                      <div style="border-radius:14px;overflow:hidden;border:1px solid rgba(30,64,175,.6);background:#020617;">
+                        <img src="https://images.unsplash.com/photo-1581090700221-1e37b190418e?auto=format&fit=crop&w=900&q=80" alt="Warehouse shelves with spare parts crates" style="display:block;width:100%;height:auto;border-bottom:1px solid rgba(15,23,42,.9);" />
+                        <div style="padding:10px 12px;">
+                          <strong style="display:block;color:#e5e7eb;margin-bottom:2px;">For stores &amp; inventory</strong>
+                          <span>Clear up “mystery” stock by snapping photos and labelling everything once in SpareFinder.</span>
+                        </div>
+                      </div>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+
+            <tr>
+              <td style="padding:10px 30px 4px 30px;">
+                <div style="background:radial-gradient(circle at top left,#0f172a,#020617);border-radius:14px;padding:16px 18px;border:1px solid rgba(148,163,184,.28);">
+                  <h3 style="margin:0 0 6px 0;font-size:15px;color:#e5e7eb;">What you’ll see in your first result</h3>
+                  <ul style="margin:0;padding-left:18px;font-size:13px;color:#cbd5e1;line-height:1.7;">
+                    <li>A clear part name, category and manufacturer (where available).</li>
+                    <li>A confidence score so you can judge how strong the match is.</li>
+                    <li>Supporting description and specs your stores or buyers can use.</li>
+                    <li>A full history entry so your team can reuse the result later.</li>
+                  </ul>
+                </div>
               </td>
             </tr>
 
@@ -368,6 +427,9 @@ class EmailService {
                   <a href="${docsUrl}" style="font-size:13px;color:#60a5fa;text-decoration:none;font-weight:500;">
                     Open the getting-started guide →
                   </a>
+                  <p style="margin:10px 0 0 0;font-size:12px;color:#94a3b8;">
+                    Prefer to talk to us? You can also reach the team via <a href="${contactUrl}" style="color:#60a5fa;text-decoration:none;">our contact page</a>.
+                  </p>
                 </div>
               </td>
             </tr>
@@ -426,8 +488,11 @@ class EmailService {
       const subject = "You still have SpareFinder credits waiting for you";
       const frontendUrl =
         process.env.FRONTEND_URL || "https://sparefinder.org";
+      const baseUrl = frontendUrl.replace(/\/$/, "");
+      const logoUrl = `${baseUrl}/sparefinderlogo.png`;
       const dashboardUrl = `${frontendUrl}/dashboard`;
       const uploadUrl = `${frontendUrl}/dashboard/upload`;
+      const docsUrl = `${frontendUrl}/help`;
 
       const html = `
 <!doctype html>
@@ -438,7 +503,21 @@ class EmailService {
         <td>
           <table role="presentation" width="600" align="center" cellspacing="0" cellpadding="0" style="background:#020617;border-radius:18px;overflow:hidden;box-shadow:0 22px 60px rgba(15,23,42,.9);border:1px solid rgba(34,197,94,.4);">
             <tr>
-              <td style="padding:24px 28px 18px 28px;background:linear-gradient(135deg,#16a34a,#22c55e);color:#f9fafb;">
+              <td style="padding:18px 28px 14px 28px;background:#020617;color:#f9fafb;border-bottom:1px solid rgba(15,23,42,.9);">
+                <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
+                  <tr>
+                    <td style="text-align:left;vertical-align:middle;">
+                      <img src="${logoUrl}" alt="SpareFinder" style="max-height:28px;width:auto;display:block;border-radius:6px;" />
+                    </td>
+                    <td style="text-align:right;vertical-align:middle;font-size:11px;color:#bbf7d0;">
+                      Credits reminder · Onboarding nudge
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:22px 28px 18px 28px;background:linear-gradient(135deg,#16a34a,#22c55e);color:#f9fafb;">
                 <h1 style="margin:0;font-size:22px;line-height:1.3;">
                   Hey ${data.userName || "there"}, your first search is one click away ⚡
                 </h1>
@@ -472,9 +551,37 @@ class EmailService {
             </tr>
 
             <tr>
+              <td style="padding:14px 28px 12px 28px;">
+                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="font-size:12px;color:#9ca3af;">
+                  <tr>
+                    <td style="padding-right:10px;vertical-align:top;width:50%;border-right:1px solid rgba(31,41,55,.8);">
+                      <p style="margin:0 0 4px 0;color:#e5e7eb;font-weight:600;">Great first tests</p>
+                      <ul style="margin:0;padding-left:16px;line-height:1.6;">
+                        <li>Fast-moving spares you reorder often.</li>
+                        <li>Legacy parts with poor or missing labels.</li>
+                        <li>Field photos from engineers on site.</li>
+                      </ul>
+                    </td>
+                    <td style="padding-left:14px;vertical-align:top;width:50%;">
+                      <p style="margin:0 0 4px 0;color:#e5e7eb;font-weight:600;">Best results when</p>
+                      <ul style="margin:0;padding-left:16px;line-height:1.6;">
+                        <li>The whole part is in the frame.</li>
+                        <li>Labels / markings are readable.</li>
+                        <li>The background is simple and not cluttered.</li>
+                      </ul>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+
+            <tr>
               <td style="padding:12px 28px 18px 28px;border-top:1px solid rgba(31,41,55,.9);font-size:11px;color:#9ca3af;">
                 <p style="margin:0 0 4px 0;">
                   You can see your recent analyses and remaining credits anytime from your <a href="${dashboardUrl}" style="color:#4ade80;text-decoration:none;">SpareFinder dashboard</a>.
+                </p>
+                <p style="margin:0;">
+                  For tips and example photos, visit the <a href="${docsUrl}" style="color:#4ade80;text-decoration:none;">getting-started guide</a>.
                 </p>
               </td>
             </tr>
@@ -522,6 +629,8 @@ class EmailService {
       const subject = "See what SpareFinder can do for your next job";
       const frontendUrl =
         process.env.FRONTEND_URL || "https://sparefinder.org";
+      const baseUrl = frontendUrl.replace(/\/$/, "");
+      const logoUrl = `${baseUrl}/sparefinderlogodark.png`;
       const dashboardUrl = `${frontendUrl}/dashboard`;
       const uploadUrl = `${frontendUrl}/dashboard/upload`;
 
@@ -533,6 +642,20 @@ class EmailService {
       <tr>
         <td>
           <table role="presentation" width="600" align="center" cellspacing="0" cellpadding="0" style="background:#020617;border-radius:18px;overflow:hidden;box-shadow:0 22px 60px rgba(15,23,42,.9);border:1px solid rgba(56,189,248,.4);">
+            <tr>
+              <td style="padding:18px 28px 14px 28px;background:#020617;color:#f9fafb;border-bottom:1px solid rgba(15,23,42,.9);">
+                <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
+                  <tr>
+                    <td style="text-align:left;vertical-align:middle;">
+                      <img src="${logoUrl}" alt="SpareFinder" style="max-height:28px;width:auto;display:block;border-radius:6px;" />
+                    </td>
+                    <td style="text-align:right;vertical-align:middle;font-size:11px;color:#7dd3fc;">
+                      Usage reminder · Inactive account
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
             <tr>
               <td style="padding:24px 28px 16px 28px;background:linear-gradient(135deg,#0ea5e9,#6366f1);color:#f9fafb;">
                 <h1 style="margin:0;font-size:22px;line-height:1.3;">
@@ -562,6 +685,31 @@ class EmailService {
                 <p style="margin:10px 0 0 0;font-size:12px;color:#9ca3af;">
                   It takes seconds to run a search, and every result is saved to your history so your team can reuse it later.
                 </p>
+              </td>
+            </tr>
+
+            <tr>
+              <td style="padding:14px 28px 12px 28px;">
+                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="font-size:12px;color:#9ca3af;">
+                  <tr>
+                    <td style="padding-right:10px;vertical-align:top;width:50%;border-right:1px solid rgba(31,41,55,.8);">
+                      <p style="margin:0 0 4px 0;color:#e5e7eb;font-weight:600;">Teams who benefit most</p>
+                      <ul style="margin:0;padding-left:16px;line-height:1.6;">
+                        <li>Maintenance &amp; reliability teams.</li>
+                        <li>Stores / inventory / spares managers.</li>
+                        <li>Procurement and purchasing teams.</li>
+                      </ul>
+                    </td>
+                    <td style="padding-left:14px;vertical-align:top;width:50%;">
+                      <p style="margin:0 0 4px 0;color:#e5e7eb;font-weight:600;">Why come back now</p>
+                      <ul style="margin:0;padding-left:16px;line-height:1.6;">
+                        <li>Reduce time spent hunting for unknown parts.</li>
+                        <li>Keep a clean, searchable record of identifications.</li>
+                        <li>Share consistent part info across your whole team.</li>
+                      </ul>
+                    </td>
+                  </tr>
+                </table>
               </td>
             </tr>
 

@@ -28,6 +28,7 @@ import creditsRoutes from "./routes/credits";
 import healthRoutes from "./routes/health";
 import contactRoutes from "./routes/contact";
 import reviewsRoutes from "./routes/reviews";
+import cronRoutes from "./routes/cron";
 
 // Initialize Supabase client
 export const supabase = createClient(
@@ -119,6 +120,7 @@ app.use("/api/statistics", statisticsRoutes);
 app.use("/api/credits", creditsRoutes);
 app.use("/api/contact", contactRoutes);
 app.use("/api/reviews", reviewsRoutes);
+app.use("/api/cron", cronRoutes);
 
 // 404 handler
 app.use("*", (req, res) => {
