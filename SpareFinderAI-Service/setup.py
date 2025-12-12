@@ -55,7 +55,7 @@ setup(
     python_requires=">=3.8,<3.13",
     
     # Metadata
-    description="AI-powered automotive part identification service",
+    description="AI-powered Manufacturing part identification service",
     author="SpareFinderAI Team",
     author_email="support@sparefinderai.com",
     

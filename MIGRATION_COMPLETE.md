@@ -144,6 +144,6 @@ If needed, rollback instructions are in `backend/MIGRATION_GUIDE.md`:
 
 ## 🎉 Ready to Go!
 
-The migration is fully prepared and tested. Execute the steps above to enable comprehensive user analytics and statistics tracking in your automotive parts identification system.
+The migration is fully prepared and tested. Execute the steps above to enable comprehensive user analytics and statistics tracking in your Manufacturing parts identification system.
 
 **Next Action**: Go to Supabase Dashboard and run the migration SQL! 🚀 

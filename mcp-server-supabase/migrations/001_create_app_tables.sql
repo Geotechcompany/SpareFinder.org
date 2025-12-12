@@ -187,7 +187,7 @@ ON public.subscriptions FOR SELECT
 USING (auth.uid() = user_id);
 
 -- Comments for documentation
-COMMENT ON TABLE public.part_analyses IS 'Stores detailed analyses of automotive parts with user-specific access';
+COMMENT ON TABLE public.part_analyses IS 'Stores detailed analyses of Manufacturing parts with user-specific access';
 COMMENT ON TABLE public.search_history IS 'Tracks user search activities with privacy controls';
 COMMENT ON TABLE public.user_preferences IS 'Manages individual user preferences and settings';
 COMMENT ON TABLE public.subscriptions IS 'Manages user subscription and billing information'; 

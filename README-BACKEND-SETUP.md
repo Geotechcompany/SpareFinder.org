@@ -154,15 +154,15 @@ def download_mobilenet_v2(output_dir):
     
     # Save ImageNet class names
     class_names_path = os.path.join(output_dir, 'class_names.txt')
-    # Download ImageNet labels or create automotive-specific labels
-    automotive_classes = [
+    # Download ImageNet labels or create Manufacturing-specific labels
+    Manufacturing_classes = [
         "brake_pad", "brake_rotor", "air_filter", "oil_filter",
         "spark_plug", "battery", "tire", "headlight", "taillight",
-        # ... add more automotive parts
+        # ... add more Manufacturing parts
     ]
     
     with open(class_names_path, 'w') as f:
-        for class_name in automotive_classes:
+        for class_name in Manufacturing_classes:
             f.write(f"{class_name}\n")
     
     print(f"Model saved to {model_path}")
@@ -311,7 +311,7 @@ export class RSComponentsAPI {
 1. Go to [Google Cloud Console](https://console.cloud.google.com/)
 2. Enable Custom Search API
 3. Create a Custom Search Engine at [CSE](https://cse.google.com/cse/)
-4. Configure to search automotive parts websites
+4. Configure to search Manufacturing parts websites
 5. Get API key and Search Engine ID
 
 ## 📊 **Phase 4: Monitoring & Deployment**

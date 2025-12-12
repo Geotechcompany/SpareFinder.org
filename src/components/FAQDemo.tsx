@@ -11,7 +11,7 @@ const FAQDemo = () => {
     {
       question: "What types of parts can SpareFinder identify?",
       answer:
-        "SpareFinder can identify automotive parts, heavy equipment components, aerospace parts, industrial machinery, marine equipment, agricultural machinery, and more. Our database covers over 10 million parts across diverse industrial sectors.",
+        "SpareFinder can identify Manufacturing parts, heavy equipment components, aerospace parts, industrial machinery, marine equipment, agricultural machinery, and more. Our database covers over 10 million parts across diverse industrial sectors.",
       meta: "Coverage",
     },
     {

@@ -107,7 +107,7 @@ export class DatabaseLogger {
           search_term: data.search_query || data.image_name || 'Image Upload',
           part_name: primaryPrediction?.class_name || data.search_query || 'Unknown Part',
           manufacturer: primaryPrediction?.manufacturer || 'Unknown',
-          category: primaryPrediction?.category || 'Automotive',
+          category: primaryPrediction?.category || 'Manufacturing',
           part_number: primaryPrediction?.part_number || null,
           image_url: data.image_url,
           image_name: data.image_name,

@@ -1,8 +1,8 @@
-# SpareFinderAI - Automotive Part Identification Platform
+# SpareFinderAI - Manufacturing Part Identification Platform
 
 ## Overview
 
-SpareFinderAI is a comprehensive SaaS platform that combines AI-powered image recognition with web scraping intelligence to identify automotive spare parts. The application allows users to upload images of auto parts and receive detailed analysis including part identification, pricing, supplier information, and technical specifications.
+SpareFinderAI is a comprehensive SaaS platform that combines AI-powered image recognition with web scraping intelligence to identify Manufacturing spare parts. The application allows users to upload images of auto parts and receive detailed analysis including part identification, pricing, supplier information, and technical specifications.
 
 ### Core Value Proposition
 
@@ -861,4 +861,4 @@ async def test_supplier_scraping():
         assert 'company_name' in result
 ```
 
-This SpareFinderAI platform represents a sophisticated full-stack application that combines modern web technologies with advanced AI capabilities and intelligent web scraping to provide comprehensive automotive part identification services.
+This SpareFinderAI platform represents a sophisticated full-stack application that combines modern web technologies with advanced AI capabilities and intelligent web scraping to provide comprehensive Manufacturing part identification services.

@@ -1071,7 +1071,7 @@ class EmailService {
               <p style="margin:16px 0;color:#cbd5e1;line-height:1.6;">
                 You now have full access to all ${
                   data.planName
-                } features. Start using SpareFinder AI to identify and manage your automotive parts!
+                } features. Start using SpareFinder AI to identify and manage your Manufacturing parts!
               </p>
               <div style="margin:24px 0;">
                 <a href="${dashboardUrl}" style="display:inline-block;background:#3b82f6;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-weight:600;margin-right:12px;">Go to Dashboard</a>

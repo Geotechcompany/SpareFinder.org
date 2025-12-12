@@ -1,41 +1,41 @@
 {
-  "filename": "9cca3faf-5309-4378-b790-c11b1f74b050.jpeg",
-  "success": true,
-  "status": "completed",
-  "class_name": "Automotive Component",
-  "category": "Automotive Parts",
-  "precise_part_name": "Automotive Component",
-  "material_composition": "Unknown",
-  "manufacturer": "Not Specified",
-  "confidence_score": 70,
-  "confidence_explanation": "Analysis based on visible features and patterns",
-  "estimated_price": {
-    "new": "Price not available",
-    "used": "Price not available",
-    "refurbished": "Price not available"
-  },
-  "description": "Technical description not available",
-  "technical_data_sheet": {
-    "part_type": "Automotive Component",
-    "material": "Unknown",
-    "common_specs": "Varies by application",
-    "load_rating": "Standard",
-    "weight": "Varies",
-    "reusability": "Depends on condition",
-    "finish": "Standard finish",
-    "temperature_tolerance": "Standard operating range"
-  },
-  "compatible_vehicles": [],
-  "engine_types": [
-    "Inline",
-    "V-type",
-    "Flat"
-  ],
-  "buy_links": {},
-  "suppliers": [],
-  "fitment_tips": "Verify compatibility with your specific vehicle before purchase",
-  "additional_instructions": "Upload clearer images with visible part numbers for better accuracy",
-  "full_analysis": "I'm unable to provide a detailed analysis of this image. However, I can guide you on how to identify and source automotive parts. Please provide additional details or context if available.",
-  "processing_time_seconds": 5.0,
-  "model_version": "SpareFinderAI Part Analysis v1.0"
+    "filename": "9cca3faf-5309-4378-b790-c11b1f74b050.jpeg",
+    "success": true,
+    "status": "completed",
+    "class_name": "Manufacturing Component",
+    "category": "Manufacturing Parts",
+    "precise_part_name": "Manufacturing Component",
+    "material_composition": "Unknown",
+    "manufacturer": "Not Specified",
+    "confidence_score": 70,
+    "confidence_explanation": "Analysis based on visible features and patterns",
+    "estimated_price": {
+        "new": "Price not available",
+        "used": "Price not available",
+        "refurbished": "Price not available"
+    },
+    "description": "Technical description not available",
+    "technical_data_sheet": {
+        "part_type": "Manufacturing Component",
+        "material": "Unknown",
+        "common_specs": "Varies by application",
+        "load_rating": "Standard",
+        "weight": "Varies",
+        "reusability": "Depends on condition",
+        "finish": "Standard finish",
+        "temperature_tolerance": "Standard operating range"
+    },
+    "compatible_vehicles": [],
+    "engine_types": [
+        "Inline",
+        "V-type",
+        "Flat"
+    ],
+    "buy_links": {},
+    "suppliers": [],
+    "fitment_tips": "Verify compatibility with your specific vehicle before purchase",
+    "additional_instructions": "Upload clearer images with visible part numbers for better accuracy",
+    "full_analysis": "I'm unable to provide a detailed analysis of this image. However, I can guide you on how to identify and source Manufacturing parts. Please provide additional details or context if available.",
+    "processing_time_seconds": 5.0,
+    "model_version": "SpareFinderAI Part Analysis v1.0"
 }

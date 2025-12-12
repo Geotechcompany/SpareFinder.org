@@ -21,9 +21,9 @@ const pageConfigs: PageSEOConfig = {
   "/": {
     title: "SpareFinder - AI-Powered Industrial Spare Parts Identification System",
     description:
-      "Identify spare parts instantly with 99.9% accuracy using advanced AI computer vision. Upload images and get instant part identification, specifications, and supplier information for automotive, aerospace, and industrial equipment.",
+      "Identify spare parts instantly with 99.9% accuracy using advanced AI computer vision. Upload images and get instant part identification, specifications, and supplier information for Manufacturing, aerospace, and industrial equipment.",
     keywords:
-      "spare parts identification, AI parts recognition, industrial part finder, automotive parts, aerospace components, machine vision, part identification system",
+      "spare parts identification, AI parts recognition, industrial part finder, Manufacturing parts, aerospace components, machine vision, part identification system",
     type: "website",
     schema: {
       "@context": "https://schema.org",
@@ -31,7 +31,7 @@ const pageConfigs: PageSEOConfig = {
       name: "SpareFinder",
       url: "https://sparefinder.org",
       description:
-        "AI-powered spare parts identification system with 99.9% accuracy for industrial, automotive, and aerospace components.",
+        "AI-powered spare parts identification system with 99.9% accuracy for industrial, Manufacturing, and aerospace components.",
       potentialAction: {
         "@type": "SearchAction",
         target: "https://sparefinder.org/dashboard/upload?q={search_term_string}",

@@ -123,7 +123,7 @@ load_dotenv()
 # Initialize FastAPI app with explicit lifespan management
 app = FastAPI(
     title="SpareFinderAI Service",
-    description="AI-powered automotive part identification service",
+    description="AI-powered Manufacturing part identification service",
     version="1.0.0"
 )
 
@@ -617,7 +617,7 @@ async def search_by_keywords(payload: KeywordSearchRequest):
 
         # Build prompt to request structured JSON results
         system_prompt = (
-            "You are an expert automotive parts search assistant. Given a list of keywords, "
+            "You are an expert Manufacturing parts search assistant. Given a list of keywords, "
             "return a JSON object containing: (1) an array named 'results' of relevant parts where each result has: "
             "name, category, manufacturer (optional), part_number (optional), price (string, optional), availability (optional); "
             "and (2) a 'markdown' string. The 'markdown' must be formatted as follows: \n\n"
@@ -1022,10 +1022,10 @@ async def _run_keyword_search_job(job_id: str, keyword_list: List[str], user_ema
         normalized = [str(k).strip().lower() for k in (keyword_list or []) if str(k).strip()]
 
         system_prompt = (
-            "You are SpareFinder AI. Given automotive keywords, return a concise JSON with 'results'[] and optional 'markdown' string."
+            "You are SpareFinder AI. Given Manufacturing keywords, return a concise JSON with 'results'[] and optional 'markdown' string."
         )
         user_prompt = (
-            f"Find automotive parts related to: {', '.join(normalized)}. Return fields: name, category, manufacturer, price, availability, part_number."
+            f"Find Manufacturing parts related to: {', '.join(normalized)}. Return fields: name, category, manufacturer, price, availability, part_number."
         )
 
         from openai import OpenAI as _OpenAI

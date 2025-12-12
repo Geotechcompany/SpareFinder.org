@@ -43,7 +43,7 @@ npm run migrate:create
 - Always test migrations in a staging environment first
 
 ## Tables Created
-- `part_analyses`: Stores detailed automotive part analysis results
+- `part_analyses`: Stores detailed Manufacturing part analysis results
 - `search_history`: Tracks user search activities
 - `user_preferences`: Manages user-specific settings
 - `subscriptions`: Handles billing and subscription information

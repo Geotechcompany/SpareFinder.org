@@ -30,12 +30,12 @@ const BASE_URL = "https://sparefinder.org";
 const DEFAULT_IMAGE = `${BASE_URL}/sparefinderlogodark.png`;
 const DEFAULT_TITLE = "SpareFinder - AI-Powered Industrial Spare Parts Identification";
 const DEFAULT_DESCRIPTION =
-  "Identify spare parts instantly with 99.9% accuracy using advanced AI computer vision. Upload images and get instant part identification, specifications, and supplier information for automotive, aerospace, and industrial equipment.";
+  "Identify spare parts instantly with 99.9% accuracy using advanced AI computer vision. Upload images and get instant part identification, specifications, and supplier information for Manufacturing, aerospace, and industrial equipment.";
 
 export const SEO = ({
   title = DEFAULT_TITLE,
   description = DEFAULT_DESCRIPTION,
-  keywords = "spare parts identification, AI parts recognition, industrial part finder, automotive parts, aerospace components, machine vision, part identification system, spare parts database, supplier finder",
+  keywords = "spare parts identification, AI parts recognition, industrial part finder, Manufacturing parts, aerospace components, machine vision, part identification system, spare parts database, supplier finder",
   image = DEFAULT_IMAGE,
   url,
   type = "website",

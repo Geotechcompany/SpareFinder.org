@@ -253,7 +253,7 @@ Reply directly to this email to respond to the sender.
               </div>
 
               <p style="margin:24px 0 16px;color:#374151;font-size:16px;line-height:1.6;">
-                In the meantime, feel free to explore our platform and discover how AI-powered part identification can streamline your automotive repair workflow.
+                In the meantime, feel free to explore our platform and discover how AI-powered part identification can streamline your Manufacturing repair workflow.
               </p>
 
               <div style="text-align:center;margin:32px 0;">
@@ -299,7 +299,7 @@ ${subject ? `- Subject: ${subject}` : ''}
   timeZone: 'Europe/London'
 })}
 
-In the meantime, feel free to explore our platform and discover how AI-powered part identification can streamline your automotive repair workflow.
+In the meantime, feel free to explore our platform and discover how AI-powered part identification can streamline your Manufacturing repair workflow.
 
 Visit: ${process.env.FRONTEND_URL || 'https://app.sparefinder.org'}/dashboard
 

@@ -73,4 +73,4 @@ WITH CHECK (auth.uid() = user_id);
 
 -- Optional: Add a comment to describe the table
 COMMENT ON TABLE part_analysis_results IS 
-'Stores results of AI-powered automotive part identification analyses, including predictions, image URLs, and performance metadata.'; 
+'Stores results of AI-powered Manufacturing part identification analyses, including predictions, image URLs, and performance metadata.'; 

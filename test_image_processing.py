@@ -56,7 +56,7 @@ def analyze_image(image_path):
 
     # Comprehensive prompt for detailed analysis
     prompt = """
-    Perform a comprehensive technical analysis of this automotive part image. 
+    Perform a comprehensive technical analysis of this Manufacturing part image. 
     Provide a detailed breakdown including:
     1. Specific component identification
     2. Detailed description of component parts

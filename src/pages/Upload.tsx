@@ -1053,7 +1053,7 @@ const Upload = () => {
 
   const extractCategory = (text: string): string => {
     const categoryMatches = text.match(/Category:\s*([^.\n]+)/i);
-    return categoryMatches ? categoryMatches[1].trim() : "Automotive Component";
+    return categoryMatches ? categoryMatches[1].trim() : "Manufacturing Component";
   };
 
   const extractManufacturer = (text: string): string => {
@@ -1357,7 +1357,7 @@ const Upload = () => {
               class_name:
                 flatData.class_name ||
                 flatData.precise_part_name ||
-                "Automotive Component",
+                "Manufacturing Component",
               confidence: (flatData.confidence_score || 0) / 100, // Convert percentage to decimal
               description: flatData.description || flatData.full_analysis || "",
               category: flatData.category || "Unspecified",
@@ -1430,7 +1430,7 @@ const Upload = () => {
           class_name:
             flatData.class_name ||
             flatData.precise_part_name ||
-            "Automotive Component",
+            "Manufacturing Component",
           confidence: (flatData.confidence_score || 0) / 100, // Convert percentage to decimal
           description: flatData.description || flatData.full_analysis || "",
           category: flatData.category || "Unspecified",
@@ -1766,7 +1766,7 @@ const Upload = () => {
         "ai_analysis",
         "Initializing AI-powered part analysis...",
         40,
-        "Searching advanced automotive databases"
+        "Searching advanced Manufacturing databases"
       );
 
       const result = await api.upload.image(uploadedFile, savedKeywords, {
@@ -1781,7 +1781,7 @@ const Upload = () => {
         "part_matching",
         "Matching part details across multiple databases...",
         70,
-        "Cross-referencing automotive part catalogs"
+        "Cross-referencing Manufacturing part catalogs"
       );
       await new Promise((resolve) => setTimeout(resolve, 1000)); // Simulate matching process
 
@@ -1827,7 +1827,7 @@ const Upload = () => {
       // Prepare predictions, using the service's predictions or fallback parsing
       const predictions = (result.data as any)?.predictions?.length
         ? (result.data as any).predictions.map((prediction: any) => ({
-            class_name: prediction.class_name || "Automotive Component",
+            class_name: prediction.class_name || "Manufacturing Component",
             confidence: prediction.confidence || 0.75,
             description: prediction.analysis || prediction.description || "", // Use analysis field first
             category: prediction.category || "Unspecified",
@@ -1840,7 +1840,7 @@ const Upload = () => {
         : // Fallback parsing if no predictions
           [
             {
-              class_name: "Automotive Component",
+              class_name: "Manufacturing Component",
               confidence: 0.75,
               description:
                 (result.data as any)?.analysis ||
@@ -1918,7 +1918,7 @@ const Upload = () => {
           const analysisResults: AnalysisResponse = {
             success: result.success,
             predictions: (result.data as any[]).map((prediction: any) => ({
-              class_name: prediction.class_name || "Automotive Component",
+              class_name: prediction.class_name || "Manufacturing Component",
               confidence: prediction.confidence || 0.75,
               description: prediction.description || "",
               category: prediction.category || "Unspecified",
@@ -2623,7 +2623,7 @@ const Upload = () => {
 
       // Save PDF with descriptive filename
       const partName =
-        analysisResults.predictions[0]?.class_name || "automotive-part";
+        analysisResults.predictions[0]?.class_name || "Manufacturing-part";
       const timestamp = new Date()
         .toISOString()
         .replace(/:/g, "-")
@@ -3417,13 +3417,13 @@ const Upload = () => {
                   transition={{ delay: 0.4 }}
                 >
                   {wizardStep === "landing"
-                    ? "Welcome to SpareFinder AI - Let's identify your automotive part!"
+                    ? "Welcome to SpareFinder AI - Let's identify your Manufacturing part!"
                     : wizardStep === "selection"
-                    ? "Choose how you'd like to identify your automotive part"
+                    ? "Choose how you'd like to identify your Manufacturing part"
                     : wizardStep === "image"
                     ? selectedMode === "both"
                       ? "Upload an image - step 1 of 2"
-                      : "Upload an image of your automotive part for AI analysis"
+                      : "Upload an image of your Manufacturing part for AI analysis"
                     : wizardStep === "keywords"
                     ? "Add keywords to refine your search - step 2 of 2"
                     : "Review and submit your request"}
@@ -3507,7 +3507,7 @@ const Upload = () => {
                           Get Started with SpareFinder AI
                         </CardTitle>
                         <CardDescription className="text-lg text-muted-foreground dark:text-gray-400">
-                          Identify your automotive parts in just a few simple
+                          Identify your Manufacturing parts in just a few simple
                           steps
                         </CardDescription>
                       </CardHeader>
@@ -3794,7 +3794,7 @@ const Upload = () => {
                           {selectedMode === "both"
                             ? "Your image will be analyzed using AI, refined with your keywords for maximum accuracy."
                             : selectedMode === "image"
-                            ? "Your image will be processed using advanced AI to identify the automotive part."
+                            ? "Your image will be processed using advanced AI to identify the Manufacturing part."
                             : "Our system will search for parts matching your keywords in our extensive catalog."}
                         </p>
                       </div>
@@ -4005,7 +4005,7 @@ const Upload = () => {
                                       </div>
                                       <div className="text-gray-300 text-base mt-1">
                                         {analysisProgress.details ||
-                                          "Processing your automotive part analysis..."}
+                                          "Processing your Manufacturing part analysis..."}
                                       </div>
                                       {analysisProgress.currentStepIndex &&
                                         analysisProgress.totalSteps && (
@@ -4209,7 +4209,7 @@ const Upload = () => {
                                         "part_matching" && (
                                         <div className="flex justify-between text-purple-300">
                                           <span>
-                                            🔗 Matching against automotive
+                                            🔗 Matching against Manufacturing
                                             database...
                                           </span>
                                           <span className="text-gray-500">
@@ -4314,7 +4314,7 @@ const Upload = () => {
                           Add Keywords
                         </CardTitle>
                         <CardDescription className="text-muted-foreground dark:text-gray-400">
-                          Describe your automotive part using keywords
+                          Describe your Manufacturing part using keywords
                         </CardDescription>
                       </CardHeader>
                       <CardContent>
@@ -4616,7 +4616,7 @@ const Upload = () => {
               </h3>
               <p className="text-gray-400 text-lg">
                 {isAnalyzing
-                  ? "Our AI is examining your automotive part..."
+                  ? "Our AI is examining your Manufacturing part..."
                   : "Finding matching parts for your keywords..."}
               </p>
             </div>

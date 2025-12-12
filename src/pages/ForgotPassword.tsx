@@ -337,7 +337,7 @@ const ForgotPassword = () => {
         <div className="absolute inset-0">
           <img
             src="https://images.pexels.com/photos/4489732/pexels-photo-4489732.jpeg?auto=compress&cs=tinysrgb&w=1600&q=80"
-            alt="Technician using an AI-powered platform to verify automotive parts"
+            alt="Technician using an AI-powered platform to verify Manufacturing parts"
             className="h-full w-full object-cover"
           />
           <div className="absolute inset-0 bg-gradient-to-l from-slate-950 via-slate-950/75 to-transparent" />

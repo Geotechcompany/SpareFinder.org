@@ -26,7 +26,7 @@ FROM first_user,
   ('Achievement Unlocked', 'Congratulations! You''ve reached 95% accuracy rate', 'success', true, NOW() - INTERVAL '3 days'),
   ('System Maintenance', 'Scheduled maintenance will occur tonight from 2-4 AM UTC', 'warning', false, NOW() - INTERVAL '5 hours'),
   ('API Quota Warning', 'You have used 80% of your monthly API quota', 'warning', false, NOW() - INTERVAL '6 hours'),
-  ('New Part Database', 'We''ve added 10,000 new automotive parts to our database', 'info', true, NOW() - INTERVAL '1 week'),
+  ('New Part Database', 'We''ve added 10,000 new Manufacturing parts to our database', 'info', true, NOW() - INTERVAL '1 week'),
   ('Account Security', 'Your account password was updated successfully', 'success', true, NOW() - INTERVAL '2 weeks')
 ) AS sample_data(title, message, type, read, created_at);
 

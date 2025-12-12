@@ -88,7 +88,7 @@ const Footer = () => {
             </h4>
             <ul className="space-y-4">
               {[
-                { name: 'Automotive', desc: 'Vehicle components' },
+                { name: 'Manufacturing', desc: 'Vehicle components' },
                 { name: 'Aerospace', desc: 'Aviation parts' },
                 { name: 'Manufacturing', desc: 'Industrial equipment' },
                 { name: 'Electronics', desc: 'Circuit components' }
