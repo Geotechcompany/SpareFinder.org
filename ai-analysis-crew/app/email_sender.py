@@ -14,12 +14,13 @@ import httpx
 
 logger = logging.getLogger(__name__)
 
-def _get_smtp_host_port() -> tuple[str, int] | None:
+def _resolve_smtp_host_port() -> tuple[str, int] | None:
     """
-    Read SMTP host/port from env, but treat empty values as "not set".
+    Resolve SMTP host/port from env vars, handling empty-string misconfigs.
 
-    Fixes common Render misconfig where SMTP_HOST is present but empty, which can
-    break TLS with: "server_hostname cannot be an empty string or start with a leading dot."
+    Important: Render can store env vars with empty values. `os.getenv("SMTP_HOST", "smtp.gmail.com")`
+    would return "" (empty) in that case, which breaks TLS with:
+    "server_hostname cannot be an empty string or start with a leading dot."
     """
     raw_host = os.getenv("SMTP_HOST")
     host = (raw_host or "").strip()
@@ -27,18 +28,17 @@ def _get_smtp_host_port() -> tuple[str, int] | None:
         host = "smtp.gmail.com"
 
     if host.startswith("."):
-        logger.error(
-            f"❌ Invalid SMTP_HOST value: {host!r}. It cannot start with a leading dot."
-        )
+        logger.error(f"❌ Invalid SMTP_HOST (starts with '.'): {host!r}")
         return None
 
     raw_port = os.getenv("SMTP_PORT")
     try:
         port = int((raw_port or "").strip() or "587")
     except ValueError:
-        logger.warning(f"⚠️ Invalid SMTP_PORT value: {raw_port!r}. Falling back to 587.")
+        logger.warning(f"⚠️ Invalid SMTP_PORT value {raw_port!r}; defaulting to 587")
         port = 587
 
+    logger.info(f"📧 SMTP config: host={host!r} port={port}")
     return host, port
 
 
@@ -49,27 +49,18 @@ def send_basic_email_smtp(
     html: str,
     text: Optional[str] = None,
 ) -> bool:
-    """
-    Send a basic email via SMTP using the AI service env vars.
-
-    Uses:
-    - GMAIL_USER / GMAIL_PASS (recommended)
-    - SMTP_HOST / SMTP_PORT (defaults to gmail STARTTLS)
-    """
+    """Send a basic email via SMTP using GMAIL_USER/GMAIL_PASS."""
     gmail_user = os.getenv("GMAIL_USER")
     gmail_pass = os.getenv("GMAIL_PASS")
     if not gmail_user or not gmail_pass:
-        logger.warning(
-            "⚠️ Email not configured (GMAIL_USER/GMAIL_PASS not set) - skipping email send"
-        )
+        logger.warning("⚠️ Email not configured (GMAIL_USER/GMAIL_PASS not set) - skipping email send")
         return False
 
-    smtp_config = _get_smtp_host_port()
-    if not smtp_config:
+    smtp_cfg = _resolve_smtp_host_port()
+    if not smtp_cfg:
         return False
-    smtp_host, smtp_port = smtp_config
+    smtp_host, smtp_port = smtp_cfg
 
-    # Build message (multipart alternative: text + html)
     msg = MIMEMultipart("alternative")
     msg["From"] = gmail_user
     msg["To"] = to_email
@@ -79,7 +70,7 @@ def send_basic_email_smtp(
     if html:
         msg.attach(MIMEText(html, "html"))
 
-    # Quick connectivity test first (helps return fast on blocked SMTP)
+    # Quick connectivity test
     try:
         test_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         test_socket.settimeout(5)
@@ -95,8 +86,9 @@ def send_basic_email_smtp(
     try:
         server = None
         try:
-            server = smtplib.SMTP(timeout=30)
-            server.connect(smtp_host, smtp_port)
+            # Pass host/port into constructor so smtplib stores a non-empty internal hostname for TLS SNI.
+            server = smtplib.SMTP(host=smtp_host, port=smtp_port, timeout=30)
+            server._host = smtp_host  # type: ignore[attr-defined]
             server.starttls()
             server.login(gmail_user, gmail_pass)
             server.sendmail(gmail_user, [to_email], msg.as_string())
@@ -184,10 +176,10 @@ def send_email_with_attachment(
         logger.error(f"❌ Attachment file not found: {attachment_path}")
         return False
     
-    smtp_config = _get_smtp_host_port()
-    if not smtp_config:
+    smtp_cfg = _resolve_smtp_host_port()
+    if not smtp_cfg:
         return False
-    smtp_host, smtp_port = smtp_config
+    smtp_host, smtp_port = smtp_cfg
     
     try:
         # Test network connectivity first
@@ -233,8 +225,8 @@ def send_email_with_attachment(
         # Connect to SMTP server with timeout and better error handling
         server = None
         try:
-            server = smtplib.SMTP(timeout=30)  # 30 second timeout
-            server.connect(smtp_host, smtp_port)
+            server = smtplib.SMTP(host=smtp_host, port=smtp_port, timeout=30)  # 30 second timeout
+            server._host = smtp_host  # type: ignore[attr-defined]
             server.starttls()
             server.login(gmail_user, gmail_pass)
             text = msg.as_string()

@@ -140,47 +140,29 @@ class EmailService {
   }
 
   async sendEmail(options: EmailOptions): Promise<boolean> {
-    const emailApiUrlRaw = (
-      process.env.EMAIL_SERVICE_URL ||
-      process.env.EMAIL_API_URL ||
-      ""
-    ).trim();
+    const emailApiUrl =
+      (process.env.EMAIL_SERVICE_URL || process.env.EMAIL_API_URL || "").trim();
 
     // Prefer external email-service over HTTPS whenever configured (works on Render Starter/Free).
-    // Supports either:
-    // - base URL (we'll try /send-email then /email/send)
-    // - full URL including path (/send-email or /email/send)
-    if (emailApiUrlRaw) {
-      const url = emailApiUrlRaw.replace(/\/$/, "");
-      const payload = {
-        to: options.to,
-        subject: options.subject,
-        html: options.html,
-        text: options.text ?? "",
-      };
-
-      const candidateUrls = url.endsWith("/send-email") || url.endsWith("/email/send")
-        ? [url]
-        : [`${url}/send-email`, `${url}/email/send`];
-
-      for (const candidateUrl of candidateUrls) {
-        try {
-          await axios.post(candidateUrl, payload, { timeout: 15000 });
-          console.log(
-            `📧 Email sent via external email service to ${options.to}: ${options.subject} (${candidateUrl})`
-          );
-          return true;
-        } catch (err: any) {
-          const status = err?.response?.status;
-          // If the endpoint isn't found, try the next candidate path.
-          if (status === 404 || status === 405) continue;
-          console.error(
-            `Failed to send email via external email service (${candidateUrl}):`,
-            err
-          );
-          // For non-404 failures, fall through to SMTP attempt (useful for local dev)
-          break;
-        }
+    if (emailApiUrl) {
+      try {
+        await axios.post(
+          `${emailApiUrl}/send-email`,
+          {
+            to: options.to,
+            subject: options.subject,
+            html: options.html,
+            text: options.text ?? "",
+          },
+          {
+            timeout: 15000,
+          }
+        );
+        console.log(`📧 Email sent via external email service to ${options.to}: ${options.subject}`);
+        return true;
+      } catch (err) {
+        console.error("Failed to send email via external email service:", err);
+        // fall through to SMTP attempt (useful for local dev)
       }
     }
 

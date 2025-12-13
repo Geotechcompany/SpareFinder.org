@@ -139,8 +139,6 @@ async def email_send(payload: EmailProxyRequest):
         html=payload.html,
         text=payload.text,
     )
-    # Fallback: send directly via SMTP using GMAIL_USER/GMAIL_PASS if the proxy is not configured
-    # or the email-service is failing.
     if not ok:
         ok = send_basic_email_smtp(
             to_email=payload.to,
