@@ -1,10 +1,21 @@
-import {
-  createRemoteJWKSet,
-  decodeJwt,
-  importSPKI,
-  jwtVerify,
-  type JWTPayload,
-} from "jose";
+// NOTE: `jose` is ESM-only. This backend currently compiles to CommonJS for Node.
+// If we `import { ... } from "jose"` here, the emitted JS becomes `require("jose")`,
+// which crashes at runtime with ERR_REQUIRE_ESM on Node 18.
+//
+// To stay on CommonJS without changing the whole backend build, we load `jose`
+// using native dynamic import in a way TypeScript will not transform into `require()`.
+type JWTPayload = Record<string, unknown> & { sub?: string; iss?: string };
+
+type JoseModule = typeof import("jose");
+let joseModule: JoseModule | null = null;
+
+const loadJose = async (): Promise<JoseModule> => {
+  if (joseModule) return joseModule;
+  // `new Function()` prevents TypeScript from downleveling dynamic import to require().
+  const importer = new Function('return import("jose")') as () => Promise<JoseModule>;
+  joseModule = await importer();
+  return joseModule;
+};
 
 type VerifiedClerkToken = {
   clerkUserId: string;
@@ -24,8 +35,8 @@ const buildClerkJwksUrl = (issuer: string) => {
   return new URL(`${normalized}/.well-known/jwks.json`);
 };
 
-const jwksByIssuer = new Map<string, ReturnType<typeof createRemoteJWKSet>>();
-let cachedSpkiKey: Awaited<ReturnType<typeof importSPKI>> | null = null;
+const jwksByIssuer = new Map<string, any>();
+let cachedSpkiKey: any | null = null;
 
 const getSpkiKey = async () => {
   if (cachedSpkiKey) return cachedSpkiKey;
@@ -35,11 +46,14 @@ const getSpkiKey = async () => {
 
   // Support either literal PEM or a single-line env value with \n escapes.
   const pem = raw.includes("\\n") ? raw.replace(/\\n/g, "\n") : raw;
+  const { importSPKI } = await loadJose();
   cachedSpkiKey = await importSPKI(pem, "RS256");
   return cachedSpkiKey;
 };
 
 export const verifyClerkSessionToken = async (token: string) => {
+  const { decodeJwt, jwtVerify, createRemoteJWKSet } = await loadJose();
+
   const decoded = decodeJwt(token);
   const issuer = decoded.iss;
 
