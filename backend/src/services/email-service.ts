@@ -1,4 +1,5 @@
 import nodemailer from "nodemailer";
+import axios from "axios";
 import { createClient } from "@supabase/supabase-js";
 import dotenv from "dotenv";
 
@@ -132,6 +133,33 @@ class EmailService {
   }
 
   async sendEmail(options: EmailOptions): Promise<boolean> {
+    const emailApiUrl = process.env.EMAIL_API_URL;
+
+    // In production on Render free tier, SMTP ports are blocked.
+    // If EMAIL_API_URL is configured, delegate sending to an external email service over HTTPS.
+    if (process.env.NODE_ENV === "production" && emailApiUrl) {
+      try {
+        await axios.post(
+          `${emailApiUrl}/send-email`,
+          {
+            to: options.to,
+            subject: options.subject,
+            html: options.html,
+            text: options.text ?? "",
+          },
+          {
+            timeout: 10000,
+          }
+        );
+        console.log(`📧 Email sent via external email service to ${options.to}: ${options.subject}`);
+        return true;
+      } catch (err) {
+        console.error("Failed to send email via external email service:", err);
+        return false;
+      }
+    }
+
+    // Fallback: direct SMTP (works for local dev or when running on a platform that allows SMTP)
     try {
       if (!this.transporter || !this.isConfigured) {
         await this.initializeTransporter();
@@ -154,7 +182,7 @@ class EmailService {
       console.log(`📧 Email sent to ${options.to}: ${options.subject}`);
       return true;
     } catch (error) {
-      console.error("Failed to send email:", error);
+      console.error("Failed to send email via SMTP:", error);
       return false;
     }
   }
