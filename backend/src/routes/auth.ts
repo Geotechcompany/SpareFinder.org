@@ -4,6 +4,7 @@ import { body, validationResult } from 'express-validator';
 import { supabase } from '../server';
 import { authenticateToken } from '../middleware/auth';
 import { AuthRequest } from '../types/auth';
+import { fetchClerkUser } from '../services/clerk-auth';
 
 const router = Router();
 
@@ -77,11 +78,33 @@ router.get("/migration-status", async (req: Request, res: Response) => {
 
     const exists = !!data;
     const linked = !!data?.clerk_user_id;
-    const needsMigration = exists && !linked;
+
+    // If a profile *claims* to be linked but the Clerk user doesn't exist in the
+    // current Clerk instance (common when switching from pk_test to pk_live),
+    // treat it as needing migration so the user can re-link safely.
+    let isClerkUserValid = true;
+    if (linked) {
+      try {
+        // Only validate if the backend has a Clerk secret key configured.
+        // If not, fail open to the previous behavior.
+        if (process.env.CLERK_SECRET_KEY) {
+          await fetchClerkUser(String(data!.clerk_user_id));
+        }
+      } catch (e) {
+        isClerkUserValid = false;
+      }
+    }
+
+    const needsMigration = exists && (!linked || !isClerkUserValid);
 
     return res.json({
       success: true,
       needs_migration: needsMigration,
+      // Non-breaking extra info for debugging. Safe to ignore on the client.
+      reason:
+        exists && linked && !isClerkUserValid
+          ? "clerk_user_missing_in_current_instance"
+          : undefined,
     });
   } catch (e) {
     console.error("migration-status error:", e);
