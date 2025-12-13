@@ -12,7 +12,8 @@ crewai==0.80.0
 crewai-tools==0.14.0
 langchain-openai==0.2.0
 # Pin OpenAI client to avoid resolver backtracking during Docker builds on Render
-openai==1.99.5
+# NOTE: stagehand requires openai>=1.99.6
+openai==1.99.6
 reportlab==4.0.7
 pillow==10.1.0
 python-dotenv==1.0.0
