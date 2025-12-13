@@ -19,16 +19,8 @@ const ADMIN_SUMMARY_EMAIL = "arthurbreck417@gmail.com";
  */
 router.get("/reminders", async (req: Request, res: Response) => {
   try {
-    // Optional protection: if CRON_SECRET is set, require token query param
-    const cronSecret = (process.env.CRON_SECRET || "").trim();
-    const token = String(req.query.token || "").trim();
-    if (cronSecret && token !== cronSecret) {
-      return res.status(401).json({
-        success: false,
-        error: "unauthorized",
-        message: "Invalid cron token",
-      });
-    }
+    // This endpoint is public by design (for cronjobs.org).
+    // Do NOT put secrets in the URL unless you explicitly decide to protect it.
 
     // Safe test mode: send a single test email without querying/sending to users.
     // Example:
@@ -180,6 +172,130 @@ Run at: ${now.toISOString()}`,
 
     // Re-engagement flow
     const inactiveDays = Number(req.query.inactive_days) || 14;
+
+    // Optional: send re-engagement to ALL users (high risk).
+    // Public by default, but gated behind an explicit env flag + confirm query param to prevent accidents.
+    //
+    // To enable:
+    //   Set ALLOW_PUBLIC_MASS_EMAIL=true on the backend service
+    //
+    // Usage (no secret/token):
+    //   GET /api/cron/reminders?type=reengagement&all=true&confirm=send_all&limit=200
+    const sendToAll = String(req.query.all || "").toLowerCase() === "true";
+    const confirm = String(req.query.confirm || "");
+    const limit = Math.min(Math.max(Number(req.query.limit) || 200, 1), 2000);
+    if (type === "reengagement" && sendToAll) {
+      const allowPublicMassEmail =
+        String(process.env.ALLOW_PUBLIC_MASS_EMAIL || "").toLowerCase() === "true";
+      if (!allowPublicMassEmail) {
+        return res.status(400).json({
+          success: false,
+          error: "mass_email_disabled",
+          message:
+            "Mass email is disabled. Set ALLOW_PUBLIC_MASS_EMAIL=true to enable all=true.",
+        });
+      }
+      if (confirm !== "send_all") {
+        return res.status(400).json({
+          success: false,
+          error: "confirm_required",
+          message:
+            "To send to ALL users, you must add confirm=send_all (mass email protection).",
+        });
+      }
+
+      // Send emails in the background so the cron HTTP call returns quickly
+      (async () => {
+        let sent = 0;
+        let failed = 0;
+
+        // Fetch in pages to avoid pulling too many rows at once
+        const pageSize = 200;
+        let offset = 0;
+        const maxToProcess = limit;
+
+        while (offset < maxToProcess) {
+          const end = Math.min(offset + pageSize - 1, maxToProcess - 1);
+          const { data: profiles, error } = await supabase
+            .from("profiles")
+            .select("id, email, full_name, updated_at")
+            .not("email", "is", null)
+            .order("updated_at", { ascending: true })
+            .range(offset, end);
+
+          if (error) {
+            console.error("Cron reengagement(all) query failed:", error);
+            break;
+          }
+          if (!profiles || profiles.length === 0) break;
+
+          for (const profile of profiles) {
+            const email = profile.email as string | null;
+            if (!email) continue;
+            try {
+              const ok = await emailService.sendReengagementEmail({
+                userEmail: email,
+                userName:
+                  (profile.full_name as string | null) ||
+                  (email.split("@")[0] ?? "there"),
+              });
+              if (ok) sent += 1;
+              else failed += 1;
+            } catch (e) {
+              failed += 1;
+              console.error("Failed to send reengagement email (all):", e);
+            }
+          }
+
+          offset += profiles.length;
+          if (profiles.length < pageSize) break;
+        }
+
+        const summary = {
+          type,
+          mode: "reengagement_all",
+          processed: Math.min(offset, maxToProcess),
+          sent,
+          failed,
+          limit: maxToProcess,
+          runAt: now.toISOString(),
+        };
+
+        console.log("Cron reengagement (all users) completed:", summary);
+
+        await emailService.sendEmail({
+          to: ADMIN_SUMMARY_EMAIL,
+          subject: `SpareFinder cron – reengagement (ALL) (${sent}/${Math.min(
+            offset,
+            maxToProcess
+          )})`,
+          html: `<p>Cron job <strong>reengagement (ALL users)</strong> finished.</p>
+                 <p>Processed: ${Math.min(offset, maxToProcess)}<br/>
+                 Sent: ${sent}<br/>
+                 Failed: ${failed}</p>
+                 <p>Limit: ${maxToProcess}<br/>
+                 Run at: ${now.toISOString()}</p>`,
+          text: `SpareFinder reengagement (ALL users) cron finished.
+Processed: ${Math.min(offset, maxToProcess)}
+Sent: ${sent}
+Failed: ${failed}
+Limit: ${maxToProcess}
+Run at: ${now.toISOString()}`,
+        });
+      })().catch((err) => {
+        console.error("Cron reengagement(all) background task failed:", err);
+      });
+
+      return res.json({
+        success: true,
+        type,
+        mode: "reengagement_all",
+        processed: limit,
+        queued: true,
+        message:
+          "Queued reengagement emails to ALL users (bounded by limit). Check admin summary email for results.",
+      });
+    }
     const inactiveCutoff = new Date(now);
     inactiveCutoff.setDate(now.getDate() - inactiveDays);
 
