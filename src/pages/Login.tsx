@@ -17,6 +17,12 @@ type LoginStep =
   | "totp"
   | "backup_code";
 
+type ClerkSignInResource = NonNullable<ReturnType<typeof useSignIn>["signIn"]>;
+type ClerkRedirectStrategy = Parameters<
+  ClerkSignInResource["authenticateWithRedirect"]
+>[0]["strategy"];
+type OAuthStrategy = Extract<ClerkRedirectStrategy, `oauth_${string}`>;
+
 const Login = () => {
   const { isLoading, isAuthenticated } = useAuth();
   const location = useLocation();
@@ -41,9 +47,29 @@ const Login = () => {
     [location.state]
   );
 
-    if (!isLoading && isAuthenticated) {
+  if (!isLoading && isAuthenticated) {
     return <Navigate to="/dashboard" replace />;
   }
+
+  const oauthStrategies = useMemo(() => {
+    if (!isLoaded || !signIn) return [] as OAuthStrategy[];
+    const supported = ((signIn as any).supportedFirstFactors || []) as Array<{
+      strategy?: string;
+    }>;
+    const values = supported
+      .map((f) => f?.strategy)
+      .filter((s): s is string => typeof s === "string" && s.startsWith("oauth_"));
+    return Array.from(new Set(values)) as OAuthStrategy[];
+  }, [isLoaded, signIn]);
+
+  const formatStrategyLabel = (strategy: OAuthStrategy) => {
+    const raw = strategy.replace(/^oauth_/, "");
+    return raw
+      .split("_")
+      .filter(Boolean)
+      .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+      .join(" ");
+  };
 
   const completeSignIn = async ({ createdSessionId }: { createdSessionId: string | null }) => {
     if (!createdSessionId) {
@@ -57,18 +83,31 @@ const Login = () => {
   const getClerkError = (err: any) => {
     const clerkCode = err?.errors?.[0]?.code as string | undefined;
     const clerkMsg = err?.errors?.[0]?.message as string | undefined;
-    return { clerkCode, clerkMsg };
+    const paramName = err?.errors?.[0]?.meta?.param_name as string | undefined;
+    return { clerkCode, clerkMsg, paramName };
   };
 
-  const handleOauth = async (strategy: "oauth_google" | "oauth_facebook") => {
+  const handleOauth = async (strategy: OAuthStrategy) => {
     if (!isLoaded || !signIn) return;
     setErrorMessage(null);
     setInfoMessage(null);
-    await signIn.authenticateWithRedirect({
-      strategy,
-      redirectUrl: "/login/sso-callback",
-      redirectUrlComplete: redirectTo,
-    });
+    try {
+      await signIn.authenticateWithRedirect({
+        strategy,
+        redirectUrl: "/login/sso-callback",
+        redirectUrlComplete: redirectTo,
+      });
+    } catch (err: any) {
+      const { clerkCode, clerkMsg, paramName } = getClerkError(err);
+      if (clerkCode === "form_param_value_invalid" && paramName === "strategy") {
+        const providerLabel = formatStrategyLabel(strategy);
+        setErrorMessage(
+          `${providerLabel} sign-in is not enabled for this Clerk environment. Enable it in Clerk Dashboard → User & Authentication → Social Connections (production instance), or update your VITE_CLERK_PUBLISHABLE_KEY to the correct pk_live key.`
+        );
+        return;
+      }
+      setErrorMessage(clerkMsg || "Unable to start OAuth sign-in. Please try again.");
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -341,26 +380,22 @@ const Login = () => {
       }
     >
       <div className="space-y-4">
-        <div className="grid gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            className="w-full"
-            onClick={() => handleOauth("oauth_google")}
-            disabled={!isLoaded || isSubmitting}
-          >
-            Continue with Google
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            className="w-full"
-            onClick={() => handleOauth("oauth_facebook")}
-            disabled={!isLoaded || isSubmitting}
-          >
-            Continue with Facebook
-          </Button>
-        </div>
+        {oauthStrategies.length ? (
+          <div className="grid gap-2">
+            {oauthStrategies.map((strategy) => (
+              <Button
+                key={strategy}
+                type="button"
+                variant="outline"
+                className="w-full"
+                onClick={() => handleOauth(strategy)}
+                disabled={!isLoaded || isSubmitting}
+              >
+                Continue with {formatStrategyLabel(strategy)}
+              </Button>
+            ))}
+          </div>
+        ) : null}
 
         <div className="flex items-center gap-3">
           <div className="h-px flex-1 bg-border" />

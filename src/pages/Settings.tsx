@@ -146,6 +146,12 @@ const Settings = () => {
     );
   };
 
+  const isOauthStrategyDisabledError = (err: any) => {
+    const code = err?.errors?.[0]?.code as string | undefined;
+    const paramName = err?.errors?.[0]?.meta?.param_name as string | undefined;
+    return code === "form_param_value_invalid" && paramName === "strategy";
+  };
+
   useEffect(() => {
     fetchUserProfile();
   }, []);
@@ -1001,6 +1007,15 @@ const Settings = () => {
                                           Re-authenticate
                                         </ToastAction>
                                       ),
+                                    });
+                                    return;
+                                  }
+                                  if (isOauthStrategyDisabledError(err)) {
+                                    toast({
+                                      title: "Provider not enabled",
+                                      description:
+                                        "Google/Facebook linking is disabled in this Clerk environment. Enable it in Clerk Dashboard → User & Authentication → Social Connections (production instance), or ensure your VITE_CLERK_PUBLISHABLE_KEY is the correct pk_live key.",
+                                      variant: "destructive",
                                     });
                                     return;
                                   }
