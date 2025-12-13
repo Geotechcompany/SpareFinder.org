@@ -174,8 +174,8 @@ class EmailService {
 
     // Prefer external email-service over HTTPS whenever configured (works on Render Starter/Free).
     // Supports either:
-    // - base URL (we'll try /send-email then /email/send)
-    // - full URL including path (/send-email or /email/send)
+    // - base URL (we'll try /email/send first, then /send-email for legacy services)
+    // - full URL including path (/email/send or /send-email)
     if (emailApiUrlRaw) {
       const url = emailApiUrlRaw.replace(/\/$/, "");
       const payload = {
@@ -186,9 +186,16 @@ class EmailService {
       };
 
       const candidateUrls =
-        url.endsWith("/send-email") || url.endsWith("/email/send")
+        url.endsWith("/email/send") || url.endsWith("/send-email")
           ? [url]
-          : [`${url}/send-email`, `${url}/email/send`];
+          : [
+              // aiagent path (FastAPI proxy)
+              `${url}/email/send`,
+              // legacy email-service path
+              `${url}/send-email`,
+            ];
+
+      let lastError: unknown = null;
 
       for (const candidateUrl of candidateUrls) {
         try {
@@ -198,22 +205,25 @@ class EmailService {
           );
           return true;
         } catch (err: any) {
+          lastError = err;
           const status = err?.response?.status;
           // If the endpoint isn't found, try the next candidate path.
           if (status === 404 || status === 405) continue;
+
           console.error(
             `Failed to send email via external email service (${candidateUrl}):`,
             err
           );
           // Do NOT fall back to SMTP when an external service is configured.
-          // This prevents Render SMTP timeouts and ensures the backend uses external only.
           return false;
         }
       }
 
       console.error(
         "External email service configured, but no valid endpoint found. Tried:",
-        candidateUrls
+        candidateUrls,
+        "Last error:",
+        lastError
       );
       return false;
     }
