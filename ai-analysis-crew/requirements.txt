@@ -1,16 +1,15 @@
-fastapi==0.104.1
-uvicorn[standard]==0.24.0
+fastapi==0.115.0
+uvicorn[standard]==0.30.3
 python-multipart==0.0.6
 
-# Pin websockets to 11.x because websockets 12 removed the `websockets.asyncio`
-# module that `supabase-py` still imports, which causes:
-#   ImportError: No module named 'websockets.asyncio'
-websockets==11.0.3
+# websockets is pulled by realtime/uvicorn and (via stagehand) google-genai.
+# Keep it compatible with google-genai (<15.1,>=13) and realtime (<16,>=11).
+websockets==14.2
 
 setuptools>=65.5.0
 crewai==0.80.0
 crewai-tools==0.14.0
-langchain-openai==0.2.0
+langchain-openai==0.2.14
 # Pin OpenAI client to avoid resolver backtracking during Docker builds on Render
 # NOTE: stagehand requires openai>=1.99.6
 openai==1.99.6
@@ -21,11 +20,16 @@ tiktoken>=0.7.0
 requests>=2.31.0
 
 # Storage and database integration
-supabase==2.3.0
-postgrest>=0.13.0
+# NOTE: Older supabase versions pin httpx<0.25 which conflicts with modern AI libs (anthropic/stagehand).
+supabase==2.25.1
+postgrest==2.25.1
+
+# Shared HTTP client version to keep resolver deterministic (must satisfy supabase/openai/anthropic/stagehand)
+httpx==0.28.1
 
 # CrewAI transitive deps (pin to keep Render builds deterministic / fast)
 litellm==1.74.15
 stagehand==0.5.6
 anthropic==0.52.1
+google-genai==1.55.0
 
