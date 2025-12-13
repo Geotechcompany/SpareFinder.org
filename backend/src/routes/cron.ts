@@ -107,6 +107,7 @@ router.get("/reminders", async (req: Request, res: Response) => {
       (async () => {
         let sent = 0;
         let failed = 0;
+        const copy = await emailService.getAiReminderCopy("onboarding");
 
         for (const profile of profiles) {
           const email = profile.email as string | null;
@@ -118,6 +119,7 @@ router.get("/reminders", async (req: Request, res: Response) => {
               userName:
                 (profile.full_name as string | null) ||
                 (email.split("@")[0] ?? "there"),
+              copy: copy || undefined,
             });
             if (ok) sent += 1;
             else failed += 1;
@@ -208,6 +210,7 @@ Run at: ${now.toISOString()}`,
       (async () => {
         let sent = 0;
         let failed = 0;
+        const copy = await emailService.getAiReminderCopy("reengagement");
 
         // Fetch in pages to avoid pulling too many rows at once
         const pageSize = 200;
@@ -238,6 +241,7 @@ Run at: ${now.toISOString()}`,
                 userName:
                   (profile.full_name as string | null) ||
                   (email.split("@")[0] ?? "there"),
+                copy: copy || undefined,
               });
               if (ok) sent += 1;
               else failed += 1;
@@ -328,6 +332,7 @@ Run at: ${now.toISOString()}`,
     (async () => {
       let sent = 0;
       let failed = 0;
+      const copy = await emailService.getAiReminderCopy("reengagement");
 
       for (const profile of profiles) {
         const email = profile.email as string | null;
@@ -339,6 +344,7 @@ Run at: ${now.toISOString()}`,
             userName:
               (profile.full_name as string | null) ||
               (email.split("@")[0] ?? "there"),
+            copy: copy || undefined,
           });
           if (ok) sent += 1;
           else failed += 1;

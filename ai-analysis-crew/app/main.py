@@ -22,12 +22,14 @@ from fastapi import FastAPI, File, Form, UploadFile, WebSocket, WebSocketDisconn
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from datetime import datetime
+import json
 import uvicorn
 from .crew_setup import setup_crew, set_progress_emitter, emit_progress, generate_report_tool_func, send_email_tool_func
 from .email_sender import send_email_via_email_service, send_basic_email_smtp
 from .utils import ensure_temp_dir
 from .vision_analyzer import get_image_description
 from .database_storage import store_crew_analysis_to_database, update_crew_job_status, complete_crew_job
+from openai import OpenAI
 
 app = FastAPI(
     title="AI Spare Part Analyzer API",
@@ -125,6 +127,117 @@ class EmailProxyRequest(BaseModel):
     subject: str
     html: str
     text: str | None = None
+
+
+class EmailCopyRequest(BaseModel):
+    kind: str  # "onboarding" | "reengagement"
+    brand: str | None = "SpareFinder"
+    audience: str | None = "industrial maintenance & spares teams"
+    language: str | None = "en"
+
+
+class EmailCopyResponse(BaseModel):
+    subject: str
+    headline: str
+    subhead: str
+    bullets: list[str]
+    ctaLabel: str
+
+
+@app.post("/email/copy")
+async def email_copy(payload: EmailCopyRequest):
+    """
+    Generate catchy, high-converting reminder email copy.
+    Returns a small JSON payload for the backend to inject into HTML templates.
+    """
+    kind = (payload.kind or "").strip().lower()
+    if kind not in ("onboarding", "reengagement"):
+        raise HTTPException(status_code=400, detail="kind must be 'onboarding' or 'reengagement'")
+
+    api_key = (os.getenv("OPENAI_API_KEY") or "").strip()
+    if not api_key:
+        raise HTTPException(status_code=501, detail="OPENAI_API_KEY not configured")
+
+    brand = payload.brand or "SpareFinder"
+    audience = payload.audience or "industrial maintenance & spares teams"
+    language = payload.language or "en"
+
+    now = datetime.utcnow().isoformat()
+
+    system = (
+        f"You are a senior lifecycle marketer for {brand}. "
+        f"Write concise, high-converting email copy for {audience}. "
+        "Avoid spammy words (FREE!!!, guarantee, act now). "
+        "Keep it friendly, confident, and practical. "
+        "Return ONLY valid JSON matching the schema."
+    )
+
+    user = {
+        "task": "Generate reminder email copy",
+        "kind": kind,
+        "constraints": {
+            "subject_max_chars": 60,
+            "headline_max_chars": 70,
+            "subhead_max_chars": 140,
+            "bullets_count": 3,
+            "bullet_max_chars_each": 90,
+            "cta_max_chars": 28,
+            "language": language,
+        },
+        "notes": [
+            "Use {{userName}} placeholder in headline if it fits naturally; otherwise don't.",
+            "Make it feel fresh/unique each run.",
+            f"Timestamp seed: {now}",
+        ],
+        "schema": {
+            "subject": "string",
+            "headline": "string",
+            "subhead": "string",
+            "bullets": ["string", "string", "string"],
+            "ctaLabel": "string",
+        },
+    }
+
+    try:
+        client = OpenAI(api_key=api_key)
+        resp = client.chat.completions.create(
+            model=os.getenv("EMAIL_COPY_MODEL", "gpt-4o-mini"),
+            temperature=0.9,
+            max_tokens=300,
+            messages=[
+                {"role": "system", "content": system},
+                {"role": "user", "content": json.dumps(user)},
+            ],
+            response_format={"type": "json_object"},
+        )
+        content = resp.choices[0].message.content or "{}"
+        data = json.loads(content)
+
+        # Validate/normalize
+        parsed = EmailCopyResponse(
+            subject=str(data.get("subject", "")).strip(),
+            headline=str(data.get("headline", "")).strip(),
+            subhead=str(data.get("subhead", "")).strip(),
+            bullets=[str(x).strip() for x in (data.get("bullets") or [])][:3],
+            ctaLabel=str(data.get("ctaLabel", "")).strip(),
+        )
+        if len(parsed.bullets) < 3:
+            parsed.bullets = (parsed.bullets + [""] * 3)[:3]
+
+        # Basic fallbacks
+        if not parsed.subject:
+            parsed.subject = "Quick check-in from SpareFinder"
+        if not parsed.headline:
+            parsed.headline = "{{userName}}, ready for your next part?"
+        if not parsed.subhead:
+            parsed.subhead = "Upload a photo and get a confident match in seconds."
+        if not parsed.ctaLabel:
+            parsed.ctaLabel = "Upload a part photo"
+
+        return parsed.model_dump()
+    except Exception as e:
+        logger.error(f"❌ Failed to generate email copy: {e}")
+        raise HTTPException(status_code=502, detail="Failed to generate email copy")
 
 
 @app.post("/email/send")

@@ -35,6 +35,14 @@ interface WelcomeEmailData {
   userName: string;
 }
 
+type ReminderCopy = {
+  subject?: string;
+  headline?: string;
+  subhead?: string;
+  bullets?: string[];
+  ctaLabel?: string;
+};
+
 interface AnalysisStartedEmailData {
   userEmail: string;
   userName: string;
@@ -97,6 +105,55 @@ class EmailService {
       process.env.EMAIL_API_URL ||
       ""
     ).trim();
+  }
+
+  private getEmailCopyServiceBaseUrl(): string {
+    const raw =
+      (
+        process.env.EMAIL_COPY_API_URL ||
+        process.env.AI_COPY_API_URL ||
+        process.env.EMAIL_API_URL ||
+        process.env.EMAIL_SERVICE_URL ||
+        ""
+      ).trim();
+    if (!raw) return "";
+    const url = raw.replace(/\/$/, "");
+    // If a full endpoint URL is provided, normalize to base.
+    return url.endsWith("/email/send") || url.endsWith("/send-email")
+      ? url.replace(/\/email\/send$|\/send-email$/, "")
+      : url;
+  }
+
+  async getAiReminderCopy(kind: "onboarding" | "reengagement"): Promise<ReminderCopy | null> {
+    const baseUrl = this.getEmailCopyServiceBaseUrl();
+    if (!baseUrl) return null;
+
+    try {
+      const res = await axios.post(
+        `${baseUrl}/email/copy`,
+        {
+          kind,
+          brand: "SpareFinder",
+          audience: "industrial maintenance & spares teams",
+          language: "en",
+        },
+        { timeout: 15000 }
+      );
+
+      const data = res?.data || {};
+      return {
+        subject: typeof data.subject === "string" ? data.subject : undefined,
+        headline: typeof data.headline === "string" ? data.headline : undefined,
+        subhead: typeof data.subhead === "string" ? data.subhead : undefined,
+        bullets: Array.isArray(data.bullets)
+          ? data.bullets.map((x: any) => String(x)).filter(Boolean)
+          : undefined,
+        ctaLabel: typeof data.ctaLabel === "string" ? data.ctaLabel : undefined,
+      };
+    } catch (e) {
+      console.warn("AI reminder copy generation failed; falling back to static copy:", e);
+      return null;
+    }
   }
 
   private isSmtpConfigured(): boolean {
@@ -552,13 +609,14 @@ class EmailService {
    * Gentle nudge a few days after signup to encourage first use
    */
   async sendOnboardingNudgeEmail(
-    data: WelcomeEmailData
+    data: WelcomeEmailData & { copy?: ReminderCopy }
   ): Promise<boolean> {
     try {
       const emailEnabled = await this.isEmailEnabled();
       if (!emailEnabled) return false;
 
-      const subject = "You still have SpareFinder credits waiting for you";
+      const subject =
+        data.copy?.subject || "You still have SpareFinder credits waiting for you";
       const frontendUrl =
         process.env.FRONTEND_URL || "https://sparefinder.org";
       const baseUrl = frontendUrl.replace(/\/$/, "");
@@ -566,6 +624,22 @@ class EmailService {
       const dashboardUrl = `${baseUrl}/dashboard`;
       const uploadUrl = `${baseUrl}/dashboard/upload`;
       const docsUrl = `${baseUrl}/help`;
+
+      const headline =
+        data.copy?.headline ||
+        `Hey ${data.userName || "there"}, your first search is one click away ⚡`;
+      const subhead =
+        data.copy?.subhead ||
+        "SpareFinder is ready whenever you are – upload a part photo and we’ll handle the rest.";
+      const bullets =
+        (data.copy?.bullets && data.copy.bullets.length > 0
+          ? data.copy.bullets
+          : [
+              "<strong>Snap or upload</strong> a clear photo of any spare part.",
+              "<strong>See the match instantly</strong> with confidence scores and key specs.",
+              "<strong>Compare alternatives</strong> and save results to your history.",
+            ]) ?? [];
+      const ctaLabel = data.copy?.ctaLabel || "Run a quick test search";
 
       const html = `
 <!doctype html>
@@ -596,10 +670,10 @@ class EmailService {
             <tr>
               <td style="padding:22px 28px 18px 28px;background:linear-gradient(135deg,#16a34a,#22c55e);color:#f9fafb;">
                 <h1 style="margin:0;font-size:22px;line-height:1.3;">
-                  Hey ${data.userName || "there"}, your first search is one click away ⚡
+                  ${headline}
                 </h1>
                 <p style="margin:6px 0 0 0;font-size:13px;opacity:.95;">
-                  SpareFinder is ready whenever you are – upload a part photo and we’ll handle the rest.
+                  ${subhead}
                 </p>
               </td>
             </tr>
@@ -610,14 +684,15 @@ class EmailService {
                   Here’s a quick reminder of what you can do in under a minute:
                 </p>
                 <ul style="margin:0;padding-left:18px;font-size:13px;color:#9ca3af;line-height:1.7;">
-                  <li><strong>Snap or upload</strong> a clear photo of any spare part.</li>
-                  <li><strong>See the match instantly</strong> with confidence scores and key specs.</li>
-                  <li><strong>Compare alternatives</strong> and save results to your history.</li>
+                  ${bullets
+                    .slice(0, 3)
+                    .map((b) => `<li>${b}</li>`)
+                    .join("")}
                 </ul>
 
                 <div style="margin:20px 0 8px 0;">
                   <a href="${uploadUrl}" style="display:inline-block;background:linear-gradient(135deg,#22c55e,#15803d);color:#f9fafb;text-decoration:none;padding:11px 22px;border-radius:999px;font-weight:600;font-size:14px;box-shadow:0 12px 30px rgba(34,197,94,.55);">
-                    Run a quick test search
+                    ${ctaLabel}
                   </a>
                 </div>
 
@@ -697,13 +772,14 @@ class EmailService {
    * Re‑engagement email for inactive users who used the app before
    */
   async sendReengagementEmail(
-    data: WelcomeEmailData
+    data: WelcomeEmailData & { copy?: ReminderCopy }
   ): Promise<boolean> {
     try {
       const emailEnabled = await this.isEmailEnabled();
       if (!emailEnabled) return false;
 
-      const subject = "See what SpareFinder can do for your next job";
+      const subject =
+        data.copy?.subject || "See what SpareFinder can do for your next job";
       const frontendUrl =
         process.env.FRONTEND_URL || "https://sparefinder.org";
       const baseUrl = frontendUrl.replace(/\/$/, "");
@@ -716,6 +792,22 @@ class EmailService {
       const heroImageUrl =
         "https://images.unsplash.com/photo-1581092580497-e0d23cbdf1dc?auto=format&fit=crop&w=1200&q=80";
       const year = new Date().getFullYear();
+
+      const headline =
+        data.copy?.headline ||
+        `${data.userName || "There"}, spare parts shouldn’t slow your team down`;
+      const subhead =
+        data.copy?.subhead ||
+        "Upload a photo (or add keywords), get a confident match, and share a clean result with your team—without digging through old catalogues.";
+      const bullets =
+        (data.copy?.bullets && data.copy.bullets.length > 0
+          ? data.copy.bullets
+          : [
+              "Field engineers needing fast identification from site.",
+              "Stores teams dealing with unlabelled or legacy stock.",
+              "Maintenance teams logging parts for repeat orders.",
+            ]) ?? [];
+      const ctaLabel = data.copy?.ctaLabel || "Upload a part photo";
 
       const html = `
 <!doctype html>
@@ -778,10 +870,10 @@ class EmailService {
                     Back in seconds · Photo to part ID
                   </div>
                   <h1 class="text" style="margin:10px 0 0 0;font-size:24px;line-height:1.25;">
-                    ${data.userName || "There"}, spare parts shouldn’t slow your team down
+                    ${headline}
                   </h1>
                   <p class="muted" style="margin:8px 0 0 0;font-size:14px;line-height:1.6;">
-                    Upload a photo (or add keywords), get a confident match, and share a clean result with your team—without digging through old catalogues.
+                    ${subhead}
                   </p>
                 </div>
               </td>
@@ -791,16 +883,17 @@ class EmailService {
               <td style="padding:10px 28px 10px 28px;">
                 <h2 class="text" style="margin:0 0 10px 0;font-size:16px;">Perfect for those “what part is this?” moments</h2>
                 <ul class="muted" style="margin:0 0 10px 0;padding-left:18px;font-size:13px;line-height:1.75;">
-                  <li>Field engineers needing fast identification from site.</li>
-                  <li>Stores teams dealing with unlabelled or legacy stock.</li>
-                  <li>Maintenance teams logging parts for repeat orders.</li>
+                  ${bullets
+                    .slice(0, 3)
+                    .map((b) => `<li>${b}</li>`)
+                    .join("")}
                 </ul>
 
                 <table role="presentation" cellspacing="0" cellpadding="0" style="margin:16px 0 6px 0;">
                   <tr>
                     <td style="padding-right:10px;">
                       <a class="cta" href="${uploadUrl}" style="display:inline-block;text-decoration:none;padding:12px 20px;border-radius:999px;font-weight:700;font-size:14px;box-shadow:0 10px 26px rgba(37,99,235,.25);">
-                        Upload a part photo
+                        ${ctaLabel}
                       </a>
                     </td>
                     <td>
