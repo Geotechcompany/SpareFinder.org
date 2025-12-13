@@ -84,11 +84,41 @@ class EmailService {
   private senderEmail: string = "";
 
   constructor() {
-    this.initializeTransporter();
+    // IMPORTANT:
+    // On Render, direct SMTP often times out / is blocked.
+    // If an external email service is configured (EMAIL_API_URL/EMAIL_SERVICE_URL),
+    // we should not attempt SMTP initialization during startup.
+    // SMTP will be initialized lazily only when no external service is configured.
+  }
+
+  private getExternalEmailServiceUrl(): string {
+    return (
+      process.env.EMAIL_SERVICE_URL ||
+      process.env.EMAIL_API_URL ||
+      ""
+    ).trim();
+  }
+
+  private isSmtpConfigured(): boolean {
+    const user = (process.env.SMTP_USER || "").trim();
+    const pass = (
+      process.env.SMTP_PASSWORD ||
+      process.env.SMTP_PASS ||
+      ""
+    ).trim();
+    return Boolean(user && pass);
   }
 
   private async initializeTransporter() {
     try {
+      // If an external email service is configured, do NOT initialize SMTP.
+      // This avoids Render SMTP timeouts (ETIMEDOUT) entirely.
+      if (this.getExternalEmailServiceUrl()) {
+        this.isConfigured = false;
+        this.transporter = null;
+        return;
+      }
+
       // Private SMTP configuration for SpareFinder emails.
       // Uses environment variables if present, otherwise falls back to hardcoded defaults.
       const host = process.env.SMTP_HOST || "smtp.gmail.com";
@@ -140,34 +170,60 @@ class EmailService {
   }
 
   async sendEmail(options: EmailOptions): Promise<boolean> {
-    const emailApiUrl =
-      (process.env.EMAIL_SERVICE_URL || process.env.EMAIL_API_URL || "").trim();
+    const emailApiUrlRaw = this.getExternalEmailServiceUrl();
 
     // Prefer external email-service over HTTPS whenever configured (works on Render Starter/Free).
-    if (emailApiUrl) {
-      try {
-        await axios.post(
-          `${emailApiUrl}/send-email`,
-          {
-            to: options.to,
-            subject: options.subject,
-            html: options.html,
-            text: options.text ?? "",
-          },
-          {
-            timeout: 15000,
-          }
-        );
-        console.log(`📧 Email sent via external email service to ${options.to}: ${options.subject}`);
-        return true;
-      } catch (err) {
-        console.error("Failed to send email via external email service:", err);
-        // fall through to SMTP attempt (useful for local dev)
+    // Supports either:
+    // - base URL (we'll try /send-email then /email/send)
+    // - full URL including path (/send-email or /email/send)
+    if (emailApiUrlRaw) {
+      const url = emailApiUrlRaw.replace(/\/$/, "");
+      const payload = {
+        to: options.to,
+        subject: options.subject,
+        html: options.html,
+        text: options.text ?? "",
+      };
+
+      const candidateUrls =
+        url.endsWith("/send-email") || url.endsWith("/email/send")
+          ? [url]
+          : [`${url}/send-email`, `${url}/email/send`];
+
+      for (const candidateUrl of candidateUrls) {
+        try {
+          await axios.post(candidateUrl, payload, { timeout: 15000 });
+          console.log(
+            `📧 Email sent via external email service to ${options.to}: ${options.subject} (${candidateUrl})`
+          );
+          return true;
+        } catch (err: any) {
+          const status = err?.response?.status;
+          // If the endpoint isn't found, try the next candidate path.
+          if (status === 404 || status === 405) continue;
+          console.error(
+            `Failed to send email via external email service (${candidateUrl}):`,
+            err
+          );
+          // Do NOT fall back to SMTP when an external service is configured.
+          // This prevents Render SMTP timeouts and ensures the backend uses external only.
+          return false;
+        }
       }
+
+      console.error(
+        "External email service configured, but no valid endpoint found. Tried:",
+        candidateUrls
+      );
+      return false;
     }
 
     // Fallback: direct SMTP (works for local dev or when running on a platform that allows SMTP)
     try {
+      if (!this.isSmtpConfigured()) {
+        console.log("Email service not configured, skipping email send");
+        return false;
+      }
       if (!this.transporter || !this.isConfigured) {
         await this.initializeTransporter();
       }
