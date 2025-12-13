@@ -35,7 +35,7 @@ def send_email_via_smtp(
 
     if not user or not password:
         logger.warning("SMTP_USER/SMTP_PASSWORD not set - skipping email send")
-        return false
+        return False
 
     msg = MIMEMultipart("alternative")
     msg["Subject"] = subject
@@ -80,4 +80,5 @@ async def send_email(payload: EmailRequest):
         raise HTTPException(status_code=500, detail="Failed to send email")
 
     return {"success": True}
+
 
