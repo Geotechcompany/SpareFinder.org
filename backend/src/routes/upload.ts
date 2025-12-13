@@ -456,6 +456,92 @@ setInterval(async () => {
   }
 }, 3 * 60 * 1000); // Run every 3 minutes
 
+// Long-running job notifier: send "Analysis Processing" email once for jobs that are still running.
+// This ensures users get an update while deep research is ongoing.
+setInterval(async () => {
+  try {
+    const thresholdMinutes = Math.max(
+      1,
+      Number(process.env.ANALYSIS_PROCESSING_EMAIL_MINUTES) || 10
+    );
+    const cutoffIso = new Date(
+      Date.now() - thresholdMinutes * 60 * 1000
+    ).toISOString();
+
+    const { data: jobs, error } = await supabase
+      .from("crew_analysis_jobs")
+      .select("id, user_id, user_email, created_at, status, progress")
+      .eq("status", "processing")
+      .lt("created_at", cutoffIso)
+      .limit(25);
+
+    if (error) {
+      console.error("❌ Error fetching long-running crew jobs:", error);
+      return;
+    }
+    if (!jobs || jobs.length === 0) return;
+
+    for (const job of jobs) {
+      try {
+        const userId = job.user_id as string | null;
+        if (!userId) continue;
+
+        // Avoid duplicates: skip if we already created an analysis_processing notification for this job
+        const { data: existing } = await supabase
+          .from("notifications")
+          .select("id")
+          .eq("user_id", userId)
+          .contains("metadata", {
+            type: "analysis_processing",
+            analysis_id: job.id,
+          })
+          .limit(1);
+
+        if (existing && existing.length > 0) continue;
+
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("email, full_name")
+          .eq("id", userId)
+          .single();
+
+        const email =
+          (profile?.email as string | null) ||
+          (job.user_email as string | null) ||
+          "";
+        if (!email) continue;
+
+        const userName =
+          (profile?.full_name as string | null) ||
+          (email.split("@")[0] ?? "User");
+
+        const createdAtMs = job.created_at
+          ? new Date(job.created_at as string).getTime()
+          : Date.now();
+        const processingTimeMinutes = Math.max(
+          1,
+          Math.round((Date.now() - createdAtMs) / 60000)
+        );
+
+        emailService
+          .sendAnalysisProcessingEmail({
+            userEmail: email,
+            userName,
+            analysisId: String(job.id),
+            processingTimeMinutes,
+          })
+          .catch((e) =>
+            console.error("Failed to send analysis processing email:", e)
+          );
+      } catch (e) {
+        console.error("Error processing long-running job email:", e);
+      }
+    }
+  } catch (e) {
+    console.error("❌ Long-running job email notifier failed:", e);
+  }
+}, 10 * 60 * 1000); // Run every 10 minutes
+
 // Configure multer for file uploads
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -2153,14 +2239,17 @@ router.post(
 
       console.log("✅ Image uploaded to:", publicUrl);
 
-      // Get user email
+      // Get user email + name (for notifications)
       const { data: userProfile } = await supabase
         .from("profiles")
-        .select("email")
+        .select("email, full_name")
         .eq("id", userId)
         .single();
 
       const userEmail = userProfile?.email || "";
+      const userName =
+        (userProfile?.full_name as string | null) ||
+        (userEmail.split("@")[0] ?? "User");
 
       // Create Deep Research job in database
       const jobId = uuidv4();
@@ -2256,6 +2345,30 @@ router.post(
 
             console.log("✅ Deep Research job created:", jobId);
 
+            // Fire-and-forget: send "Analysis Started" email for Deep Research
+            try {
+              const currentDate = new Date().toLocaleDateString();
+              const currentTime = new Date().toLocaleTimeString();
+              const dashboardUrl = `${
+                process.env.FRONTEND_URL || "https://sparefinder.org"
+              }/dashboard`;
+
+              if (userEmail) {
+                emailService
+                  .sendTemplateEmail({
+                    templateName: "Analysis Started",
+                    userEmail,
+                    variables: {
+                      userName,
+                      dashboardUrl,
+                      currentDate,
+                      currentTime,
+                    },
+                  })
+                  .catch(() => {});
+              }
+            } catch {}
+
             // Trigger the SpareFinder AI Research in the background
             console.log("🚀 Triggering SpareFinder AI Research");
 
@@ -2307,6 +2420,30 @@ router.post(
       }
 
       console.log("✅ Deep Research job created:", jobId);
+
+      // Fire-and-forget: send "Analysis Started" email for Deep Research
+      try {
+        const currentDate = new Date().toLocaleDateString();
+        const currentTime = new Date().toLocaleTimeString();
+        const dashboardUrl = `${
+          process.env.FRONTEND_URL || "https://sparefinder.org"
+        }/dashboard`;
+
+        if (userEmail) {
+          emailService
+            .sendTemplateEmail({
+              templateName: "Analysis Started",
+              userEmail,
+              variables: {
+                userName,
+                dashboardUrl,
+                currentDate,
+                currentTime,
+              },
+            })
+            .catch(() => {});
+        }
+      } catch {}
 
       // Trigger the SpareFinder AI Research in the background
       // Don't await this - let it run asynchronously
