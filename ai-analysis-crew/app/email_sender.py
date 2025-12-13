@@ -14,6 +14,34 @@ import httpx
 
 logger = logging.getLogger(__name__)
 
+def _get_smtp_host_port() -> tuple[str, int] | None:
+    """
+    Read SMTP host/port from env, but treat empty values as "not set".
+
+    Fixes common Render misconfig where SMTP_HOST is present but empty, which can
+    break TLS with: "server_hostname cannot be an empty string or start with a leading dot."
+    """
+    raw_host = os.getenv("SMTP_HOST")
+    host = (raw_host or "").strip()
+    if not host:
+        host = "smtp.gmail.com"
+
+    if host.startswith("."):
+        logger.error(
+            f"❌ Invalid SMTP_HOST value: {host!r}. It cannot start with a leading dot."
+        )
+        return None
+
+    raw_port = os.getenv("SMTP_PORT")
+    try:
+        port = int((raw_port or "").strip() or "587")
+    except ValueError:
+        logger.warning(f"⚠️ Invalid SMTP_PORT value: {raw_port!r}. Falling back to 587.")
+        port = 587
+
+    return host, port
+
+
 def send_basic_email_smtp(
     *,
     to_email: str,
@@ -36,8 +64,10 @@ def send_basic_email_smtp(
         )
         return False
 
-    smtp_host = os.getenv("SMTP_HOST", "smtp.gmail.com")
-    smtp_port = int(os.getenv("SMTP_PORT", "587"))
+    smtp_config = _get_smtp_host_port()
+    if not smtp_config:
+        return False
+    smtp_host, smtp_port = smtp_config
 
     # Build message (multipart alternative: text + html)
     msg = MIMEMultipart("alternative")
@@ -154,8 +184,10 @@ def send_email_with_attachment(
         logger.error(f"❌ Attachment file not found: {attachment_path}")
         return False
     
-    smtp_host = os.getenv("SMTP_HOST", "smtp.gmail.com")
-    smtp_port = int(os.getenv("SMTP_PORT", "587"))
+    smtp_config = _get_smtp_host_port()
+    if not smtp_config:
+        return False
+    smtp_host, smtp_port = smtp_config
     
     try:
         # Test network connectivity first
