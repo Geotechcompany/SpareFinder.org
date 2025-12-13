@@ -6,7 +6,7 @@ from typing import Callable, Optional, Tuple
 from crewai import Agent, Task, Crew
 from langchain_openai import ChatOpenAI
 from .report_generator import generate_report
-from .email_sender import send_email_with_attachment
+from .email_sender import send_email_with_attachment, send_email_via_email_service
 
 
 # Global progress emitter function
@@ -130,11 +130,15 @@ def generate_report_tool_func(comprehensive_report_text: str) -> str:
     return filepath
 
 
-def send_email_tool_func(to_email: str, pdf_path: str) -> str:
-    """Send an email with PDF attachment via Gmail SMTP."""
+def send_email_tool_func(to_email: str, pdf_path: str, pdf_url: str | None = None) -> str:
+    """
+    Send an email with the report.
+    Prefer the external email-service (EMAIL_SERVICE_URL) with a PDF link when available;
+    fall back to SMTP attachment otherwise.
+    """
     emit_progress("email_agent", f"Sending email to {to_email}...", "in_progress")
     subject = "Comprehensive Part Analysis Report"
-    body = """Dear Customer,
+    body_text = """Dear Customer,
 
 Please find attached your comprehensive manufacturer part analysis report.
 
@@ -167,7 +171,31 @@ This report has been professionally formatted and structured for your convenienc
 Best regards,
 AI Spare Part Analyzer Team
 """
-    success = send_email_with_attachment(to_email, subject, body, pdf_path)
+    # Preferred path: send a link via the external email-service
+    if pdf_url:
+        html = f"""
+        <div style="font-family:Arial,Helvetica,sans-serif;line-height:1.5">
+          <p>Dear Customer,</p>
+          <p>Your comprehensive part analysis report is ready.</p>
+          <p>
+            <a href="{pdf_url}" target="_blank" rel="noreferrer">Download your PDF report</a>
+          </p>
+          <p style="white-space:pre-line">{body_text}</p>
+        </div>
+        """.strip()
+
+        success = send_email_via_email_service(
+            to_email=to_email,
+            subject=subject,
+            html=html,
+            text=body_text + (f"\n\nReport link: {pdf_url}" if pdf_url else ""),
+        )
+        if success:
+            emit_progress("email_agent", f"Email sent successfully to {to_email}", "completed")
+            return f"Email sent successfully to {to_email}"
+
+    # Fallback: try SMTP attachment (may be blocked on some Render plans)
+    success = send_email_with_attachment(to_email, subject, body_text, pdf_path)
     if success:
         emit_progress("email_agent", f"Email sent successfully to {to_email}", "completed")
         return f"Email sent successfully to {to_email}"

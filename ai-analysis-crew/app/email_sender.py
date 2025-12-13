@@ -4,13 +4,46 @@ import os
 import smtplib
 import logging
 import socket
+from typing import Optional
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.mime.base import MIMEBase
 from email import encoders
 from pathlib import Path
+import httpx
 
 logger = logging.getLogger(__name__)
+
+
+def send_email_via_email_service(
+    *,
+    to_email: str,
+    subject: str,
+    html: str,
+    text: Optional[str] = None,
+) -> bool:
+    """
+    Send an email via the separate email-service HTTP API.
+    Expects EMAIL_SERVICE_URL to be set (e.g. https://sparefinder-org-1.onrender.com).
+    """
+    base_url = (os.getenv("EMAIL_SERVICE_URL") or "").strip().rstrip("/")
+    if not base_url:
+        return False
+
+    url = f"{base_url}/send-email"
+    payload = {"to": to_email, "subject": subject, "html": html, "text": text}
+
+    try:
+        with httpx.Client(timeout=30) as client:
+            res = client.post(url, json=payload)
+        if 200 <= res.status_code < 300:
+            logger.info(f"✅ Email-service sent email to {to_email}")
+            return True
+        logger.error(f"❌ Email-service failed ({res.status_code}): {res.text}")
+        return False
+    except Exception as e:
+        logger.error(f"❌ Email-service request failed: {e}")
+        return False
 
 
 def send_email_with_attachment(

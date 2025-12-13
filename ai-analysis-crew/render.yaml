@@ -22,6 +22,8 @@ services:
         value: false
       - key: SMTP_AUTH_METHOD
         value: PLAIN
+      - key: EMAIL_SERVICE_URL
+        sync: false
       - key: PORT
         value: 8000
       - key: OTEL_SDK_DISABLED

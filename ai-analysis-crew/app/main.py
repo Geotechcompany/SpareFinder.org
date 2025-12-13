@@ -17,12 +17,14 @@ os.environ['OTEL_SDK_DISABLED'] = 'true'
 # Setup logger
 logger = logging.getLogger(__name__)
 
-from fastapi import FastAPI, File, Form, UploadFile, WebSocket, WebSocketDisconnect, Request
+from pydantic import BaseModel
+from fastapi import FastAPI, File, Form, UploadFile, WebSocket, WebSocketDisconnect, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from datetime import datetime
 import uvicorn
 from .crew_setup import setup_crew, set_progress_emitter, emit_progress, generate_report_tool_func, send_email_tool_func
+from .email_sender import send_email_via_email_service
 from .utils import ensure_temp_dir
 from .vision_analyzer import get_image_description
 from .database_storage import store_crew_analysis_to_database, update_crew_job_status, complete_crew_job
@@ -116,6 +118,30 @@ async def health():
         "service": "AI Spare Part Analyzer API",
         "timestamp": datetime.now().isoformat()
     }
+
+
+class EmailProxyRequest(BaseModel):
+    to: str
+    subject: str
+    html: str
+    text: str | None = None
+
+
+@app.post("/email/send")
+async def email_send(payload: EmailProxyRequest):
+    """
+    Proxy endpoint to send emails through the separate email-service.
+    Configure EMAIL_SERVICE_URL on this service (Render env var).
+    """
+    ok = send_email_via_email_service(
+        to_email=payload.to,
+        subject=payload.subject,
+        html=payload.html,
+        text=payload.text,
+    )
+    if not ok:
+        raise HTTPException(status_code=502, detail="Email-service failed to send email")
+    return {"success": True}
 
 
 async def run_analysis_background(
@@ -232,7 +258,7 @@ async def run_analysis_background(
         # Send email (non-blocking - don't fail analysis if email fails)
         logger.info(f"📧 Attempting to send email to {user_email}")
         try:
-            email_result = send_email_tool_func(user_email, pdf_path)
+            email_result = send_email_tool_func(user_email, pdf_path, pdf_public_url)
             if "successfully" in email_result.lower():
                 logger.info(f"✅ Email sent successfully to {user_email}")
             else:
@@ -457,7 +483,7 @@ async def websocket_progress(websocket: WebSocket):
         
         # Send email (non-blocking - don't fail analysis if email fails)
         try:
-            email_result = send_email_tool_func(user_email, pdf_path)
+            email_result = send_email_tool_func(user_email, pdf_path, pdf_public_url)
             if "successfully" in email_result.lower():
                 emit_progress("completion", "✅ Analysis complete! Report sent to your email.", "completed")
             else:
