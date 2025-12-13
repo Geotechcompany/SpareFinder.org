@@ -9,9 +9,10 @@ websockets==11.0.3
 
 setuptools>=65.5.0
 crewai==0.80.0
+crewai-tools==0.14.0
 langchain-openai==0.2.0
-# Ensure OpenAI satisfies langchain-openai's minimum version requirement
-openai>=1.23.0
+# Pin OpenAI client to avoid resolver backtracking during Docker builds on Render
+openai==1.99.5
 reportlab==4.0.7
 pillow==10.1.0
 python-dotenv==1.0.0
@@ -21,4 +22,9 @@ requests>=2.31.0
 # Storage and database integration
 supabase==2.3.0
 postgrest>=0.13.0
+
+# CrewAI transitive deps (pin to keep Render builds deterministic / fast)
+litellm==1.74.15
+stagehand==0.5.6
+anthropic==0.52.1
 

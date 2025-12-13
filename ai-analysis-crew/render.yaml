@@ -27,6 +27,6 @@ services:
       - key: OTEL_SDK_DISABLED
         value: true
       - key: PYTHON_VERSION
-        value: 3.12.0
+        value: 3.11.0
     healthCheckPath: /health
     autoDeploy: true
