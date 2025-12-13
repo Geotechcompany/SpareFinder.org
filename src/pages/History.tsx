@@ -1685,7 +1685,7 @@ const History = () => {
                                           ? "✅ SpareFinder AI Research"
                                           : job.status === "failed"
                                           ? "❌ Analysis Failed"
-                                          : "🤖Deep research Ongoing..."}
+                                          : "🤖SpareFinder research Ongoing..."}
                                       </h3>
                                       <p className="mt-1 text-xs font-mono text-muted-foreground truncate dark:text-gray-400">
                                         ID: {job.id?.slice(0, 8)}...
