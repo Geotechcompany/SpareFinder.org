@@ -14,6 +14,83 @@ import httpx
 
 logger = logging.getLogger(__name__)
 
+def send_basic_email_smtp(
+    *,
+    to_email: str,
+    subject: str,
+    html: str,
+    text: Optional[str] = None,
+) -> bool:
+    """
+    Send a basic email via SMTP using the AI service env vars.
+
+    Uses:
+    - GMAIL_USER / GMAIL_PASS (recommended)
+    - SMTP_HOST / SMTP_PORT (defaults to gmail STARTTLS)
+    """
+    gmail_user = os.getenv("GMAIL_USER")
+    gmail_pass = os.getenv("GMAIL_PASS")
+    if not gmail_user or not gmail_pass:
+        logger.warning(
+            "⚠️ Email not configured (GMAIL_USER/GMAIL_PASS not set) - skipping email send"
+        )
+        return False
+
+    smtp_host = os.getenv("SMTP_HOST", "smtp.gmail.com")
+    smtp_port = int(os.getenv("SMTP_PORT", "587"))
+
+    # Build message (multipart alternative: text + html)
+    msg = MIMEMultipart("alternative")
+    msg["From"] = gmail_user
+    msg["To"] = to_email
+    msg["Subject"] = subject
+    if text:
+        msg.attach(MIMEText(text, "plain"))
+    if html:
+        msg.attach(MIMEText(html, "html"))
+
+    # Quick connectivity test first (helps return fast on blocked SMTP)
+    try:
+        test_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        test_socket.settimeout(5)
+        result = test_socket.connect_ex((smtp_host, smtp_port))
+        test_socket.close()
+        if result != 0:
+            logger.warning(f"⚠️ Cannot reach {smtp_host}:{smtp_port} - skipping email send")
+            return False
+    except Exception as conn_test_error:
+        logger.warning(f"⚠️ Network connectivity test failed: {conn_test_error}")
+        return False
+
+    try:
+        server = None
+        try:
+            server = smtplib.SMTP(timeout=30)
+            server.connect(smtp_host, smtp_port)
+            server.starttls()
+            server.login(gmail_user, gmail_pass)
+            server.sendmail(gmail_user, [to_email], msg.as_string())
+            logger.info(f"✅ Email sent successfully to {to_email}")
+            return True
+        finally:
+            if server:
+                try:
+                    server.quit()
+                except Exception:
+                    try:
+                        server.close()
+                    except Exception:
+                        pass
+    except smtplib.SMTPAuthenticationError as e:
+        logger.error(f"❌ SMTP authentication failed: {e}")
+        return False
+    except smtplib.SMTPException as e:
+        logger.error(f"❌ SMTP error: {e}")
+        return False
+    except Exception as e:
+        logger.error(f"❌ Unexpected error sending email: {e}")
+        return False
+
 
 def send_email_via_email_service(
     *,

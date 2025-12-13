@@ -24,7 +24,7 @@ from fastapi.responses import JSONResponse
 from datetime import datetime
 import uvicorn
 from .crew_setup import setup_crew, set_progress_emitter, emit_progress, generate_report_tool_func, send_email_tool_func
-from .email_sender import send_email_via_email_service
+from .email_sender import send_email_via_email_service, send_basic_email_smtp
 from .utils import ensure_temp_dir
 from .vision_analyzer import get_image_description
 from .database_storage import store_crew_analysis_to_database, update_crew_job_status, complete_crew_job
@@ -139,8 +139,17 @@ async def email_send(payload: EmailProxyRequest):
         html=payload.html,
         text=payload.text,
     )
+    # Fallback: send directly via SMTP using GMAIL_USER/GMAIL_PASS if the proxy is not configured
+    # or the email-service is failing.
     if not ok:
-        raise HTTPException(status_code=502, detail="Email-service failed to send email")
+        ok = send_basic_email_smtp(
+            to_email=payload.to,
+            subject=payload.subject,
+            html=payload.html,
+            text=payload.text,
+        )
+    if not ok:
+        raise HTTPException(status_code=502, detail="Email sending failed")
     return {"success": True}
 
 

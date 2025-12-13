@@ -1,7 +1,0 @@
-include VERSION
-include LICENSE
-include README.md
-include requirements.txt
-recursive-include app *.py
-recursive-include app *.txt
-recursive-include app *.json 

@@ -1,3 +1,0 @@
-"""SpareFinder Email Service package."""
-
-
