@@ -204,19 +204,19 @@ router.get("/", authenticateToken, async (req: AuthRequest, res: Response) => {
       console.warn("Error fetching usage:", usageError);
     }
 
-    // Default subscription if none exists
-    const defaultSubscription = {
-      id: "default",
+    // IMPORTANT: do NOT auto-grant an active plan. If the user hasn't completed
+    // trial checkout or paid for a plan, they should be treated as inactive.
+    const inactiveSubscription = {
+      id: "inactive",
       tier: "free",
-      status: "active",
+      status: "inactive",
       current_period_start: new Date().toISOString(),
-      current_period_end: new Date(
-        Date.now() + 30 * 24 * 60 * 60 * 1000
-      ).toISOString(),
+      // Set end to "now" so any expiry checks fail consistently.
+      current_period_end: new Date().toISOString(),
       cancel_at_period_end: false,
     };
 
-    let userSubscription = subscription || defaultSubscription;
+    let userSubscription = subscription || inactiveSubscription;
     // Admins have unlimited/enterprise-equivalent access
     if (req.user?.role === "admin" || req.user?.role === "super_admin") {
       userSubscription = {
@@ -239,23 +239,27 @@ router.get("/", authenticateToken, async (req: AuthRequest, res: Response) => {
           ];
 
     // Get recent invoices (mock data for now)
-    const invoices = [
-      {
-        id: "inv_001",
-        amount:
-          userSubscription.tier === "pro"
-            ? PLAN_PRICING.pro.amount
-            : userSubscription.tier === "enterprise"
-            ? PLAN_PRICING.enterprise.amount
-            : userSubscription.tier === "free"
-            ? PLAN_PRICING.free.amount
-            : 0,
-        currency: "GBP",
-        status: "paid",
-        created_at: new Date().toISOString(),
-        invoice_url: "#",
-      },
-    ];
+    // If the subscription is inactive, return none.
+    const invoices =
+      userSubscription.status === "inactive"
+        ? []
+        : [
+            {
+              id: "inv_001",
+              amount:
+                userSubscription.tier === "pro"
+                  ? PLAN_PRICING.pro.amount
+                  : userSubscription.tier === "enterprise"
+                  ? PLAN_PRICING.enterprise.amount
+                  : userSubscription.tier === "free"
+                  ? PLAN_PRICING.free.amount
+                  : 0,
+              currency: "GBP",
+              status: "paid",
+              created_at: new Date().toISOString(),
+              invoice_url: "#",
+            },
+          ];
 
     return res.json({
       subscription: userSubscription,

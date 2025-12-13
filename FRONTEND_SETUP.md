@@ -20,6 +20,9 @@ cp .env.example .env
 # Backend API Configuration
 VITE_API_URL=http://localhost:4000
 
+# Clerk Authentication (required)
+VITE_CLERK_PUBLISHABLE_KEY=pk_test_********
+
 # Supabase Configuration (for database)
 VITE_SUPABASE_URL=your_supabase_url
 VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
@@ -47,9 +50,10 @@ The frontend will be available at `http://localhost:5173`
 The frontend now uses your Node.js/Express backend for:
 
 ### Authentication
-- **Login/Register**: Uses `/api/auth/login` and `/api/auth/register`
-- **JWT Tokens**: Stored in localStorage and sent with API requests
-- **User Management**: Profile updates via `/api/user/profile`
+- **Identity**: Clerk (frontend) issues session JWTs
+- **API auth**: Frontend sends `Authorization: Bearer <clerk_session_jwt>` to the backend
+- **Linking existing users**: Backend links Clerk users to existing `profiles` rows by email and persists `profiles.clerk_user_id`
+- **User Management**: Profile data still lives in `profiles` and is served from `/api/auth/current-user` and `/api/user/profile`
 
 ### File Uploads
 - **Image Upload**: Uses `/api/upload/image` for part analysis
@@ -83,20 +87,17 @@ The frontend now uses your Node.js/Express backend for:
 
 ## Authentication Flow
 
-1. **Registration**: 
-   - Frontend sends credentials to `/api/auth/register`
-   - Backend creates user and returns JWT token
-   - Token stored in localStorage for future requests
+1. **Sign up / Sign in** (Clerk UI):
+   - Frontend uses Clerk `<SignUp />` / `<SignIn />`
+   - Clerk manages sessions and token rotation
 
-2. **Login**:
-   - Frontend sends credentials to `/api/auth/login`
-   - Backend validates and returns JWT token
-   - User data cached in React context
+2. **Backend profile sync**:
+   - After sign-in, frontend calls `/api/auth/current-user`
+   - Backend verifies the Clerk session JWT and maps it to `profiles.id` (link by `clerk_user_id` or email)
 
 3. **Protected Routes**:
-   - JWT token sent with each API request
-   - Backend middleware validates token
-   - Automatic logout on token expiration
+   - Clerk session JWT is attached to each request by the API client interceptor
+   - Backend middleware validates token and sets `req.user.userId` to your internal `profiles.id`
 
 ## File Upload Flow
 
@@ -114,9 +115,9 @@ The frontend now uses your Node.js/Express backend for:
 - Verify CORS settings in backend allow frontend origin
 
 ### Authentication Issues
-- Clear localStorage and try logging in again
-- Check JWT_SECRET matches between frontend and backend
-- Verify Supabase database connection
+- Confirm `VITE_CLERK_PUBLISHABLE_KEY` is set (Vite requires `VITE_` prefix)
+- Confirm backend has `CLERK_SECRET_KEY`
+- Ensure the DB migration adding `profiles.clerk_user_id` has been applied
 
 ### Upload Issues
 - Check file size limits (10MB default)
@@ -137,4 +138,3 @@ The frontend now uses your Node.js/Express backend for:
 2. **Real-time Features**: Add WebSocket for live updates
 3. **Caching**: Implement Redis caching for better performance
 4. **Testing**: Add unit and integration tests
-5. **Production**: Deploy with proper environment configuration 

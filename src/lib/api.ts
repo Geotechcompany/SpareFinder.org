@@ -20,6 +20,29 @@ export type ApiResponse<T = unknown> = {
   refresh_token?: string;
 };
 
+export type AdminDashboardStatistics = {
+  total_users: number;
+  total_searches: number;
+  active_users: number;
+  success_rate: number;
+  searches_today: number;
+  new_users_today: number;
+  searches_this_week: number;
+  system_health: string;
+  pending_tasks: number;
+  recent_alerts: number;
+  recent_searches: any[];
+  top_users: any[];
+  avg_response_time: number;
+  cpu_usage: number;
+  memory_usage: number;
+  disk_usage: number;
+};
+
+export type AdminStatsApiResponse = {
+  statistics: AdminDashboardStatistics;
+};
+
 // Remove the Axios module declaration and the duplicate interface
 // Type assertions will be used in the code instead
 
@@ -38,7 +61,7 @@ console.log("🔧 API Client Config:", {
   },
 });
 
-// Token storage utilities
+// Token storage utilities (legacy Supabase auth)
 const TOKEN_KEY = "auth_token";
 const REFRESH_TOKEN_KEY = "auth_refresh_token";
 
@@ -56,6 +79,29 @@ const tokenStorage = {
     sessionStorage.removeItem(TOKEN_KEY);
     sessionStorage.removeItem(REFRESH_TOKEN_KEY);
   },
+};
+
+// Clerk token provider (preferred). This lets the AuthProvider inject Clerk tokens
+// without importing Clerk into this module (avoids circular deps / hook usage).
+type AuthTokenProvider = () => Promise<string | null>;
+let authTokenProvider: AuthTokenProvider | null = null;
+let isClerkAuthEnabled = false;
+
+export const setAuthTokenProvider = (provider: AuthTokenProvider | null) => {
+  authTokenProvider = provider;
+  isClerkAuthEnabled = !!provider;
+};
+
+export const getAuthToken = async (): Promise<string | null> => {
+  if (authTokenProvider) {
+    return await authTokenProvider().catch(() => null);
+  }
+  return tokenStorage.getToken();
+};
+
+export const getAuthHeaders = async (): Promise<Record<string, string>> => {
+  const token = await getAuthToken();
+  return token ? { Authorization: `Bearer ${token}` } : {};
 };
 
 // Create axios instance
@@ -91,8 +137,8 @@ const processQueue = (error: unknown, token: string | null = null) => {
 
 // Request interceptor to add token to every request
 apiClient.interceptors.request.use(
-  (config) => {
-    const token = tokenStorage.getToken();
+  async (config) => {
+    const token = await getAuthToken();
     const hasToken = !!token;
 
     // Check if this is a public endpoint that doesn't require a token
@@ -137,6 +183,29 @@ apiClient.interceptors.response.use(
 
     // If the error is due to an unauthorized request and we haven't already tried to refresh
     if (error.response?.status === 401 && !originalRequest._retry) {
+      // Never force a hard redirect away from public auth pages.
+      // These pages (especially Clerk reset-password flow) can trigger background API calls
+      // while auth is initializing, which would otherwise bounce users to /login.
+      const pathname =
+        typeof window !== "undefined" ? window.location.pathname : "";
+      const isPublicRoute =
+        pathname.startsWith("/login") ||
+        pathname.startsWith("/register") ||
+        pathname.startsWith("/reset-password") ||
+        pathname.startsWith("/migrate") ||
+        pathname.startsWith("/account/sso-callback");
+
+      // If we're using Clerk, there is no refresh-token dance in this client.
+      // Clerk manages session/token rotation; we just redirect to login if needed.
+      if (isClerkAuthEnabled) {
+        console.warn("🔒 Unauthorized (Clerk) - redirecting to login");
+        originalRequest._retry = true;
+        if (!isPublicRoute) {
+          window.location.href = "/login";
+        }
+        return Promise.reject(error);
+      }
+
       // If we're already refreshing, wait for the existing refresh to complete
       if (isRefreshing && refreshPromise) {
         return refreshPromise
@@ -177,7 +246,9 @@ apiClient.interceptors.response.use(
         refreshPromise = null;
         processQueue(error, null);
         tokenStorage.clearAll();
-        window.location.href = "/login";
+        if (!isPublicRoute) {
+          window.location.href = "/login";
+        }
         return Promise.reject(error);
       }
 
@@ -223,7 +294,9 @@ apiClient.interceptors.response.use(
 
           // Clear tokens and redirect to login
           tokenStorage.clearAll();
-          window.location.href = "/login";
+          if (!isPublicRoute) {
+            window.location.href = "/login";
+          }
           throw refreshError;
         } finally {
           isRefreshing = false;
@@ -306,9 +379,9 @@ export const authApi = {
     }
   },
 
-  getCurrentUser: async (): Promise<ApiResponse> => {
+  getCurrentUser: async <T = unknown>(): Promise<ApiResponse<T>> => {
     const response = await apiClient.get("/auth/current-user");
-    return response.data;
+    return response.data as ApiResponse<T>;
   },
 
   signOut: async (): Promise<ApiResponse> => {
@@ -326,11 +399,22 @@ type DashboardStats = {
   totalAchievements?: number;
 };
 
+type DashboardAnalyticsPoint = {
+  date: string; // YYYY-MM-DD
+  analyzedParts: number;
+  completedAnalyses: number;
+  completionRate: number; // 0..100
+  avgConfidence: number; // 0..100
+  avgProcessingSeconds: number;
+};
+
 export const dashboardApi = {
-  getStats: async (): Promise<ApiResponse<DashboardStats>> => {
+  getStats: async (options?: { signal?: AbortSignal }): Promise<ApiResponse<DashboardStats>> => {
     console.log("📊 Fetching dashboard stats...");
     try {
-      const response = await apiClient.get("/dashboard/stats");
+      const response = await apiClient.get("/dashboard/stats", {
+        signal: options?.signal,
+      });
       console.log("📊 Stats response:", response.data);
       console.log("📊 Stats response URL:", response.config.url);
       console.log("📊 Stats response status:", response.status);
@@ -415,11 +499,15 @@ export const dashboardApi = {
     }
   },
 
-  getRecentActivities: async (limit: number = 5): Promise<ApiResponse> => {
+  getRecentActivities: async (
+    limit: number = 5,
+    options?: { signal?: AbortSignal }
+  ): Promise<ApiResponse> => {
     console.log("🔄 Fetching recent activities...");
     try {
       const response = await apiClient.get(
-        `/dashboard/recent-activities?limit=${limit}`
+        `/dashboard/recent-activities?limit=${limit}`,
+        { signal: options?.signal }
       );
       console.log("🔄 Recent activities response:", response.data);
       return response.data;
@@ -429,16 +517,29 @@ export const dashboardApi = {
     }
   },
 
-  getPerformanceMetrics: async (): Promise<ApiResponse> => {
+  getPerformanceMetrics: async (options?: { signal?: AbortSignal }): Promise<ApiResponse> => {
     console.log("📈 Fetching performance metrics...");
     try {
-      const response = await apiClient.get("/dashboard/performance-metrics");
+      const response = await apiClient.get("/dashboard/performance-metrics", {
+        signal: options?.signal,
+      });
       console.log("📈 Performance metrics response:", response.data);
       return response.data;
     } catch (error) {
       console.error("📈 Failed to fetch performance metrics:", error);
       throw error;
     }
+  },
+
+  getAnalytics: async (options?: {
+    days?: number;
+    signal?: AbortSignal;
+  }): Promise<ApiResponse<{ days: number; series: DashboardAnalyticsPoint[] }>> => {
+    const days = options?.days ?? 30;
+    const response = await apiClient.get(`/dashboard/analytics?days=${days}`, {
+      signal: options?.signal,
+    });
+    return response.data as ApiResponse<{ days: number; series: DashboardAnalyticsPoint[] }>;
   },
 
   // Add missing methods used by History component
@@ -500,7 +601,7 @@ export const adminApi = {
     }
   },
 
-  getAdminStats: async (): Promise<ApiResponse> => {
+  getAdminStats: async (): Promise<ApiResponse<AdminStatsApiResponse>> => {
     const response = await apiClient.get("/admin/stats");
     return { success: true, data: { statistics: response.data.statistics } };
   },
@@ -1348,6 +1449,48 @@ export const reviewsApi = {
   },
 };
 
+// Authenticated analysis-reviews API (requires Authorization header)
+export const analysisReviewsApi = {
+  list: async (): Promise<
+    ApiResponse<{
+      data: Array<{
+        id: string;
+        job_id: string;
+        job_type: string;
+        rating: number;
+        comment: string | null;
+        feedback_type: string | null;
+        helpful_features: string[] | null;
+        improvement_suggestions: string | null;
+        created_at: string;
+        updated_at: string;
+      }>;
+    }>
+  > => {
+    const response = await apiClient.get("/reviews/analysis");
+    return response.data;
+  },
+
+  create: async (payload: {
+    job_id: string;
+    job_type: "image" | "keyword" | "both";
+    part_search_id?: string | null;
+    rating: number;
+    comment?: string | null;
+    feedback_type?: string | null;
+    helpful_features?: string[] | null;
+    improvement_suggestions?: string | null;
+  }): Promise<ApiResponse> => {
+    const response = await apiClient.post("/reviews/analysis", payload);
+    return response.data;
+  },
+
+  remove: async (reviewId: string): Promise<ApiResponse> => {
+    const response = await apiClient.delete(`/reviews/analysis/${reviewId}`);
+    return response.data;
+  },
+};
+
 // Export combined API
 export const api = {
   auth: authApi,
@@ -1400,6 +1543,7 @@ export const api = {
   credits: creditsApi,
   contact: contactApi,
   reviews: reviewsApi,
+  analysisReviews: analysisReviewsApi,
 };
 
 // Export individual APIs for backward compatibility

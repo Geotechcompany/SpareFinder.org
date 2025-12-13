@@ -1,9 +1,10 @@
 import React from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useAuth } from '@/contexts/AuthContext';
+import { useSubscription } from "@/contexts/SubscriptionContext";
 import { 
   Home, 
   Upload, 
@@ -24,7 +25,9 @@ interface MobileSidebarProps {
 
 const MobileSidebar: React.FC<MobileSidebarProps> = ({ isOpen, onClose }) => {
   const location = useLocation();
-  const { user, logout } = useAuth();
+  const navigate = useNavigate();
+  const { user, logout, isAdmin } = useAuth();
+  const { isPlanActive, isLoading: subscriptionLoading, tier, status } = useSubscription();
 
   const navItems = [
     { href: '/dashboard', icon: Home, label: 'Dashboard', description: 'Overview & analytics' },
@@ -35,6 +38,12 @@ const MobileSidebar: React.FC<MobileSidebarProps> = ({ isOpen, onClose }) => {
     { href: '/dashboard/billing', icon: CreditCard, label: 'Billing', description: 'Subscription' },
     { href: '/dashboard/settings', icon: Settings, label: 'Settings', description: 'Preferences' }
   ];
+
+  const visibleNavItems = (!subscriptionLoading && !isPlanActive)
+    ? navItems.filter((i) =>
+        ["/dashboard", "/dashboard/billing", "/dashboard/profile", "/dashboard/settings"].includes(i.href)
+      )
+    : navItems;
 
   const isActiveRoute = (href: string) => {
     if (href === '/dashboard') {
@@ -62,8 +71,25 @@ const MobileSidebar: React.FC<MobileSidebarProps> = ({ isOpen, onClose }) => {
     ? user.full_name.split(' ').map(n => n[0]).join('').toUpperCase()
     : user?.email?.charAt(0).toUpperCase() || 'U';
   
-  // Get subscription tier display
-  const tierDisplay = user?.company || 'Free Plan';
+  const tierDisplay = (() => {
+    if (subscriptionLoading) return "Checking plan…";
+    if (isAdmin) return "Admin access";
+    if (!isPlanActive) return "No active plan";
+    const tierLabel =
+      tier === "free"
+        ? "Starter"
+        : tier === "pro"
+        ? "Professional"
+        : tier === "enterprise"
+        ? "Enterprise"
+        : "Plan active";
+    return status === "trialing" ? `${tierLabel} (trial)` : tierLabel;
+  })();
+
+  const handleUpgrade = () => {
+    onClose();
+    navigate(!subscriptionLoading && !isPlanActive ? "/onboarding/trial" : "/dashboard/billing");
+  };
 
   return (
     <AnimatePresence>
@@ -99,9 +125,19 @@ const MobileSidebar: React.FC<MobileSidebarProps> = ({ isOpen, onClose }) => {
                   <h3 className="font-semibold text-sm text-sidebar-foreground dark:text-white">
                     {displayName}
                   </h3>
-                  <p className="text-xs text-muted-foreground dark:text-gray-400">
-                    {tierDisplay}
+                  <p className="text-[11px] text-muted-foreground dark:text-gray-400">
+                    {(user as any)?.company || " "}
                   </p>
+                  <div className="mt-1 flex items-center gap-2">
+                    <span className="inline-flex items-center rounded-full border border-white/10 bg-black/10 px-2 py-0.5 text-[11px] text-muted-foreground dark:bg-white/5 dark:text-gray-300">
+                      {tierDisplay}
+                    </span>
+                    {!subscriptionLoading && !isPlanActive && !isAdmin ? (
+                      <span className="inline-flex items-center rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[11px] text-amber-600 dark:text-amber-300">
+                        Locked
+                      </span>
+                    ) : null}
+                  </div>
                 </div>
               </div>
               <Button
@@ -114,9 +150,20 @@ const MobileSidebar: React.FC<MobileSidebarProps> = ({ isOpen, onClose }) => {
               </Button>
             </div>
 
+            {/* Upgrade CTA */}
+            <div className="px-4 pt-4">
+              <Button
+                type="button"
+                onClick={handleUpgrade}
+                className="h-11 w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 shadow-lg shadow-purple-500/20"
+              >
+                Upgrade plan
+              </Button>
+            </div>
+
             {/* Navigation */}
             <div className="p-4 space-y-2">
-              {navItems.map((item) => (
+              {visibleNavItems.map((item) => (
                 <Link
                   key={item.href}
                   to={item.href}

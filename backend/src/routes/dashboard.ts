@@ -485,6 +485,171 @@ router.get("/stats", async (req: AuthRequest, res: Response) => {
   }
 });
 
+// Dashboard analytics timeseries (daily buckets)
+router.get("/analytics", async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user?.userId;
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        error: "Unauthorized",
+      });
+    }
+
+    const daysRaw = Number(req.query.days ?? 30);
+    const days = Number.isFinite(daysRaw) ? Math.floor(daysRaw) : 30;
+    const safeDays = Math.min(90, Math.max(7, days || 30));
+
+    const now = new Date();
+    // Use UTC date buckets to avoid timezone inconsistencies
+    const start = new Date(
+      Date.UTC(
+        now.getUTCFullYear(),
+        now.getUTCMonth(),
+        now.getUTCDate() - (safeDays - 1),
+        0,
+        0,
+        0,
+        0
+      )
+    );
+    const startIso = start.toISOString();
+
+    type Bucket = {
+      date: string; // YYYY-MM-DD
+      analyzedParts: number;
+      completedAnalyses: number;
+      // confidence in [0..100]
+      confidenceSum: number;
+      confidenceCount: number;
+      // processing in seconds
+      processingSumSec: number;
+      processingCount: number;
+    };
+
+    const fmtDate = (d: Date) =>
+      `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(
+        d.getUTCDate()
+      ).padStart(2, "0")}`;
+
+    const buckets = new Map<string, Bucket>();
+    for (let i = 0; i < safeDays; i++) {
+      const d = new Date(start.getTime() + i * 24 * 60 * 60 * 1000);
+      const key = fmtDate(d);
+      buckets.set(key, {
+        date: key,
+        analyzedParts: 0,
+        completedAnalyses: 0,
+        confidenceSum: 0,
+        confidenceCount: 0,
+        processingSumSec: 0,
+        processingCount: 0,
+      });
+    }
+
+    // 1) Crew analysis jobs → analyzed/completed + processing seconds (from created→completed)
+    const { data: crewJobs, error: crewErr } = await supabase
+      .from("crew_analysis_jobs")
+      .select("created_at, completed_at, status, progress")
+      .eq("user_id", userId)
+      .gte("created_at", startIso);
+
+    if (crewErr) {
+      return handleDashboardError(res, crewErr, "Dashboard Analytics (crew jobs)");
+    }
+
+    for (const job of crewJobs || []) {
+      const created = job.created_at ? new Date(job.created_at) : null;
+      if (!created) continue;
+      const key = fmtDate(created);
+      const bucket = buckets.get(key);
+      if (!bucket) continue;
+
+      bucket.analyzedParts += 1;
+      if (job.status === "completed") {
+        bucket.completedAnalyses += 1;
+      }
+
+      // progress sometimes is 0..100, treat it as a confidence proxy only if it looks like percent
+      if (typeof job.progress === "number" && job.progress >= 0 && job.progress <= 100) {
+        bucket.confidenceSum += job.progress;
+        bucket.confidenceCount += 1;
+      }
+
+      if (job.completed_at) {
+        const completed = new Date(job.completed_at);
+        const durationSec = Math.max(0, Math.round((completed.getTime() - created.getTime()) / 1000));
+        bucket.processingSumSec += durationSec;
+        bucket.processingCount += 1;
+      }
+    }
+
+    // 2) part_searches → better confidence + processing_time_ms if available
+    const { data: searches, error: searchesErr } = await supabase
+      .from("part_searches")
+      .select("created_at, confidence_score, ai_confidence, processing_time_ms, analysis_status")
+      .eq("user_id", userId)
+      .gte("created_at", startIso);
+
+    if (searchesErr) {
+      return handleDashboardError(res, searchesErr, "Dashboard Analytics (part searches)");
+    }
+
+    for (const row of searches || []) {
+      const created = row.created_at ? new Date(row.created_at) : null;
+      if (!created) continue;
+      const key = fmtDate(created);
+      const bucket = buckets.get(key);
+      if (!bucket) continue;
+
+      // Only take confidence from completed searches (less noisy)
+      if (row.analysis_status === "completed") {
+        const raw = (row.ai_confidence ?? row.confidence_score) as unknown;
+        if (typeof raw === "number" && raw > 0) {
+          // normalize to 0..100
+          const normalized = raw <= 1 ? raw * 100 : raw > 100 ? raw / 100 : raw;
+          const bounded = Math.max(0, Math.min(100, normalized));
+          bucket.confidenceSum += bounded;
+          bucket.confidenceCount += 1;
+        }
+      }
+
+      if (typeof row.processing_time_ms === "number" && row.processing_time_ms > 0) {
+        bucket.processingSumSec += row.processing_time_ms / 1000;
+        bucket.processingCount += 1;
+      }
+    }
+
+    const series = Array.from(buckets.values()).map((b) => {
+      const avgConfidence =
+        b.confidenceCount > 0 ? Math.round((b.confidenceSum / b.confidenceCount) * 10) / 10 : 0;
+      const avgProcessingSeconds =
+        b.processingCount > 0 ? Math.round((b.processingSumSec / b.processingCount) * 10) / 10 : 0;
+      const completionRate =
+        b.analyzedParts > 0 ? Math.round((b.completedAnalyses / b.analyzedParts) * 1000) / 10 : 0;
+
+      return {
+        date: b.date,
+        analyzedParts: b.analyzedParts,
+        completedAnalyses: b.completedAnalyses,
+        completionRate,
+        avgConfidence,
+        avgProcessingSeconds,
+      };
+    });
+
+    return res.json({
+      success: true,
+      data: {
+        days: safeDays,
+        series,
+      },
+    });
+  } catch (error) {
+    return handleDashboardError(res, error, "Dashboard Analytics");
+  }
+});
+
 // Get individual job data from database
 router.get(
   "/jobs/:jobId",

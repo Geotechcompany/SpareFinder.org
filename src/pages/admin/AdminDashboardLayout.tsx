@@ -10,7 +10,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/components/ui/use-toast";
-import { api, tokenStorage } from "@/lib/api";
+import { api } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 import AdminDesktopSidebar from "@/components/AdminDesktopSidebar";
@@ -107,85 +107,49 @@ const AdminDashboardLayout = () => {
   const [adminUser, setAdminUser] = useState<AdminUser | null>(null);
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   const { toast } = useToast();
-  const { user, isLoading: authLoading, logout } = useAuth();
+  const {
+    user,
+    isLoading: authLoading,
+    logout,
+    isAuthenticated,
+    isAdmin,
+    isSuperAdmin,
+  } = useAuth();
   const navigate = useNavigate();
 
-  // Check authentication and token validity
-  const checkAuthentication = async () => {
-    try {
-      const token = tokenStorage.getToken();
-
-      if (!token) {
-        console.log("🔒 No admin token found in session storage");
-        navigate("/admin/login");
-        return false;
-      }
-
-      console.log("🔍 Admin token found, validating...");
-
-      // Verify token with backend
-      const userResponse = await api.auth.getCurrentUser();
-
-      if (userResponse.success && userResponse.data?.user) {
-        const userData = userResponse.data.user;
-
-        // Check if user has admin role
-        if (
-          !userData.role ||
-          !["admin", "super_admin"].includes(userData.role)
-        ) {
-          console.log("❌ User does not have admin privileges");
-          toast({
-            variant: "destructive",
-            title: "Access Denied",
-            description: "You don't have admin privileges to access this page.",
-          });
-          navigate("/dashboard");
-          return false;
-        }
-
-        console.log("✅ Admin authentication successful:", userData);
-        setAdminUser(userData);
-        setIsAuthenticated(true);
-        return true;
-      } else {
-        console.warn("❌ Admin token validation failed:", userResponse.error);
-        tokenStorage.clearAll();
-        navigate("/admin/login");
-        return false;
-      }
-    } catch (error) {
-      console.error("❌ Admin authentication check failed:", error);
-      tokenStorage.clearAll();
-      navigate("/admin/login");
-      return false;
-    }
-  };
-
   useEffect(() => {
-    const initializeAdmin = async () => {
-      // Wait for auth context to load
-      if (authLoading) {
-        return;
-      }
+    // Wait for auth context to load
+    if (authLoading) return;
 
-      const isValid = await checkAuthentication();
-      if (isValid) {
-        fetchAdminData(true); // Skip auth check since we just validated
-      }
-    };
-
-    initializeAdmin();
-  }, [authLoading]);
-
-  const fetchAdminData = async (skipAuthCheck = false) => {
-    if (!skipAuthCheck && !isAuthenticated) {
-      console.log("⏳ Skipping admin data fetch - not authenticated");
+    // Admin routes are already wrapped by AdminProtectedRoute, but keep a defensive check
+    if (!isAuthenticated) {
+      navigate("/admin/login");
       return;
     }
+
+    const hasAdminRole = isSuperAdmin || isAdmin;
+    if (!hasAdminRole) {
+      navigate("/unauthorized");
+      return;
+    }
+
+    if (user) {
+      setAdminUser({
+        id: user.id,
+        email: user.email,
+        full_name: user.full_name || "Administrator",
+        role: (user as any).role,
+        avatar_url: user.avatar_url || undefined,
+      });
+    }
+
+    fetchAdminData();
+  }, [authLoading, isAuthenticated, isAdmin, isSuperAdmin, user?.id]);
+
+  const fetchAdminData = async () => {
+    if (!isAuthenticated || !(isSuperAdmin || isAdmin)) return;
 
     try {
       setIsLoading(true);
@@ -193,22 +157,12 @@ const AdminDashboardLayout = () => {
 
       console.log("📊 Fetching admin dashboard data...");
 
-      // Check token before making requests
-      const token = tokenStorage.getToken();
-      if (!token) {
-        console.log("❌ No token available for admin data fetch");
-        navigate("/admin/login");
-        return;
-      }
-
       // Fetch admin stats
       const statsResponse = await api.admin.getAdminStats();
-      if (statsResponse.success && statsResponse.data?.statistics) {
-        console.log(
-          "✅ Admin stats fetched successfully:",
-          statsResponse.data.statistics
-        );
-        setStats(statsResponse.data.statistics as AdminStats);
+      const statistics = statsResponse.data?.statistics;
+      if (statsResponse.success && statistics) {
+        console.log("✅ Admin stats fetched successfully:", statistics);
+        setStats(statistics as AdminStats);
       } else {
         console.warn("❌ Failed to fetch admin stats:", statsResponse);
         throw new Error(
@@ -265,7 +219,7 @@ const AdminDashboardLayout = () => {
           title: "Session Expired",
           description: "Your admin session has expired. Please log in again.",
         });
-        tokenStorage.clearAll();
+        await logout();
         navigate("/admin/login");
         return;
       }
@@ -303,7 +257,7 @@ const AdminDashboardLayout = () => {
       return;
     }
 
-    fetchAdminData(false); // Use normal auth check for manual refresh
+    fetchAdminData();
     toast({
       title: "Data Refreshed",
       description: "Admin dashboard data has been updated.",
@@ -311,13 +265,12 @@ const AdminDashboardLayout = () => {
   };
 
   const handleTryAgain = () => {
-    fetchAdminData(false);
+    fetchAdminData();
   };
 
   const handleLogout = async () => {
     try {
       await logout();
-      tokenStorage.clearAll();
       navigate("/admin/login");
       toast({
         title: "Logged Out",
@@ -326,7 +279,6 @@ const AdminDashboardLayout = () => {
     } catch (error) {
       console.error("Logout error:", error);
       // Force logout even if API call fails
-      tokenStorage.clearAll();
       navigate("/admin/login");
     }
   };

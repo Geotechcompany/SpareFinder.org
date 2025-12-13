@@ -51,6 +51,7 @@ import {
 } from "@/components/ui/table";
 import { api } from "@/lib/api";
 import { PLAN_CONFIG } from "@/lib/plans";
+import { SpinningLogoLoader } from "@/components/brand/spinning-logo-loader";
 import {
   CreditCard, 
   Plus, 
@@ -485,14 +486,7 @@ const PaymentManagement = () => {
   };
 
   if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-[#F0F2F5] to-[#E8EBF1] dark:from-gray-900 dark:via-green-900/20 dark:to-gray-900">
-        <div className="text-center">
-          <Loader2 className="w-10 h-10 animate-spin text-green-600 mx-auto mb-4" />
-          <p className="text-muted-foreground dark:text-gray-400">Loading payment methods...</p>
-        </div>
-      </div>
-    );
+    return <SpinningLogoLoader label="Loading payment methods…" />;
   }
 
   if (error) {

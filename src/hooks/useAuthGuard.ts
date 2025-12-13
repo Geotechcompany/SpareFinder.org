@@ -10,7 +10,7 @@ interface AuthGuardOptions {
 }
 
 export const useAuthGuard = (options: AuthGuardOptions = {}) => {
-  const { user, loading } = useAuth()
+  const { user, isLoading } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
 
@@ -21,7 +21,7 @@ export const useAuthGuard = (options: AuthGuardOptions = {}) => {
   } = options
 
   useEffect(() => {
-    if (loading) return
+    if (isLoading) return
 
     // Check if user is authenticated
     if (!user) {
@@ -43,11 +43,11 @@ export const useAuthGuard = (options: AuthGuardOptions = {}) => {
       navigate('/dashboard', { replace: true })
       return
     }
-  }, [user, loading, requiredRole, redirectTo, showToast, navigate, location])
+  }, [user, isLoading, requiredRole, redirectTo, showToast, navigate, location])
 
   return {
     user,
-    loading,
+    loading: isLoading,
     isAuthenticated: !!user,
     isAdmin: user?.role === 'admin',
     hasRole: (role: 'user' | 'admin') => user?.role === role,

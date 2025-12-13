@@ -2,8 +2,28 @@ import { Router, Response } from 'express';
 import { authenticateToken } from '../middleware/auth';
 import { AuthRequest } from '../types/auth';
 import { creditService } from '../services/credit-service';
+import { supabase } from '../server';
 
 const router = Router();
+
+const hasActiveSubscriptionOrTrial = async (userId: string) => {
+  const { data: subscription, error } = await supabase
+    .from("subscriptions")
+    .select("status, current_period_end")
+    .eq("user_id", userId)
+    .single();
+
+  if (error && error.code !== "PGRST116") {
+    // If we can't verify, fail closed (no credits).
+    return false;
+  }
+
+  if (!subscription) return false;
+
+  const isActive = subscription.status === "active" || subscription.status === "trialing";
+  const isNotExpired = new Date(subscription.current_period_end) > new Date();
+  return isActive && isNotExpired;
+};
 
 // Get user's current credit balance
 router.get('/balance', authenticateToken, async (req: AuthRequest, res: Response) => {
@@ -18,12 +38,25 @@ router.get('/balance', authenticateToken, async (req: AuthRequest, res: Response
         unlimited: true
       });
     }
+
+    // If there's no active subscription/trial, show 0 credits (locked state)
+    const isPlanActive = await hasActiveSubscriptionOrTrial(userId);
+    if (!isPlanActive) {
+      return res.json({
+        success: true,
+        credits: 0,
+        user_id: userId,
+        plan_active: false,
+      });
+    }
+
     const credits = await creditService.getUserCredits(userId);
     
     return res.json({
       success: true,
       credits,
-      user_id: userId
+      user_id: userId,
+      plan_active: true,
     });
 
   } catch (error) {
@@ -40,6 +73,16 @@ router.get('/balance', authenticateToken, async (req: AuthRequest, res: Response
 router.get('/transactions', authenticateToken, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.user!.userId;
+
+    const isPlanActive = await hasActiveSubscriptionOrTrial(userId);
+    if (!isPlanActive && req.user?.role !== "admin" && req.user?.role !== "super_admin") {
+      return res.json({
+        success: true,
+        transactions: [],
+        pagination: { page: 1, limit: 20, total: 0 },
+      });
+    }
+
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 20;
     const offset = (page - 1) * limit;
@@ -164,6 +207,17 @@ router.get('/check/:amount', authenticateToken, async (req: AuthRequest, res: Re
   try {
     const userId = req.user!.userId;
     const requiredCredits = parseInt(req.params.amount) || 1;
+
+    const isPlanActive = await hasActiveSubscriptionOrTrial(userId);
+    if (!isPlanActive && req.user?.role !== "admin" && req.user?.role !== "super_admin") {
+      return res.json({
+        success: true,
+        has_enough_credits: false,
+        current_credits: 0,
+        required_credits: requiredCredits,
+        plan_active: false,
+      });
+    }
     
     const hasEnough = await creditService.hasEnoughCredits(userId, requiredCredits);
     const currentCredits = await creditService.getUserCredits(userId);
@@ -172,7 +226,8 @@ router.get('/check/:amount', authenticateToken, async (req: AuthRequest, res: Re
       success: true,
       has_enough_credits: hasEnough,
       current_credits: currentCredits,
-      required_credits: requiredCredits
+      required_credits: requiredCredits,
+      plan_active: true,
     });
 
   } catch (error) {
@@ -186,3 +241,4 @@ router.get('/check/:amount', authenticateToken, async (req: AuthRequest, res: Re
 });
 
 export default router; 
+

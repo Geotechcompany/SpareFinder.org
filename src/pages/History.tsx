@@ -41,7 +41,7 @@ import DashboardSidebar from "@/components/DashboardSidebar";
 import MobileSidebar from "@/components/MobileSidebar";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/components/ui/use-toast";
-import { dashboardApi, tokenStorage, uploadApi, api } from "@/lib/api";
+import { dashboardApi, getAuthHeaders, uploadApi, api } from "@/lib/api";
 import { PartAnalysisDisplayModal } from "@/components/PartAnalysisDisplay";
 import { ReviewModal } from "@/components/ReviewModal";
 import OnboardingGuide from "@/components/OnboardingGuide";
@@ -225,8 +225,7 @@ const History = () => {
 
   // Stable token validation function
   const hasValidToken = useCallback(() => {
-    const token = tokenStorage.getToken();
-    return !!token && isAuthenticated && !!user?.id;
+    return isAuthenticated && !!user?.id;
   }, [isAuthenticated, user?.id]);
 
   // Single comprehensive data fetch function
@@ -835,9 +834,7 @@ const History = () => {
         `${apiBaseUrl}/api/history/export?format=csv`,
         {
           method: "GET",
-          headers: {
-            Authorization: `Bearer ${sessionStorage.getItem("auth_token")}`,
-          },
+          headers: await getAuthHeaders(),
         }
       );
 
@@ -1047,6 +1044,7 @@ const History = () => {
         avgProcessingTime: "0s",
       });
       setError(null);
+      setIsLoading(false);
     }
   }, [isAuthenticated, user?.id, authLoading, fetchAllData]);
 
@@ -1209,15 +1207,10 @@ const History = () => {
         "http://localhost:4000";
 
       // Fetch PDF as blob to avoid browser security warnings
-      const response = await fetch(
-        `${apiBaseUrl}/api/reports/pdf/${filename}`,
-        {
-          method: "GET",
-          headers: {
-            Authorization: `Bearer ${sessionStorage.getItem("auth_token")}`,
-          },
-        }
-      );
+      const response = await fetch(`${apiBaseUrl}/api/reports/pdf/${filename}`, {
+        method: "GET",
+        headers: await getAuthHeaders(),
+      });
 
       if (!response.ok) {
         throw new Error(`Failed to download PDF: ${response.statusText}`);

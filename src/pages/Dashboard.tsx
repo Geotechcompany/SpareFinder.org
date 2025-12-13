@@ -30,37 +30,80 @@ import DashboardSidebar from "@/components/DashboardSidebar";
 import MobileSidebar from "@/components/MobileSidebar";
 import { useDashboardLayout } from "@/contexts/DashboardLayoutContext";
 import { useAuth } from "@/contexts/AuthContext";
+import { useSubscription } from "@/contexts/SubscriptionContext";
+import { PlanRequiredCard } from "@/components/billing/PlanRequiredCard";
 import { format } from "date-fns";
 import { useNavigate } from "react-router-dom";
-import { dashboardApi, tokenStorage, apiClient } from "@/lib/api";
+import { dashboardApi, apiClient } from "@/lib/api";
 import { useToast } from "@/components/ui/use-toast";
 import DashboardSkeleton from "@/components/DashboardSkeleton";
+import { PerformanceOverviewChart } from "@/components/PerformanceOverviewChart";
 
 const Dashboard = () => {
   const { inLayout } = useDashboardLayout();
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const { user, isLoading: authLoading, logout, isAuthenticated } = useAuth();
+  const { isPlanActive, isLoading: subscriptionLoading } = useSubscription();
   const navigate = useNavigate();
   const [isDataLoading, setIsDataLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   // Use refs to prevent multiple simultaneous requests
-  const isInitializedRef = useRef(false);
   const isFetchingRef = useRef(false);
   const abortControllerRef = useRef<AbortController | null>(null);
   const hasLoadedOnceRef = useRef(false);
 
-  // State for dashboard data
-  const [stats, setStats] = useState({
-    totalUploads: 0,
-    successfulUploads: 0,
-    avgConfidence: 0,
-    avgProcessTime: 0,
+  // State for dashboard data (persist last successful stats to avoid flicker-to-zero)
+  const [stats, setStats] = useState(() => {
+    try {
+      const raw = localStorage.getItem("dashboard_overview_stats_v1");
+      if (!raw) {
+        return {
+          totalUploads: 0,
+          successfulUploads: 0,
+          avgConfidence: 0,
+          avgProcessTime: 0,
+        };
+      }
+      const parsed = JSON.parse(raw) as Partial<{
+        totalUploads: number;
+        successfulUploads: number;
+        avgConfidence: number;
+        avgProcessTime: number;
+      }>;
+      return {
+        totalUploads: Number(parsed.totalUploads || 0),
+        successfulUploads: Number(parsed.successfulUploads || 0),
+        avgConfidence: Number(parsed.avgConfidence || 0),
+        avgProcessTime: Number(parsed.avgProcessTime || 0),
+      };
+    } catch {
+      return {
+        totalUploads: 0,
+        successfulUploads: 0,
+        avgConfidence: 0,
+        avgProcessTime: 0,
+      };
+    }
   });
 
-  const [recentUploads, setRecentUploads] = useState([]);
-  const [recentActivities, setRecentActivities] = useState([]);
+  const [recentUploads, setRecentUploads] = useState<any[]>(() => {
+    try {
+      const raw = localStorage.getItem("dashboard_recent_uploads_v1");
+      return raw ? (JSON.parse(raw) as any[]) : [];
+    } catch {
+      return [];
+    }
+  });
+  const [recentActivities, setRecentActivities] = useState<any[]>(() => {
+    try {
+      const raw = localStorage.getItem("dashboard_recent_activities_v1");
+      return raw ? (JSON.parse(raw) as any[]) : [];
+    } catch {
+      return [];
+    }
+  });
   const [performanceMetrics, setPerformanceMetrics] = useState([
     {
       label: "AI Model Accuracy",
@@ -84,6 +127,14 @@ const Dashboard = () => {
       color: "from-purple-600 to-violet-600",
     },
   ]);
+  const [analyticsSeries, setAnalyticsSeries] = useState<any[]>(() => {
+    try {
+      const raw = localStorage.getItem("dashboard_analytics_series_v1");
+      return raw ? (JSON.parse(raw) as any[]) : [];
+    } catch {
+      return [];
+    }
+  });
 
   const { toast } = useToast();
 
@@ -107,15 +158,18 @@ const Dashboard = () => {
     navigate("/dashboard/upload");
   };
 
-  // Check if user has valid token and is authenticated
-  const hasValidToken = useCallback(() => {
-    const token = tokenStorage.getToken();
-    return !!token && isAuthenticated && !!user?.id;
-  }, [isAuthenticated, user?.id]);
+  // Clerk migration: tokens are no longer stored in tokenStorage.
+  // Use Clerk-backed auth state + app user presence to decide readiness.
+  const canFetchDashboard = useCallback(() => {
+    // Backend identifies the user from the Authorization bearer token.
+    // Don't block dashboard fetch on `user?.id` because the profile can briefly be null
+    // during refresh/revalidation, which would wipe the UI back to 0.
+    return !authLoading && isAuthenticated;
+  }, [authLoading, isAuthenticated]);
 
   const fetchDashboardData = useCallback(async () => {
     // Prevent multiple simultaneous requests
-    if (isFetchingRef.current || !hasValidToken()) {
+    if (isFetchingRef.current || !canFetchDashboard()) {
       return;
     }
 
@@ -142,21 +196,26 @@ const Dashboard = () => {
         crewJobsResponse,
         activitiesResponse,
         metricsResponse,
+        analyticsResponse,
       ] = await Promise.allSettled([
-        dashboardApi.getStats().catch((err) => {
+        dashboardApi.getStats({ signal }).catch((err) => {
           if (signal.aborted) throw new Error("Request aborted");
           throw err;
         }),
         // Fetch crew analysis jobs instead of regular uploads
-        apiClient.get("/upload/crew-analysis-jobs").catch((err) => {
+        apiClient.get("/upload/crew-analysis-jobs", { signal }).catch((err) => {
           if (signal.aborted) throw new Error("Request aborted");
           throw err;
         }),
-        dashboardApi.getRecentActivities().catch((err) => {
+        dashboardApi.getRecentActivities(5, { signal }).catch((err) => {
           if (signal.aborted) throw new Error("Request aborted");
           throw err;
         }),
-        dashboardApi.getPerformanceMetrics().catch((err) => {
+        dashboardApi.getPerformanceMetrics({ signal }).catch((err) => {
+          if (signal.aborted) throw new Error("Request aborted");
+          throw err;
+        }),
+        dashboardApi.getAnalytics({ days: 30, signal }).catch((err) => {
           if (signal.aborted) throw new Error("Request aborted");
           throw err;
         }),
@@ -171,63 +230,37 @@ const Dashboard = () => {
       if (statsResponse.status === "fulfilled" && statsResponse.value.success) {
         const data = statsResponse.value.data as any;
 
-        // Map the API response to dashboard state
-        // Backend returns: totalSearches, avgConfidence, matchRate, avgProcessTime
-        // Frontend needs: totalUploads, successfulUploads, avgConfidence, avgProcessTime
-        const totalUploads = data.totalUploads || data.totalSearches || 0;
-        const successfulUploads =
-          data.successfulUploads ||
-          Math.round(((data.matchRate || 0) * totalUploads) / 100) ||
-          0;
-
-        const rawTime = data.avgProcessTime || data.avgResponseTime || 0;
+        // Match History page: use /dashboard/stats payload directly.
+        const totalUploads = Number(data.totalUploads || 0);
+        const successfulUploads = Number(data.successfulUploads || 0);
+        const avgConfidence = Number(data.avgConfidence || 0);
+        // Backend /dashboard/stats returns seconds already (History shows `${avgProcessTime}s`)
         const avgSec =
-          typeof rawTime === "number"
-            ? rawTime > 100
-              ? Math.round(rawTime / 1000)
-              : Math.round(rawTime)
+          typeof data.avgProcessTime === "number"
+            ? data.avgProcessTime
+            : typeof data.avgResponseTime === "number"
+            ? Math.round(data.avgResponseTime / 1000)
             : 0;
+
         setStats({
           totalUploads: totalUploads,
           successfulUploads: successfulUploads,
-          avgConfidence: data.avgConfidence || 0,
+          avgConfidence,
           avgProcessTime: avgSec,
         });
+        try {
+          localStorage.setItem(
+            "dashboard_overview_stats_v1",
+            JSON.stringify({
+              totalUploads,
+              successfulUploads,
+              avgConfidence,
+              avgProcessTime: avgSec,
+            })
+          );
+        } catch {}
       } else {
-        // Fallback: Calculate stats from crew jobs if available
-        if (
-          crewJobsResponse.status === "fulfilled" &&
-          crewJobsResponse.value.data
-        ) {
-          const crewJobs = crewJobsResponse.value.data.jobs || [];
-
-          const totalUploads = crewJobs.length;
-          const successfulUploads = crewJobs.filter(
-            (job: any) => job.status === "completed"
-          ).length;
-          const avgConfidence =
-            totalUploads > 0
-              ? crewJobs.reduce(
-                  (sum: number, job: any) => sum + (job.progress || 0),
-                  0
-                ) / totalUploads
-              : 0;
-
-          const avgSecFallback = 0; // unknown without API stats
-          setStats({
-            totalUploads,
-            successfulUploads,
-            avgConfidence: Math.round(avgConfidence),
-            avgProcessTime: avgSecFallback,
-          });
-        } else {
-          setStats({
-            totalUploads: 0,
-            successfulUploads: 0,
-            avgConfidence: 0,
-            avgProcessTime: 0,
-          });
-        }
+        // Keep last successful stats instead of wiping to 0 (avoids flicker on transient failures).
       }
 
       // Handle uploads response
@@ -235,7 +268,14 @@ const Dashboard = () => {
         crewJobsResponse.status === "fulfilled" &&
         crewJobsResponse.value.data
       ) {
-        const crewJobs = crewJobsResponse.value.data.jobs || [];
+        const crewJobsPayload = crewJobsResponse.value.data as any;
+        const crewJobs = (Array.isArray(crewJobsPayload?.data)
+          ? crewJobsPayload.data
+          : Array.isArray(crewJobsPayload?.jobs)
+          ? crewJobsPayload.jobs
+          : Array.isArray(crewJobsPayload)
+          ? crewJobsPayload
+          : []) as any[];
 
         // Show only completed jobs, sorted by most recent
         const recentCompleted = crewJobs
@@ -256,9 +296,23 @@ const Dashboard = () => {
             confidence: job.progress || 100, // Use progress as confidence (completed jobs are 100%)
           }))
         );
+        try {
+          localStorage.setItem(
+            "dashboard_recent_uploads_v1",
+            JSON.stringify(
+              recentCompleted.map((job: any) => ({
+                id: job.id,
+                name: job.keywords || "SpareFinder AI Research",
+                date: format(new Date(job.completed_at || job.created_at), "PPp"),
+                status: job.status,
+                confidence: job.progress || 100,
+              }))
+            )
+          );
+        } catch {}
       } else {
+        // Keep last successful recent uploads instead of wiping on transient failures.
         console.warn("❌ Failed to fetch crew jobs:", crewJobsResponse);
-        setRecentUploads([]);
       }
 
       // Handle activities response and augment with AI service jobs
@@ -294,9 +348,18 @@ const Dashboard = () => {
         if (
           crewJobsResponse.status === "fulfilled" &&
           crewJobsResponse.value?.data &&
-          Array.isArray(crewJobsResponse.value.data.jobs)
+          (Array.isArray((crewJobsResponse.value.data as any)?.data) ||
+            Array.isArray((crewJobsResponse.value.data as any)?.jobs) ||
+            Array.isArray(crewJobsResponse.value.data))
         ) {
-          const jobs = crewJobsResponse.value.data.jobs as any[];
+          const payload = crewJobsResponse.value.data as any;
+          const jobs = (Array.isArray(payload?.data)
+            ? payload.data
+            : Array.isArray(payload?.jobs)
+            ? payload.jobs
+            : Array.isArray(payload)
+            ? payload
+            : []) as any[];
 
           return jobs
             .filter((j) => j.status === "completed")
@@ -322,7 +385,8 @@ const Dashboard = () => {
         return [] as any[];
       })();
 
-      // Merge both activity sources and show latest 3
+      // Merge both activity sources and show latest 3.
+      // If the requests fail transiently, keep last successful list rather than wiping.
       const allActivities = [...activitiesMapped, ...aiJobsMapped];
 
       console.log(
@@ -344,10 +408,26 @@ const Dashboard = () => {
         mergedActivities
       );
 
-      if (!mergedActivities.length) {
-        console.warn("❌ No recent activities available");
+      const activitiesFetchFailed =
+        activitiesResponse.status === "rejected" || crewJobsResponse.status === "rejected";
+
+      if (mergedActivities.length) {
+        setRecentActivities(mergedActivities);
+        try {
+          localStorage.setItem(
+            "dashboard_recent_activities_v1",
+            JSON.stringify(mergedActivities)
+          );
+        } catch {}
+      } else if (!activitiesFetchFailed) {
+        // Only set empty if both sources succeeded but there is genuinely no activity.
+        setRecentActivities([]);
+        try {
+          localStorage.setItem("dashboard_recent_activities_v1", "[]");
+        } catch {}
+      } else {
+        console.warn("❌ Recent activities fetch failed; keeping last successful list.");
       }
-      setRecentActivities(mergedActivities);
 
       // Stats are now fetched from the API endpoint above
       // No need to recalculate from jobs array
@@ -359,48 +439,41 @@ const Dashboard = () => {
       ) {
         const data = metricsResponse.value.data as any;
 
-        // If stats endpoint failed but performance metrics has the data, use it as fallback
-        if (
-          (statsResponse.status === "rejected" ||
-            !(statsResponse as any).value?.success) &&
-          data.totalSearches
-        ) {
-          const totalUploads = data.totalSearches || 0;
-          const successfulUploads =
-            Math.round(((data.matchRate || 0) * totalUploads) / 100) || 0;
-
-          setStats({
-            totalUploads: totalUploads,
-            successfulUploads: successfulUploads,
-            avgConfidence: data.avgConfidence || 0,
-            avgProcessTime: data.avgResponseTime || 0,
-          });
-        }
+        // Normalize backend payload shape (older/newer backends use different keys)
+        const normalizedTotal =
+          data.totalSearches ?? data.totalUploads ?? data.total_searches ?? 0;
+        const normalizedMatchRate =
+          data.matchRate ?? data.modelAccuracy ?? data.successRate ?? 0;
+        const normalizedAvgResponseTime =
+          data.avgResponseTime ?? data.avgProcessTime ?? data.avgProcessTimeMs ?? 0;
+        const normalizedAccuracyChange = data.accuracyChange ?? 0;
+        const normalizedSearchesGrowth = data.searchesGrowth ?? 0;
+        const normalizedResponseTimeChange = data.responseTimeChange ?? 0;
 
         setPerformanceMetrics([
           {
             label: "AI Model Accuracy",
-            value: `${data.modelAccuracy?.toFixed(1) || data.matchRate || 0}%`,
-            change: `${data.accuracyChange > 0 ? "+" : ""}${
-              data.accuracyChange?.toFixed(1) || 0
-            }%`,
+            value: `${Number(normalizedMatchRate || 0).toFixed(1)}%`,
+            change: `${normalizedAccuracyChange > 0 ? "+" : ""}${Number(
+              normalizedAccuracyChange || 0
+            ).toFixed(1)}%`,
             icon: Cpu,
             color: "from-green-600 to-emerald-600",
           },
           {
-            label: "Total Searches",
-            value: `${data.totalSearches || 0}`,
-            change: `${data.searchesGrowth > 0 ? "+" : ""}${
-              data.searchesGrowth?.toFixed(1) || 0
-            }%`,
+            label: "Total Uploads",
+            value: `${normalizedTotal || 0}`,
+            change: `${normalizedSearchesGrowth > 0 ? "+" : ""}${Number(
+              normalizedSearchesGrowth || 0
+            ).toFixed(1)}%`,
             icon: Database,
             color: "from-blue-600 to-cyan-600",
           },
           {
             label: "Response Time",
-            value: `${data.avgResponseTime || data.avgProcessTime || 0}ms`,
-            change: `${data.responseTimeChange < 0 ? "" : "+"}${
-              data.responseTimeChange || 0
+            value: `${normalizedAvgResponseTime || 0}ms`,
+            change: `${normalizedResponseTimeChange < 0 ? "" : "+"}${
+              normalizedResponseTimeChange || 0
             }ms`,
             icon: Activity,
             color: "from-purple-600 to-violet-600",
@@ -436,12 +509,30 @@ const Dashboard = () => {
         ]);
       }
 
+      // Timeseries analytics powers the Performance Overview chart.
+      // If it fails, show an empty-state chart rather than crashing.
+      if (analyticsResponse.status === "fulfilled" && analyticsResponse.value.success) {
+        const nextAnalyticsSeries =
+          ((analyticsResponse.value.data as any)?.series as any[]) || [];
+        setAnalyticsSeries(nextAnalyticsSeries);
+        try {
+          localStorage.setItem(
+            "dashboard_analytics_series_v1",
+            JSON.stringify(nextAnalyticsSeries)
+          );
+        } catch {}
+      } else {
+        // Keep last successful analytics series instead of wiping to empty.
+        console.warn("❌ Analytics fetch failed; keeping last successful series.", analyticsResponse);
+      }
+
       // Check if any request failed with auth error
       const authErrors = [
         statsResponse,
         crewJobsResponse,
         activitiesResponse,
         metricsResponse,
+        analyticsResponse,
       ].filter(
         (response) =>
           response.status === "rejected" &&
@@ -492,61 +583,25 @@ const Dashboard = () => {
       isFetchingRef.current = false;
       setIsDataLoading(false);
     }
-  }, [hasValidToken, user?.id, toast, logout]);
+  }, [canFetchDashboard, toast, logout]);
 
-  // Initialize data fetch - only run once when component mounts and user is authenticated
+  // Initialize data fetch - run whenever auth becomes ready and user is present.
+  // Avoid one-shot gating; Clerk can take longer than a fixed timeout to hydrate.
   useEffect(() => {
-    if (
-      !authLoading &&
-      isAuthenticated &&
-      user?.id &&
-      !isInitializedRef.current
-    ) {
-      isInitializedRef.current = true;
+    if (authLoading) return;
 
-      // Add a small delay to ensure auth context is fully ready
-      setTimeout(() => {
-        fetchDashboardData();
-      }, 100);
+    // If unauthenticated, ProtectedRoute will redirect; don't wipe UI state to 0 (prevents flicker).
+    if (!isAuthenticated) {
+      hasLoadedOnceRef.current = false;
+      return;
     }
 
-    // Reset initialization flag when user changes
-    if (!isAuthenticated || !user?.id) {
-      isInitializedRef.current = false;
-      setStats({
-        totalUploads: 0,
-        successfulUploads: 0,
-        avgConfidence: 0,
-        avgProcessTime: 0,
-      });
-      setRecentUploads([]);
-      setRecentActivities([]);
-      setError(null);
-    }
-  }, [isAuthenticated, user?.id, authLoading]);
-
-  // Separate effect to trigger fetch when auth state becomes ready
-  useEffect(() => {
-    const shouldFetch =
-      !authLoading && isAuthenticated && user?.id && tokenStorage.getToken();
-
-    if (shouldFetch && !isInitializedRef.current) {
-      isInitializedRef.current = true;
-
-      // Ensure auth context is completely ready
-      const timeoutId = setTimeout(() => {
-        if (hasValidToken()) {
-          fetchDashboardData();
-        }
-      }, 200);
-
-      return () => clearTimeout(timeoutId);
-    }
+    // Kick off (or retry) data fetch when auth is ready.
+    // fetchDashboardData itself is guarded against parallel calls.
+    fetchDashboardData();
   }, [
-    isAuthenticated,
-    user?.id,
     authLoading,
-    hasValidToken,
+    isAuthenticated,
     fetchDashboardData,
   ]);
 
@@ -570,6 +625,14 @@ const Dashboard = () => {
   };
 
   // Removed periodic auto-refresh to avoid repeated background requests when stats are legitimately empty
+
+  if (!subscriptionLoading && !isPlanActive) {
+    return (
+      <div className="min-h-screen flex w-full bg-gradient-to-br from-gray-50 via-gray-100 to-gray-200 dark:from-[#0B1026] dark:via-[#1A1033] dark:to-[#0C1226]">
+        <PlanRequiredCard />
+      </div>
+    );
+  }
 
   if (isDataLoading) {
     return <DashboardSkeleton variant="user" showSidebar={!inLayout} />;
@@ -719,41 +782,27 @@ const Dashboard = () => {
             {[
               {
                 title: "Total Uploads",
-                value: stats.totalUploads?.toString() || "0",
-                change: stats.totalUploads > 0 ? "+12%" : "0%",
-                icon: Upload,
-                color: "from-blue-500 to-blue-600",
-                bgColor: "from-slate-800/40 to-slate-700/20",
+                value: String(stats.totalUploads || 0),
+                icon: FileText,
+                color: "from-purple-600 to-blue-600",
               },
               {
-                title: "Successful IDs",
-                value: stats.successfulUploads?.toString() || "0",
-                change:
-                  stats.totalUploads > 0
-                    ? `${(
-                        (stats.successfulUploads / stats.totalUploads) *
-                        100
-                      ).toFixed(1)}% success rate`
-                    : "0%",
+                title: "Completed",
+                value: String(stats.successfulUploads || 0),
                 icon: CheckCircle,
-                color: "from-emerald-500 to-emerald-600",
-                bgColor: "from-slate-800/40 to-slate-700/20",
+                color: "from-green-600 to-emerald-600",
               },
               {
                 title: "Avg Confidence",
                 value: `${Number(stats.avgConfidence || 0).toFixed(1)}%`,
-                change: stats.avgConfidence > 0 ? "+2.1%" : "0%",
                 icon: TrendingUp,
-                color: "from-blue-500 to-blue-600",
-                bgColor: "from-slate-800/40 to-slate-700/20",
+                color: "from-blue-600 to-cyan-600",
               },
               {
                 title: "Avg Processing",
                 value: `${stats.avgProcessTime || 0}s`,
-                change: stats.avgProcessTime > 0 ? "-15%" : "0%",
                 icon: Clock,
-                color: "from-amber-500 to-amber-600",
-                bgColor: "from-slate-800/40 to-slate-700/20",
+                color: "from-orange-600 to-red-600",
               },
             ].map((stat, index) => (
               <motion.div
@@ -761,48 +810,25 @@ const Dashboard = () => {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.1 * index, duration: 0.5 }}
-                whileHover={{ y: -5, scale: 1.02 }}
+                whileHover={{ y: -2, scale: 1.02 }}
                 className="relative group"
               >
-                <div
-                  className="absolute inset-0 rounded-xl sm:rounded-2xl bg-card/95 shadow-[0_18px_45px_rgba(15,23,42,0.06)] dark:bg-gradient-to-br dark:from-slate-900/40 dark:to-slate-800/30 dark:shadow-[0_10px_30px_rgba(0,0,0,0.35)]"
-                />
-                <Card className="relative bg-transparent backdrop-blur-xl border border-border hover:border-border/80 transition-all duration-300 dark:border-slate-700/60 dark:hover:border-slate-500/70">
+                <div className="absolute inset-0 rounded-xl md:rounded-2xl bg-card/80 blur-xl opacity-60 group-hover:opacity-80 transition-opacity" />
+                <Card className="relative border border-border bg-card text-foreground shadow-soft-elevated backdrop-blur-xl transition-all duration-300 hover:border-[#C7D2FE] dark:bg-black/40 dark:border-white/10 dark:hover:border-white/20">
                   <CardContent className="p-4 sm:p-6">
                     <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-xs sm:text-sm font-medium text-muted-foreground">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-medium text-muted-foreground md:text-sm truncate">
                           {stat.title}
                         </p>
-                        <p className="mt-1 text-xl sm:text-2xl font-bold text-foreground dark:text-white">
+                        <p className="mt-1 text-lg font-bold text-foreground md:text-xl lg:text-2xl truncate">
                           {stat.value}
                         </p>
-                        <p
-                          className={`mt-1 text-xs sm:text-sm ${
-                            stat.change.startsWith("+")
-                              ? "text-emerald-500"
-                              : "text-red-500"
-                          }`}
-                        >
-                          {stat.change} from last month
-                        </p>
                       </div>
-                      <div className="flex items-center gap-3">
-                        <div
-                          className={`relative flex h-10 w-10 items-center justify-center rounded-full bg-muted/60 shadow-inner`}
-                        >
-                          <div
-                            className="absolute inset-0 rounded-full"
-                            style={{
-                              background: `conic-gradient(hsl(var(--primary)) ${getMetricProgress(
-                                stat.value
-                              )}%, rgba(148,163,184,0.18) 0)`,
-                            }}
-                          />
-                          <div className="relative h-7 w-7 rounded-full bg-card flex items-center justify-center">
-                            <stat.icon className="w-4 h-4 text-primary" />
-                          </div>
-                        </div>
+                      <div
+                        className={`p-3 rounded-xl bg-gradient-to-r ${stat.color} shadow-lg flex-shrink-0`}
+                      >
+                        <stat.icon className="w-5 h-5 text-white" />
                       </div>
                     </div>
                   </CardContent>
@@ -825,46 +851,14 @@ const Dashboard = () => {
                   <span>Performance Overview</span>
                 </CardTitle>
                 <CardDescription className="text-sm text-muted-foreground">
-                  AI model insights and system performance metrics
+                  Trends over the last 30 days (analysis volume + quality)
                 </CardDescription>
               </CardHeader>
               <CardContent className="p-4 sm:p-6">
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-                  {performanceMetrics.map((metric, index) => (
-                    <motion.div
-                      key={metric.label}
-                      initial={{ opacity: 0, scale: 0.8 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      transition={{ delay: 0.7 + index * 0.1 }}
-                      className="relative group"
-                    >
-                      <div className="absolute inset-0 rounded-2xl bg-card/80 dark:bg-gradient-to-br dark:from-slate-900/60 dark:to-slate-800/40" />
-                      <div className="relative p-4 rounded-2xl border border-border/80 bg-background/80 backdrop-blur-sm hover:border-border transition-colors dark:border-white/10 dark:bg-transparent dark:hover:border-white/20">
-                        <div className="flex items-center justify-between mb-3">
-                          <div
-                            className="p-2 rounded-xl bg-gradient-to-r from-[#3A5AFE] to-[#4C5DFF] shadow-lg"
-                          >
-                            <metric.icon className="w-5 h-5 text-white" />
-                          </div>
-                          <Badge
-                            variant="secondary"
-                            className="bg-emerald-600/20 text-emerald-400 border-emerald-500/30"
-                          >
-                            {metric.change}
-                          </Badge>
-                        </div>
-                        <div>
-                          <p className="text-sm text-muted-foreground">
-                            {metric.label}
-                          </p>
-                          <p className="text-2xl font-bold text-foreground dark:text-white">
-                            {metric.value}
-                          </p>
-                        </div>
-                      </div>
-                    </motion.div>
-                  ))}
-                </div>
+                <PerformanceOverviewChart
+                  series={analyticsSeries}
+                  isLoading={isDataLoading}
+                />
               </CardContent>
             </Card>
           </motion.div>

@@ -91,6 +91,38 @@ class EmailService {
   private senderName: string = "SpareFinder";
   private senderEmail: string = "";
 
+  private escapeRegExp(source: string): string {
+    return source.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  }
+
+  private interpolateUserPlaceholders(text: string, userName: string): string {
+    // Support both {{userName}} and {{ userName }} (AI copy sometimes adds spaces)
+    return text.replace(/\{\{\s*userName\s*\}\}/g, userName || "there");
+  }
+
+  private normalizeReminderCopy(args: {
+    copy?: ReminderCopy;
+    userName: string;
+  }): ReminderCopy | undefined {
+    const { copy, userName } = args;
+    if (!copy) return undefined;
+
+    const mapStr = (value: string | undefined) =>
+      typeof value === "string" ? this.interpolateUserPlaceholders(value, userName) : undefined;
+
+    return {
+      subject: mapStr(copy.subject),
+      headline: mapStr(copy.headline),
+      subhead: mapStr(copy.subhead),
+      ctaLabel: mapStr(copy.ctaLabel),
+      bullets: Array.isArray(copy.bullets)
+        ? copy.bullets
+            .map((b) => String(b))
+            .map((b) => this.interpolateUserPlaceholders(b, userName))
+        : undefined,
+    };
+  }
+
   constructor() {
     // IMPORTANT:
     // On Render, direct SMTP often times out / is blocked.
@@ -615,8 +647,13 @@ class EmailService {
       const emailEnabled = await this.isEmailEnabled();
       if (!emailEnabled) return false;
 
+      const copy = this.normalizeReminderCopy({
+        copy: data.copy,
+        userName: data.userName || "there",
+      });
+
       const subject =
-        data.copy?.subject || "You still have SpareFinder credits waiting for you";
+        copy?.subject || "You still have SpareFinder credits waiting for you";
       const frontendUrl =
         process.env.FRONTEND_URL || "https://sparefinder.org";
       const baseUrl = frontendUrl.replace(/\/$/, "");
@@ -626,20 +663,20 @@ class EmailService {
       const docsUrl = `${baseUrl}/help`;
 
       const headline =
-        data.copy?.headline ||
+        copy?.headline ||
         `Hey ${data.userName || "there"}, your first search is one click away ⚡`;
       const subhead =
-        data.copy?.subhead ||
+        copy?.subhead ||
         "SpareFinder is ready whenever you are – upload a part photo and we’ll handle the rest.";
       const bullets =
-        (data.copy?.bullets && data.copy.bullets.length > 0
-          ? data.copy.bullets
+        (copy?.bullets && copy.bullets.length > 0
+          ? copy.bullets
           : [
               "<strong>Snap or upload</strong> a clear photo of any spare part.",
               "<strong>See the match instantly</strong> with confidence scores and key specs.",
               "<strong>Compare alternatives</strong> and save results to your history.",
             ]) ?? [];
-      const ctaLabel = data.copy?.ctaLabel || "Run a quick test search";
+      const ctaLabel = copy?.ctaLabel || "Run a quick test search";
 
       const html = `
 <!doctype html>
@@ -778,8 +815,13 @@ class EmailService {
       const emailEnabled = await this.isEmailEnabled();
       if (!emailEnabled) return false;
 
+      const copy = this.normalizeReminderCopy({
+        copy: data.copy,
+        userName: data.userName || "there",
+      });
+
       const subject =
-        data.copy?.subject || "See what SpareFinder can do for your next job";
+        copy?.subject || "See what SpareFinder can do for your next job";
       const frontendUrl =
         process.env.FRONTEND_URL || "https://sparefinder.org";
       const baseUrl = frontendUrl.replace(/\/$/, "");
@@ -794,20 +836,20 @@ class EmailService {
       const year = new Date().getFullYear();
 
       const headline =
-        data.copy?.headline ||
+        copy?.headline ||
         `${data.userName || "There"}, spare parts shouldn’t slow your team down`;
       const subhead =
-        data.copy?.subhead ||
+        copy?.subhead ||
         "Upload a photo (or add keywords), get a confident match, and share a clean result with your team—without digging through old catalogues.";
       const bullets =
-        (data.copy?.bullets && data.copy.bullets.length > 0
-          ? data.copy.bullets
+        (copy?.bullets && copy.bullets.length > 0
+          ? copy.bullets
           : [
               "Field engineers needing fast identification from site.",
               "Stores teams dealing with unlabelled or legacy stock.",
               "Maintenance teams logging parts for repeat orders.",
             ]) ?? [];
-      const ctaLabel = data.copy?.ctaLabel || "Upload a part photo";
+      const ctaLabel = copy?.ctaLabel || "Upload a part photo";
 
       const html = `
 <!doctype html>
@@ -1642,15 +1684,10 @@ class EmailService {
       // Replace all variables
       Object.entries(data.variables).forEach(([key, value]) => {
         const placeholder = `{{${key}}}`;
-        htmlContent = htmlContent.replace(
-          new RegExp(placeholder, "g"),
-          String(value)
-        );
-        textContent = textContent.replace(
-          new RegExp(placeholder, "g"),
-          String(value)
-        );
-        subject = subject.replace(new RegExp(placeholder, "g"), String(value));
+        const matcher = new RegExp(this.escapeRegExp(placeholder), "g");
+        htmlContent = htmlContent.replace(matcher, String(value));
+        textContent = textContent.replace(matcher, String(value));
+        subject = subject.replace(matcher, String(value));
       });
 
       const emailOptions: EmailOptions = {

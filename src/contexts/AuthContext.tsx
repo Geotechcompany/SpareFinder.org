@@ -1,11 +1,6 @@
-import React, {
-  createContext,
-  useContext,
-  useState,
-  useEffect,
-  ReactNode,
-} from "react";
-import { api, tokenStorage } from "@/lib/api";
+import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { useAuth as useClerkAuth, useUser as useClerkUser } from "@clerk/clerk-react";
+import { type ApiResponse, api, setAuthTokenProvider, tokenStorage } from "@/lib/api";
 
 interface User {
   id: string;
@@ -21,10 +16,11 @@ interface AuthContextType {
   user: User | null;
   isLoading: boolean;
   isAuthenticated: boolean;
-  login: (
-    email: string,
-    password: string
-  ) => Promise<{ success: boolean; error?: string }>;
+  isAdmin: boolean;
+  isSuperAdmin: boolean;
+  // Legacy methods kept for compatibility with existing pages.
+  // With Clerk enabled, Login/Register pages should use Clerk UI instead of these.
+  login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
   signup: (userData: {
     email: string;
     password: string;
@@ -46,190 +42,122 @@ export const useAuth = (): AuthContextType => {
 };
 
 interface AuthProviderProps {
-  children: ReactNode;
+  children: React.ReactNode;
 }
 
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
+  const { isLoaded, isSignedIn, getToken, signOut } = useClerkAuth();
+  const { user: clerkUser } = useClerkUser();
+
   const [user, setUser] = useState<User | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isProfileLoading, setIsProfileLoading] = useState(false);
 
   // Check if user is authenticated on app load
   const checkAuth = async () => {
     try {
-      setIsLoading(true);
+      if (!isLoaded) return;
 
-      const token = tokenStorage.getToken();
-      if (!token) {
-        console.log("🔍 No token found in sessionStorage");
+      if (!isSignedIn) {
         setUser(null);
-        setIsAuthenticated(false);
+        tokenStorage.clearAll(); // legacy cleanup
         return;
       }
 
-      console.log("🔍 Token found, verifying with backend...");
+      setIsProfileLoading(true);
 
-      // Verify token with backend
-      const response = await api.auth.getCurrentUser();
+      // Verify / sync app profile via backend (also performs Clerk→profiles linking server-side)
+      const response = await api.auth.getCurrentUser<{ user: User }>();
 
       if (response.success && response.data?.user) {
-        console.log("✅ User authenticated successfully:", response.data.user);
         setUser(response.data.user);
-        setIsAuthenticated(true);
       } else {
-        console.warn("❌ Token verification failed:", response.error);
-        // Clear invalid tokens
-        tokenStorage.clearAll();
+        console.warn("❌ Failed to load app profile:", response.error || response.message);
         setUser(null);
-        setIsAuthenticated(false);
       }
     } catch (error) {
       console.error("❌ Auth check failed:", error);
-      // Clear tokens on error
-      tokenStorage.clearAll();
       setUser(null);
-      setIsAuthenticated(false);
     } finally {
-      setIsLoading(false);
+      setIsProfileLoading(false);
     }
   };
 
-  // Login function
-  const login = async (
-    email: string,
-    password: string
-  ): Promise<{ success: boolean; error?: string }> => {
-    try {
-      setIsLoading(true);
-      console.log("🔐 Attempting login for:", email);
-
-      const response = await api.auth.login({ email, password });
-
-      if (response.success && response.user) {
-        console.log("✅ Login successful:", response.user);
-        setUser(response.user);
-        setIsAuthenticated(true);
-        return { success: true };
-      } else {
-        console.error("❌ Login failed:", response.error || response.message);
-        const backendCode = (response as any)?.code;
-        const backendMessage =
-          (response as any)?.message || (response as any)?.error || "";
-        const isInvalidCredentials =
-          backendCode === "invalid_credentials" ||
-          (/invalid/i.test(backendMessage) &&
-            /(credential|password|email)/i.test(backendMessage));
-        return {
-          success: false,
-          error: isInvalidCredentials
-            ? "Invalid email or password"
-            : backendMessage || "Login failed",
-        };
-      }
-    } catch (error: any) {
-      console.error("❌ Login error:", error);
-      const status = error?.response?.status;
-      const backendCode = error?.response?.data?.code;
-      const backendMessage =
-        error?.response?.data?.message || error?.message || "";
-      const isInvalidCredentials =
-        status === 401 ||
-        backendCode === "invalid_credentials" ||
-        (/invalid/i.test(backendMessage) &&
-          /(credential|password|email|login)/i.test(backendMessage));
-      const errorMessage = isInvalidCredentials
-        ? "Invalid email or password"
-        : backendMessage || "Login failed";
-      return { success: false, error: errorMessage };
-    } finally {
-      setIsLoading(false);
-    }
+  // Legacy login (Supabase) kept for compatibility during migration. Prefer Clerk UI.
+  const login = async (): Promise<{ success: boolean; error?: string }> => {
+    return {
+      success: false,
+      error: "This app now uses Clerk. Please sign in using the Clerk sign-in form.",
+    };
   };
 
-  // Signup function
+  // Legacy signup (Supabase) kept for compatibility during migration. Prefer Clerk UI.
   const signup = async (userData: {
     email: string;
     password: string;
     full_name: string;
     company?: string;
   }): Promise<{ success: boolean; error?: string }> => {
-    try {
-      setIsLoading(true);
-      console.log("📝 Attempting signup for:", userData.email);
-
-      const response = await api.auth.register(userData);
-
-      if (response.success && response.user) {
-        console.log("✅ Signup successful:", response.user);
-        setUser(response.user);
-        setIsAuthenticated(true);
-        return { success: true };
-      } else {
-        console.error("❌ Signup failed:", response.error || response.message);
-        return {
-          success: false,
-          error: response.message || response.error || "Registration failed",
-        };
-      }
-    } catch (error: any) {
-      console.error("❌ Signup error:", error);
-      const errorMessage =
-        error.response?.data?.message || error.message || "Registration failed";
-      return { success: false, error: errorMessage };
-    } finally {
-      setIsLoading(false);
-    }
+    return {
+      success: false,
+      error: "This app now uses Clerk. Please sign up using the Clerk sign-up form.",
+    };
   };
 
   // Logout function
   const logout = async (): Promise<void> => {
     try {
       console.log("🚪 Logging out user...");
-
-      // Call backend logout (this will also clear tokens)
-      await api.auth.logout();
-
-      console.log("✅ Logout successful");
+      await signOut();
     } catch (error) {
       console.error("❌ Logout error:", error);
       // Even if backend logout fails, clear local state
     } finally {
       // Always clear local state
       setUser(null);
-      setIsAuthenticated(false);
       tokenStorage.clearAll();
     }
   };
 
-  // Check auth on mount and when tokens change
+  // Configure Axios token injection to use Clerk getToken()
+  useEffect(() => {
+    if (!isLoaded) return;
+    setAuthTokenProvider(
+      isSignedIn
+        ? async () => {
+            const token = await getToken();
+            return token || null;
+          }
+        : null
+    );
+
+    // legacy cleanup: if Clerk is enabled, don't keep Supabase tokens around
+    if (isSignedIn) tokenStorage.clearAll();
+  }, [getToken, isLoaded, isSignedIn]);
+
+  // Fetch profile when Clerk session changes
   useEffect(() => {
     checkAuth();
-  }, []);
+  }, [isLoaded, isSignedIn, clerkUser?.id]);
 
-  // Listen for storage changes (logout in other tabs) - Note: sessionStorage doesn't sync across tabs
-  useEffect(() => {
-    const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === "auth_token" && !e.newValue) {
-        // Token was removed in another tab (this won't work with sessionStorage but keeping for localStorage compatibility)
-        console.log("🔄 Token removed in another tab, logging out...");
-        setUser(null);
-        setIsAuthenticated(false);
-      }
-    };
+  // Note: Clerk session state is shared across tabs by Clerk itself.
 
-    window.addEventListener("storage", handleStorageChange);
-    return () => window.removeEventListener("storage", handleStorageChange);
-  }, []);
+  const isLoading = !isLoaded || isProfileLoading;
+  const isAuthenticated = !!isSignedIn;
 
-  const value: AuthContextType = {
-    user,
-    isLoading,
-    isAuthenticated,
-    login,
-    signup,
-    logout,
-    checkAuth,
-  };
+  const value: AuthContextType = useMemo(
+    () => ({
+      user,
+      isLoading,
+      isAuthenticated,
+      isAdmin: user?.role === "admin" || user?.role === "super_admin",
+      isSuperAdmin: user?.role === "super_admin",
+      login,
+      signup,
+      logout,
+      checkAuth,
+    }),
+    [user, isLoading, isAuthenticated]
+  );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };

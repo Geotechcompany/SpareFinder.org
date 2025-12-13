@@ -1,6 +1,59 @@
-import { Response, NextFunction } from 'express';
-import { supabase } from '../server';
-import { AuthRequest } from '../types/auth';
+import { Response, NextFunction } from "express";
+import { randomBytes } from "crypto";
+import { supabase } from "../server";
+import { AuthRequest } from "../types/auth";
+import {
+  fetchClerkUser,
+  verifyClerkSessionToken,
+} from "../services/clerk-auth";
+
+const normalizeEmail = (email: string) => email.trim().toLowerCase();
+
+const shouldUpdateStringField = (current: unknown, incoming: string | null) => {
+  if (!incoming) return false;
+  if (typeof current !== "string") return true;
+  const trimmed = current.trim();
+  if (trimmed.length === 0) return true;
+  return trimmed !== incoming;
+};
+
+const parseEmailAllowlist = (raw: string | undefined) => {
+  const list = (raw ?? "")
+    .split(/[,;\n]/g)
+    .map((e) => e.trim().toLowerCase())
+    .filter(Boolean);
+  return new Set(list);
+};
+
+type AppRole = "user" | "admin" | "super_admin";
+const roleRank: Record<AppRole, number> = {
+  user: 0,
+  admin: 1,
+  super_admin: 2,
+};
+
+const resolveDesiredRole = (args: {
+  currentRole: unknown;
+  metadataRole: AppRole | null;
+  isEmailAllowlisted: boolean;
+}): { desiredRole: AppRole; shouldUpdate: boolean } => {
+  const current =
+    args.currentRole === "admin" ||
+    args.currentRole === "super_admin" ||
+    args.currentRole === "user"
+      ? (args.currentRole as AppRole)
+      : "user";
+
+  // Only ever upgrade automatically (never downgrade on login).
+  const fromAllowlist: AppRole = args.isEmailAllowlisted ? "admin" : "user";
+  const fromMetadata: AppRole = args.metadataRole ?? "user";
+
+  const desired: AppRole =
+    roleRank[fromMetadata] >= roleRank[fromAllowlist] ? fromMetadata : fromAllowlist;
+
+  const shouldUpdate = roleRank[desired] > roleRank[current];
+  return { desiredRole: desired, shouldUpdate };
+};
 
 export const authenticateToken = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
@@ -18,18 +71,256 @@ export const authenticateToken = async (req: AuthRequest, res: Response, next: N
       });
     }
 
-    // Use Supabase to verify the token
-    console.log('🔍 Verifying token with Supabase...');
-    
-    // Try to get user with the JWT token
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    // 1) Try Clerk session token first (new auth)
+    try {
+      const verified = await verifyClerkSessionToken(token);
+      if (verified?.clerkUserId) {
+        const clerkUser = await fetchClerkUser(verified.clerkUserId);
+        const desiredEmail = normalizeEmail(clerkUser.primaryEmail);
+        const desiredFullName =
+          clerkUser.fullName || desiredEmail.split("@")[0] || null;
+        const desiredAvatarUrl = clerkUser.avatarUrl ?? null;
+        const emailAllowlist = parseEmailAllowlist(process.env.ADMIN_WHITELIST_EMAILS);
+        const isEmailAllowlisted = emailAllowlist.has(desiredEmail);
+
+        // Find existing profile by clerk_user_id
+        const { data: byClerk, error: byClerkError } = await supabase
+          .from("profiles")
+          .select("*")
+          .eq("clerk_user_id", clerkUser.clerkUserId)
+          .single();
+
+        if (!byClerkError && byClerk) {
+          // Sync profile info on login (only update if values are empty or changed)
+          const profileEmail = typeof byClerk.email === "string" ? normalizeEmail(byClerk.email) : null;
+          const emailChanged = profileEmail && profileEmail !== desiredEmail;
+
+          if (emailChanged) {
+            // Prevent collisions: if another profile already has this email, block.
+            const { data: emailOwner, error: emailOwnerErr } = await supabase
+              .from("profiles")
+              .select("id")
+              .eq("email", desiredEmail)
+              .single();
+
+            if (!emailOwnerErr && emailOwner?.id && emailOwner.id !== byClerk.id) {
+              return res.status(409).json({
+                success: false,
+                error: "Account conflict",
+                message:
+                  "This email is already associated with another account. Please contact support.",
+              });
+            }
+          }
+
+          const profilePatch: Record<string, unknown> = {};
+          if (emailChanged) profilePatch.email = desiredEmail;
+          if (shouldUpdateStringField(byClerk.full_name, desiredFullName)) {
+            profilePatch.full_name = desiredFullName;
+          }
+          if (shouldUpdateStringField(byClerk.avatar_url, desiredAvatarUrl)) {
+            profilePatch.avatar_url = desiredAvatarUrl;
+          }
+
+          const { desiredRole, shouldUpdate: shouldUpdateRole } = resolveDesiredRole({
+            currentRole: byClerk.role,
+            metadataRole: clerkUser.roleFromMetadata,
+            isEmailAllowlisted,
+          });
+          if (shouldUpdateRole) profilePatch.role = desiredRole;
+
+          if (Object.keys(profilePatch).length > 0) {
+            profilePatch.updated_at = new Date().toISOString();
+            await supabase.from("profiles").update(profilePatch).eq("id", byClerk.id);
+          }
+
+          req.user = {
+            userId: byClerk.id,
+            email: (byClerk.email as string) || desiredEmail,
+            role: (profilePatch.role as string) || byClerk.role || "user",
+            clerkUserId: clerkUser.clerkUserId,
+          };
+
+          console.log("🎉 User Successfully Authenticated (Clerk):", req.user);
+          return next();
+        }
+
+        if (byClerkError && byClerkError.code !== "PGRST116") {
+          console.error("❌ Clerk profile lookup error:", byClerkError);
+          return res.status(500).json({
+            success: false,
+            error: "Profile fetch failed",
+            message: "Failed to retrieve user profile",
+          });
+        }
+
+        // Link existing profile by email (one-time migration)
+        const { data: byEmail, error: byEmailError } = await supabase
+          .from("profiles")
+          .select("*")
+          .eq("email", desiredEmail)
+          .single();
+
+        if (!byEmailError && byEmail) {
+          // If profile is already linked to a different Clerk user, block to prevent account takeovers.
+          if (
+            byEmail.clerk_user_id &&
+            byEmail.clerk_user_id !== clerkUser.clerkUserId
+          ) {
+            return res.status(409).json({
+              success: false,
+              error: "Account conflict",
+              message:
+                "This email is already linked to a different account. Please contact support.",
+            });
+          }
+
+          // Link + sync (safe, does not overwrite populated fields unless changed)
+          const patch: Record<string, unknown> = {
+            updated_at: new Date().toISOString(),
+          };
+          if (!byEmail.clerk_user_id) patch.clerk_user_id = clerkUser.clerkUserId;
+          if (shouldUpdateStringField(byEmail.full_name, desiredFullName)) {
+            patch.full_name = desiredFullName;
+          }
+          if (shouldUpdateStringField(byEmail.avatar_url, desiredAvatarUrl)) {
+            patch.avatar_url = desiredAvatarUrl;
+          }
+
+          const { desiredRole, shouldUpdate: shouldUpdateRole } = resolveDesiredRole({
+            currentRole: byEmail.role,
+            metadataRole: clerkUser.roleFromMetadata,
+            isEmailAllowlisted,
+          });
+          if (shouldUpdateRole) patch.role = desiredRole;
+
+          const { data: linked, error: linkError } = await supabase
+            .from("profiles")
+            .update(patch)
+            .eq("id", byEmail.id)
+            .select("*")
+            .single();
+
+          if (linkError) {
+            console.error("❌ Failed to link/sync Clerk user to profile:", linkError);
+            return res.status(500).json({
+              success: false,
+              error: "Profile update failed",
+              message: "Failed to link your account. Please contact support.",
+            });
+          }
+
+          req.user = {
+            userId: linked.id,
+            email: (linked.email as string) || desiredEmail,
+            role: linked.role || "user",
+            clerkUserId: clerkUser.clerkUserId,
+          };
+
+          console.log("🎉 User Successfully Authenticated (Clerk linked/synced):", req.user);
+          return next();
+        }
+
+        if (byEmailError && byEmailError.code !== "PGRST116") {
+          console.error("❌ Email profile lookup error:", byEmailError);
+          return res.status(500).json({
+            success: false,
+            error: "Profile fetch failed",
+            message: "Failed to retrieve user profile",
+          });
+        }
+
+        // No existing profile: create a Supabase Auth user (to satisfy FK profiles.id -> auth.users.id),
+        // then create the profile row mapped to Clerk.
+        const nowIso = new Date().toISOString();
+        const { desiredRole } = resolveDesiredRole({
+          currentRole: "user",
+          metadataRole: clerkUser.roleFromMetadata,
+          isEmailAllowlisted,
+        });
+
+        const randomPassword = randomBytes(24).toString("base64url");
+        const { data: authCreated, error: authCreateError } =
+          await supabase.auth.admin.createUser({
+            email: desiredEmail,
+            password: randomPassword,
+            email_confirm: true,
+            user_metadata: {
+              full_name: desiredFullName,
+              avatar_url: desiredAvatarUrl,
+              clerk_user_id: clerkUser.clerkUserId,
+            },
+          });
+
+        const authUserId = authCreated?.user?.id ?? null;
+        if (authCreateError || !authUserId) {
+          console.error("❌ Supabase auth user creation failed:", authCreateError);
+          return res.status(500).json({
+            success: false,
+            error: "Account creation failed",
+            message:
+              "Failed to create user account. Please contact support.",
+          });
+        }
+
+        const { data: created, error: createError } = await supabase
+          .from("profiles")
+          .insert([
+            {
+              id: authUserId,
+              email: desiredEmail,
+              full_name: desiredFullName || "User",
+              avatar_url: desiredAvatarUrl,
+              role: desiredRole,
+              clerk_user_id: clerkUser.clerkUserId,
+              created_at: nowIso,
+              updated_at: nowIso,
+            },
+          ])
+          .select("*")
+          .single();
+
+        if (createError) {
+          console.error("❌ Clerk profile creation error:", createError);
+          // Best-effort cleanup so we don't leave orphaned auth users behind.
+          await supabase.auth.admin.deleteUser(authUserId).catch(() => {});
+          return res.status(500).json({
+            success: false,
+            error: "Profile creation failed",
+            message: "Failed to create user profile. Please contact support.",
+          });
+        }
+
+        req.user = {
+          userId: created.id,
+          email: (created.email as string) || desiredEmail,
+          role: created.role || "user",
+          clerkUserId: clerkUser.clerkUserId,
+        };
+
+        console.log("🎉 User Successfully Authenticated (Clerk new profile):", req.user);
+        return next();
+      }
+    } catch (clerkError) {
+      // Clerk token verification failed; fall back to legacy Supabase auth below.
+      console.warn("⚠️ Clerk token verification failed, falling back to Supabase:", clerkError);
+    }
+
+    // 2) Legacy path: Supabase Auth access token (existing auth)
+    console.log("🔍 Verifying token with Supabase...");
+
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser(token);
           
     if (authError || !user) {
-      console.warn('❌ Supabase token verification failed:', authError?.message);
+      console.warn("❌ Supabase token verification failed:", authError?.message);
       return res.status(401).json({
         success: false,
-        error: 'Invalid token',
-        message: 'Authentication token is invalid or expired. Please log in again.'
+        error: "Invalid token",
+        message:
+          "Authentication token is invalid or expired. Please log in again.",
       });
     }
 
@@ -113,15 +404,15 @@ export const requireRole = (roles: string[]) => {
   return (req: AuthRequest, res: Response, next: NextFunction) => {
     if (!req.user) {
       return res.status(401).json({
-        error: 'Authentication required',
-        message: 'Please log in first'
+        error: "Authentication required",
+        message: "Please log in first",
       });
     }
 
     if (!roles.includes(req.user.role)) {
       return res.status(403).json({
-        error: 'Insufficient permissions',
-        message: 'You do not have permission to access this resource'
+        error: "Insufficient permissions",
+        message: "You do not have permission to access this resource",
       });
     }
 
@@ -129,22 +420,26 @@ export const requireRole = (roles: string[]) => {
   };
 };
 
-export const requireAdmin = requireRole(['admin', 'super_admin']);
-export const requireSuperAdmin = requireRole(['super_admin']);
+export const requireAdmin = requireRole(["admin", "super_admin"]);
+export const requireSuperAdmin = requireRole(["super_admin"]);
 
 // Middleware specifically for admin console access
-export const requireAdminLogin = (req: AuthRequest, res: Response, next: NextFunction) => {
+export const requireAdminLogin = (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+) => {
   if (!req.user) {
     return res.status(401).json({
-      error: 'Authentication required',
-      message: 'Please log in first'
+      error: "Authentication required",
+      message: "Please log in first",
     });
   }
 
-  if (!['admin', 'super_admin'].includes(req.user.role)) {
+  if (!["admin", "super_admin"].includes(req.user.role)) {
     return res.status(403).json({
-      error: 'Insufficient permissions',
-      message: 'Admin privileges required'
+      error: "Insufficient permissions",
+      message: "Admin privileges required",
     });
   }
 

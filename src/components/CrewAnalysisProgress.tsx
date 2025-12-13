@@ -128,14 +128,14 @@ export const CrewAnalysisProgress = ({
         {isAnalyzing && (
           <>
             <div className="flex items-center justify-between text-xs">
-              <span className="text-gray-400">SpareFinder AI Research</span>
+              <span className="text-muted-foreground">SpareFinder AI Research</span>
               <span className="text-blue-400">{progress}%</span>
             </div>
             <Progress value={progress} className="h-1" />
 
             {/* Current Stage + Toggle Button */}
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 text-xs text-gray-400">
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
                 <Loader2 className="h-3 w-3 animate-spin text-blue-400" />
                 <span>
                   {currentStage
@@ -153,7 +153,7 @@ export const CrewAnalysisProgress = ({
                     onToggleExpanded();
                   }
                 }}
-                className="h-6 px-2 text-xs text-gray-400 hover:text-gray-300 hover:bg-gray-700/50"
+                className="h-6 px-2 text-xs text-muted-foreground hover:text-foreground hover:bg-accent"
                 title={isExpanded ? "Collapse stages" : "Expand stages"}
               >
                 {isExpanded ? (
@@ -166,7 +166,7 @@ export const CrewAnalysisProgress = ({
 
             {/* Collapsible Stages List */}
             {isExpanded && (
-              <div className="space-y-1.5 pt-2 border-t border-gray-700/50">
+              <div className="space-y-1.5 pt-2 border-t border-border">
                 {stages.map((stage, index) => {
                   const stageStatus = getStageStatus(index);
                   const displayText =
@@ -189,7 +189,7 @@ export const CrewAnalysisProgress = ({
                         ${stageStatus === "completed" ? "text-green-400" : ""}
                         ${
                           stageStatus === "pending"
-                            ? "text-gray-500 opacity-60"
+                            ? "text-muted-foreground/70 opacity-70"
                             : ""
                         }
                       `}
@@ -202,7 +202,7 @@ export const CrewAnalysisProgress = ({
                           <CheckCircle2 className="h-3 w-3" />
                         )}
                         {stageStatus === "pending" && (
-                          <div className="h-3 w-3 rounded-full border border-gray-500" />
+                          <div className="h-3 w-3 rounded-full border border-muted-foreground/50" />
                         )}
                       </div>
                       {stageStatus !== "completed" && (
@@ -243,16 +243,10 @@ export const CrewAnalysisProgress = ({
           SpareFinder AI Research
         </h4>
         <Badge
-          variant={
-            isAnalyzing ? "default" : isCompleted ? "success" : "destructive"
-          }
-          className={
-            isAnalyzing
-              ? "bg-blue-500"
-              : isCompleted
-              ? "bg-green-500"
-              : "bg-red-500"
-          }
+          variant="outline"
+          className={`${
+            isAnalyzing ? "bg-blue-500" : isCompleted ? "bg-green-500" : "bg-red-500"
+          }`}
         >
           {isAnalyzing ? "In Progress" : isCompleted ? "Complete" : "Failed"}
         </Badge>

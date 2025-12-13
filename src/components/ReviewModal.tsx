@@ -13,7 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { Star, Loader2, CheckCircle, X } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
-import { tokenStorage } from "@/lib/api";
+import { api } from "@/lib/api";
 
 interface ReviewModalProps {
   isOpen: boolean;
@@ -89,36 +89,20 @@ export const ReviewModal: React.FC<ReviewModalProps> = ({
     setIsSubmitting(true);
 
     try {
-      const token = tokenStorage.getToken();
-      const API_BASE =
-        import.meta.env.VITE_API_BASE_URL || "http://localhost:3000";
-
-      const response = await fetch(`${API_BASE}/api/reviews/analysis`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          job_id: jobId,
-          job_type: jobType,
-          part_search_id: partSearchId || null,
-          rating,
-          comment: comment.trim() || null,
-          feedback_type: feedbackType,
-          helpful_features:
-            selectedFeatures.length > 0 ? selectedFeatures : null,
-          improvement_suggestions: improvementSuggestions.trim() || null,
-        }),
+      const result = await api.analysisReviews.create({
+        job_id: jobId,
+        job_type: jobType,
+        part_search_id: partSearchId || null,
+        rating,
+        comment: comment.trim() || null,
+        feedback_type: feedbackType,
+        helpful_features: selectedFeatures.length > 0 ? selectedFeatures : null,
+        improvement_suggestions: improvementSuggestions.trim() || null,
       });
 
-      const result = await response.json();
-
-      if (!response.ok) {
-        // Check if it's a duplicate review error
-        if (response.status === 409) {
-          throw new Error("duplicate");
-        }
+      if (!result.success) {
+        // Preserve existing UX for duplicate reviews if backend returns 409 conflict.
+        // Axios throws for non-2xx, so we only handle "logical" failures here.
         throw new Error(result.error || "Failed to submit review");
       }
 
@@ -169,12 +153,12 @@ export const ReviewModal: React.FC<ReviewModalProps> = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="bg-black/95 backdrop-blur-xl border-white/10 text-white max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="bg-background/95 backdrop-blur-xl border-border text-foreground max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="text-2xl font-bold bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent">
+          <DialogTitle className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 dark:from-purple-400 dark:to-blue-400 bg-clip-text text-transparent">
             Rate Your Analysis
           </DialogTitle>
-          <DialogDescription className="text-gray-400">
+          <DialogDescription className="text-muted-foreground">
             Help us improve by sharing your experience with this analysis
           </DialogDescription>
         </DialogHeader>
@@ -195,8 +179,10 @@ export const ReviewModal: React.FC<ReviewModalProps> = ({
               >
                 <CheckCircle className="w-20 h-20 text-green-500 mb-4" />
               </motion.div>
-              <h3 className="text-2xl font-bold text-white mb-2">Thank You!</h3>
-              <p className="text-gray-400 text-center">
+              <h3 className="text-2xl font-bold text-foreground mb-2">
+                Thank You!
+              </h3>
+              <p className="text-muted-foreground text-center">
                 Your feedback helps us improve SpareFinder AI
               </p>
             </motion.div>
@@ -210,7 +196,7 @@ export const ReviewModal: React.FC<ReviewModalProps> = ({
             >
               {/* Star Rating */}
               <div className="space-y-3">
-                <label className="text-sm font-medium text-gray-300">
+                <label className="text-sm font-medium text-foreground/80">
                   Overall Rating *
                 </label>
                 <div className="flex items-center space-x-2">
@@ -229,7 +215,7 @@ export const ReviewModal: React.FC<ReviewModalProps> = ({
                         className={`w-10 h-10 transition-colors ${
                           star <= (hoveredRating || rating)
                             ? "fill-yellow-400 text-yellow-400"
-                            : "text-gray-600"
+                            : "text-muted-foreground/40"
                         }`}
                       />
                     </motion.button>
@@ -238,7 +224,7 @@ export const ReviewModal: React.FC<ReviewModalProps> = ({
                     <motion.span
                       initial={{ opacity: 0, x: -10 }}
                       animate={{ opacity: 1, x: 0 }}
-                      className="ml-4 text-lg font-semibold text-white"
+                      className="ml-4 text-lg font-semibold text-foreground"
                     >
                       {rating} / 5
                     </motion.span>
@@ -248,7 +234,7 @@ export const ReviewModal: React.FC<ReviewModalProps> = ({
 
               {/* Feedback Type */}
               <div className="space-y-3">
-                <label className="text-sm font-medium text-gray-300">
+                <label className="text-sm font-medium text-foreground/80">
                   What aspect are you reviewing?
                 </label>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
@@ -262,8 +248,8 @@ export const ReviewModal: React.FC<ReviewModalProps> = ({
                       onClick={() => setFeedbackType(option.value)}
                       className={`${
                         feedbackType === option.value
-                          ? "bg-gradient-to-r from-purple-600 to-blue-600 border-purple-500/30"
-                          : "bg-white/5 border-white/10 hover:bg-white/10"
+                          ? "bg-gradient-to-r from-purple-600 to-blue-600 border-purple-500/30 text-white"
+                          : "bg-card border-border hover:bg-accent"
                       }`}
                     >
                       <span className="mr-2">{option.emoji}</span>
@@ -275,7 +261,7 @@ export const ReviewModal: React.FC<ReviewModalProps> = ({
 
               {/* Helpful Features */}
               <div className="space-y-3">
-                <label className="text-sm font-medium text-gray-300">
+                <label className="text-sm font-medium text-foreground/80">
                   Which features were most helpful?
                 </label>
                 <div className="flex flex-wrap gap-2">
@@ -285,8 +271,8 @@ export const ReviewModal: React.FC<ReviewModalProps> = ({
                       onClick={() => handleFeatureToggle(feature)}
                       className={`cursor-pointer transition-all ${
                         selectedFeatures.includes(feature)
-                          ? "bg-gradient-to-r from-purple-600 to-blue-600 border-purple-500/30 hover:opacity-80"
-                          : "bg-white/5 border-white/10 hover:bg-white/10"
+                          ? "bg-gradient-to-r from-purple-600 to-blue-600 border-purple-500/30 text-white hover:opacity-90"
+                          : "bg-muted/30 border-border text-foreground hover:bg-muted/50"
                       }`}
                     >
                       {feature}
@@ -300,34 +286,34 @@ export const ReviewModal: React.FC<ReviewModalProps> = ({
 
               {/* Comment */}
               <div className="space-y-3">
-                <label className="text-sm font-medium text-gray-300">
+                <label className="text-sm font-medium text-foreground/80">
                   Your Feedback (Optional)
                 </label>
                 <Textarea
                   value={comment}
                   onChange={(e) => setComment(e.target.value)}
                   placeholder="Tell us what you liked or what could be improved..."
-                  className="bg-white/5 border-white/10 text-white placeholder:text-gray-500 min-h-[100px] resize-none"
+                  className="bg-background/60 border-border text-foreground placeholder:text-muted-foreground/70 min-h-[100px] resize-none"
                   maxLength={500}
                 />
-                <p className="text-xs text-gray-500 text-right">
+                <p className="text-xs text-muted-foreground text-right">
                   {comment.length} / 500
                 </p>
               </div>
 
               {/* Improvement Suggestions */}
               <div className="space-y-3">
-                <label className="text-sm font-medium text-gray-300">
+                <label className="text-sm font-medium text-foreground/80">
                   Suggestions for Improvement (Optional)
                 </label>
                 <Textarea
                   value={improvementSuggestions}
                   onChange={(e) => setImprovementSuggestions(e.target.value)}
                   placeholder="What features or improvements would you like to see?"
-                  className="bg-white/5 border-white/10 text-white placeholder:text-gray-500 min-h-[80px] resize-none"
+                  className="bg-background/60 border-border text-foreground placeholder:text-muted-foreground/70 min-h-[80px] resize-none"
                   maxLength={500}
                 />
-                <p className="text-xs text-gray-500 text-right">
+                <p className="text-xs text-muted-foreground text-right">
                   {improvementSuggestions.length} / 500
                 </p>
               </div>
@@ -339,7 +325,7 @@ export const ReviewModal: React.FC<ReviewModalProps> = ({
                   variant="outline"
                   onClick={handleClose}
                   disabled={isSubmitting}
-                  className="bg-white/5 border-white/10 hover:bg-white/10"
+                  className="border-border bg-transparent hover:bg-accent"
                 >
                   Cancel
                 </Button>

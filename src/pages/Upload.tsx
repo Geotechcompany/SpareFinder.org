@@ -46,6 +46,8 @@ import MobileSidebar from "@/components/MobileSidebar";
 import { useDashboardLayout } from "@/contexts/DashboardLayoutContext";
 import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
+import { useSubscription } from "@/contexts/SubscriptionContext";
+import { PlanRequiredCard } from "@/components/billing/PlanRequiredCard";
 import axios from "axios";
 import { useToast } from "@/components/ui/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -814,7 +816,7 @@ const AnalysisDebugInfo = ({
         </Button>
       </CollapsibleTrigger>
       <CollapsibleContent>
-        <div className="bg-gray-900/50 p-4 rounded-lg border border-gray-700 mb-4 text-xs">
+        <div className="bg-muted/30 p-4 rounded-lg border border-border mb-4 text-xs dark:bg-black/30 dark:border-white/10">
           <div className="grid grid-cols-2 gap-4">
             <div>
               <h4 className="text-green-300 font-semibold mb-2 flex items-center">
@@ -881,6 +883,7 @@ const Upload = () => {
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const { inLayout } = useDashboardLayout();
+  const { isPlanActive, isLoading: subscriptionLoading } = useSubscription();
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [analysisResults, setAnalysisResults] =
@@ -916,6 +919,10 @@ const Upload = () => {
     }
   });
   const [skipWelcome, setSkipWelcome] = useState<boolean>(false);
+
+  if (!subscriptionLoading && !isPlanActive) {
+    return <PlanRequiredCard title="Activate a plan to upload" />;
+  }
 
   // Wizard state
   const [wizardStep, setWizardStep] = useState<
@@ -3443,15 +3450,15 @@ const Upload = () => {
               <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-[#3A5AFE0A] via-[#8B5CF60A] to-transparent blur-xl opacity-80 dark:from-purple-600/10 dark:to-blue-600/10" />
               <div className="relative rounded-2xl border border-border bg-card shadow-soft-elevated backdrop-blur-xl dark:bg-black/30 dark:border-white/10">
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm text-gray-300 font-medium">
+                  <span className="text-sm text-muted-foreground font-medium">
                     Progress
                   </span>
                   <span className="text-sm text-purple-400 font-semibold">
                     {wizardProgress}%
                   </span>
                 </div>
-                <Progress value={wizardProgress} className="h-2 bg-gray-800" />
-                <div className="flex justify-between mt-2 text-xs text-gray-400">
+                <Progress value={wizardProgress} className="h-2 bg-muted" />
+                <div className="flex justify-between mt-2 text-xs text-muted-foreground">
                   <span
                     className={wizardStep === "image" ? "text-purple-400" : ""}
                   >
@@ -3699,20 +3706,20 @@ const Upload = () => {
               exit={{ opacity: 0, y: -20 }}
               className="max-w-4xl mx-auto"
             >
-              <Card className="bg-black/20 backdrop-blur-xl border-white/10">
+              <Card className="border border-border bg-card/95 shadow-soft-elevated backdrop-blur-xl dark:bg-black/30 dark:border-white/10">
                 <CardHeader>
-                  <CardTitle className="text-white flex items-center gap-2">
-                    <FileText className="w-6 h-6 text-purple-400" />
+                  <CardTitle className="text-foreground flex items-center gap-2">
+                    <FileText className="w-6 h-6 text-primary" />
                     Analysis Summary
                   </CardTitle>
-                  <CardDescription className="text-gray-400">
+                  <CardDescription className="text-muted-foreground">
                     Review your submission before starting the analysis
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
                   {/* Mode Badge */}
                   <div className="flex items-center gap-2">
-                    <span className="text-gray-400 text-sm">
+                    <span className="text-muted-foreground text-sm">
                       Analysis Mode:
                     </span>
                     <Badge className="bg-purple-600/20 text-purple-300 border-purple-500/30">
@@ -3728,13 +3735,13 @@ const Upload = () => {
                   {(selectedMode === "image" || selectedMode === "both") &&
                     uploadedFile && (
                       <div className="space-y-3">
-                        <h3 className="text-white font-semibold flex items-center gap-2">
-                          <ImagePlus className="w-5 h-5 text-blue-400" />
+                        <h3 className="text-foreground font-semibold flex items-center gap-2">
+                          <ImagePlus className="w-5 h-5 text-primary" />
                           Uploaded Image
                         </h3>
-                        <div className="flex items-start gap-4 p-4 rounded-lg bg-white/5 border border-white/10">
+                        <div className="flex items-start gap-4 p-4 rounded-lg bg-muted/30 border border-border">
                           {imagePreview && (
-                            <div className="relative w-32 h-32 rounded-lg overflow-hidden border border-white/10 flex-shrink-0">
+                            <div className="relative w-32 h-32 rounded-lg overflow-hidden border border-border flex-shrink-0">
                               <img
                                 src={imagePreview}
                                 alt="Part preview"
@@ -3743,10 +3750,10 @@ const Upload = () => {
                             </div>
                           )}
                           <div className="flex-1 space-y-2">
-                            <p className="text-white font-medium">
+                            <p className="text-foreground font-medium">
                               {uploadedFile.name}
                             </p>
-                            <p className="text-sm text-gray-400">
+                            <p className="text-sm text-muted-foreground">
                               {(uploadedFile.size / 1024).toFixed(2)} KB •{" "}
                               {uploadedFile.type}
                             </p>
@@ -3763,11 +3770,11 @@ const Upload = () => {
                   {(selectedMode === "keywords" || selectedMode === "both") &&
                     savedKeywords.length > 0 && (
                       <div className="space-y-3">
-                        <h3 className="text-white font-semibold flex items-center gap-2">
-                          <Target className="w-5 h-5 text-emerald-400" />
+                        <h3 className="text-foreground font-semibold flex items-center gap-2">
+                          <Target className="w-5 h-5 text-emerald-500" />
                           Search Keywords ({savedKeywords.length})
                         </h3>
-                        <div className="p-4 rounded-lg bg-white/5 border border-white/10">
+                        <div className="p-4 rounded-lg bg-muted/30 border border-border">
                           <div className="flex flex-wrap gap-2">
                             {savedKeywords.map((keyword, index) => (
                               <Badge
@@ -3783,14 +3790,14 @@ const Upload = () => {
                     )}
 
                   {/* Processing Info */}
-                  <div className="p-4 rounded-lg bg-blue-600/10 border border-blue-500/20">
+                  <div className="p-4 rounded-lg bg-primary/5 border border-primary/15">
                     <div className="flex items-start gap-3">
-                      <Info className="w-5 h-5 text-blue-400 mt-0.5 flex-shrink-0" />
+                      <Info className="w-5 h-5 text-primary mt-0.5 flex-shrink-0" />
                       <div className="space-y-1">
-                        <p className="text-sm text-blue-300 font-medium">
+                        <p className="text-sm text-foreground font-medium">
                           What happens next?
                         </p>
-                        <p className="text-xs text-blue-200/80">
+                        <p className="text-xs text-muted-foreground">
                           {selectedMode === "both"
                             ? "Your image will be analyzed using AI, refined with your keywords for maximum accuracy."
                             : selectedMode === "image"
@@ -3818,11 +3825,11 @@ const Upload = () => {
                     className="relative mx-auto w-full max-w-xl"
                   >
                     <div className="absolute inset-0 bg-gradient-to-r from-purple-600/10 to-blue-600/10 rounded-3xl blur-xl opacity-60" />
-                    <Card className="relative bg-black/20 backdrop-blur-xl border-white/10 h-full">
+                    <Card className="relative border border-border bg-card/95 shadow-soft-elevated backdrop-blur-xl dark:bg-black/30 dark:border-white/10 h-full">
                       <CardHeader>
-                        <CardTitle className="text-white flex items-center justify-between">
+                        <CardTitle className="text-foreground flex items-center justify-between">
                           <div className="flex items-center space-x-2">
-                            <UploadIcon className="w-5 h-5 text-purple-400" />
+                            <UploadIcon className="w-5 h-5 text-primary" />
                             <span>Upload Part Image</span>
                           </div>
                           {uploadedFile && (
@@ -3830,13 +3837,13 @@ const Upload = () => {
                               variant="ghost"
                               size="sm"
                               onClick={handleRemoveFile}
-                              className="text-gray-400 hover:text-white h-8 w-8 p-0"
+                              className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground hover:bg-accent"
                             >
                               <X className="w-4 h-4" />
                             </Button>
                           )}
                         </CardTitle>
-                        <CardDescription className="text-gray-400">
+                        <CardDescription className="text-muted-foreground">
                           Upload an image for AI-powered part identification
                         </CardDescription>
                       </CardHeader>
@@ -3849,7 +3856,7 @@ const Upload = () => {
                               ? "border-purple-500 bg-purple-600/10"
                               : uploadedFile
                               ? "border-green-500/50 bg-green-600/5"
-                              : "border-gray-600 hover:border-gray-500"
+                              : "border-border hover:border-muted-foreground/50"
                           }`}
                           onDragOver={handleDrag}
                           onDragLeave={handleDrag}
@@ -3871,7 +3878,7 @@ const Upload = () => {
                             >
                               {/* Image Preview */}
                               <div className="relative mx-auto w-full max-w-md">
-                                <div className="aspect-video rounded-xl overflow-hidden border border-white/10">
+                                <div className="aspect-video rounded-xl overflow-hidden border border-border">
                                   <ImageWithFallback
                                     src={imagePreview}
                                     alt="Uploaded part"
@@ -3888,7 +3895,7 @@ const Upload = () => {
                                         const placeholder =
                                           document.createElement("div");
                                         placeholder.className =
-                                          "w-full h-full bg-gray-700 flex items-center justify-center text-gray-400 text-xs";
+                                          "w-full h-full bg-muted flex items-center justify-center text-muted-foreground text-xs";
                                         placeholder.innerHTML =
                                           '<div class="text-center"><div class="w-8 h-8 mx-auto mb-1 opacity-50"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg></div>Image unavailable</div>';
                                         target.parentNode?.appendChild(
@@ -3908,10 +3915,10 @@ const Upload = () => {
 
                               {/* File Info */}
                               <div className="text-center">
-                                <p className="text-white font-medium text-lg">
+                                <p className="text-foreground font-medium text-lg">
                                   {uploadedFile.name}
                                 </p>
-                                <p className="text-gray-400 text-sm">
+                                <p className="text-muted-foreground text-sm">
                                   {(uploadedFile.size / 1024 / 1024).toFixed(2)}{" "}
                                   MB • {uploadedFile.type}
                                 </p>
@@ -3934,10 +3941,10 @@ const Upload = () => {
                                 <ImagePlus className="w-16 h-16 text-gray-400 mx-auto" />
                               </motion.div>
                               <div>
-                                <p className="text-white font-medium text-lg mb-2">
+                                <p className="text-foreground font-medium text-lg mb-2">
                                   Drop your image here
                                 </p>
-                                <p className="text-gray-400 text-sm">
+                                <p className="text-muted-foreground text-sm">
                                   Supports JPG, PNG, WebP up to 10MB
                                 </p>
                               </div>
@@ -3949,7 +3956,7 @@ const Upload = () => {
                                 <Button
                                   onClick={() => fileInputRef.current?.click()}
                                   variant="outline"
-                                  className="w-full sm:w-auto border-gray-600 text-gray-300 hover:bg-white/10 hover:text-white hover:border-white/30 h-12 px-6"
+                                  className="w-full sm:w-auto h-12 px-6 border-border text-foreground hover:bg-accent"
                                 >
                                   <Camera className="w-5 h-5 mr-2" />
                                   Choose File
@@ -3966,7 +3973,7 @@ const Upload = () => {
                               initial={{ opacity: 0, y: 10 }}
                               animate={{ opacity: 1, y: 0 }}
                               exit={{ opacity: 0, y: -10 }}
-                              className="space-y-6 bg-gray-900/50 rounded-2xl p-6 border border-gray-700/50 backdrop-blur-sm"
+                              className="space-y-6 rounded-2xl p-6 border border-border bg-muted/30 backdrop-blur-sm dark:bg-black/30 dark:border-white/10"
                             >
                               {/* Enhanced Progress Header */}
                               <div className="space-y-4">
@@ -3999,17 +4006,17 @@ const Upload = () => {
                                       )}
                                     </motion.div>
                                     <div className="flex-1">
-                                      <div className="text-white font-bold text-xl">
+                                      <div className="text-foreground font-bold text-xl">
                                         {analysisProgress.currentStep ||
                                           analysisProgress.message}
                                       </div>
-                                      <div className="text-gray-300 text-base mt-1">
+                                      <div className="text-muted-foreground text-base mt-1">
                                         {analysisProgress.details ||
                                           "Processing your Engineering spares part analysis..."}
                                       </div>
                                       {analysisProgress.currentStepIndex &&
                                         analysisProgress.totalSteps && (
-                                          <div className="text-gray-400 text-sm mt-2 flex items-center space-x-2">
+                                          <div className="text-muted-foreground text-sm mt-2 flex items-center space-x-2">
                                             <span>
                                               Step{" "}
                                               {
@@ -4170,7 +4177,7 @@ const Upload = () => {
                                   </Button>
                                 </CollapsibleTrigger>
                                 <CollapsibleContent>
-                                  <div className="mt-4 space-y-2 bg-gray-900/70 rounded-lg p-4 border border-gray-700/50 max-h-40 overflow-y-auto">
+                                  <div className="mt-4 space-y-2 bg-muted/30 rounded-lg p-4 border border-border max-h-40 overflow-y-auto dark:bg-black/30 dark:border-white/10">
                                     <div className="text-xs font-mono text-gray-300 space-y-1">
                                       <div className="flex justify-between">
                                         <span>🔄 Analysis started</span>
@@ -4602,10 +4609,12 @@ const Upload = () => {
         >
           <div className="text-center space-y-6 p-8">
             {/* Animated Loader */}
-            <div className="relative mx-auto w-24 h-24">
-              <Loader2 className="w-full h-full text-purple-500 animate-spin" />
-              <div className="absolute inset-0 rounded-full border-4 border-purple-500/20"></div>
-              <div className="absolute inset-4 rounded-full border-4 border-blue-500/30"></div>
+            <div className="mx-auto h-24 w-24">
+              <img
+                src="/sparefinderlogodark.png"
+                alt="SpareFinder"
+                className="h-full w-full object-contain motion-safe:animate-[spin_1.35s_linear_infinite] motion-reduce:animate-none"
+              />
             </div>
 
             {/* Loading Text */}

@@ -1,0 +1,16 @@
+/* Clerk prebuilt components use stable "cl-*" classnames.
+   Avoid hiding footer actions (Sign up / Forgot password). */
+.cl-footer {
+  display: none !important;
+}
+
+/* Remove the inner white card/background so Clerk embeds into our own auth card */
+.cl-cardBox,
+.cl-card {
+  background: transparent !important;
+  box-shadow: none !important;
+  border: 0 !important;
+}
+
+
+

@@ -2,13 +2,20 @@ import React from 'react'
 import { motion } from 'framer-motion'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { ShieldX, ArrowLeft, Home, Lock } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 
 const Unauthorized = () => {
   const { user } = useAuth()
   const navigate = useNavigate()
+  const location = useLocation()
+
+  const requiredRole = (location.state as any)?.requiredRole as
+    | 'admin'
+    | 'super_admin'
+    | 'user'
+    | undefined
 
   return (
     <div className="min-h-screen bg-black relative overflow-hidden flex items-center justify-center">
@@ -67,7 +74,11 @@ const Unauthorized = () => {
                         <p className="font-medium">Signed in as: {user.email}</p>
                         <p className="text-sm text-red-400">Role: {user.role}</p>
                         <p className="text-sm text-gray-400 mt-1">
-                          This area requires administrator privileges.
+                          {requiredRole === 'super_admin'
+                            ? 'This area requires super admin privileges.'
+                            : requiredRole === 'admin'
+                            ? 'This area requires administrator privileges.'
+                            : 'You do not have permission to access this page.'}
                         </p>
                       </div>
                     </div>

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { api } from "@/lib/api";
+import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/components/ui/use-toast";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -80,6 +81,7 @@ const AdminDesktopSidebar: React.FC<AdminSidebarProps> = ({
   const location = useLocation();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { logout } = useAuth();
 
   const [adminStats, setAdminStats] = useState<AdminStats>({
     totalUsers: 0,
@@ -220,11 +222,7 @@ const AdminDesktopSidebar: React.FC<AdminSidebarProps> = ({
     try {
       console.log("🚪 Admin logout initiated...");
 
-      // Use the proper logout function
-      await api.auth.logout();
-
-      // Clear any admin-specific storage
-      localStorage.removeItem("admin_session");
+      await logout();
 
       console.log("✅ Admin logout successful");
 
@@ -237,9 +235,6 @@ const AdminDesktopSidebar: React.FC<AdminSidebarProps> = ({
       navigate("/admin/login");
     } catch (error) {
       console.error("❌ Admin logout error:", error);
-
-      // Force logout even if API call fails
-      localStorage.removeItem("admin_session");
 
       toast({
         variant: "destructive",

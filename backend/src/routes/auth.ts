@@ -7,6 +7,8 @@ import { AuthRequest } from '../types/auth';
 
 const router = Router();
 
+const normalizeEmail = (email: string) => email.trim().toLowerCase();
+
 // Validation middleware
 const registerValidation = [
   body('email').isEmail().normalizeEmail().withMessage('Please provide a valid email'),
@@ -42,6 +44,54 @@ const loginValidation = [
   body('email').isEmail().normalizeEmail().withMessage('Please provide a valid email'),
   body('password').notEmpty().withMessage('Password is required')
 ];
+
+// Public endpoint: check if a legacy user exists but is not linked to Clerk yet.
+// Used to route the user into a safe migration flow.
+router.get("/migration-status", async (req: Request, res: Response) => {
+  try {
+    const rawEmail = String(req.query.email || "");
+    const email = normalizeEmail(rawEmail);
+
+    if (!email || !email.includes("@")) {
+      return res.status(400).json({
+        success: false,
+        error: "invalid_email",
+        message: "Valid email is required",
+      });
+    }
+
+    const { data, error } = await supabase
+      .from("profiles")
+      .select("clerk_user_id")
+      .eq("email", email)
+      .single();
+
+    if (error && error.code !== "PGRST116") {
+      console.error("migration-status lookup error:", error);
+      return res.status(500).json({
+        success: false,
+        error: "lookup_failed",
+        message: "Failed to check account status",
+      });
+    }
+
+    const exists = !!data;
+    const linked = !!data?.clerk_user_id;
+    const needsMigration = exists && !linked;
+
+    return res.json({
+      success: true,
+      needs_migration: needsMigration,
+    });
+  } catch (e) {
+    console.error("migration-status error:", e);
+    return res.status(500).json({
+      success: false,
+      error: "lookup_failed",
+      message: "Failed to check account status",
+    });
+  }
+});
 
 // Register endpoint
 router.post('/register', registerValidation, async (req: Request, res: Response) => {

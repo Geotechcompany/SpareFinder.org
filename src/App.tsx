@@ -6,6 +6,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import { AuthProvider } from "@/contexts/AuthContext";
+import { SubscriptionProvider } from "@/contexts/SubscriptionContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import DebugEnv from "@/components/DebugEnv";
 
@@ -37,6 +38,7 @@ import PrivacyPolicy from "@/pages/PrivacyPolicy";
 import TermsOfService from "@/pages/TermsOfService";
 import Help from "@/pages/Help";
 import Trial from "@/pages/Trial";
+import { MigrateAccount } from "@/pages/MigrateAccount";
 import Unauthorized from "@/pages/Unauthorized";
 import ForgotPassword from "@/pages/ForgotPassword";
 import Contact from "@/pages/Contact";
@@ -45,23 +47,36 @@ import PublicReviews from "@/pages/PublicReviews";
 import DashboardLayout from "@/components/DashboardLayout";
 import SharedAnalysis from "@/pages/SharedAnalysis";
 import { PageSEO } from "@/components/PageSEO";
+import ClerkSsoCallback from "@/pages/ClerkSsoCallback";
 
 const queryClient = new QueryClient();
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <AuthProvider>
-      <ThemeProvider>
-        <TooltipProvider>
-          <DebugEnv />
-          <Toaster />
-          <Sonner />
-          <BrowserRouter>
-            <PageSEO />
-            <Routes>
+      <SubscriptionProvider>
+        <ThemeProvider>
+          <TooltipProvider>
+            <DebugEnv />
+            <Toaster />
+            <Sonner />
+            <BrowserRouter>
+              <PageSEO />
+              <Routes>
               <Route path="/" element={<Landing />} />
+
+              {/* Clerk OAuth/SAML callback routes (required for social sign-in) */}
+              <Route path="/login/sso-callback" element={<ClerkSsoCallback />} />
+              <Route path="/register/sso-callback" element={<ClerkSsoCallback />} />
+              <Route path="/admin/login/sso-callback" element={<ClerkSsoCallback />} />
+              {/* Used when a signed-in user links an OAuth provider (Google/Facebook) */}
               <Route
-                path="/login"
+                path="/account/sso-callback"
+                element={<ClerkSsoCallback redirectUrlComplete="/dashboard/settings" />}
+              />
+
+              <Route
+                path="/login/*"
                 element={
                   <ProtectedRoute requireAuth={false}>
                     <Login />
@@ -69,7 +84,7 @@ const App = () => (
                 }
               />
               <Route
-                path="/register"
+                path="/register/*"
                 element={
                   <ProtectedRoute requireAuth={false}>
                     <Register />
@@ -77,10 +92,18 @@ const App = () => (
                 }
               />
               <Route
-                path="/reset-password"
+                path="/reset-password/*"
                 element={
                   <ProtectedRoute requireAuth={false}>
                     <ForgotPassword />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/migrate"
+                element={
+                  <ProtectedRoute requireAuth={false}>
+                    <MigrateAccount />
                   </ProtectedRoute>
                 }
               />
@@ -200,10 +223,11 @@ const App = () => (
               <Route path="/share/:token" element={<SharedAnalysis />} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
-            </Routes>
-          </BrowserRouter>
-        </TooltipProvider>
-      </ThemeProvider>
+              </Routes>
+            </BrowserRouter>
+          </TooltipProvider>
+        </ThemeProvider>
+      </SubscriptionProvider>
     </AuthProvider>
   </QueryClientProvider>
 );

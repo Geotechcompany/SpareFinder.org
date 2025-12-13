@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { dashboardApi } from '@/lib/api';
+import { dashboardApi, getAuthHeaders } from "@/lib/api";
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 
@@ -47,9 +47,7 @@ export const SearchHistoryAnalytics: React.FC = () => {
         `${apiBaseUrl}/api/history/export?format=csv`,
         {
           method: "GET",
-          headers: {
-            Authorization: `Bearer ${sessionStorage.getItem("auth_token")}`,
-          },
+          headers: await getAuthHeaders(),
         }
       );
 

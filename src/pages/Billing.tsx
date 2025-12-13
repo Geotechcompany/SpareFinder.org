@@ -178,13 +178,14 @@ const Billing = () => {
         });
 
         if (isMounted && billingResponse) {
-          setBillingData(billingResponse as BillingData);
-          setCurrentPlan(
-            (billingResponse as BillingData).subscription?.tier || "free"
-          );
+          const nextBillingData = billingResponse as BillingData;
+          setBillingData(nextBillingData);
+          const sub = nextBillingData.subscription;
+          const isActive = sub?.status === "active" || sub?.status === "trialing";
+          setCurrentPlan(isActive ? sub?.tier || "free" : "none");
 
           // If the billing info already contains invoices, use them first
-          const preloaded = (billingResponse as BillingData).invoices as
+          const preloaded = nextBillingData.invoices as
             | Invoice[]
             | undefined;
           if (preloaded && preloaded.length > 0) {
@@ -382,18 +383,30 @@ const Billing = () => {
         : `${plan.limits.searches} recognitions/month`,
   }));
 
+  const hasActiveSubscription =
+    billingData?.subscription?.status === "active" ||
+    billingData?.subscription?.status === "trialing";
+  const hasRealSubscriptionId = !!billingData?.subscription?.stripe_subscription_id;
+
   // Get current subscription data from API response
   const currentSubscription = billingData?.subscription
     ? {
         plan:
-          billingData.subscription.tier === "free"
-            ? "Starter"
-            : billingData.subscription.tier === "pro"
-            ? "Professional"
-            : "Enterprise",
+          billingData.subscription.status === "active" ||
+          billingData.subscription.status === "trialing"
+            ? billingData.subscription.tier === "free"
+              ? "Starter"
+              : billingData.subscription.tier === "pro"
+              ? "Professional"
+              : "Enterprise"
+            : "No active plan",
         status: billingData.subscription.status,
         nextBilling: billingData.subscription.current_period_end,
-        amount: getPlan(billingData.subscription.tier as PlanTier).price,
+        amount:
+          billingData.subscription.status === "active" ||
+          billingData.subscription.status === "trialing"
+            ? getPlan(billingData.subscription.tier as PlanTier).price
+            : 0,
         daysLeft: Math.ceil(
           (new Date(billingData.subscription.current_period_end).getTime() -
             new Date().getTime()) /
@@ -410,24 +423,28 @@ const Billing = () => {
         daysLeft: 30,
       };
 
-  const usageStats = billingData?.usage
-    ? {
-        uploadsThisMonth: billingData.usage.uploads_count || 0,
-        uploadsLimit:
-          currentPlan === "free"
-            ? `${getPlan("free").limits.searches}/month`
-            : isUnlimited(getPlan(currentPlan as PlanTier).limits.searches)
-            ? "Unlimited"
-            : `${getPlan(currentPlan as PlanTier).limits.searches}/month`,
-        accuracyRate: 96.8, // This would come from analytics
-        avgProcessingTime: "0.3s", // This would come from analytics
-      }
-    : {
-        uploadsThisMonth: 0,
-        uploadsLimit: `${getPlan("free").limits.searches}/month`,
-        accuracyRate: 0,
-        avgProcessingTime: "0s",
-      };
+  const usageStats = (() => {
+    const uploadsThisMonth = billingData?.usage?.uploads_count || 0;
+    const uploadsLimit =
+      currentPlan === "none"
+        ? "0/month"
+        : currentPlan === "free"
+        ? `${getPlan("free").limits.searches}/month`
+        : isUnlimited(getPlan(currentPlan as PlanTier).limits.searches)
+        ? "Unlimited"
+        : `${getPlan(currentPlan as PlanTier).limits.searches}/month`;
+
+    // Until real analytics exist, do not show placeholder "accuracy" / "avg processing"
+    // when the user has no active plan or no activity this month.
+    const showAnalytics = hasActiveSubscription && uploadsThisMonth > 0;
+
+    return {
+      uploadsThisMonth,
+      uploadsLimit,
+      accuracyRate: showAnalytics ? "96.8%" : "—",
+      avgProcessingTime: showAnalytics ? "0.3s" : "—",
+    };
+  })();
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -694,30 +711,36 @@ const Billing = () => {
                           >
                             <Button
                               onClick={() => {
-                                const el =
-                                  document.getElementById("plans-section");
-                                if (el) {
-                                  el.scrollIntoView({ behavior: "smooth" });
+                                if (hasActiveSubscription) {
+                                  const el =
+                                    document.getElementById("plans-section");
+                                  if (el) {
+                                    el.scrollIntoView({ behavior: "smooth" });
+                                  }
+                                } else {
+                                  window.location.href = "/onboarding/trial";
                                 }
                               }}
                               variant="outline"
                               className="border-border text-muted-foreground hover:bg-muted hover:text-foreground dark:border-white/10 dark:text-gray-300 dark:hover:bg-white/10 dark:hover:text-white dark:hover:border-white/30"
                             >
-                              Change Plan
+                              {hasActiveSubscription ? "Change Plan" : "Choose a plan"}
                             </Button>
                           </motion.div>
-                          <motion.div
-                            whileHover={{ scale: 1.05 }}
-                            whileTap={{ scale: 0.95 }}
-                          >
-                            <Button
-                              onClick={handleCancelSubscription}
-                              variant="outline"
-                              className="border-red-600/30 text-red-400 hover:bg-red-600/10 hover:border-red-500/50"
+                          {hasActiveSubscription && hasRealSubscriptionId ? (
+                            <motion.div
+                              whileHover={{ scale: 1.05 }}
+                              whileTap={{ scale: 0.95 }}
                             >
-                              Cancel Subscription
-                            </Button>
-                          </motion.div>
+                              <Button
+                                onClick={handleCancelSubscription}
+                                variant="outline"
+                                className="border-red-600/30 text-red-400 hover:bg-red-600/10 hover:border-red-500/50"
+                              >
+                                Cancel Subscription
+                              </Button>
+                            </motion.div>
+                          ) : null}
                         </div>
                       </div>
 
@@ -733,7 +756,7 @@ const Billing = () => {
                         </div>
                         <div className="text-center">
                           <div className="text-2xl font-bold text-blue-500 dark:text-blue-400">
-                            {usageStats.accuracyRate}%
+                            {usageStats.accuracyRate}
                           </div>
                           <div className="text-sm text-muted-foreground dark:text-gray-400">
                             Accuracy rate
@@ -749,7 +772,9 @@ const Billing = () => {
                         </div>
                         <div className="text-center">
                           <div className="text-2xl font-bold text-purple-500 dark:text-purple-400">
-                            ∞
+                            {usageStats.uploadsLimit === "Unlimited"
+                              ? "∞"
+                              : usageStats.uploadsLimit.replace("/month", "")}
                           </div>
                           <div className="text-sm text-muted-foreground dark:text-gray-400">
                             Upload limit

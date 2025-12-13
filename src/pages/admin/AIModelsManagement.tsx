@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/components/ui/use-toast';
 import { api } from '@/lib/api';
+import { SpinningLogoLoader } from '@/components/brand/spinning-logo-loader';
 import { 
   BrainCircuit, 
   Plus, 
@@ -29,7 +30,6 @@ import {
   Shield,
   Globe,
   BarChart3,
-  Loader2
 } from 'lucide-react';
 
 interface AIModel {
@@ -159,14 +159,7 @@ const AIModelsManagement = () => {
   ];
 
   if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-900 via-blue-900/20 to-gray-900">
-        <div className="text-center">
-          <Loader2 className="w-10 h-10 animate-spin text-blue-600 mx-auto mb-4" />
-          <p className="text-gray-400">Loading AI models...</p>
-        </div>
-      </div>
-    );
+    return <SpinningLogoLoader label="Loading AI models…" />;
   }
 
   if (error) {

@@ -11,6 +11,7 @@ export interface AuthUser {
   userId: string;
   email: string;
   role: string;
+  clerkUserId?: string;
 }
 
 import { Request } from 'express';

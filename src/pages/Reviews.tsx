@@ -27,7 +27,7 @@ import DashboardSidebar from "@/components/DashboardSidebar";
 import MobileSidebar from "@/components/MobileSidebar";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/components/ui/use-toast";
-import { tokenStorage } from "@/lib/api";
+import { api } from "@/lib/api";
 import { useDashboardLayout } from "@/contexts/DashboardLayoutContext";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
@@ -82,22 +82,8 @@ const Reviews = () => {
     try {
       setIsLoading(true);
 
-      const token = tokenStorage.getToken();
-      const API_BASE =
-        import.meta.env.VITE_API_BASE_URL || "http://localhost:3000";
-
-      const response = await fetch(`${API_BASE}/api/reviews/analysis`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to fetch reviews");
-      }
-
-      const result = await response.json();
-      const data = result.data || [];
+      const result = await api.analysisReviews.list();
+      const data = result.data?.data || [];
 
       setReviews(data);
 
@@ -133,23 +119,8 @@ const Reviews = () => {
 
   const handleDelete = async (reviewId: string) => {
     try {
-      const token = tokenStorage.getToken();
-      const API_BASE =
-        import.meta.env.VITE_API_BASE_URL || "http://localhost:3000";
-
-      const response = await fetch(
-        `${API_BASE}/api/reviews/analysis/${reviewId}`,
-        {
-          method: "DELETE",
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error("Failed to delete review");
-      }
+      const response = await api.analysisReviews.remove(reviewId);
+      if (!response.success) throw new Error(response.error || "Failed to delete review");
 
       toast({
         title: "Review Deleted",
