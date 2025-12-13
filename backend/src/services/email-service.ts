@@ -644,6 +644,12 @@ class EmailService {
       const logoUrl = `${baseUrl}/sparefinderlogo.png`;
       const dashboardUrl = `${baseUrl}/dashboard`;
       const uploadUrl = `${baseUrl}/dashboard/upload`;
+      const helpUrl = `${baseUrl}/help`;
+      const contactUrl = `${baseUrl}/contact`;
+      const settingsUrl = `${baseUrl}/dashboard/settings`;
+      const heroImageUrl =
+        "https://images.unsplash.com/photo-1581092580497-e0d23cbdf1dc?auto=format&fit=crop&w=1200&q=80";
+      const year = new Date().getFullYear();
 
       const html = `
 <!doctype html>
@@ -651,20 +657,43 @@ class EmailService {
   <head>
     <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <style>
+      /* Light by default */
+      .bg { background: #f8fafc !important; }
+      .card { background: #ffffff !important; border: 1px solid rgba(2,6,23,.08) !important; }
+      .muted { color: #64748b !important; }
+      .text { color: #0f172a !important; }
+      .link { color: #2563eb !important; }
+      .pill { background: rgba(37,99,235,.08) !important; color: #1d4ed8 !important; border: 1px solid rgba(37,99,235,.18) !important; }
+      .divider { border-top: 1px solid rgba(2,6,23,.10) !important; }
+      .cta { background: linear-gradient(135deg,#2563eb,#1d4ed8) !important; color: #ffffff !important; }
+      .subcta { background: #ffffff !important; color: #1d4ed8 !important; border: 1px solid rgba(29,78,216,.35) !important; }
+      /* Dark-mode overrides (supported by some clients) */
+      @media (prefers-color-scheme: dark) {
+        .bg { background: #020617 !important; }
+        .card { background: #020617 !important; border: 1px solid rgba(56,189,248,.35) !important; }
+        .muted { color: #94a3b8 !important; }
+        .text { color: #e5e7eb !important; }
+        .link { color: #38bdf8 !important; }
+        .pill { background: rgba(56,189,248,.12) !important; color: #7dd3fc !important; border: 1px solid rgba(56,189,248,.30) !important; }
+        .divider { border-top: 1px solid rgba(31,41,55,.85) !important; }
+        .subcta { background: #0b1220 !important; color: #7dd3fc !important; border: 1px solid rgba(125,211,252,.35) !important; }
+      }
+    </style>
   </head>
-  <body style="margin:0;padding:0;background:#020617;color:#e2e8f0;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica,Arial,sans-serif;">
-    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:radial-gradient(circle at top,#0ea5e9 0,#020617 55%,#000 100%);padding:32px 0;">
+  <body class="bg" style="margin:0;padding:0;background:#f8fafc;color:#0f172a;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica,Arial,sans-serif;">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" class="bg" style="background:#f8fafc;padding:32px 0;">
       <tr>
         <td>
-          <table role="presentation" width="600" align="center" cellspacing="0" cellpadding="0" style="width:100%;max-width:600px;background:#020617;border-radius:18px;overflow:hidden;box-shadow:0 22px 60px rgba(15,23,42,.9);border:1px solid rgba(56,189,248,.4);">
+          <table role="presentation" width="600" align="center" cellspacing="0" cellpadding="0" class="card" style="width:100%;max-width:600px;background:#ffffff;border-radius:18px;overflow:hidden;box-shadow:0 18px 45px rgba(2,6,23,.10);border:1px solid rgba(2,6,23,.08);">
             <tr>
-              <td style="padding:18px 28px 14px 28px;background:#020617;color:#f9fafb;border-bottom:1px solid rgba(15,23,42,.9);">
+              <td style="padding:18px 28px 14px 28px;background:transparent;border-bottom:1px solid rgba(2,6,23,.08);" class="divider">
                 <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
                   <tr>
                     <td style="text-align:left;vertical-align:middle;">
                       <img src="${logoUrl}" alt="SpareFinder" style="max-height:28px;width:auto;display:block;border-radius:6px;" />
                     </td>
-                    <td style="text-align:right;vertical-align:middle;font-size:11px;color:#7dd3fc;">
+                    <td style="text-align:right;vertical-align:middle;font-size:11px;" class="muted">
                       Usage reminder · Inactive account
                     </td>
                   </tr>
@@ -672,52 +701,71 @@ class EmailService {
               </td>
             </tr>
             <tr>
-              <td style="padding:24px 28px 16px 28px;background:linear-gradient(135deg,#0ea5e9,#6366f1);color:#f9fafb;">
-                <h1 style="margin:0;font-size:22px;line-height:1.3;">
-                  ${data.userName || "There"}, spare parts shouldn’t slow your team down
-                </h1>
-                <p style="margin:6px 0 0 0;font-size:13px;opacity:.95;">
-                  Drop in a photo, get the part, move on with the work – that’s it.
-                </p>
+              <td style="padding:0;background:transparent;">
+                <img
+                  src="${heroImageUrl}"
+                  alt="Industrial maintenance and spare parts"
+                  style="display:block;width:100%;height:auto;max-height:260px;object-fit:cover;"
+                />
+                <div style="padding:18px 28px 14px 28px;">
+                  <div class="pill" style="display:inline-block;padding:6px 10px;border-radius:999px;font-size:11px;font-weight:600;">
+                    Back in seconds · Photo to part ID
+                  </div>
+                  <h1 class="text" style="margin:10px 0 0 0;font-size:24px;line-height:1.25;">
+                    ${data.userName || "There"}, spare parts shouldn’t slow your team down
+                  </h1>
+                  <p class="muted" style="margin:8px 0 0 0;font-size:14px;line-height:1.6;">
+                    Upload a photo (or add keywords), get a confident match, and share a clean result with your team—without digging through old catalogues.
+                  </p>
+                </div>
               </td>
             </tr>
 
             <tr>
-              <td style="padding:22px 28px 10px 28px;">
-                <h2 style="margin:0 0 10px 0;font-size:15px;color:#e5e7eb;">Perfect for those “what part is this?” moments</h2>
-                <ul style="margin:0 0 8px 0;padding-left:18px;font-size:13px;color:#9ca3af;line-height:1.7;">
+              <td style="padding:10px 28px 10px 28px;">
+                <h2 class="text" style="margin:0 0 10px 0;font-size:16px;">Perfect for those “what part is this?” moments</h2>
+                <ul class="muted" style="margin:0 0 10px 0;padding-left:18px;font-size:13px;line-height:1.75;">
                   <li>Field engineers needing fast identification from site.</li>
                   <li>Stores teams dealing with unlabelled or legacy stock.</li>
                   <li>Maintenance teams logging parts for repeat orders.</li>
                 </ul>
 
-                <div style="margin:18px 0 4px 0;">
-                  <a href="${uploadUrl}" style="display:inline-block;background:linear-gradient(135deg,#0ea5e9,#2563eb);color:#f9fafb;text-decoration:none;padding:11px 22px;border-radius:999px;font-weight:600;font-size:14px;box-shadow:0 12px 30px rgba(37,99,235,.55);">
-                    Open SpareFinder and upload a part
-                  </a>
-                </div>
+                <table role="presentation" cellspacing="0" cellpadding="0" style="margin:16px 0 6px 0;">
+                  <tr>
+                    <td style="padding-right:10px;">
+                      <a class="cta" href="${uploadUrl}" style="display:inline-block;text-decoration:none;padding:12px 20px;border-radius:999px;font-weight:700;font-size:14px;box-shadow:0 10px 26px rgba(37,99,235,.25);">
+                        Upload a part photo
+                      </a>
+                    </td>
+                    <td>
+                      <a class="subcta" href="${dashboardUrl}" style="display:inline-block;text-decoration:none;padding:12px 16px;border-radius:999px;font-weight:700;font-size:14px;">
+                        View dashboard
+                      </a>
+                    </td>
+                  </tr>
+                </table>
 
-                <p style="margin:10px 0 0 0;font-size:12px;color:#9ca3af;">
-                  It takes seconds to run a search, and every result is saved to your history so your team can reuse it later.
+                <p class="muted" style="margin:8px 0 0 0;font-size:12px;line-height:1.6;">
+                  Every result is saved to your history, so you can reuse the part info later or share it with your team.
                 </p>
               </td>
             </tr>
 
             <tr>
-              <td style="padding:14px 28px 12px 28px;">
-                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="font-size:12px;color:#9ca3af;">
+              <td style="padding:12px 28px 12px 28px;">
+                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="font-size:12.5px;" class="muted">
                   <tr>
-                    <td style="padding-right:10px;vertical-align:top;width:50%;border-right:1px solid rgba(31,41,55,.8);">
-                      <p style="margin:0 0 4px 0;color:#e5e7eb;font-weight:600;">Teams who benefit most</p>
-                      <ul style="margin:0;padding-left:16px;line-height:1.6;">
+                    <td style="padding-right:12px;vertical-align:top;width:50%;border-right:1px solid rgba(2,6,23,.10);" class="divider">
+                      <p class="text" style="margin:0 0 6px 0;font-weight:800;">Teams who benefit most</p>
+                      <ul style="margin:0;padding-left:16px;line-height:1.7;">
                         <li>Maintenance &amp; reliability teams.</li>
                         <li>Stores / inventory / spares managers.</li>
                         <li>Procurement and purchasing teams.</li>
                       </ul>
                     </td>
                     <td style="padding-left:14px;vertical-align:top;width:50%;">
-                      <p style="margin:0 0 4px 0;color:#e5e7eb;font-weight:600;">Why come back now</p>
-                      <ul style="margin:0;padding-left:16px;line-height:1.6;">
+                      <p class="text" style="margin:0 0 6px 0;font-weight:800;">Why come back now</p>
+                      <ul style="margin:0;padding-left:16px;line-height:1.7;">
                         <li>Reduce time spent hunting for unknown parts.</li>
                         <li>Keep a clean, searchable record of identifications.</li>
                         <li>Share consistent part info across your whole team.</li>
@@ -729,9 +777,32 @@ class EmailService {
             </tr>
 
             <tr>
-              <td style="padding:12px 28px 18px 28px;border-top:1px solid rgba(31,41,55,.9);font-size:11px;color:#9ca3af;">
-                <p style="margin:0;">
-                  Log in any time at <a href="${dashboardUrl}" style="color:#38bdf8;text-decoration:none;">${dashboardUrl}</a> to see your analyses and credit balance.
+              <td style="padding:12px 28px 14px 28px;">
+                <div style="border-radius:14px;padding:14px 14px;border:1px solid rgba(2,6,23,.10);background:rgba(2,6,23,.02);" class="card">
+                  <p class="text" style="margin:0 0 8px 0;font-weight:800;font-size:13px;">3 quick tips for better matches</p>
+                  <ol class="muted" style="margin:0;padding-left:18px;font-size:12.5px;line-height:1.7;">
+                    <li>Fill the frame with the part and keep the background simple.</li>
+                    <li>Include any labels/markings (model numbers, stamps, logos) if possible.</li>
+                    <li>If it’s ambiguous, add a short keyword like “pump”, “bearing”, or “valve”.</li>
+                  </ol>
+                </div>
+
+                <p class="muted" style="margin:12px 0 0 0;font-size:12px;line-height:1.6;">
+                  Need a refresher? Read the guide: <a class="link" href="${helpUrl}" style="text-decoration:none;">${helpUrl}</a>
+                </p>
+              </td>
+            </tr>
+
+            <tr>
+              <td class="divider" style="padding:14px 28px 18px 28px;border-top:1px solid rgba(2,6,23,.10);">
+                <p class="muted" style="margin:0 0 10px 0;font-size:12px;line-height:1.6;">
+                  You’re receiving this because you have a SpareFinder account.
+                  Manage preferences in <a class="link" href="${settingsUrl}" style="text-decoration:none;">Settings</a>.
+                </p>
+                <p class="muted" style="margin:0;font-size:11px;line-height:1.7;">
+                  <strong class="text" style="font-weight:800;">SpareFinder</strong> · ${baseUrl}<br/>
+                  Help: <a class="link" href="${helpUrl}" style="text-decoration:none;">${helpUrl}</a> · Contact: <a class="link" href="${contactUrl}" style="text-decoration:none;">${contactUrl}</a><br/>
+                  © ${year} SpareFinder. All rights reserved.
                 </p>
               </td>
             </tr>

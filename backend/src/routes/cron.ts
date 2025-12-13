@@ -35,17 +35,37 @@ router.get("/reminders", async (req: Request, res: Response) => {
     //   GET /api/cron/reminders?test_email=arthurbreck417@gmail.com&token=...
     const testEmail = String(req.query.test_email || "").trim();
     if (testEmail) {
-      const ok = await emailService.sendEmail({
-        to: testEmail,
-        subject: "SpareFinder cron test email",
-        html: `<p>This is a <strong>test email</strong> from the SpareFinder cron endpoint.</p>
-               <p>Run at: ${new Date().toISOString()}</p>`,
-        text: `This is a test email from the SpareFinder cron endpoint.\nRun at: ${new Date().toISOString()}`,
-      });
+      const testTemplate = String(req.query.test_template || "generic").trim();
+      const testName = String(req.query.test_name || "").trim();
+      const nameFromEmail = testEmail.split("@")[0] ?? "there";
+      const userName = testName || nameFromEmail;
+
+      let ok = false;
+
+      if (testTemplate === "reengagement") {
+        ok = await emailService.sendReengagementEmail({
+          userEmail: testEmail,
+          userName,
+        });
+      } else if (testTemplate === "onboarding") {
+        ok = await emailService.sendOnboardingNudgeEmail({
+          userEmail: testEmail,
+          userName,
+        });
+      } else {
+        ok = await emailService.sendEmail({
+          to: testEmail,
+          subject: "SpareFinder cron test email",
+          html: `<p>This is a <strong>test email</strong> from the SpareFinder cron endpoint.</p>
+                 <p>Run at: ${new Date().toISOString()}</p>`,
+          text: `This is a test email from the SpareFinder cron endpoint.\nRun at: ${new Date().toISOString()}`,
+        });
+      }
 
       return res.json({
         success: ok,
         type: "test",
+        template: testTemplate,
         processed: ok ? 1 : 0,
         message: ok ? "Test email sent" : "Failed to send test email",
       });
