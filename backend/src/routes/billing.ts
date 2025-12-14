@@ -927,7 +927,6 @@ router.post(
 // Handle Stripe webhooks
 router.post(
   "/stripe-webhook",
-  express.raw({ type: "application/json" }),
   async (req: express.Request, res: Response) => {
     try {
       const stripe = await getStripeInstance();
@@ -962,7 +961,9 @@ router.post(
       try {
         // Verify the webhook signature
         event = stripe.webhooks.constructEvent(
-          req.body,
+          // `req.body` must be a raw Buffer for signature verification.
+          // This is ensured by conditional body parsing in `backend/src/server.ts`.
+          req.body as Buffer,
           signature,
           webhookSecret
         );

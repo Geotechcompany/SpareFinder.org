@@ -89,8 +89,21 @@ app.use(
 );
 
 // Body parsing middleware
-app.use(express.json({ limit: "10mb" }));
-app.use(express.urlencoded({ extended: true, limit: "10mb" }));
+// NOTE: Stripe webhook signature verification requires the *raw* request body.
+// If we parse JSON before the webhook route runs, the payload changes and
+// `stripe.webhooks.constructEvent(...)` fails.
+app.use((req, res, next) => {
+  if (req.originalUrl === "/api/billing/stripe-webhook") {
+    return express.raw({ type: "application/json" })(req, res, next);
+  }
+  return express.json({ limit: "10mb" })(req, res, next);
+});
+app.use((req, res, next) => {
+  if (req.originalUrl === "/api/billing/stripe-webhook") {
+    return next();
+  }
+  return express.urlencoded({ extended: true, limit: "10mb" })(req, res, next);
+});
 
 // Compression middleware
 app.use(compression());
