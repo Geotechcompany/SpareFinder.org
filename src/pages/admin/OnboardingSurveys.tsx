@@ -23,7 +23,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Loader2, RefreshCw, FileText, ChevronLeft, ChevronRight } from "lucide-react";
+import { Loader2, RefreshCw, FileText, ChevronLeft, ChevronRight, Menu } from "lucide-react";
 
 type SurveyRow = {
   id: string;
@@ -63,6 +63,7 @@ const OnboardingSurveys = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [range, setRange] = useState<"7d" | "30d" | "90d" | "365d">("90d");
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const [surveys, setSurveys] = useState<SurveyRow[]>([]);
   const [pagination, setPagination] = useState<Pagination>({
@@ -121,20 +122,52 @@ const OnboardingSurveys = () => {
   }, [range, pagination.page]);
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
-      <div className="flex">
-        <AdminDesktopSidebar isCollapsed={isCollapsed} onToggle={() => setIsCollapsed(!isCollapsed)} />
+    <div className="min-h-screen flex w-full bg-gradient-to-br from-background via-[#F0F2F5] to-[#E8EBF1] dark:from-[#0B1026] dark:via-[#1A1033] dark:to-[#0C1226] relative overflow-hidden">
+      {/* Background accents */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute top-1/4 -right-40 w-80 h-80 bg-purple-600/10 rounded-full blur-3xl opacity-60" />
+        <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-blue-600/10 rounded-full blur-3xl opacity-40" />
+      </div>
 
-        <div className="flex-1">
-          <MobileSidebar />
+      <AdminDesktopSidebar
+        isCollapsed={isCollapsed}
+        onToggle={() => setIsCollapsed(!isCollapsed)}
+      />
 
-          <main className="p-4 sm:p-6 lg:p-8">
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.35 }}
-              className="space-y-6"
-            >
+      {/* Mobile Sidebar (dashboard-style, but used across admin pages for small screens) */}
+      <MobileSidebar
+        isOpen={isMobileMenuOpen}
+        onClose={() => setIsMobileMenuOpen(false)}
+      />
+
+      {/* Mobile Menu Button */}
+      <button
+        onClick={() => setIsMobileMenuOpen((v) => !v)}
+        className="fixed top-4 right-4 z-50 p-2 rounded-lg border border-border bg-card/90 text-muted-foreground shadow-soft-elevated backdrop-blur-xl hover:bg-accent hover:text-accent-foreground md:hidden dark:bg-black/70 dark:border-white/10 dark:text-white"
+        aria-label="Open menu"
+      >
+        <Menu className="w-5 h-5" />
+      </button>
+
+      {/* Main Content */}
+      <motion.div
+        initial={false}
+        animate={{}}
+        transition={{ duration: 0.3, ease: "easeInOut" }}
+        style={
+          {
+            // Only apply sidebar offset on desktop, matching AdminDesktopSidebar's fixed width.
+            "--admin-sidebar-offset": isCollapsed ? "80px" : "320px",
+          } as React.CSSProperties
+        }
+        className="flex-1 p-2 sm:p-4 lg:p-8 relative z-10 overflow-x-hidden md:overflow-x-visible lg:ml-[var(--admin-sidebar-offset)] lg:w-[calc(100%-var(--admin-sidebar-offset))]"
+      >
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.35 }}
+          className="space-y-6 max-w-7xl mx-auto"
+        >
               <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                 <div className="space-y-1">
                   <div className="flex items-center gap-2">
@@ -328,10 +361,8 @@ const OnboardingSurveys = () => {
                   )}
                 </CardContent>
               </Card>
-            </motion.div>
-          </main>
-        </div>
-      </div>
+        </motion.div>
+      </motion.div>
     </div>
   );
 };
