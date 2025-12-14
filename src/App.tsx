@@ -170,7 +170,7 @@ const App = () => (
               <Route
                 path="/admin/system-settings"
                 element={
-                  <AdminProtectedRoute requiredRole="super_admin">
+                  <AdminProtectedRoute>
                     <SystemSettings />
                   </AdminProtectedRoute>
                 }
@@ -178,7 +178,7 @@ const App = () => (
               <Route
                 path="/admin/database-console"
                 element={
-                  <AdminProtectedRoute requiredRole="super_admin">
+                  <AdminProtectedRoute>
                     <DatabaseConsole />
                   </AdminProtectedRoute>
                 }
@@ -194,7 +194,7 @@ const App = () => (
               <Route
                 path="/admin/email-smtp"
                 element={
-                  <AdminProtectedRoute requiredRole="super_admin">
+                  <AdminProtectedRoute>
                     <EmailSmtpManagement />
                   </AdminProtectedRoute>
                 }
@@ -210,7 +210,7 @@ const App = () => (
               <Route
                 path="/admin/ai-models"
                 element={
-                  <AdminProtectedRoute requiredRole="super_admin">
+                  <AdminProtectedRoute>
                     <AIModelsManagement />
                   </AdminProtectedRoute>
                 }

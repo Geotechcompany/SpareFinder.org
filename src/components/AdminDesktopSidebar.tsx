@@ -81,7 +81,7 @@ const AdminDesktopSidebar: React.FC<AdminSidebarProps> = ({
   const location = useLocation();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { logout, isSuperAdmin } = useAuth();
+  const { logout } = useAuth();
 
   const [adminStats, setAdminStats] = useState<AdminStats>({
     totalUsers: 0,
@@ -197,7 +197,6 @@ const AdminDesktopSidebar: React.FC<AdminSidebarProps> = ({
       icon: Settings,
       description: "System configuration",
       badge: null,
-      superAdminOnly: true,
     },
     {
       href: "/admin/database-console",
@@ -205,7 +204,6 @@ const AdminDesktopSidebar: React.FC<AdminSidebarProps> = ({
       icon: Database,
       description: "Database management",
       badge: null,
-      superAdminOnly: true,
     },
     {
       href: "/admin/email-smtp",
@@ -213,7 +211,6 @@ const AdminDesktopSidebar: React.FC<AdminSidebarProps> = ({
       icon: Mail,
       description: "Email configuration",
       badge: null,
-      superAdminOnly: true,
     },
     {
       href: "/admin/ai-models",
@@ -221,7 +218,6 @@ const AdminDesktopSidebar: React.FC<AdminSidebarProps> = ({
       icon: BrainCircuit,
       description: "AI model management",
       badge: null,
-      superAdminOnly: true,
     },
   ];
 
@@ -281,10 +277,8 @@ const AdminDesktopSidebar: React.FC<AdminSidebarProps> = ({
     }
   };
 
-  // Hide super-admin-only items unless the current user is a super admin.
-  const filteredNavItems = navItems.filter(
-    (item) => !item.superAdminOnly || isSuperAdmin
-  );
+  // Admin console: all items are available to admins.
+  const filteredNavItems = navItems;
 
   return (
     <motion.div

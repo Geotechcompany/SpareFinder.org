@@ -1231,7 +1231,7 @@ router.get(
 // Create new email template
 router.post(
   "/email-templates",
-  [authenticateToken, requireSuperAdmin],
+  [authenticateToken, requireAdmin],
   async (req: AuthRequest, res: Response) => {
     try {
       const {
@@ -1295,7 +1295,7 @@ router.post(
 // Update email template
 router.put(
   "/email-templates/:id",
-  [authenticateToken, requireSuperAdmin],
+  [authenticateToken, requireAdmin],
   async (req: AuthRequest, res: Response) => {
     try {
       const { id } = req.params;
@@ -1365,7 +1365,7 @@ router.put(
 // Delete email template
 router.delete(
   "/email-templates/:id",
-  [authenticateToken, requireSuperAdmin],
+  [authenticateToken, requireAdmin],
   async (req: AuthRequest, res: Response) => {
     try {
       const { id } = req.params;
@@ -1612,7 +1612,7 @@ router.post(
 // Save SMTP Settings
 router.post(
   "/smtp-settings",
-  [authenticateToken, requireSuperAdmin],
+  [authenticateToken, requireAdmin],
   async (req: AuthRequest, res: Response) => {
     try {
       const { smtpConfig } = req.body;
@@ -1762,7 +1762,7 @@ router.get(
 
 router.patch(
   "/system-settings",
-  [authenticateToken, requireSuperAdmin],
+  [authenticateToken, requireAdmin],
   async (req: AuthRequest, res: Response) => {
     try {
       const { settings } = req.body;
@@ -1812,7 +1812,7 @@ router.patch(
   "/settings",
   [
     authenticateToken,
-    requireSuperAdmin,
+    requireAdmin,
     body("settings").isObject().withMessage("Settings must be an object"),
   ],
   async (req: AuthRequest, res: Response) => {
