@@ -81,7 +81,7 @@ const AdminDesktopSidebar: React.FC<AdminSidebarProps> = ({
   const location = useLocation();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { logout } = useAuth();
+  const { logout, isSuperAdmin } = useAuth();
 
   const [adminStats, setAdminStats] = useState<AdminStats>({
     totalUsers: 0,
@@ -281,12 +281,10 @@ const AdminDesktopSidebar: React.FC<AdminSidebarProps> = ({
     }
   };
 
-  // Remove the filter so all nav items are visible
-  // const filteredNavItems = navItems.filter(item =>
-  //   !item.superAdminOnly || adminUser?.role === 'super_admin'
-  // );
-
-  // Use navItems directly
+  // Hide super-admin-only items unless the current user is a super admin.
+  const filteredNavItems = navItems.filter(
+    (item) => !item.superAdminOnly || isSuperAdmin
+  );
 
   return (
     <motion.div
@@ -439,7 +437,7 @@ const AdminDesktopSidebar: React.FC<AdminSidebarProps> = ({
 
       {/* Navigation */}
       <div className="flex-1 overflow-y-auto p-4 space-y-2">
-        {navItems.map((item, index) => (
+        {filteredNavItems.map((item, index) => (
           <motion.div
             key={item.href}
             initial={{ opacity: 0, x: -20 }}
