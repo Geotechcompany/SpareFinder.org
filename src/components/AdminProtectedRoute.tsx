@@ -12,7 +12,7 @@ const AdminProtectedRoute: React.FC<AdminProtectedRouteProps> = ({
   children, 
   requiredRole = 'admin' 
 }) => {
-  const { isLoading, isAuthenticated, isAdmin, isSuperAdmin } = useAuth();
+  const { user, isLoading, isAuthenticated, isAdmin, isSuperAdmin } = useAuth();
   const location = useLocation();
 
   // Show loading state
@@ -23,6 +23,12 @@ const AdminProtectedRoute: React.FC<AdminProtectedRouteProps> = ({
   // Redirect to admin login if not authenticated
   if (!isAuthenticated) {
     return <Navigate to="/admin/login" state={{ from: location }} replace />;
+  }
+
+  // Clerk can be authenticated before the app profile finishes hydrating.
+  // Avoid false "unauthorized" redirects during this brief window.
+  if (!user) {
+    return <SpinningLogoLoader label="Loading admin profile…" />;
   }
 
   const hasRequiredRole =
