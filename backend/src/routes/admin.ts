@@ -5,7 +5,7 @@ import { supabase } from "../server";
 import {
   authenticateToken,
   requireAdmin,
-  requireSuperAdmin,
+ 
 } from "../middleware/auth";
 import { AuthRequest } from "../types/auth";
 import { emailService } from "../services/email-service";
