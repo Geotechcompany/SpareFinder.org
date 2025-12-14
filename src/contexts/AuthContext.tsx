@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { useAuth as useClerkAuth, useUser as useClerkUser } from "@clerk/clerk-react";
-import { type ApiResponse, api, setAuthTokenProvider, tokenStorage } from "@/lib/api";
+import { type ApiResponse, api, setAuthFailureHandler, setAuthTokenProvider, tokenStorage } from "@/lib/api";
 
 interface User {
   id: string;
@@ -133,6 +133,28 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     // legacy cleanup: if Clerk is enabled, don't keep Supabase tokens around
     if (isSignedIn) tokenStorage.clearAll();
   }, [getToken, isLoaded, isSignedIn]);
+
+  // Ensure 401s never leave the app in a broken/blank state:
+  // clear auth state and return to /login.
+  useEffect(() => {
+    if (!isLoaded) return;
+    setAuthFailureHandler(async ({ status, message }) => {
+      console.warn("🔒 Auth failure handler triggered:", { status, message });
+      // Clear local user immediately so ProtectedRoute won't bounce back to /dashboard
+      setUser(null);
+      try {
+        await signOut();
+      } catch {
+        // ignore
+      } finally {
+        tokenStorage.clearAll();
+        // Hard navigate because AuthProvider is outside the Router.
+        window.location.href = "/login";
+      }
+    });
+
+    return () => setAuthFailureHandler(null);
+  }, [isLoaded, signOut]);
 
   // Fetch profile when Clerk session changes
   useEffect(() => {

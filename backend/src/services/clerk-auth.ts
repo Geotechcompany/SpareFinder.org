@@ -23,9 +23,11 @@ type VerifiedClerkToken = {
   payload: JWTPayload;
 };
 
-const isLikelyClerkIssuer = (issuer: unknown): issuer is string => {
+const isAllowedIssuerForRemoteJwks = (issuer: unknown): issuer is string => {
   if (typeof issuer !== "string" || issuer.length === 0) return false;
-  // Clerk issuers typically look like: https://<instance>.clerk.accounts.dev
+  // Remote JWKS fetching must be restricted to avoid accepting attacker-controlled issuers.
+  // When CLERK_JWT_PUBLIC_KEY is set, we verify offline with our pinned key, which is safe
+  // even if the issuer is a custom domain (e.g. https://clerk.yourdomain.com).
   return issuer.includes("clerk.accounts.");
 };
 
@@ -56,11 +58,11 @@ export const verifyClerkSessionToken = async (token: string) => {
 
   const decoded = decodeJwt(token);
   const issuer = decoded.iss;
-
-  if (!isLikelyClerkIssuer(issuer)) return null;
+  if (typeof issuer !== "string" || issuer.length === 0) return null;
 
   // Prefer offline verification if CLERK_JWT_PUBLIC_KEY is configured.
   const spkiKey = await getSpkiKey();
+  if (!spkiKey && !isAllowedIssuerForRemoteJwks(issuer)) return null;
   const { payload } = spkiKey
     ? await jwtVerify(token, spkiKey, { issuer })
     : await jwtVerify(

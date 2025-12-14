@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from "react";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
-import { useSignIn } from "@clerk/clerk-react";
+import { useClerk, useSignIn } from "@clerk/clerk-react";
 import { Sparkles, ArrowRight, Eye, EyeOff } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { AuthShell } from "@/components/auth/auth-shell";
@@ -28,6 +28,7 @@ const Login = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { isLoaded, signIn, setActive } = useSignIn();
+  const clerk = useClerk();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -56,11 +57,65 @@ const Login = () => {
     const supported = ((signIn as any).supportedFirstFactors || []) as Array<{
       strategy?: string;
     }>;
-    const values = supported
+    const fromSignIn = supported
       .map((f) => f?.strategy)
-      .filter((s): s is string => typeof s === "string" && s.startsWith("oauth_"));
-    return Array.from(new Set(values)) as OAuthStrategy[];
-  }, [isLoaded, signIn]);
+      .filter(
+        (s): s is string => typeof s === "string" && s.startsWith("oauth_")
+      );
+
+    // In some Clerk configurations, `supportedFirstFactors` won't be populated
+    // with OAuth strategies until after signIn.create(). To match <SignUp /> behavior
+    // (which can render providers immediately), we fall back to scanning the Clerk
+    // environment payload for `oauth_*` strategies.
+    const env = (clerk as any)?.__unstable__environment;
+
+    const fromEnv: string[] = (() => {
+      if (!env) return [];
+
+      const out = new Set<string>();
+      const seen = new Set<unknown>();
+      const stack: Array<{ value: unknown; depth: number }> = [
+        { value: env, depth: 0 },
+      ];
+
+      const MAX_DEPTH = 8;
+      const MAX_VISITS = 2500;
+      let visits = 0;
+
+      while (stack.length && visits < MAX_VISITS) {
+        const next = stack.pop()!;
+        visits += 1;
+        const { value, depth } = next;
+
+        if (value == null) continue;
+        if (typeof value === "string") {
+          if (/^oauth_[a-z0-9_]+$/i.test(value)) out.add(value);
+          continue;
+        }
+        if (typeof value !== "object") continue;
+        if (seen.has(value)) continue;
+        seen.add(value);
+
+        if (depth >= MAX_DEPTH) continue;
+
+        if (Array.isArray(value)) {
+          for (const item of value) stack.push({ value: item, depth: depth + 1 });
+          continue;
+        }
+
+        for (const key of Object.keys(value as Record<string, unknown>)) {
+          stack.push({
+            value: (value as Record<string, unknown>)[key],
+            depth: depth + 1,
+          });
+        }
+      }
+
+      return Array.from(out);
+    })();
+
+    return Array.from(new Set([...fromSignIn, ...fromEnv])) as OAuthStrategy[];
+  }, [isLoaded, signIn, clerk]);
 
   const formatStrategyLabel = (strategy: OAuthStrategy) => {
     const raw = strategy.replace(/^oauth_/, "");

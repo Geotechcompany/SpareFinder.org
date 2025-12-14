@@ -92,6 +92,13 @@ export const setAuthTokenProvider = (provider: AuthTokenProvider | null) => {
   isClerkAuthEnabled = !!provider;
 };
 
+type AuthFailureHandler = (args: { status?: number; message?: string }) => void;
+let authFailureHandler: AuthFailureHandler | null = null;
+
+export const setAuthFailureHandler = (handler: AuthFailureHandler | null) => {
+  authFailureHandler = handler;
+};
+
 export const getAuthToken = async (): Promise<string | null> => {
   if (authTokenProvider) {
     return await authTokenProvider().catch(() => null);
@@ -200,6 +207,10 @@ apiClient.interceptors.response.use(
       if (isClerkAuthEnabled) {
         console.warn("🔒 Unauthorized (Clerk) - redirecting to login");
         originalRequest._retry = true;
+        authFailureHandler?.({
+          status: error.response?.status,
+          message: error.response?.data?.message || error.message,
+        });
         if (!isPublicRoute) {
           window.location.href = "/login";
         }
