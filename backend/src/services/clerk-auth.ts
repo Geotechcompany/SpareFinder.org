@@ -4,6 +4,15 @@
 //
 // To stay on CommonJS without changing the whole backend build, we load `jose`
 // using native dynamic import in a way TypeScript will not transform into `require()`.
+//
+// NOTE (runtime): Some Node deployments don't expose `globalThis.crypto` even though
+// WebCrypto exists at `crypto.webcrypto`. The `jose` webapi build expects `globalThis.crypto`.
+// Polyfill to avoid: "ReferenceError: crypto is not defined".
+import { webcrypto } from "crypto";
+
+if (!(globalThis as any).crypto) {
+  (globalThis as any).crypto = webcrypto as any;
+}
 type JWTPayload = Record<string, unknown> & { sub?: string; iss?: string };
 
 type JoseModule = typeof import("jose");
