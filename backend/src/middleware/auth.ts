@@ -72,73 +72,26 @@ export const authenticateToken = async (req: AuthRequest, res: Response, next: N
     }
 
     // 1) Try Clerk session token first (new auth)
+    // Important: do NOT require Clerk REST API access just to validate a request.
+    // We can authenticate using the Clerk JWT `sub` (clerk user id) and map to our profile.
     try {
       const verified = await verifyClerkSessionToken(token);
       if (verified?.clerkUserId) {
-        const clerkUser = await fetchClerkUser(verified.clerkUserId);
-        const desiredEmail = normalizeEmail(clerkUser.primaryEmail);
-        const desiredFullName =
-          clerkUser.fullName || desiredEmail.split("@")[0] || null;
-        const desiredAvatarUrl = clerkUser.avatarUrl ?? null;
-        const emailAllowlist = parseEmailAllowlist(process.env.ADMIN_WHITELIST_EMAILS);
-        const isEmailAllowlisted = emailAllowlist.has(desiredEmail);
+        const clerkUserId = verified.clerkUserId;
 
-        // Find existing profile by clerk_user_id
+        // Find existing profile by clerk_user_id (no Clerk API call needed)
         const { data: byClerk, error: byClerkError } = await supabase
           .from("profiles")
           .select("*")
-          .eq("clerk_user_id", clerkUser.clerkUserId)
+          .eq("clerk_user_id", clerkUserId)
           .single();
 
         if (!byClerkError && byClerk) {
-          // Sync profile info on login (only update if values are empty or changed)
-          const profileEmail = typeof byClerk.email === "string" ? normalizeEmail(byClerk.email) : null;
-          const emailChanged = profileEmail && profileEmail !== desiredEmail;
-
-          if (emailChanged) {
-            // Prevent collisions: if another profile already has this email, block.
-            const { data: emailOwner, error: emailOwnerErr } = await supabase
-              .from("profiles")
-              .select("id")
-              .eq("email", desiredEmail)
-              .single();
-
-            if (!emailOwnerErr && emailOwner?.id && emailOwner.id !== byClerk.id) {
-              return res.status(409).json({
-                success: false,
-                error: "Account conflict",
-                message:
-                  "This email is already associated with another account. Please contact support.",
-              });
-            }
-          }
-
-          const profilePatch: Record<string, unknown> = {};
-          if (emailChanged) profilePatch.email = desiredEmail;
-          if (shouldUpdateStringField(byClerk.full_name, desiredFullName)) {
-            profilePatch.full_name = desiredFullName;
-          }
-          if (shouldUpdateStringField(byClerk.avatar_url, desiredAvatarUrl)) {
-            profilePatch.avatar_url = desiredAvatarUrl;
-          }
-
-          const { desiredRole, shouldUpdate: shouldUpdateRole } = resolveDesiredRole({
-            currentRole: byClerk.role,
-            metadataRole: clerkUser.roleFromMetadata,
-            isEmailAllowlisted,
-          });
-          if (shouldUpdateRole) profilePatch.role = desiredRole;
-
-          if (Object.keys(profilePatch).length > 0) {
-            profilePatch.updated_at = new Date().toISOString();
-            await supabase.from("profiles").update(profilePatch).eq("id", byClerk.id);
-          }
-
           req.user = {
             userId: byClerk.id,
-            email: (byClerk.email as string) || desiredEmail,
-            role: (profilePatch.role as string) || byClerk.role || "user",
-            clerkUserId: clerkUser.clerkUserId,
+            email: (byClerk.email as string) || "",
+            role: byClerk.role || "user",
+            clerkUserId,
           };
 
           console.log("🎉 User Successfully Authenticated (Clerk):", req.user);
@@ -153,6 +106,26 @@ export const authenticateToken = async (req: AuthRequest, res: Response, next: N
             message: "Failed to retrieve user profile",
           });
         }
+
+        // If we didn't find a profile by clerk_user_id, we need email to link/create.
+        // That requires Clerk REST API; if CLERK_SECRET_KEY is missing/mismatched, fail closed with a clear error.
+        const secretKey = (process.env.CLERK_SECRET_KEY || "").trim();
+        if (!secretKey) {
+          return res.status(401).json({
+            success: false,
+            error: "clerk_not_configured",
+            message:
+              "Authentication token is valid, but the server is not configured to link your account. Please contact support.",
+          });
+        }
+
+        const clerkUser = await fetchClerkUser(clerkUserId);
+        const desiredEmail = normalizeEmail(clerkUser.primaryEmail);
+        const desiredFullName =
+          clerkUser.fullName || desiredEmail.split("@")[0] || null;
+        const desiredAvatarUrl = clerkUser.avatarUrl ?? null;
+        const emailAllowlist = parseEmailAllowlist(process.env.ADMIN_WHITELIST_EMAILS);
+        const isEmailAllowlisted = emailAllowlist.has(desiredEmail);
 
         // Link existing profile by email (one-time migration)
         const { data: byEmail, error: byEmailError } = await supabase
