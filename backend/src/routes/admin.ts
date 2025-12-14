@@ -5,7 +5,6 @@ import { supabase } from "../server";
 import {
   authenticateToken,
   requireAdmin,
- 
 } from "../middleware/auth";
 import { AuthRequest } from "../types/auth";
 import { emailService } from "../services/email-service";
@@ -506,7 +505,7 @@ router.get(
           .from("part_searches")
           .select(
             `
-          id, created_at, confidence_score, processing_time, status,
+          id, created_at, confidence_score, ai_confidence, processing_time_ms, analysis_status,
           profiles!inner(full_name, email)
         `
           )
@@ -531,8 +530,9 @@ router.get(
       const { count: successfulSearchCount } = await adminSupabase
         .from("part_searches")
         .select("id", { count: "exact", head: true })
-        .eq("status", "completed")
-        .gt("confidence_score", 0.7);
+        .eq("analysis_status", "completed")
+        // Support both confidence_score [0..100] and ai_confidence [0..1]
+        .or("confidence_score.gte.70,ai_confidence.gte.0.7");
 
       const successRate =
         searchCount && searchCount > 0

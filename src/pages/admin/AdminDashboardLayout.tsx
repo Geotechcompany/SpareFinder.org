@@ -46,6 +46,20 @@ import {
 import { PLAN_CONFIG } from "@/lib/plans";
 import ThemeToggle from "@/components/ThemeToggle";
 import {
+  ResponsiveContainer,
+  AreaChart,
+  Area,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  BarChart,
+  Bar,
+  PieChart,
+  Pie,
+  Cell,
+} from "recharts";
+import {
   Breadcrumb,
   BreadcrumbList,
   BreadcrumbItem,
@@ -97,6 +111,22 @@ interface AdminUser {
   avatar_url?: string;
 }
 
+type AdminAnalytics = {
+  searches_by_day: Record<string, number>;
+  registrations_by_day: Record<string, number>;
+  time_range: string;
+};
+
+type OnboardingSummary = {
+  range: string;
+  total: number;
+  byReferralSource: Record<string, number>;
+  byCompanySize: Record<string, number>;
+  byRole: Record<string, number>;
+  byPrimaryGoal: Record<string, number>;
+  topInterests: Array<{ interest: string; count: number }>;
+};
+
 const AdminDashboardLayout = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -107,6 +137,8 @@ const AdminDashboardLayout = () => {
   const [adminUser, setAdminUser] = useState<AdminUser | null>(null);
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [analytics, setAnalytics] = useState<AdminAnalytics | null>(null);
+  const [onboardingSummary, setOnboardingSummary] = useState<OnboardingSummary | null>(null);
 
   const { toast } = useToast();
   const {
@@ -207,6 +239,32 @@ const AdminDashboardLayout = () => {
         );
         setSubscriptionStats(null);
         setEstimatedRevenue(null);
+      }
+
+      // Best-effort: fetch analytics and onboarding summary for charts
+      try {
+        const [analyticsResp, onboardingResp] = await Promise.all([
+          api.admin.getAnalytics("30d"),
+          api.admin.getOnboardingSurveysSummary("90d"),
+        ]);
+
+        const analyticsData = (analyticsResp as any)?.data?.analytics;
+        if (analyticsData?.searches_by_day && analyticsData?.registrations_by_day) {
+          setAnalytics(analyticsData as AdminAnalytics);
+        } else {
+          setAnalytics(null);
+        }
+
+        const onboardingData = (onboardingResp as any)?.data;
+        if (onboardingData?.byReferralSource) {
+          setOnboardingSummary(onboardingData as OnboardingSummary);
+        } else {
+          setOnboardingSummary(null);
+        }
+      } catch (chartErr) {
+        console.warn("⚠️ Failed to load admin charts:", chartErr);
+        setAnalytics(null);
+        setOnboardingSummary(null);
       }
     } catch (err: any) {
       console.error("❌ Error fetching admin data:", err);
@@ -423,6 +481,50 @@ const AdminDashboardLayout = () => {
       color: "from-orange-600 to-red-600",
     },
   ];
+
+  const formatDayLabel = (isoDate: string) => {
+    // isoDate: YYYY-MM-DD
+    const d = new Date(`${isoDate}T00:00:00Z`);
+    if (Number.isNaN(d.getTime())) return isoDate;
+    return d.toLocaleDateString(undefined, { month: "short", day: "2-digit" });
+  };
+
+  const timeSeries = (() => {
+    const searches = analytics?.searches_by_day ?? {};
+    const regs = analytics?.registrations_by_day ?? {};
+    const keys = Array.from(new Set([...Object.keys(searches), ...Object.keys(regs)])).sort();
+    return keys.map((date) => ({
+      date,
+      label: formatDayLabel(date),
+      searches: searches[date] ?? 0,
+      registrations: regs[date] ?? 0,
+    }));
+  })();
+
+  const referralBars = (() => {
+    const by = onboardingSummary?.byReferralSource ?? {};
+    return Object.entries(by)
+      .map(([source, count]) => ({ source, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 8);
+  })();
+
+  const tierPie = (() => {
+    const byTier = subscriptionStats?.by_tier ?? {};
+    return [
+      { name: "Starter", key: "free", value: byTier.free || 0, color: "#60a5fa" },
+      { name: "Pro", key: "pro", value: byTier.pro || 0, color: "#a78bfa" },
+      { name: "Enterprise", key: "enterprise", value: byTier.enterprise || 0, color: "#34d399" },
+    ].filter((x) => x.value > 0);
+  })();
+
+  const formatConfidencePct = (raw: any) => {
+    const n = typeof raw === "number" ? raw : Number(raw);
+    if (!Number.isFinite(n)) return 0;
+    // support [0..1] and [0..100]
+    const pct = n <= 1 ? n * 100 : n;
+    return Math.max(0, Math.min(100, Math.round(pct)));
+  };
 
   return (
     <div className="min-h-screen flex w-full bg-gradient-to-br from-background via-[#F0F2F5] to-[#E8EBF1] dark:from-[#0B1026] dark:via-[#1A1033] dark:to-[#0C1226] relative overflow-hidden">
@@ -648,6 +750,204 @@ const AdminDashboardLayout = () => {
             ))}
           </div>
 
+          {/* Growth & Acquisition */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 lg:gap-8">
+            {/* Growth Chart */}
+            <motion.div
+              initial={{ opacity: 0, y: 14 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.45 }}
+              className="relative lg:col-span-2"
+            >
+              <div className="absolute inset-0 rounded-3xl bg-gradient-to-r from-purple-500/5 to-blue-500/5 blur-xl opacity-70 dark:from-purple-600/10 dark:to-blue-600/10" />
+              <Card className="relative bg-card/95 backdrop-blur-xl border-border shadow-soft-elevated dark:bg-black/20 dark:border-white/10">
+                <CardHeader className="pb-2">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <CardTitle className="flex items-center gap-2 text-foreground dark:text-white">
+                        <TrendingUp className="h-5 w-5 text-purple-500 dark:text-purple-400" />
+                        Growth (last 30 days)
+                      </CardTitle>
+                      <CardDescription className="text-muted-foreground">
+                        Searches and new registrations over time
+                      </CardDescription>
+                    </div>
+                    <Badge
+                      variant="secondary"
+                      className="bg-purple-100 text-purple-700 border-purple-200 dark:bg-purple-600/20 dark:text-purple-300 dark:border-purple-500/30"
+                    >
+                      {analytics?.time_range || "30d"}
+                    </Badge>
+                  </div>
+                </CardHeader>
+                <CardContent className="pt-2">
+                  {timeSeries.length ? (
+                    <div className="h-[280px]">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <AreaChart data={timeSeries} margin={{ top: 10, right: 12, left: 0, bottom: 0 }}>
+                          <defs>
+                            <linearGradient id="gradSearches" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="0%" stopColor="#8b5cf6" stopOpacity={0.35} />
+                              <stop offset="100%" stopColor="#8b5cf6" stopOpacity={0.02} />
+                            </linearGradient>
+                            <linearGradient id="gradRegs" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="0%" stopColor="#60a5fa" stopOpacity={0.30} />
+                              <stop offset="100%" stopColor="#60a5fa" stopOpacity={0.02} />
+                            </linearGradient>
+                          </defs>
+                          <CartesianGrid strokeDasharray="3 3" opacity={0.15} />
+                          <XAxis dataKey="label" tickLine={false} axisLine={false} fontSize={12} />
+                          <YAxis tickLine={false} axisLine={false} fontSize={12} />
+                          <Tooltip
+                            contentStyle={{
+                              borderRadius: 12,
+                              border: "1px solid rgba(255,255,255,0.10)",
+                              background: "rgba(17,24,39,0.85)",
+                              color: "white",
+                            }}
+                            labelStyle={{ color: "rgba(255,255,255,0.85)" }}
+                          />
+                          <Area
+                            type="monotone"
+                            dataKey="searches"
+                            stroke="#8b5cf6"
+                            strokeWidth={2}
+                            fill="url(#gradSearches)"
+                            name="Searches"
+                          />
+                          <Area
+                            type="monotone"
+                            dataKey="registrations"
+                            stroke="#60a5fa"
+                            strokeWidth={2}
+                            fill="url(#gradRegs)"
+                            name="Registrations"
+                          />
+                        </AreaChart>
+                      </ResponsiveContainer>
+                    </div>
+                  ) : (
+                    <div className="h-[280px] flex items-center justify-center text-muted-foreground">
+                      No chart data yet.
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </motion.div>
+
+            {/* Subscription mix */}
+            <motion.div
+              initial={{ opacity: 0, y: 14 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.5 }}
+              className="relative"
+            >
+              <div className="absolute inset-0 rounded-3xl bg-gradient-to-r from-emerald-500/5 to-blue-500/5 blur-xl opacity-70 dark:from-emerald-600/10 dark:to-blue-600/10" />
+              <Card className="relative h-full bg-card/95 backdrop-blur-xl border-border shadow-soft-elevated dark:bg-black/20 dark:border-white/10">
+                <CardHeader className="pb-2">
+                  <CardTitle className="flex items-center gap-2 text-foreground dark:text-white">
+                    <CreditCard className="h-5 w-5 text-emerald-500 dark:text-emerald-400" />
+                    Subscription mix
+                  </CardTitle>
+                  <CardDescription className="text-muted-foreground">
+                    Tier distribution
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="pt-2">
+                  {tierPie.length ? (
+                    <div className="h-[280px]">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                          <Pie
+                            data={tierPie}
+                            dataKey="value"
+                            nameKey="name"
+                            innerRadius={60}
+                            outerRadius={92}
+                            paddingAngle={2}
+                          >
+                            {tierPie.map((entry) => (
+                              <Cell key={entry.key} fill={entry.color} />
+                            ))}
+                          </Pie>
+                          <Tooltip
+                            contentStyle={{
+                              borderRadius: 12,
+                              border: "1px solid rgba(255,255,255,0.10)",
+                              background: "rgba(17,24,39,0.85)",
+                              color: "white",
+                            }}
+                          />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </div>
+                  ) : (
+                    <div className="h-[280px] flex items-center justify-center text-muted-foreground">
+                      No subscription data yet.
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </motion.div>
+          </div>
+
+          {/* Acquisition (Onboarding surveys) */}
+          <motion.div
+            initial={{ opacity: 0, y: 14 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.55 }}
+            className="relative"
+          >
+            <div className="absolute inset-0 rounded-3xl bg-gradient-to-r from-blue-500/5 to-purple-500/5 blur-xl opacity-70 dark:from-blue-600/10 dark:to-purple-600/10" />
+            <Card className="relative bg-card/95 backdrop-blur-xl border-border shadow-soft-elevated dark:bg-black/20 dark:border-white/10">
+              <CardHeader className="pb-2">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <CardTitle className="flex items-center gap-2 text-foreground dark:text-white">
+                      <FileText className="h-5 w-5 text-blue-500 dark:text-blue-400" />
+                      Acquisition sources
+                    </CardTitle>
+                    <CardDescription className="text-muted-foreground">
+                      From onboarding survey (top sources)
+                    </CardDescription>
+                  </div>
+                  <Badge
+                    variant="secondary"
+                    className="bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-600/20 dark:text-blue-300 dark:border-blue-500/30"
+                  >
+                    {onboardingSummary ? onboardingSummary.range : "—"}
+                  </Badge>
+                </div>
+              </CardHeader>
+              <CardContent className="pt-2">
+                {referralBars.length ? (
+                  <div className="h-[260px]">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={referralBars} margin={{ top: 10, right: 12, left: 0, bottom: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" opacity={0.15} />
+                        <XAxis dataKey="source" tickLine={false} axisLine={false} fontSize={12} />
+                        <YAxis tickLine={false} axisLine={false} fontSize={12} />
+                        <Tooltip
+                          contentStyle={{
+                            borderRadius: 12,
+                            border: "1px solid rgba(255,255,255,0.10)",
+                            background: "rgba(17,24,39,0.85)",
+                            color: "white",
+                          }}
+                        />
+                        <Bar dataKey="count" radius={[10, 10, 0, 0]} fill="#60a5fa" />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                ) : (
+                  <div className="h-[260px] flex items-center justify-center text-muted-foreground">
+                    No onboarding survey data yet.
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </motion.div>
+
           {/* System Metrics */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 lg:gap-8">
             {/* System Performance */}
@@ -730,8 +1030,7 @@ const AdminDashboardLayout = () => {
                               variant="secondary"
                               className="bg-green-600/20 text-green-400 border-green-500/30 text-xs"
                             >
-                              {Math.round((search.confidence_score || 0) * 100)}
-                              %
+                              {formatConfidencePct(search.ai_confidence ?? search.confidence_score)}%
                             </Badge>
                             <p className="text-gray-500 text-xs mt-1">
                               {new Date(search.created_at).toLocaleTimeString()}
