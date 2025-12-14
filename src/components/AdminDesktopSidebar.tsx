@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   Skeleton,
   SkeletonAvatar,
@@ -82,6 +83,7 @@ const AdminDesktopSidebar: React.FC<AdminSidebarProps> = ({
   const navigate = useNavigate();
   const { toast } = useToast();
   const { logout } = useAuth();
+  const [navQuery, setNavQuery] = useState("");
 
   const [adminStats, setAdminStats] = useState<AdminStats>({
     totalUsers: 0,
@@ -139,13 +141,21 @@ const AdminDesktopSidebar: React.FC<AdminSidebarProps> = ({
     }
   };
 
-  const navItems = [
+  const navItems: Array<{
+    href: string;
+    label: string;
+    icon: React.ComponentType<{ className?: string }>;
+    description: string;
+    badge: string | null;
+    section: "Core" | "Billing" | "System";
+  }> = [
     {
       href: "/admin/dashboard",
       label: "Dashboard",
       icon: BarChart3,
       description: "Overview and analytics",
       badge: null,
+      section: "Core",
     },
     {
       href: "/admin/user-management",
@@ -154,6 +164,7 @@ const AdminDesktopSidebar: React.FC<AdminSidebarProps> = ({
       description: "Manage system users",
       badge:
         adminStats.totalUsers > 0 ? adminStats.totalUsers.toString() : null,
+      section: "Core",
     },
     {
       href: "/admin/system-analytics",
@@ -161,6 +172,7 @@ const AdminDesktopSidebar: React.FC<AdminSidebarProps> = ({
       icon: TrendingUp,
       description: "Performance metrics",
       badge: null,
+      section: "Core",
     },
     {
       href: "/admin/audit-logs",
@@ -169,6 +181,7 @@ const AdminDesktopSidebar: React.FC<AdminSidebarProps> = ({
       description: "System activity logs",
       badge:
         adminStats.recentAlerts > 0 ? adminStats.recentAlerts.toString() : null,
+      section: "Core",
     },
     {
       href: "/admin/payment-methods",
@@ -176,6 +189,7 @@ const AdminDesktopSidebar: React.FC<AdminSidebarProps> = ({
       icon: CreditCard,
       description: "Payment settings",
       badge: null,
+      section: "Billing",
     },
     {
       href: "/admin/subscribers",
@@ -183,6 +197,7 @@ const AdminDesktopSidebar: React.FC<AdminSidebarProps> = ({
       icon: Crown,
       description: "User subscriptions",
       badge: null,
+      section: "Billing",
     },
     {
       href: "/admin/onboarding-surveys",
@@ -190,6 +205,7 @@ const AdminDesktopSidebar: React.FC<AdminSidebarProps> = ({
       icon: FileText,
       description: "Acquisition & interests",
       badge: null,
+      section: "Core",
     },
     {
       href: "/admin/system-settings",
@@ -197,6 +213,7 @@ const AdminDesktopSidebar: React.FC<AdminSidebarProps> = ({
       icon: Settings,
       description: "System configuration",
       badge: null,
+      section: "System",
     },
     {
       href: "/admin/database-console",
@@ -204,6 +221,7 @@ const AdminDesktopSidebar: React.FC<AdminSidebarProps> = ({
       icon: Database,
       description: "Database management",
       badge: null,
+      section: "System",
     },
     {
       href: "/admin/email-smtp",
@@ -211,6 +229,7 @@ const AdminDesktopSidebar: React.FC<AdminSidebarProps> = ({
       icon: Mail,
       description: "Email configuration",
       badge: null,
+      section: "System",
     },
     {
       href: "/admin/ai-models",
@@ -218,6 +237,7 @@ const AdminDesktopSidebar: React.FC<AdminSidebarProps> = ({
       icon: BrainCircuit,
       description: "AI model management",
       badge: null,
+      section: "System",
     },
   ];
 
@@ -278,7 +298,27 @@ const AdminDesktopSidebar: React.FC<AdminSidebarProps> = ({
   };
 
   // Admin console: all items are available to admins.
-  const filteredNavItems = navItems;
+  const filteredNavItems = navItems.filter((i) => {
+    const q = navQuery.trim().toLowerCase();
+    if (!q) return true;
+    return (
+      i.label.toLowerCase().includes(q) || i.description.toLowerCase().includes(q)
+    );
+  });
+
+  const isActive = (href: string) => {
+    if (href === "/admin/dashboard") return location.pathname === href;
+    return location.pathname.startsWith(href);
+  };
+
+  const navSections: Array<{ title: string; items: typeof filteredNavItems }> = [
+    { title: "Core", items: filteredNavItems.filter((i) => i.section === "Core") },
+    {
+      title: "Billing",
+      items: filteredNavItems.filter((i) => i.section === "Billing"),
+    },
+    { title: "System", items: filteredNavItems.filter((i) => i.section === "System") },
+  ].filter((s) => s.items.length > 0);
 
   return (
     <motion.div
@@ -430,59 +470,113 @@ const AdminDesktopSidebar: React.FC<AdminSidebarProps> = ({
       )}
 
       {/* Navigation */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-2">
-        {filteredNavItems.map((item, index) => (
-          <motion.div
-            key={item.href}
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: index * 0.05 }}
-          >
-              <Link
-                to={item.href}
-                className={`flex items-center space-x-4 p-3 rounded-xl transition-all duration-200 group relative ${
-                  location.pathname === item.href
-                    ? "bg-sidebar-accent text-sidebar-accent-foreground border border-sidebar-border shadow-soft-elevated dark:bg-gradient-to-r dark:from-blue-600/20 dark:to-purple-600/20 dark:border-blue-500/30 dark:text-blue-100"
-                    : "text-sidebar-foreground/80 hover:text-sidebar-foreground hover:bg-sidebar-accent/60 border border-transparent dark:text-gray-300 dark:hover:text-blue-200 dark:hover:bg-blue-800/10"
-                }`}
-              >
-              <div
-                className={`p-2 rounded-lg transition-colors ${
-                  location.pathname === item.href
-                    ? "bg-sidebar-accent/80 text-sidebar-accent-foreground dark:bg-blue-600/20 dark:text-blue-300"
-                    : "bg-muted text-muted-foreground group-hover:bg-sidebar-accent/60 group-hover:text-sidebar-accent-foreground dark:bg-gray-800/50 dark:text-gray-400 dark:group-hover:bg-blue-800/20 dark:group-hover:text-blue-400"
-                }`}
-              >
-                <item.icon className="w-5 h-5" />
-              </div>
+      <div className="flex-1 overflow-y-auto px-3 py-4">
+        {!isCollapsed ? (
+          <div className="mb-3">
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <input
+                value={navQuery}
+                onChange={(e) => setNavQuery(e.target.value)}
+                placeholder="Search admin…"
+                className="w-full rounded-xl border border-border bg-background/70 py-2 pl-9 pr-3 text-sm text-foreground placeholder:text-muted-foreground shadow-sm backdrop-blur focus:outline-none focus:ring-2 focus:ring-primary/30 dark:bg-white/5 dark:border-white/10 dark:text-white"
+              />
+            </div>
+          </div>
+        ) : null}
 
-              {!isCollapsed && (
-                <div className="flex-1 min-w-0">
-                  <div className="font-medium truncate flex items-center justify-between text-foreground dark:text-white">
-                    <span>{item.label}</span>
-                    {item.badge && (
-                      <Badge
-                        variant="secondary"
-                        className="bg-blue-600/20 text-blue-400 border-blue-500/30 text-xs"
+        <div className="space-y-4">
+          {navSections.map((section, sectionIdx) => (
+            <div key={section.title} className="space-y-2">
+              {!isCollapsed ? (
+                <div className="px-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                  {section.title}
+                </div>
+              ) : sectionIdx > 0 ? (
+                <Separator className="my-2 bg-border/60 dark:bg-white/10" />
+              ) : null}
+
+              <div className="space-y-1">
+                {section.items.map((item, index) => {
+                  const active = isActive(item.href);
+
+                  const linkEl = (
+                    <Link
+                      to={item.href}
+                      className={`relative flex items-center gap-3 rounded-xl px-3 py-2.5 transition-all duration-200 group border ${
+                        active
+                          ? "bg-sidebar-accent/80 text-sidebar-accent-foreground border-sidebar-border shadow-soft-elevated dark:bg-gradient-to-r dark:from-blue-600/20 dark:to-purple-600/20 dark:border-blue-500/30 dark:text-blue-100"
+                          : "border-transparent text-sidebar-foreground/80 hover:text-sidebar-foreground hover:bg-sidebar-accent/60 dark:text-gray-300 dark:hover:text-blue-200 dark:hover:bg-blue-800/10"
+                      }`}
+                    >
+                      {/* Active indicator */}
+                      {active ? (
+                        <span className="absolute left-0 top-1/2 h-6 w-1 -translate-y-1/2 rounded-r-full bg-gradient-to-b from-purple-500 to-blue-500" />
+                      ) : null}
+
+                      <div
+                        className={`flex h-9 w-9 items-center justify-center rounded-xl transition-colors ring-1 ${
+                          active
+                            ? "bg-gradient-to-r from-purple-600/20 to-blue-600/20 text-blue-300 ring-blue-500/25"
+                            : "bg-muted text-muted-foreground ring-border/60 group-hover:bg-sidebar-accent/50 group-hover:text-sidebar-accent-foreground dark:bg-gray-800/50 dark:text-gray-400 dark:ring-white/10 dark:group-hover:bg-blue-800/20 dark:group-hover:text-blue-300"
+                        }`}
                       >
-                        {item.badge}
-                      </Badge>
-                    )}
-                  </div>
-                  <div className="text-xs opacity-70 truncate text-muted-foreground dark:text-gray-400">
-                    {item.description}
-                  </div>
-                </div>
-              )}
+                        <item.icon className="h-4.5 w-4.5" />
+                      </div>
 
-              {isCollapsed && item.badge && (
-                <div className="absolute -top-1 -right-1 w-5 h-5 bg-sidebar-accent rounded-full flex items-center justify-center text-sidebar-accent-foreground dark:bg-blue-600 dark:text-white">
-                  <span className="text-xs">{item.badge}</span>
-                </div>
-              )}
-            </Link>
-          </motion.div>
-        ))}
+                      {!isCollapsed ? (
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="truncate text-sm font-semibold text-foreground dark:text-white">
+                              {item.label}
+                            </div>
+                            {item.badge ? (
+                              <span className="inline-flex items-center rounded-full border border-blue-500/30 bg-blue-500/10 px-2 py-0.5 text-[11px] font-semibold text-blue-600 dark:text-blue-300">
+                                {item.badge}
+                              </span>
+                            ) : null}
+                          </div>
+                          <div className="truncate text-[11px] text-muted-foreground dark:text-gray-400">
+                            {item.description}
+                          </div>
+                        </div>
+                      ) : (
+                        <span className="sr-only">{item.label}</span>
+                      )}
+
+                      {isCollapsed && item.badge ? (
+                        <span className="absolute -top-1 -right-1 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-gradient-to-r from-purple-600 to-blue-600 px-1 text-[10px] font-semibold text-white shadow">
+                          {item.badge}
+                        </span>
+                      ) : null}
+                    </Link>
+                  );
+
+                  return (
+                    <motion.div
+                      key={item.href}
+                      initial={{ opacity: 0, x: -16 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: (sectionIdx * 0.05) + index * 0.03 }}
+                    >
+                      {isCollapsed ? (
+                        <Tooltip>
+                          <TooltipTrigger asChild>{linkEl}</TooltipTrigger>
+                          <TooltipContent side="right" className="text-xs">
+                            <div className="font-semibold">{item.label}</div>
+                            <div className="opacity-80">{item.description}</div>
+                          </TooltipContent>
+                        </Tooltip>
+                      ) : (
+                        linkEl
+                      )}
+                    </motion.div>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
 
       {/* Admin User Section */}
