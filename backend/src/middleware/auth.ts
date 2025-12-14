@@ -275,7 +275,37 @@ export const authenticateToken = async (req: AuthRequest, res: Response, next: N
         return next();
       }
     } catch (clerkError) {
-      // Clerk token verification failed; fall back to legacy Supabase auth below.
+      // If this looks like a Clerk token, don't fall back to Supabase (it will always fail
+      // and you'll get confusing "Invalid token" errors).
+      const looksLikeClerkToken = (() => {
+        try {
+          const parts = String(token).split(".");
+          if (parts.length !== 3) return false;
+          const payloadJson = JSON.parse(
+            Buffer.from(parts[1], "base64").toString("utf8")
+          ) as any;
+          const iss = payloadJson?.iss as string | undefined;
+          const sub = payloadJson?.sub as string | undefined;
+          return (
+            (typeof iss === "string" && iss.toLowerCase().includes("clerk")) ||
+            (typeof sub === "string" && sub.startsWith("user_"))
+          );
+        } catch {
+          return false;
+        }
+      })();
+
+      if (looksLikeClerkToken) {
+        console.warn("⚠️ Clerk token verification failed (likely key/instance mismatch):", clerkError);
+        return res.status(401).json({
+          success: false,
+          error: "clerk_token_invalid",
+          message:
+            "Clerk authentication token could not be verified by the server. Ensure frontend and backend use the SAME Clerk instance (pk_test/sk_test or pk_live/sk_live) and that CLERK_JWT_PUBLIC_KEY matches that instance.",
+        });
+      }
+
+      // Otherwise, fall back to legacy Supabase auth below.
       console.warn("⚠️ Clerk token verification failed, falling back to Supabase:", clerkError);
     }
 
