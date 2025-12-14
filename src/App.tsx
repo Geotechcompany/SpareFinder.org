@@ -32,12 +32,14 @@ import AIModelsManagement from "@/pages/admin/AIModelsManagement";
 import SubscribersManagement from "@/components/admin/SubscribersManagement";
 import AdminLogin from "@/pages/admin/AdminLogin";
 import AdminProtectedRoute from "@/components/AdminProtectedRoute";
+import OnboardingSurveys from "@/pages/admin/OnboardingSurveys";
 
 import Landing from "@/pages/Landing";
 import PrivacyPolicy from "@/pages/PrivacyPolicy";
 import TermsOfService from "@/pages/TermsOfService";
 import Help from "@/pages/Help";
 import Trial from "@/pages/Trial";
+import OnboardingProfile from "@/pages/OnboardingProfile";
 import { MigrateAccount } from "@/pages/MigrateAccount";
 import Unauthorized from "@/pages/Unauthorized";
 import ForgotPassword from "@/pages/ForgotPassword";
@@ -132,6 +134,14 @@ const App = () => (
                   </ProtectedRoute>
                 }
               />
+              <Route
+                path="/onboarding/profile"
+                element={
+                  <ProtectedRoute>
+                    <OnboardingProfile />
+                  </ProtectedRoute>
+                }
+              />
 
               <Route
                 path="/admin/dashboard"
@@ -210,6 +220,14 @@ const App = () => (
                 element={
                   <AdminProtectedRoute>
                     <SubscribersManagement />
+                  </AdminProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/onboarding-surveys"
+                element={
+                  <AdminProtectedRoute>
+                    <OnboardingSurveys />
                   </AdminProtectedRoute>
                 }
               />

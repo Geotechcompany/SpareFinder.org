@@ -718,6 +718,7 @@ const Billing = () => {
                                     el.scrollIntoView({ behavior: "smooth" });
                                   }
                                 } else {
+                                  // Trial page will enforce profile onboarding when required.
                                   window.location.href = "/onboarding/trial";
                                 }
                               }}

@@ -24,6 +24,141 @@ const adminSupabase = createClient(
 
 const router = Router();
 
+// Onboarding survey insights (admin only)
+router.get(
+  "/onboarding-surveys",
+  [authenticateToken, requireAdmin],
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const page = parseInt(req.query.page as string) || 1;
+      const limit = parseInt(req.query.limit as string) || 50;
+      const offset = (page - 1) * limit;
+
+      const { data, error, count } = await adminSupabase
+        .from("onboarding_surveys")
+        .select(
+          `
+          *,
+          profiles(full_name)
+        `,
+          { count: "exact" }
+        )
+        .order("created_at", { ascending: false })
+        .range(offset, offset + limit - 1);
+
+      if (error) {
+        console.error("Onboarding surveys fetch error:", error);
+        return res.status(500).json({
+          success: false,
+          error: "Fetch failed",
+          message: "Failed to retrieve onboarding surveys",
+        });
+      }
+
+      return res.json({
+        success: true,
+        data: {
+          surveys: data || [],
+          pagination: {
+            page,
+            limit,
+            total: count || 0,
+            pages: Math.ceil((count || 0) / limit),
+          },
+        },
+      });
+    } catch (error) {
+      console.error("Onboarding surveys error:", error);
+      return res.status(500).json({
+        success: false,
+        error: "Internal server error",
+        message: "An unexpected error occurred while fetching onboarding surveys",
+      });
+    }
+  }
+);
+
+router.get(
+  "/onboarding-surveys/summary",
+  [authenticateToken, requireAdmin],
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const range = (req.query.range as string) || "90d";
+      const days =
+        range === "7d" ? 7 : range === "30d" ? 30 : range === "365d" ? 365 : 90;
+      const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+
+      const { data, error } = await adminSupabase
+        .from("onboarding_surveys")
+        .select("referral_source, company_size, role, primary_goal, interests, created_at")
+        .gte("created_at", since);
+
+      if (error) {
+        console.error("Onboarding surveys summary error:", error);
+        return res.status(500).json({
+          success: false,
+          error: "Fetch failed",
+          message: "Failed to retrieve onboarding survey summary",
+        });
+      }
+
+      const byReferralSource: Record<string, number> = {};
+      const byCompanySize: Record<string, number> = {};
+      const byRole: Record<string, number> = {};
+      const byPrimaryGoal: Record<string, number> = {};
+      const interestCounts: Record<string, number> = {};
+
+      for (const row of data || []) {
+        const referral = (row as any).referral_source || "unknown";
+        byReferralSource[referral] = (byReferralSource[referral] || 0) + 1;
+
+        const cs = (row as any).company_size || "unknown";
+        byCompanySize[cs] = (byCompanySize[cs] || 0) + 1;
+
+        const role = (row as any).role || "unknown";
+        byRole[role] = (byRole[role] || 0) + 1;
+
+        const pg = (row as any).primary_goal || "unknown";
+        byPrimaryGoal[pg] = (byPrimaryGoal[pg] || 0) + 1;
+
+        const interests = (row as any).interests;
+        if (Array.isArray(interests)) {
+          for (const i of interests) {
+            if (typeof i !== "string" || !i) continue;
+            interestCounts[i] = (interestCounts[i] || 0) + 1;
+          }
+        }
+      }
+
+      const topInterests = Object.entries(interestCounts)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 12)
+        .map(([interest, count]) => ({ interest, count }));
+
+      return res.json({
+        success: true,
+        data: {
+          range,
+          since,
+          total: (data || []).length,
+          byReferralSource,
+          byCompanySize,
+          byRole,
+          byPrimaryGoal,
+          topInterests,
+        },
+      });
+    } catch (error) {
+      console.error("Onboarding surveys summary error:", error);
+      return res.status(500).json({
+        success: false,
+        error: "Internal server error",
+        message: "An unexpected error occurred while building onboarding survey summary",
+      });
+    }
+  }
+);
+
 // Get subscribed users (admin only)
 router.get(
   "/subscribers",

@@ -48,7 +48,7 @@ const Login = () => {
     [location.state]
   );
 
-  if (!isLoading && isAuthenticated) {
+    if (!isLoading && isAuthenticated) {
     return <Navigate to="/dashboard" replace />;
   }
 
@@ -147,11 +147,11 @@ const Login = () => {
     setErrorMessage(null);
     setInfoMessage(null);
     try {
-      await signIn.authenticateWithRedirect({
-        strategy,
-        redirectUrl: "/login/sso-callback",
-        redirectUrlComplete: redirectTo,
-      });
+    await signIn.authenticateWithRedirect({
+      strategy,
+      redirectUrl: "/login/sso-callback",
+      redirectUrlComplete: redirectTo,
+    });
     } catch (err: any) {
       const { clerkCode, clerkMsg, paramName } = getClerkError(err);
       if (clerkCode === "form_param_value_invalid" && paramName === "strategy") {
@@ -436,20 +436,20 @@ const Login = () => {
     >
       <div className="space-y-4">
         {oauthStrategies.length ? (
-          <div className="grid gap-2">
+        <div className="grid gap-2">
             {oauthStrategies.map((strategy) => (
-              <Button
+          <Button
                 key={strategy}
-                type="button"
-                variant="outline"
-                className="w-full"
+            type="button"
+            variant="outline"
+            className="w-full"
                 onClick={() => handleOauth(strategy)}
-                disabled={!isLoaded || isSubmitting}
-              >
+            disabled={!isLoaded || isSubmitting}
+          >
                 Continue with {formatStrategyLabel(strategy)}
-              </Button>
+          </Button>
             ))}
-          </div>
+        </div>
         ) : null}
 
         <div className="flex items-center gap-3">
@@ -459,67 +459,67 @@ const Login = () => {
         </div>
 
         {loginStep === "credentials" ? (
-          <form onSubmit={handleSubmit} className="space-y-3">
-            <div className="space-y-1.5">
-              <label className="text-xs font-medium text-muted-foreground">
-                Email address
-              </label>
+        <form onSubmit={handleSubmit} className="space-y-3">
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-muted-foreground">
+              Email address
+            </label>
+            <Input
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="you@company.com"
+              autoComplete="email"
+              inputMode="email"
+              disabled={isSubmitting}
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-muted-foreground">
+              Password
+            </label>
+            <div className="relative">
               <Input
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="you@company.com"
-                autoComplete="email"
-                inputMode="email"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                type={isPasswordVisible ? "text" : "password"}
+                autoComplete="current-password"
                 disabled={isSubmitting}
               />
+              <button
+                type="button"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                onClick={() => setIsPasswordVisible((v) => !v)}
+                aria-label={isPasswordVisible ? "Hide password" : "Show password"}
+              >
+                {isPasswordVisible ? (
+                  <EyeOff className="h-4 w-4" />
+                ) : (
+                  <Eye className="h-4 w-4" />
+                )}
+              </button>
             </div>
-
-            <div className="space-y-1.5">
-              <label className="text-xs font-medium text-muted-foreground">
-                Password
-              </label>
-              <div className="relative">
-                <Input
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  type={isPasswordVisible ? "text" : "password"}
-                  autoComplete="current-password"
-                  disabled={isSubmitting}
-                />
-                <button
-                  type="button"
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                  onClick={() => setIsPasswordVisible((v) => !v)}
-                  aria-label={isPasswordVisible ? "Hide password" : "Show password"}
-                >
-                  {isPasswordVisible ? (
-                    <EyeOff className="h-4 w-4" />
-                  ) : (
-                    <Eye className="h-4 w-4" />
-                  )}
-                </button>
-              </div>
-            </div>
+          </div>
 
             {infoMessage ? (
               <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-700 dark:text-emerald-200">
                 {infoMessage}
               </div>
             ) : null}
-            {errorMessage ? (
-              <div className="rounded-xl border border-red-500/20 bg-red-500/10 px-3 py-2 text-xs text-red-600 dark:text-red-300">
-                {errorMessage}
-              </div>
-            ) : null}
+          {errorMessage ? (
+            <div className="rounded-xl border border-red-500/20 bg-red-500/10 px-3 py-2 text-xs text-red-600 dark:text-red-300">
+              {errorMessage}
+        </div>
+          ) : null}
 
-            <Button
-              type="submit"
-              disabled={!isLoaded || isSubmitting || !email || !password}
-              className="w-full bg-gradient-to-r from-slate-900 to-slate-800 hover:from-slate-800 hover:to-slate-700 dark:from-slate-100 dark:to-white dark:text-slate-900 dark:hover:from-white dark:hover:to-slate-200"
-            >
-              Continue <ArrowRight className="ml-2 h-4 w-4" />
-            </Button>
-          </form>
+          <Button
+            type="submit"
+            disabled={!isLoaded || isSubmitting || !email || !password}
+            className="w-full bg-gradient-to-r from-slate-900 to-slate-800 hover:from-slate-800 hover:to-slate-700 dark:from-slate-100 dark:to-white dark:text-slate-900 dark:hover:from-white dark:hover:to-slate-200"
+          >
+            Continue <ArrowRight className="ml-2 h-4 w-4" />
+          </Button>
+        </form>
         ) : (
           <form onSubmit={handleVerify} className="space-y-3">
             <div className="rounded-xl border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">

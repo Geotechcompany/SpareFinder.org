@@ -185,6 +185,13 @@ const AdminDesktopSidebar: React.FC<AdminSidebarProps> = ({
       badge: null,
     },
     {
+      href: "/admin/onboarding-surveys",
+      label: "Onboarding Surveys",
+      icon: FileText,
+      description: "Acquisition & interests",
+      badge: null,
+    },
+    {
       href: "/admin/system-settings",
       label: "System Settings",
       icon: Settings,

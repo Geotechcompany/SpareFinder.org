@@ -879,7 +879,7 @@ const Settings = () => {
                                   ) ? (
                                     <Badge className="bg-blue-600/20 text-blue-300 border-blue-500/30 text-xs">
                                       Google connected
-                                    </Badge>
+                                </Badge>
                                   ) : null}
                                   {clerkUser.externalAccounts?.some(
                                     (a) =>

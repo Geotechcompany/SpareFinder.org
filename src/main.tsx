@@ -52,8 +52,8 @@ if (!clerkPublishableKey) {
         signInUrl="/login"
         signUpUrl="/register"
         afterSignInUrl="/dashboard"
-        // New signups should pick a plan / start the free trial first.
-        afterSignUpUrl="/onboarding/trial"
+        // New signups should complete post-signup profile onboarding before picking a plan.
+        afterSignUpUrl="/onboarding/profile"
       >
         <App />
       </ClerkProvider>

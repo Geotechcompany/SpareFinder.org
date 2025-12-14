@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useNavigate } from "react-router-dom";
 import { ArrowRight, LockKeyhole, Sparkles } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
 
 export const PlanRequiredCard: React.FC<{
   title?: string;
@@ -12,6 +13,7 @@ export const PlanRequiredCard: React.FC<{
   description = "Start a free trial or subscribe to unlock uploads, history, reviews, and analytics.",
 }) => {
   const navigate = useNavigate();
+  const { user, isLoading } = useAuth();
 
   return (
     <div className="min-h-[70dvh] flex items-center justify-center px-4 py-10">
@@ -41,7 +43,15 @@ export const PlanRequiredCard: React.FC<{
           <CardContent className="space-y-4">
             <div className="flex flex-col sm:flex-row gap-3">
               <Button
-                onClick={() => navigate("/onboarding/trial")}
+                onClick={() => {
+                  const needsOnboarding =
+                    !isLoading && user && (!user.company || user.company.trim().length === 0);
+                  navigate(
+                    needsOnboarding
+                      ? `/onboarding/profile?next=${encodeURIComponent("/onboarding/trial")}`
+                      : "/onboarding/trial"
+                  );
+                }}
                 className="w-full sm:w-auto bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 shadow-lg shadow-purple-500/20"
               >
                 Choose a plan / start trial

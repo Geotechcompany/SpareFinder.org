@@ -153,7 +153,11 @@ function FAQ1({ faqs, title, subtitle, description }: FAQ1Props) {
     return () => window.removeEventListener("load", onLoad);
   }, []);
 
-  const palette = useMemo(() => palettes[actualTheme], [actualTheme]);
+  // Safety: if theme ever comes through as an unexpected value, avoid runtime crashes.
+  const palette = useMemo(
+    () => (palettes as any)[actualTheme] ?? palettes.light,
+    [actualTheme]
+  );
 
   const toggleQuestion = (i: number) =>
     setActiveIndex((prev) => (prev === i ? -1 : i));

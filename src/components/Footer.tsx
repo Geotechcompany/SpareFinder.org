@@ -58,7 +58,7 @@ const Footer = () => {
                 { name: 'Quality Control', desc: 'Automated defect detection' },
                 { name: 'Supply Chain', desc: 'Real-time availability' }
               ].map((item) => (
-                <li key={item.name} className="group">
+                <li key={`${item.name}-${item.desc}`} className="group">
                   <a
                     href="#"
                     className="block -m-3 rounded-lg p-3 transition-all duration-300 hover:bg-muted dark:hover:bg-gray-800/30"
@@ -93,7 +93,7 @@ const Footer = () => {
                 { name: 'Engineering spares', desc: 'Industrial equipment' },
                 { name: 'Electronics', desc: 'Circuit components' }
               ].map((item) => (
-                <li key={item.name} className="group">
+                <li key={`${item.name}-${item.desc}`} className="group">
                   <a
                     href="#"
                     className="block -m-3 rounded-lg p-3 transition-all duration-300 hover:bg-muted dark:hover:bg-gray-800/30"
@@ -128,7 +128,7 @@ const Footer = () => {
                 { name: 'Support Center', desc: '24/7 assistance' },
                 { name: 'Developer API', desc: 'Integration tools' }
               ].map((item) => (
-                <li key={item.name} className="group">
+                <li key={`${item.name}-${item.desc}`} className="group">
                   <a
                     href="#"
                     className="block -m-3 rounded-lg p-3 transition-all duration-300 hover:bg-muted dark:hover:bg-gray-800/30"

@@ -12,11 +12,24 @@ import { Badge } from "@/components/ui/badge";
 import { Sparkles, Shield, CheckCircle2, Crown, Zap, ShieldCheck } from "lucide-react";
 import { api } from "@/lib/api";
 import { PLAN_CONFIG, type PlanTier, isUnlimited } from "@/lib/plans";
+import { useAuth } from "@/contexts/AuthContext";
 
 const Trial: React.FC = () => {
   const navigate = useNavigate();
+  const { user, isLoading } = useAuth();
   const [loadingTier, setLoadingTier] = useState<PlanTier | null>(null);
   const [loadingMode, setLoadingMode] = useState<"trial" | "paid" | null>(null);
+
+  // Enforce post-signup onboarding before plan selection.
+  React.useEffect(() => {
+    if (isLoading) return;
+    if (!user) return;
+    if (!user.company || user.company.trim().length === 0) {
+      navigate(`/onboarding/profile?next=${encodeURIComponent("/onboarding/trial")}`, {
+        replace: true,
+      });
+    }
+  }, [isLoading, user, navigate]);
 
   const startCheckout = async (args: { tier: PlanTier; mode: "trial" | "paid" }) => {
     try {

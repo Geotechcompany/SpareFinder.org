@@ -620,6 +620,25 @@ export const adminApi = {
     return { success: true, data: { statistics: response.data.statistics } };
   },
 
+  getOnboardingSurveys: async (
+    page: number = 1,
+    limit: number = 50
+  ): Promise<ApiResponse> => {
+    const response = await apiClient.get(
+      `/admin/onboarding-surveys?page=${page}&limit=${limit}`
+    );
+    return response.data;
+  },
+
+  getOnboardingSurveysSummary: async (
+    range: "7d" | "30d" | "90d" | "365d" = "90d"
+  ): Promise<ApiResponse> => {
+    const response = await apiClient.get(
+      `/admin/onboarding-surveys/summary?range=${range}`
+    );
+    return response.data;
+  },
+
   getAIModels: async (): Promise<ApiResponse> => {
     const response = await apiClient.get("/admin/ai-models");
     return { success: true, data: response.data };
@@ -1512,6 +1531,15 @@ export const api = {
   profile: profileApi,
   user: {
     getProfile: () => apiClient.get("/user/profile"),
+    submitOnboardingSurvey: (payload: {
+      company?: string;
+      role?: string;
+      companySize?: string;
+      primaryGoal?: string;
+      interests?: string[];
+      referralSource: string;
+      referralSourceOther?: string;
+    }) => apiClient.post("/user/onboarding-survey", payload),
     updateProfile: (profileData: {
       full_name?: string;
       company?: string;
@@ -1526,6 +1554,15 @@ export const api = {
         darkMode?: boolean;
         analytics?: boolean;
         marketing?: boolean;
+        onboarding?: {
+          companySize?: string;
+          role?: string;
+          primaryGoal?: string;
+          interests?: string[];
+          referralSource?: string;
+          referralSourceOther?: string;
+          completedAt?: string;
+        };
       };
     }) => apiClient.put("/user/profile", profileData),
     changePassword: async (
