@@ -396,7 +396,8 @@ router.get("/stats", async (req: AuthRequest, res: Response) => {
       .order("created_at", { ascending: false })
       .limit(50);
 
-    let avgConfidence = 85; // More realistic default
+    // If the user has no completed activity, default to 0 (don't show misleading "85%").
+    let avgConfidence = 0;
 
     if (!searchesError && allUserSearches && allUserSearches.length > 0) {
       // Calculate quality-adjusted confidence scores
