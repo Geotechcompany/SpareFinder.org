@@ -200,6 +200,9 @@ apiClient.interceptors.response.use(
         pathname.startsWith("/register") ||
         pathname.startsWith("/reset-password") ||
         pathname.startsWith("/migrate") ||
+        pathname.startsWith("/login/sso-callback") ||
+        pathname.startsWith("/register/sso-callback") ||
+        pathname.startsWith("/admin/login/sso-callback") ||
         pathname.startsWith("/account/sso-callback");
 
       // If we're using Clerk, there is no refresh-token dance in this client.
