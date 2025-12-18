@@ -104,7 +104,6 @@ export const useProfileData = () => {
 
   // Use refs to prevent multiple simultaneous requests
   const isFetchingRef = useRef(false);
-  const hasInitializedRef = useRef(false);
 
   const fetchProfileData = useCallback(async () => {
     // Don't fetch if not authenticated or already fetching
@@ -191,16 +190,28 @@ export const useProfileData = () => {
     }
   }, [user, isAuthenticated]);
 
-  // Only fetch once when component mounts and user is authenticated
+  // Fetch on mount + keep fresh while the page is open.
   useEffect(() => {
-    if (isAuthenticated && user && !hasInitializedRef.current) {
-      hasInitializedRef.current = true;
+    if (isAuthenticated && user) {
       fetchProfileData();
+
+      // Refresh periodically so achievements auto-update after uploads/searches.
+      const intervalId = window.setInterval(() => {
+        if (document.visibilityState !== "visible") return;
+        fetchProfileData();
+      }, 15_000);
+
+      const onFocus = () => fetchProfileData();
+      window.addEventListener("focus", onFocus);
+
+      return () => {
+        window.clearInterval(intervalId);
+        window.removeEventListener("focus", onFocus);
+      };
     }
 
-    // Reset when user changes or logs out
+    // Reset when user logs out
     if (!isAuthenticated || !user) {
-      hasInitializedRef.current = false;
       setData({
         achievements: [],
         totalEarned: 0,
@@ -213,9 +224,8 @@ export const useProfileData = () => {
   }, [isAuthenticated, user?.id, fetchProfileData]);
 
   const refetch = useCallback(() => {
-    hasInitializedRef.current = false; // Reset initialization flag
     return fetchProfileData();
   }, [fetchProfileData]);
 
   return { ...data, refetch };
-}; 
+};

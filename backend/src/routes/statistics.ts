@@ -9,7 +9,30 @@ const router = Router();
 router.get('/', authenticateToken, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.user!.userId;
-    const statistics = await DatabaseLogger.getUserStatistics(userId);
+    let statistics = await DatabaseLogger.getUserStatistics(userId);
+
+    // Backfill/refresh stats for users that already existed before we started
+    // updating `user_statistics` automatically.
+    //
+    // IMPORTANT: this endpoint is called frequently (profile/achievements polling),
+    // so we only recompute when missing or "stale enough".
+    const STALE_AFTER_MS = 10 * 60 * 1000; // 10 minutes
+    const lastUpdatedAtMs = (() => {
+      const raw = (statistics as any)?.updated_at;
+      if (!raw) return null;
+      const ms = new Date(String(raw)).getTime();
+      return Number.isFinite(ms) ? ms : null;
+    })();
+
+    const isMissing = !statistics;
+    const isStale = lastUpdatedAtMs != null ? Date.now() - lastUpdatedAtMs > STALE_AFTER_MS : false;
+
+    if (isMissing || isStale) {
+      const refresh = await DatabaseLogger.updateUserStatistics(userId);
+      if (refresh.success) {
+        statistics = await DatabaseLogger.getUserStatistics(userId);
+      }
+    }
 
     if (!statistics) {
       // Return default statistics if none exist

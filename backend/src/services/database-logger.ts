@@ -157,6 +157,17 @@ export class DatabaseLogger {
       }
 
       console.log('✅ Successfully logged part search to database');
+
+      // Keep `user_statistics` in sync so achievements can update automatically.
+      // Do this asynchronously so uploads/searches aren't slowed down by aggregation.
+      setImmediate(async () => {
+        try {
+          await DatabaseLogger.updateUserStatistics(data.user_id);
+        } catch (e) {
+          console.warn("⚠️ Failed to auto-refresh user statistics:", e);
+        }
+      });
+
       return { success: true };
 
     } catch (error) {
