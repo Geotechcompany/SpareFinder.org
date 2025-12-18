@@ -403,11 +403,13 @@ const Login = () => {
         </div>
         ) : null}
 
-        <div className="flex items-center gap-3">
-          <div className="h-px flex-1 bg-border" />
-          <span className="text-xs text-muted-foreground">or</span>
-          <div className="h-px flex-1 bg-border" />
-        </div>
+        {oauthStrategies.length ? (
+          <div className="flex items-center gap-3">
+            <div className="h-px flex-1 bg-border" />
+            <span className="text-xs text-muted-foreground">or</span>
+            <div className="h-px flex-1 bg-border" />
+          </div>
+        ) : null}
 
         {loginStep === "credentials" ? (
         <form onSubmit={handleSubmit} className="space-y-3">
