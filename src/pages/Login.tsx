@@ -414,8 +414,8 @@ const Login = () => {
       }
       description="Log in to your AI-powered spare parts workspace. Upload photos, identify components, and keep your catalog always in sync."
       rightImage={{
-        src: "https://images.pexels.com/photos/4489732/pexels-photo-4489732.jpeg?auto=compress&cs=tinysrgb&w=1600&q=80",
-        alt: "Technician using an AI-powered platform to identify spare parts",
+        src: "/registerphoto.png",
+        alt: "AI-powered spare parts identification visual",
       }}
       rightContent={
           <div className="space-y-4">

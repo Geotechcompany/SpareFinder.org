@@ -27,8 +27,8 @@ const AdminLogin = () => {
       title="Admin Console"
       description="Restricted access for administrators only."
       rightImage={{
-        src: "https://images.pexels.com/photos/4489732/pexels-photo-4489732.jpeg?auto=compress&cs=tinysrgb&w=1600&q=80",
-        alt: "Admin access",
+        src: "/registerphoto.png",
+        alt: "AI-powered spare parts identification visual",
       }}
     >
       <SignIn

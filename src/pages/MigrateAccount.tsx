@@ -130,8 +130,8 @@ export const MigrateAccount: React.FC = () => {
       }
       description="We upgraded sign-in. If you previously had a SpareFinder account, we’ll help you create a new sign-in and link your history automatically."
       rightImage={{
-        src: "https://images.pexels.com/photos/4489732/pexels-photo-4489732.jpeg?auto=compress&cs=tinysrgb&w=1600&q=80",
-        alt: "Technician reviewing parts inventory",
+        src: "/registerphoto.png",
+        alt: "AI-powered spare parts identification visual",
       }}
       rightContent={
         <div className="space-y-4">
