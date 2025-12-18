@@ -135,24 +135,16 @@ export const authenticateToken = async (req: AuthRequest, res: Response, next: N
           .single();
 
         if (!byEmailError && byEmail) {
-          // If profile is already linked to a different Clerk user, block to prevent account takeovers.
-          if (
-            byEmail.clerk_user_id &&
-            byEmail.clerk_user_id !== clerkUser.clerkUserId
-          ) {
-            return res.status(409).json({
-              success: false,
-              error: "Account conflict",
-              message:
-                "This email is already linked to a different account. Please contact support.",
-            });
-          }
-
           // Link + sync (safe, does not overwrite populated fields unless changed)
           const patch: Record<string, unknown> = {
             updated_at: new Date().toISOString(),
           };
-          if (!byEmail.clerk_user_id) patch.clerk_user_id = clerkUser.clerkUserId;
+          // OVERWRITE behavior:
+          // If the user is authenticated with Clerk and their primary email matches an
+          // existing profile, always link that profile to the current Clerk user id.
+          // This resolves production migrations (pk_test → pk_live) and prevents
+          // "Account conflict" lockouts.
+          patch.clerk_user_id = clerkUser.clerkUserId;
           if (shouldUpdateStringField(byEmail.full_name, desiredFullName)) {
             patch.full_name = desiredFullName;
           }
