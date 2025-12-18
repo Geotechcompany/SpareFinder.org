@@ -123,7 +123,15 @@ const DashboardSidebar: React.FC<SidebarProps> = ({ isCollapsed = false, onToggl
     return status === "trialing" ? `${tierLabel} (trial)` : tierLabel;
   })();
 
-  const handleUpgrade = () => {
+  const planCtaLabel = (() => {
+    if (subscriptionLoading) return "Checking plan…";
+    if (isAdmin) return null;
+    if (!isPlanActive) return "Choose plan";
+    if (tier === "enterprise") return "Manage plan";
+    return "Upgrade plan";
+  })();
+
+  const handlePlanCta = () => {
     // If plan isn't active, take them to the plan selector. Otherwise Billing is fine.
     navigate(!subscriptionLoading && !isPlanActive ? "/onboarding/trial" : "/dashboard/billing");
   };
@@ -162,13 +170,16 @@ const DashboardSidebar: React.FC<SidebarProps> = ({ isCollapsed = false, onToggl
       </div>
       {!isCollapsed && (
         <div className="mt-3 grid grid-cols-1 gap-2">
-          <Button
-            type="button"
-            onClick={handleUpgrade}
-            className="w-full justify-center bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 shadow-lg shadow-purple-500/20"
-          >
-            Upgrade plan
-          </Button>
+          {planCtaLabel ? (
+            <Button
+              type="button"
+              onClick={handlePlanCta}
+              disabled={subscriptionLoading}
+              className="w-full justify-center bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 shadow-lg shadow-purple-500/20"
+            >
+              {planCtaLabel}
+            </Button>
+          ) : null}
           <Button 
             variant="ghost" 
             className="w-full text-red-400 hover:text-red-300 hover:bg-red-600/10 justify-start"
