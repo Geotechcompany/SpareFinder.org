@@ -31,6 +31,19 @@ interface SidebarProps {
   onToggle?: () => void;
 }
 
+type NavItem = {
+  href: string;
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+  description: string;
+  requiresPlan?: boolean;
+};
+
+type NavGroup = {
+  title: string;
+  items: NavItem[];
+};
+
 const DashboardSidebar: React.FC<SidebarProps> = ({ isCollapsed = false, onToggle }) => {
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const location = useLocation();
@@ -73,23 +86,47 @@ const DashboardSidebar: React.FC<SidebarProps> = ({ isCollapsed = false, onToggl
     }
   };
 
-  const navItems = [
-    { href: '/dashboard', icon: Home, label: 'Dashboard', description: 'Overview & analytics' },
-    { href: '/dashboard/upload', icon: Upload, label: 'Upload', description: 'Identify parts' },
-    { href: '/dashboard/history', icon: History, label: 'History', description: 'Past uploads' },
-    { href: '/dashboard/reviews', icon: Star, label: 'Reviews', description: 'Your feedback' },
-    { href: '/dashboard/profile', icon: User, label: 'Profile', description: 'Your account' },
-    { href: '/dashboard/notifications', icon: Bell, label: 'Notifications', description: 'Updates & alerts' },
-    { href: '/dashboard/billing', icon: CreditCard, label: 'Billing', description: 'Subscription' },
-    { href: '/dashboard/settings', icon: Settings, label: 'Settings', description: 'Preferences' }
+  const navGroups: NavGroup[] = [
+    {
+      title: "Workspace",
+      items: [
+        { href: "/dashboard", icon: Home, label: "Dashboard", description: "Overview & analytics" },
+      ],
+    },
+    {
+      title: "Analysis",
+      items: [
+        { href: "/dashboard/upload", icon: Upload, label: "Upload", description: "Identify parts", requiresPlan: true },
+        { href: "/dashboard/history", icon: History, label: "History", description: "Past uploads", requiresPlan: true },
+      ],
+    },
+    {
+      title: "Engagement",
+      items: [
+        { href: "/dashboard/reviews", icon: Star, label: "Reviews", description: "Your feedback", requiresPlan: true },
+        { href: "/dashboard/notifications", icon: Bell, label: "Notifications", description: "Updates & alerts", requiresPlan: true },
+      ],
+    },
+    {
+      title: "Account",
+      items: [
+        { href: "/dashboard/profile", icon: User, label: "Profile", description: "Your account" },
+        { href: "/dashboard/billing", icon: CreditCard, label: "Billing", description: "Subscription" },
+        { href: "/dashboard/settings", icon: Settings, label: "Settings", description: "Preferences" },
+      ],
+    },
   ];
 
-  // Hide feature usage until a plan is active. Keep Billing/Profile/Settings visible.
-  const visibleNavItems = (!subscriptionLoading && !isPlanActive)
-    ? navItems.filter((i) =>
-        ["/dashboard", "/dashboard/billing", "/dashboard/profile", "/dashboard/settings"].includes(i.href)
-      )
-    : navItems;
+  const visibleNavGroups: NavGroup[] = navGroups
+    .map((g) => ({
+      ...g,
+      items: g.items.filter((i) => {
+        // Hide feature usage until a plan is active. Keep Billing/Profile/Settings visible.
+        if (!subscriptionLoading && !isPlanActive && i.requiresPlan) return false;
+        return true;
+      }),
+    }))
+    .filter((g) => g.items.length > 0);
 
 
 
@@ -247,33 +284,62 @@ const DashboardSidebar: React.FC<SidebarProps> = ({ isCollapsed = false, onToggl
         </div>
 
         {/* Mobile Navigation */}
-        <div className="flex-1 p-4 space-y-2">
-          {visibleNavItems.map((item, index) => (
-            <motion.div
-              key={item.href}
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: index * 0.1 }}
-            >
-              <Link
-                to={item.href}
-                onClick={toggleMobileMenu}
-                className={`relative flex items-center space-x-3 p-4 rounded-xl transition-all duration-300 group ${
-                  isActiveRoute(item.href)
-                    ? 'bg-sidebar-accent text-sidebar-accent-foreground border border-sidebar-border/80'
-                    : 'text-sidebar-foreground/80 hover:text-sidebar-foreground hover:bg-sidebar-accent/60 dark:text-gray-400 dark:hover:text-white dark:hover:bg-white/5'
-                }`}
-              >
-                <item.icon className="w-5 h-5 flex-shrink-0" />
-                <div className="flex-1">
-                  <div className="font-medium">{item.label}</div>
-                  <div className="text-xs opacity-75">{item.description}</div>
+        <div className="flex-1 overflow-y-auto px-4 py-4">
+          <div className="space-y-5">
+            {visibleNavGroups.map((group, groupIdx) => (
+              <div key={group.title} className="space-y-2">
+                <div className="px-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground dark:text-gray-400/80">
+                  {group.title}
                 </div>
-              </Link>
-            </motion.div>
-          ))}
-
-
+                <div className="space-y-1">
+                  {group.items.map((item, index) => {
+                    const active = isActiveRoute(item.href);
+                    return (
+                      <motion.div
+                        key={item.href}
+                        initial={{ opacity: 0, x: -14 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: groupIdx * 0.04 + index * 0.03 }}
+                      >
+                        <Link
+                          to={item.href}
+                          onClick={toggleMobileMenu}
+                          className={`relative flex items-center gap-3 rounded-2xl px-3 py-3 transition-all duration-200 border ${
+                            active
+                              ? "bg-sidebar-accent/80 text-sidebar-accent-foreground border-sidebar-border shadow-soft-elevated dark:bg-gradient-to-r dark:from-purple-600/15 dark:to-blue-600/15 dark:border-purple-500/25"
+                              : "border-transparent text-sidebar-foreground/80 hover:text-sidebar-foreground hover:bg-sidebar-accent/60 dark:text-gray-300 dark:hover:text-white dark:hover:bg-white/5"
+                          }`}
+                        >
+                          {active ? (
+                            <span className="absolute left-0 top-1/2 h-7 w-1 -translate-y-1/2 rounded-r-full bg-gradient-to-b from-purple-500 to-blue-500" />
+                          ) : null}
+                          <div
+                            className={`flex h-10 w-10 items-center justify-center rounded-2xl ring-1 transition-colors ${
+                              active
+                                ? "bg-gradient-to-r from-purple-600/20 to-blue-600/20 text-blue-300 ring-blue-500/25"
+                                : "bg-muted text-muted-foreground ring-border/60 dark:bg-gray-800/50 dark:text-gray-400 dark:ring-white/10"
+                            }`}
+                          >
+                            <item.icon className="h-5 w-5" />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="truncate text-sm font-semibold">
+                                {item.label}
+                              </div>
+                            </div>
+                            <div className="truncate text-[11px] text-muted-foreground dark:text-gray-400">
+                              {item.description}
+                            </div>
+                          </div>
+                        </Link>
+                      </motion.div>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
 
         {/* Mobile User Section */}
@@ -365,53 +431,76 @@ const DashboardSidebar: React.FC<SidebarProps> = ({ isCollapsed = false, onToggl
         )}
 
         {/* Desktop Navigation */}
-        <div className="flex-1 p-4 space-y-2">
-          {visibleNavItems.map((item, index) => (
-            <motion.div
-              key={item.href}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: index * 0.05 }}
-              whileHover={{ x: isCollapsed ? 0 : 5 }}
-            >
-              <Link
-                to={item.href}
-                className={`relative flex items-center space-x-3 p-3 rounded-xl transition-all duration-300 group ${
-                  isActiveRoute(item.href)
-                    ? 'bg-sidebar-accent text-sidebar-accent-foreground border border-sidebar-border/80'
-                    : 'text-sidebar-foreground/80 hover:text-sidebar-foreground hover:bg-sidebar-accent/60 dark:text-gray-400 dark:hover:text-white dark:hover:bg-white/5'
-                }`}
-              >
-                {isActiveRoute(item.href) && (
-                  <motion.div
-                    layoutId="activeTab"
-                    className="absolute inset-0 bg-gradient-to-r from-purple-600/10 to-blue-600/10 rounded-xl border border-purple-500/20"
-                    initial={false}
-                    transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
-                  />
-                )}
-                <div className="relative z-10 flex items-center space-x-3 w-full">
-                  <item.icon className="w-5 h-5 flex-shrink-0" />
-                  <AnimatePresence>
-                    {!isCollapsed && (
-                      <motion.div
-                        initial={{ opacity: 0, x: -10 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        exit={{ opacity: 0, x: -10 }}
-                        transition={{ duration: 0.2 }}
-                        className="flex-1"
+        <div className="flex-1 overflow-y-auto px-4 py-4">
+          <div className="space-y-5">
+            {visibleNavGroups.map((group, groupIdx) => (
+              <div key={group.title} className="space-y-2">
+                {!isCollapsed ? (
+                  <div className="px-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground dark:text-gray-400/80">
+                    {group.title}
+                  </div>
+                ) : groupIdx > 0 ? (
+                  <div className="my-3 h-px w-full bg-border/60 dark:bg-white/10" />
+                ) : null}
+
+                <div className="space-y-1">
+                  {group.items.map((item, index) => {
+                    const active = isActiveRoute(item.href);
+                    const linkEl = (
+                      <Link
+                        to={item.href}
+                        title={isCollapsed ? item.label : undefined}
+                        className={`relative flex items-center gap-3 rounded-2xl px-3 py-2.5 transition-all duration-200 group border ${
+                          active
+                            ? "bg-sidebar-accent/80 text-sidebar-accent-foreground border-sidebar-border shadow-soft-elevated dark:bg-gradient-to-r dark:from-purple-600/15 dark:to-blue-600/15 dark:border-purple-500/25"
+                            : "border-transparent text-sidebar-foreground/80 hover:text-sidebar-foreground hover:bg-sidebar-accent/60 dark:text-gray-300 dark:hover:text-white dark:hover:bg-white/5"
+                        }`}
                       >
-                        <div className="font-medium">{item.label}</div>
-                        <div className="text-xs opacity-75">{item.description}</div>
+                        {active ? (
+                          <span className="absolute left-0 top-1/2 h-7 w-1 -translate-y-1/2 rounded-r-full bg-gradient-to-b from-purple-500 to-blue-500" />
+                        ) : null}
+
+                        <div
+                          className={`flex h-10 w-10 items-center justify-center rounded-2xl ring-1 transition-colors ${
+                            active
+                              ? "bg-gradient-to-r from-purple-600/20 to-blue-600/20 text-blue-300 ring-blue-500/25"
+                              : "bg-muted text-muted-foreground ring-border/60 group-hover:bg-sidebar-accent/50 group-hover:text-sidebar-accent-foreground dark:bg-gray-800/50 dark:text-gray-400 dark:ring-white/10 dark:group-hover:bg-white/10 dark:group-hover:text-white"
+                          }`}
+                        >
+                          <item.icon className="h-5 w-5" />
+                        </div>
+
+                        {!isCollapsed ? (
+                          <div className="min-w-0 flex-1">
+                            <div className="truncate text-sm font-semibold">
+                              {item.label}
+                            </div>
+                            <div className="truncate text-[11px] text-muted-foreground dark:text-gray-400">
+                              {item.description}
+                            </div>
+                          </div>
+                        ) : (
+                          <span className="sr-only">{item.label}</span>
+                        )}
+                      </Link>
+                    );
+
+                    return (
+                      <motion.div
+                        key={item.href}
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: groupIdx * 0.05 + index * 0.03 }}
+                        whileHover={{ x: isCollapsed ? 0 : 3 }}
+                      >
+                        {linkEl}
                       </motion.div>
-                    )}
-                  </AnimatePresence>
+                    );
+                  })}
                 </div>
-              </Link>
-            </motion.div>
-          ))}
-
-
+              </div>
+            ))}
+          </div>
         </div>
 
         {/* Desktop User Section */}

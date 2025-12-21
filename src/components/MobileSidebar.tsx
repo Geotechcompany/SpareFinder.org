@@ -15,7 +15,7 @@ import {
   User,
   Bell,
   CreditCard,
-  UserCircle
+  Star
 } from 'lucide-react';
 
 interface MobileSidebarProps {
@@ -23,27 +23,65 @@ interface MobileSidebarProps {
   onClose: () => void;
 }
 
+type NavItem = {
+  href: string;
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+  description: string;
+  requiresPlan?: boolean;
+};
+
+type NavGroup = {
+  title: string;
+  items: NavItem[];
+};
+
 const MobileSidebar: React.FC<MobileSidebarProps> = ({ isOpen, onClose }) => {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, logout, isAdmin } = useAuth();
   const { isPlanActive, isLoading: subscriptionLoading, tier, status } = useSubscription();
 
-  const navItems = [
-    { href: '/dashboard', icon: Home, label: 'Dashboard', description: 'Overview & analytics' },
-    { href: '/dashboard/upload', icon: Upload, label: 'Upload', description: 'Identify parts' },
-    { href: '/dashboard/history', icon: History, label: 'History', description: 'Past uploads' },
-    { href: '/dashboard/profile', icon: User, label: 'Profile', description: 'Your account' },
-    { href: '/dashboard/notifications', icon: Bell, label: 'Notifications', description: 'Updates & alerts' },
-    { href: '/dashboard/billing', icon: CreditCard, label: 'Billing', description: 'Subscription' },
-    { href: '/dashboard/settings', icon: Settings, label: 'Settings', description: 'Preferences' }
+  const navGroups: NavGroup[] = [
+    {
+      title: "Workspace",
+      items: [
+        { href: "/dashboard", icon: Home, label: "Dashboard", description: "Overview & analytics" },
+      ],
+    },
+    {
+      title: "Analysis",
+      items: [
+        { href: "/dashboard/upload", icon: Upload, label: "Upload", description: "Identify parts", requiresPlan: true },
+        { href: "/dashboard/history", icon: History, label: "History", description: "Past uploads", requiresPlan: true },
+      ],
+    },
+    {
+      title: "Engagement",
+      items: [
+        { href: "/dashboard/reviews", icon: Star, label: "Reviews", description: "Your feedback", requiresPlan: true },
+        { href: "/dashboard/notifications", icon: Bell, label: "Notifications", description: "Updates & alerts", requiresPlan: true },
+      ],
+    },
+    {
+      title: "Account",
+      items: [
+        { href: "/dashboard/profile", icon: User, label: "Profile", description: "Your account" },
+        { href: "/dashboard/billing", icon: CreditCard, label: "Billing", description: "Subscription" },
+        { href: "/dashboard/settings", icon: Settings, label: "Settings", description: "Preferences" },
+      ],
+    },
   ];
 
-  const visibleNavItems = (!subscriptionLoading && !isPlanActive)
-    ? navItems.filter((i) =>
-        ["/dashboard", "/dashboard/billing", "/dashboard/profile", "/dashboard/settings"].includes(i.href)
-      )
-    : navItems;
+  const visibleNavGroups: NavGroup[] = navGroups
+    .map((g) => ({
+      ...g,
+      items: g.items.filter((i) => {
+        if (!subscriptionLoading && !isPlanActive && i.requiresPlan) return false;
+        return true;
+      }),
+    }))
+    .filter((g) => g.items.length > 0);
 
   const isActiveRoute = (href: string) => {
     if (href === '/dashboard') {
@@ -173,25 +211,54 @@ const MobileSidebar: React.FC<MobileSidebarProps> = ({ isOpen, onClose }) => {
             </div>
 
             {/* Navigation */}
-            <div className="p-4 space-y-2">
-              {visibleNavItems.map((item) => (
-                <Link
-                  key={item.href}
-                  to={item.href}
-                  onClick={onClose}
-                  className={`flex items-center gap-3 p-3 rounded-xl transition-all ${
-                    isActiveRoute(item.href)
-                      ? 'bg-sidebar-accent text-sidebar-accent-foreground border border-sidebar-border/80'
-                      : 'text-sidebar-foreground/80 hover:text-sidebar-foreground hover:bg-sidebar-accent/60 dark:text-gray-400 dark:hover:text-white dark:hover:bg-white/5'
-                  }`}
-                >
-                  <item.icon className="w-5 h-5" />
-                  <div>
-                    <div className="font-medium">{item.label}</div>
-                    <div className="text-xs opacity-60">{item.description}</div>
+            <div className="flex-1 overflow-y-auto px-4 py-4">
+              <div className="space-y-5">
+                {visibleNavGroups.map((group) => (
+                  <div key={group.title} className="space-y-2">
+                    <div className="px-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground dark:text-gray-400/80">
+                      {group.title}
+                    </div>
+                    <div className="space-y-1">
+                      {group.items.map((item) => {
+                        const active = isActiveRoute(item.href);
+                        return (
+                          <Link
+                            key={item.href}
+                            to={item.href}
+                            onClick={onClose}
+                            className={`relative flex items-center gap-3 rounded-2xl px-3 py-3 transition-all duration-200 border ${
+                              active
+                                ? "bg-sidebar-accent/80 text-sidebar-accent-foreground border-sidebar-border shadow-soft-elevated dark:bg-gradient-to-r dark:from-purple-600/15 dark:to-blue-600/15 dark:border-purple-500/25"
+                                : "border-transparent text-sidebar-foreground/80 hover:text-sidebar-foreground hover:bg-sidebar-accent/60 dark:text-gray-300 dark:hover:text-white dark:hover:bg-white/5"
+                            }`}
+                          >
+                            {active ? (
+                              <span className="absolute left-0 top-1/2 h-7 w-1 -translate-y-1/2 rounded-r-full bg-gradient-to-b from-purple-500 to-blue-500" />
+                            ) : null}
+                            <div
+                              className={`flex h-10 w-10 items-center justify-center rounded-2xl ring-1 transition-colors ${
+                                active
+                                  ? "bg-gradient-to-r from-purple-600/20 to-blue-600/20 text-blue-300 ring-blue-500/25"
+                                  : "bg-muted text-muted-foreground ring-border/60 dark:bg-gray-800/50 dark:text-gray-400 dark:ring-white/10"
+                              }`}
+                            >
+                              <item.icon className="h-5 w-5" />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <div className="truncate text-sm font-semibold">
+                                {item.label}
+                              </div>
+                              <div className="truncate text-[11px] text-muted-foreground dark:text-gray-400">
+                                {item.description}
+                              </div>
+                            </div>
+                          </Link>
+                        );
+                      })}
+                    </div>
                   </div>
-                </Link>
-              ))}
+                ))}
+              </div>
             </div>
 
             {/* Footer */}
