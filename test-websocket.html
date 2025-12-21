@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -13,21 +14,27 @@
             background: #1a1a1a;
             color: #e0e0e0;
         }
+        
         .container {
             background: #2a2a2a;
             border-radius: 8px;
             padding: 20px;
             margin-bottom: 20px;
         }
+        
         h1 {
             color: #4a9eff;
             margin-top: 0;
         }
+        
         h2 {
             color: #6ac259;
             margin-top: 0;
         }
-        input, textarea, button {
+        
+        input,
+        textarea,
+        button {
             width: 100%;
             padding: 10px;
             margin: 5px 0;
@@ -37,36 +44,44 @@
             color: #e0e0e0;
             box-sizing: border-box;
         }
+        
         button {
             background: #4a9eff;
             color: white;
             cursor: pointer;
             font-weight: bold;
         }
+        
         button:hover {
             background: #3a8eef;
         }
+        
         button:disabled {
             background: #666;
             cursor: not-allowed;
         }
+        
         .status {
             padding: 10px;
             border-radius: 4px;
             margin: 10px 0;
         }
+        
         .status.connected {
             background: #2d5a2d;
             color: #6ac259;
         }
+        
         .status.disconnected {
             background: #5a2d2d;
             color: #ff6a6a;
         }
+        
         .status.connecting {
             background: #5a5a2d;
             color: #ffcc6a;
         }
+        
         .messages {
             background: #1a1a1a;
             border: 1px solid #444;
@@ -77,24 +92,30 @@
             font-family: 'Courier New', monospace;
             font-size: 12px;
         }
+        
         .message {
             margin: 5px 0;
             padding: 5px;
             border-left: 3px solid #4a9eff;
             padding-left: 10px;
         }
+        
         .message.sent {
             border-left-color: #6ac259;
         }
+        
         .message.received {
             border-left-color: #4a9eff;
         }
+        
         .message.error {
             border-left-color: #ff6a6a;
         }
+        
         .message.system {
             border-left-color: #ffcc6a;
         }
+        
         pre {
             background: #0a0a0a;
             padding: 10px;
@@ -103,18 +124,19 @@
         }
     </style>
 </head>
+
 <body>
     <div class="container">
         <h1>🔌 WebSocket Connection Test</h1>
-        <p>Test the production WebSocket URL: <code>wss://aiagent.sparefinder.org/ws/progress</code></p>
-        
+        <p>Test the production WebSocket URL: <code>wss://aiagent-sparefinder-org.onrender.com/ws/progress</code></p>
+
         <div class="status disconnected" id="status">
             ⚪ Disconnected
         </div>
 
         <div>
             <label>WebSocket URL:</label>
-            <input type="text" id="wsUrl" value="wss://aiagent.sparefinder.org/ws/progress" placeholder="wss://aiagent.sparefinder.org/ws/progress">
+            <input type="text" id="wsUrl" value="wss://aiagent-sparefinder-org.onrender.com/ws/progress" placeholder="wss://aiagent-sparefinder-org.onrender.com/ws/progress">
         </div>
 
         <div>
@@ -141,7 +163,7 @@
     <div class="container">
         <h2>📋 Test Instructions</h2>
         <ol>
-            <li>Enter the WebSocket URL (default: wss://aiagent.sparefinder.org/ws/progress)</li>
+            <li>Enter the WebSocket URL (default: wss://aiagent-sparefinder-org.onrender.com/ws/progress)</li>
             <li>Enter your test email</li>
             <li>Enter optional keywords</li>
             <li>Click "Connect" to establish WebSocket connection</li>
@@ -181,7 +203,7 @@
 
         function connect() {
             const wsUrl = document.getElementById('wsUrl').value;
-            
+
             if (!wsUrl) {
                 alert('Please enter a WebSocket URL');
                 return;
@@ -205,7 +227,7 @@
                     try {
                         const data = JSON.parse(event.data);
                         addMessage('received', `📥 Received: <pre>${JSON.stringify(data, null, 2)}</pre>`);
-                        
+
                         // Check for completion
                         if (data.stage === 'completion' || data.stage === 'final') {
                             addMessage('system', '✅ Analysis completed!');
@@ -281,5 +303,5 @@
         // });
     </script>
 </body>
-</html>
 
+</html>

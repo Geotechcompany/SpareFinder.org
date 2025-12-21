@@ -2,7 +2,7 @@
 
 ## Production WebSocket URL
 ```
-wss://aiagent.sparefinder.org/ws/progress
+wss://aiagent-sparefinder-org.onrender.com/ws/progress
 ```
 
 ## Testing Methods
@@ -13,7 +13,7 @@ Open your browser's developer console (F12) and run:
 
 ```javascript
 // Test WebSocket connection
-const ws = new WebSocket('wss://aiagent.sparefinder.org/ws/progress');
+const ws = new WebSocket('wss://aiagent-sparefinder-org.onrender.com/ws/progress');
 
 ws.onopen = () => {
   console.log('✅ Connected!');
@@ -51,7 +51,7 @@ npm install ws
 node test-websocket.js
 
 # With custom settings
-WS_URL=wss://aiagent.sparefinder.org/ws/progress \
+WS_URL=wss://aiagent-sparefinder-org.onrender.com/ws/progress \
 TEST_EMAIL=your@email.com \
 TEST_KEYWORDS="brake pad front" \
 node test-websocket.js
@@ -66,7 +66,7 @@ npm install -g wscat
 
 **Connect to WebSocket:**
 ```bash
-wscat -c wss://aiagent.sparefinder.org/ws/progress
+wscat -c wss://aiagent-sparefinder-org.onrender.com/ws/progress
 ```
 
 **Once connected, send a test message:**
@@ -79,23 +79,23 @@ wscat -c wss://aiagent.sparefinder.org/ws/progress
 Use these online tools to test the WebSocket:
 
 1. **WebSocket King** (https://websocketking.com/)
-   - Enter URL: `wss://aiagent.sparefinder.org/ws/progress`
+   - Enter URL: `wss://aiagent-sparefinder-org.onrender.com/ws/progress`
    - Click "Connect"
    - Send test message
 
 2. **WebSocket.org Echo Test** (https://www.websocket.org/echo.html)
-   - Use custom URL: `wss://aiagent.sparefinder.org/ws/progress`
+   - Use custom URL: `wss://aiagent-sparefinder-org.onrender.com/ws/progress`
 
 3. **Postman** (Desktop App)
    - Create new WebSocket request
-   - Enter URL: `wss://aiagent.sparefinder.org/ws/progress`
+   - Enter URL: `wss://aiagent-sparefinder-org.onrender.com/ws/progress`
    - Connect and send messages
 
 ### 5. cURL (for HTTP health check first)
 
 **Test HTTP health endpoint first:**
 ```bash
-curl https://aiagent.sparefinder.org/health
+curl https://aiagent-sparefinder-org.onrender.com/health
 ```
 
 **Expected response:**
@@ -107,8 +107,8 @@ curl https://aiagent.sparefinder.org/health
 
 1. Set environment variables in `.env`:
    ```bash
-   VITE_AI_CREW_API_URL=https://aiagent.sparefinder.org
-   VITE_AI_CREW_WS_URL=wss://aiagent.sparefinder.org
+   VITE_AI_CREW_API_URL=https://aiagent-sparefinder-org.onrender.com
+   VITE_AI_CREW_WS_URL=wss://aiagent-sparefinder-org.onrender.com
    ```
 
 2. Start the frontend:
@@ -125,7 +125,7 @@ curl https://aiagent.sparefinder.org/health
 
 ### Connection Flow
 
-1. **Connect**: WebSocket connects to `wss://aiagent.sparefinder.org/ws/progress`
+1. **Connect**: WebSocket connects to `wss://aiagent-sparefinder-org.onrender.com/ws/progress`
 2. **Send Request**: Send JSON message with `email` and optional `keywords`/`image`
 3. **Receive Updates**: Receive progress updates with structure:
    ```json
@@ -168,10 +168,10 @@ curl https://aiagent.sparefinder.org/health
 - `ERR_CONNECTION_REFUSED`
 
 **Solutions:**
-1. Verify the URL is correct: `wss://aiagent.sparefinder.org/ws/progress`
+1. Verify the URL is correct: `wss://aiagent-sparefinder-org.onrender.com/ws/progress`
 2. Check if the server is running
 3. Verify firewall/network settings
-4. Test HTTP endpoint first: `curl https://aiagent.sparefinder.org/health`
+4. Test HTTP endpoint first: `curl https://aiagent-sparefinder-org.onrender.com/health`
 
 ### ❌ SSL Certificate Error
 
@@ -180,7 +180,7 @@ curl https://aiagent.sparefinder.org/health
 - Certificate validation errors
 
 **Solutions:**
-1. Verify SSL certificate is valid: `openssl s_client -connect aiagent.sparefinder.org:443`
+1. Verify SSL certificate is valid: `openssl s_client -connect aiagent-sparefinder-org.onrender.com:443`
 2. Check if the domain has a valid certificate
 3. Ensure the server supports WSS (not just WS)
 
@@ -209,7 +209,7 @@ curl https://aiagent.sparefinder.org/health
 
 ## Verification Checklist
 
-- [ ] HTTP health endpoint responds: `curl https://aiagent.sparefinder.org/health`
+- [ ] HTTP health endpoint responds: `curl https://aiagent-sparefinder-org.onrender.com/health`
 - [ ] WebSocket connects successfully
 - [ ] Can send messages without errors
 - [ ] Receives progress updates

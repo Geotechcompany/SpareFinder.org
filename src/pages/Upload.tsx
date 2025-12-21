@@ -2102,7 +2102,7 @@ const Upload = () => {
     try {
       const API_BASE =
         (import.meta as any).env?.VITE_AI_SERVICE_URL ||
-        "https://aiagent.sparefinder.org";
+        "https://aiagent-sparefinder-org.onrender.com";
       const form = new FormData();
       form.append("file", uploadedFile);
       if (savedKeywords.length)

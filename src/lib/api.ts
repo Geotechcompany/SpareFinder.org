@@ -456,7 +456,7 @@ export const dashboardApi = {
     };
     const AI_BASE =
       (import.meta as { env?: { VITE_AI_SERVICE_URL?: string } }).env
-        ?.VITE_AI_SERVICE_URL || "https://aiagent.sparefinder.org";
+        ?.VITE_AI_SERVICE_URL || "https://aiagent-sparefinder-org.onrender.com";
     const res = await axios.post(`${AI_BASE}/search/keywords`, payload, {
       headers: { "Content-Type": "application/json" },
     });

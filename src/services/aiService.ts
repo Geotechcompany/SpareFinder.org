@@ -115,7 +115,7 @@ interface BackendResponse {
 
 // Configuration
 const AI_SERVICE_CONFIG = {
-  baseUrl: import.meta.env.VITE_AI_SERVICE_URL || 'https://aiagent.sparefinder.org',
+  baseUrl: import.meta.env.VITE_AI_SERVICE_URL || 'https://aiagent-sparefinder-org.onrender.com',
   apiKey: import.meta.env.VITE_AI_SERVICE_API_KEY || 'geotech-dev-key-2024',
   maxFileSize: 10 * 1024 * 1024, // 10MB
   supportedFormats: ['image/jpeg', 'image/png', 'image/webp'],

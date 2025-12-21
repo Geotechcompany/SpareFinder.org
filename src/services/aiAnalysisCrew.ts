@@ -58,8 +58,8 @@ export type CrewProgressCallback = (update: CrewProgressUpdate) => void;
 
 const AI_CREW_CONFIG = {
   baseUrl:
-    import.meta.env.VITE_AI_CREW_API_URL || "https://aiagent.sparefinder.org",
-  wsUrl: import.meta.env.VITE_AI_CREW_WS_URL || "wss://aiagent.sparefinder.org",
+    import.meta.env.VITE_AI_CREW_API_URL || "https://aiagent-sparefinder-org.onrender.com",
+  wsUrl: import.meta.env.VITE_AI_CREW_WS_URL || "wss://aiagent-sparefinder-org.onrender.com",
   reconnectAttempts: 3,
   reconnectDelay: 2000,
   heartbeatInterval: 30000,
