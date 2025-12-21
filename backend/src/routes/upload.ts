@@ -173,6 +173,28 @@ setInterval(async () => {
           })
           .eq("id", job.id);
 
+        // Notify user (first retry only to avoid spamming on repeated retries)
+        if (retryCount === 1 && job.user_email) {
+          const userEmail = String(job.user_email);
+          const userName = userEmail.includes("@")
+            ? userEmail.split("@")[0]
+            : "there";
+          setImmediate(async () => {
+            try {
+              await emailService.sendAnalysisRetryingEmail({
+                userEmail,
+                userName,
+                analysisId: job.id,
+                retryCount,
+                kind: "research",
+                keywords: job.keywords || "",
+              });
+            } catch {
+              // ignore (retry must not fail due to email)
+            }
+          });
+        }
+
         // Fetch image from storage
         const imageResponse = await axios.get(job.image_url, {
           responseType: "arraybuffer",
@@ -286,10 +308,24 @@ setInterval(async () => {
         }
 
         // Update status to pending for retry
+        const nowIso = new Date().toISOString();
+        const lastRetryEmailAt = (analysis.metadata as any)?.last_retry_email_at as
+          | string
+          | undefined;
+        const lastRetryEmailAtMs = lastRetryEmailAt
+          ? Date.parse(lastRetryEmailAt)
+          : NaN;
+        const retryEmailCooldownMs = 12 * 60 * 60 * 1000; // 12h cooldown
+        const shouldSendRetryEmail =
+          !lastRetryEmailAt ||
+          !Number.isFinite(lastRetryEmailAtMs) ||
+          Date.now() - lastRetryEmailAtMs > retryEmailCooldownMs;
+
         const updatedMetadata = {
           ...(analysis.metadata || {}),
           retry_count: retryCount,
-          last_retry_at: new Date().toISOString(),
+          last_retry_at: nowIso,
+          ...(shouldSendRetryEmail ? { last_retry_email_at: nowIso } : {}),
         };
 
         await supabase
@@ -298,7 +334,7 @@ setInterval(async () => {
             analysis_status: "pending",
             retry_count: retryCount,
             metadata: updatedMetadata,
-            updated_at: new Date().toISOString(),
+            updated_at: nowIso,
           })
           .eq("id", analysis.id);
 
@@ -328,18 +364,42 @@ setInterval(async () => {
         let userEmail: string | undefined =
           (analysis as any)?.user_email ||
           (analysis.metadata as any)?.user_email;
+        let userName: string | undefined =
+          (analysis as any)?.user_name ||
+          (analysis.metadata as any)?.user_name;
 
         if (!userEmail && (analysis as any)?.user_id) {
           try {
             const { data: userProfile } = await supabase
               .from("profiles")
-              .select("email")
+              .select("email, full_name")
               .eq("id", (analysis as any).user_id)
               .single();
             userEmail = userProfile?.email || undefined;
+            userName =
+              (userProfile as any)?.full_name ||
+              (userEmail ? userEmail.split("@")[0] : "there");
           } catch (e) {
             // ignore, handled below
           }
+        }
+
+        // Send "retry started" email (throttled)
+        if (shouldSendRetryEmail && userEmail) {
+          const resolvedName = userName || userEmail.split("@")[0] || "there";
+          setImmediate(async () => {
+            try {
+              await emailService.sendAnalysisRetryingEmail({
+                userEmail,
+                userName: resolvedName,
+                analysisId: analysis.id,
+                retryCount,
+                kind: "image",
+              });
+            } catch {
+              // ignore
+            }
+          });
         }
 
         if (!userEmail) {

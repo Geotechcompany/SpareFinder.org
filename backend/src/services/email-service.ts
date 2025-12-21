@@ -65,6 +65,16 @@ interface AnalysisProcessingEmailData {
   processingTimeMinutes?: number;
 }
 
+interface AnalysisRetryingEmailData {
+  userEmail: string;
+  userName: string;
+  analysisId: string;
+  retryCount: number;
+  kind?: "image" | "research";
+  keywords?: string;
+  imageUrl?: string;
+}
+
 interface ReferralInviteEmailData {
   userEmail: string;
   userName: string;
@@ -1655,6 +1665,158 @@ class EmailService {
     }
   }
 
+  // Send analysis retrying email (when auto-retry kicks in)
+  async sendAnalysisRetryingEmail(
+    data: AnalysisRetryingEmailData
+  ): Promise<boolean> {
+    try {
+      const emailEnabled = await this.isEmailEnabled();
+      if (!emailEnabled) return false;
+
+      // Check user's email notification preferences (default: enabled)
+      const { data: userProfile } = await supabase
+        .from("profiles")
+        .select("preferences")
+        .eq("email", data.userEmail)
+        .single();
+      const preferences = userProfile?.preferences || {};
+      const emailNotificationsEnabled =
+        preferences.notifications?.email !== false;
+      if (!emailNotificationsEnabled) return false;
+
+      const rawFrontendUrl =
+        process.env.FRONTEND_URL || "https://sparefinder.org";
+      const baseFrontendUrl = rawFrontendUrl.replace(/\/$/, "");
+      const dashboardUrl = `${baseFrontendUrl}/dashboard`;
+      const historyUrl = `${baseFrontendUrl}/dashboard/history`;
+      const supportUrl = `${baseFrontendUrl}/contact`;
+      const logoUrl = `${baseFrontendUrl}/sparefinderlogo.png`;
+      const year = new Date().getFullYear();
+
+      const title =
+        data.kind === "research"
+          ? "We’re retrying your SpareFinder Research report"
+          : "We’re retrying your SpareFinder analysis";
+
+      const subject = `🔄 ${title} (attempt ${data.retryCount})`;
+      const keywordsLine =
+        data.keywords && data.keywords.trim()
+          ? `<p style="margin:10px 0 0 0;font-size:13px;color:#94a3b8;line-height:1.6;">
+               <strong style="color:#e2e8f0;">Keywords:</strong> ${String(data.keywords)
+                 .trim()
+                 .replace(/[<>&]/g, (c) => (c === "<" ? "&lt;" : c === ">" ? "&gt;" : "&amp;"))
+                 .replace(/\\s+/g, " ")}
+             </p>`
+          : "";
+
+      const html = `
+<!doctype html>
+<html>
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  </head>
+  <body style="margin:0;padding:0;background:#020617;color:#e2e8f0;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica,Arial,sans-serif;">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:radial-gradient(circle at top,#3b82f6 0,#020617 55%,#000 100%);padding:32px 0;">
+      <tr>
+        <td>
+          <table role="presentation" width="600" align="center" cellspacing="0" cellpadding="0" style="width:100%;max-width:600px;background:#020617;border-radius:18px;overflow:hidden;box-shadow:0 22px 60px rgba(15,23,42,.9);border:1px solid rgba(148,163,184,.22);">
+            <tr>
+              <td style="padding:16px 26px;border-bottom:1px solid rgba(31,41,55,.85);">
+                <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
+                  <tr>
+                    <td style="text-align:left;vertical-align:middle;">
+                      <img src="${logoUrl}" alt="SpareFinder" style="max-height:28px;width:auto;display:block;border-radius:6px;" />
+                    </td>
+                    <td style="text-align:right;vertical-align:middle;font-size:11px;color:#94a3b8;">
+                      Auto-retry notification
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:22px 26px 18px 26px;background:linear-gradient(135deg,#2563eb,#1d4ed8);color:#fff;">
+                <div style="font-size:12px;letter-spacing:.16em;text-transform:uppercase;opacity:.92;margin-bottom:6px;">SpareFinder</div>
+                <h1 style="margin:0;font-size:20px;line-height:1.25;">${title}</h1>
+                <p style="margin:8px 0 0 0;font-size:13px;opacity:.92;line-height:1.6;">
+                  Hi ${data.userName || "there"}, we’ve started a retry attempt for your request.
+                </p>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:20px 26px 8px 26px;">
+                <div style="background:#0b1220;border:1px solid rgba(59,130,246,.28);border-radius:14px;padding:14px 16px;">
+                  <p style="margin:0;font-size:13px;color:#cbd5e1;line-height:1.7;">
+                    <strong style="color:#e2e8f0;">Analysis ID:</strong>
+                    <span style="font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;">${data.analysisId}</span>
+                  </p>
+                  <p style="margin:6px 0 0 0;font-size:13px;color:#cbd5e1;line-height:1.7;">
+                    <strong style="color:#e2e8f0;">Attempt:</strong> ${data.retryCount}
+                  </p>
+                  ${keywordsLine}
+                </div>
+                <p style="margin:14px 0 0 0;font-size:12px;color:#94a3b8;line-height:1.6;">
+                  You don’t need to do anything — we’ll keep retrying automatically until it succeeds.
+                </p>
+                <div style="margin:18px 0 12px 0;">
+                  <a href="${historyUrl}" style="display:inline-block;background:linear-gradient(135deg,#22c55e,#16a34a);color:#020617;text-decoration:none;padding:11px 18px;border-radius:999px;font-weight:800;font-size:13px;">
+                    View your history
+                  </a>
+                  <a href="${dashboardUrl}" style="display:inline-block;margin-left:10px;background:#0b1220;color:#e2e8f0;text-decoration:none;padding:11px 16px;border-radius:999px;font-weight:700;font-size:13px;border:1px solid rgba(148,163,184,.22);">
+                    Open dashboard
+                  </a>
+                </div>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:12px 26px 18px 26px;border-top:1px solid rgba(31,41,55,.85);font-size:11px;color:#94a3b8;line-height:1.6;">
+                <p style="margin:0;">
+                  Need help? Contact us at <a href="${supportUrl}" style="color:#60a5fa;text-decoration:none;">Support</a>.
+                </p>
+                <p style="margin:8px 0 0 0;">
+                  © ${year} SpareFinder. All rights reserved.
+                </p>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>`;
+
+      const ok = await this.sendEmail({
+        to: data.userEmail,
+        subject,
+        html,
+      });
+
+      if (ok) {
+        const userId = await this.getUserIdByEmail(data.userEmail);
+        if (userId) {
+          await supabase.from("notifications").insert({
+            user_id: userId,
+            title: "Analysis retry started",
+            message: `We started retry attempt ${data.retryCount} for analysis ${data.analysisId}`,
+            type: "info",
+            metadata: {
+              email_sent: true,
+              analysis_id: data.analysisId,
+              retry_count: data.retryCount,
+              kind: data.kind || "image",
+            },
+          });
+        }
+      }
+
+      return ok;
+    } catch (error) {
+      console.error("Failed to send analysis retrying email:", error);
+      return false;
+    }
+  }
+
   // Generic method to send emails using templates from database
   async sendTemplateEmail(data: {
     templateName: string;
@@ -2356,5 +2518,6 @@ export {
   AnalysisStartedEmailData,
   AnalysisFailedEmailData,
   AnalysisProcessingEmailData,
+  AnalysisRetryingEmailData,
   SubscriptionEmailData,
 };
