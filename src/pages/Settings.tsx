@@ -19,6 +19,7 @@ import { Loader2, Eye, EyeOff } from "lucide-react";
 import { api } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
 import { useClerk, useUser } from "@clerk/clerk-react";
+import { useSubscription } from "@/contexts/SubscriptionContext";
 import {
   Settings as SettingsIcon,
   Save,
@@ -30,6 +31,7 @@ import {
   Bell,
   Shield,
   Palette,
+  KeyRound,
   Zap,
   Sparkles,
   Globe,
@@ -136,6 +138,48 @@ const Settings = () => {
   const { setTheme } = useTheme();
   const { user: clerkUser, isLoaded: isClerkLoaded } = useUser();
   const { openSignIn } = useClerk();
+  const { tier, isPlanActive, isLoading: isSubscriptionLoading } =
+    useSubscription();
+
+  const isApiKeysEnabled =
+    isPlanActive && (tier === "pro" || tier === "enterprise");
+
+  type ApiKeyRow = {
+    id: string;
+    name: string;
+    scopes?: string[] | null;
+    last_used_at?: string | null;
+    expires_at?: string | null;
+    is_active?: boolean;
+    created_at?: string | null;
+    value?: string; // only returned once on creation
+  };
+
+  const [apiKeys, setApiKeys] = useState<ApiKeyRow[]>([]);
+  const [apiKeysLoading, setApiKeysLoading] = useState(false);
+  const [apiKeysError, setApiKeysError] = useState<string | null>(null);
+  const [newApiKeyName, setNewApiKeyName] = useState(
+    "ERP/CMMS integration"
+  );
+  const [createdApiKey, setCreatedApiKey] = useState<ApiKeyRow | null>(null);
+  const [apiKeyActionId, setApiKeyActionId] = useState<string | null>(null);
+
+  const fetchApiKeys = async () => {
+    if (!isApiKeysEnabled) return;
+    try {
+      setApiKeysLoading(true);
+      setApiKeysError(null);
+      const resp = await api.apiKeys.list();
+      const keys = ((resp as any)?.keys ||
+        (resp as any)?.data?.keys ||
+        []) as ApiKeyRow[];
+      setApiKeys(Array.isArray(keys) ? keys : []);
+    } catch (e: any) {
+      setApiKeysError(e?.message || "Failed to load API keys");
+    } finally {
+      setApiKeysLoading(false);
+    }
+  };
 
   const isReverificationError = (err: any) => {
     const code = err?.errors?.[0]?.code as string | undefined;
@@ -155,6 +199,13 @@ const Settings = () => {
   useEffect(() => {
     fetchUserProfile();
   }, []);
+
+  useEffect(() => {
+    if (activeTab === "api-keys") {
+      void fetchApiKeys();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, isApiKeysEnabled]);
 
   const fetchUserProfile = async () => {
     try {
@@ -588,6 +639,9 @@ const Settings = () => {
     { id: "notifications", label: "Notifications", icon: Bell },
     { id: "security", label: "Security", icon: Shield },
     { id: "appearance", label: "Appearance", icon: Palette },
+    ...(isApiKeysEnabled
+      ? [{ id: "api-keys", label: "API Keys", icon: KeyRound }]
+      : []),
   ];
 
   // Show loading state
@@ -1515,6 +1569,254 @@ const Settings = () => {
                               </Badge>
                             </div>
                           </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+                </motion.div>
+              )}
+
+              {activeTab === "api-keys" && (
+                <motion.div
+                  key="api-keys"
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -20 }}
+                  transition={{ duration: 0.3 }}
+                  className="grid grid-cols-1 gap-4 sm:gap-6 lg:grid-cols-2 lg:gap-8"
+                >
+                  <div className="relative lg:col-span-2">
+                    <div className="absolute inset-0 rounded-3xl bg-gradient-to-r from-[#3A5AFE0A] via-[#8B5CF60A] to-transparent blur-xl opacity-80 dark:from-purple-600/10 dark:to-blue-600/10" />
+                    <Card className="relative rounded-3xl border border-border bg-card text-foreground shadow-soft-elevated backdrop-blur-xl dark:bg-black/20 dark:border-white/10">
+                      <CardHeader>
+                        <CardTitle className="flex items-center gap-2 text-foreground dark:text-white">
+                          <KeyRound className="h-5 w-5 text-[#8B5CF6]" />
+                          <span>API Keys</span>
+                          <Badge className="bg-emerald-500/15 text-emerald-700 border-emerald-500/20 dark:bg-emerald-500/15 dark:text-emerald-300 dark:border-emerald-500/30">
+                            {tier === "enterprise" ? "Enterprise" : "Pro"}
+                          </Badge>
+                        </CardTitle>
+                        <CardDescription className="text-muted-foreground dark:text-gray-400">
+                          Generate keys for ERP/CMMS integrations. Keep keys secret — we only show the full key once.
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent className="space-y-5">
+                        {createdApiKey?.value ? (
+                          <div className="rounded-2xl border border-border bg-muted/40 p-4 dark:bg-white/5">
+                            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                              <div>
+                                <div className="text-sm font-semibold text-foreground dark:text-white">
+                                  New key created (copy now)
+                                </div>
+                                <div className="text-xs text-muted-foreground dark:text-gray-400">
+                                  This is the only time we can show you the full key.
+                                </div>
+                              </div>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                onClick={async () => {
+                                  await navigator.clipboard.writeText(
+                                    createdApiKey.value as string
+                                  );
+                                  toast({
+                                    title: "Copied",
+                                    description: "API key copied to clipboard.",
+                                  });
+                                }}
+                              >
+                                Copy key
+                              </Button>
+                            </div>
+                            <pre className="mt-3 overflow-x-auto rounded-xl border border-border bg-background/70 p-3 text-xs text-foreground dark:bg-black/30 dark:text-white">
+{createdApiKey.value}
+                            </pre>
+                          </div>
+                        ) : null}
+
+                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_auto] sm:items-end">
+                          <div className="space-y-2">
+                            <Label className="text-muted-foreground dark:text-gray-200">
+                              Key name
+                            </Label>
+                            <Input
+                              value={newApiKeyName}
+                              onChange={(e) => setNewApiKeyName(e.target.value)}
+                              placeholder="e.g. SAP connector"
+                              className="h-12 border border-border bg-card text-foreground placeholder:text-muted-foreground focus:border-[#C7D2FE] focus:ring-[#C7D2FE33] dark:bg-white/5 dark:border-white/10 dark:text-white dark:placeholder:text-gray-400"
+                            />
+                          </div>
+                          <Button
+                            type="button"
+                            className="h-12 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 shadow-lg shadow-purple-500/25"
+                            disabled={
+                              apiKeysLoading ||
+                              isSubscriptionLoading ||
+                              apiKeyActionId === "create"
+                            }
+                            onClick={async () => {
+                              try {
+                                setApiKeyActionId("create");
+                                setCreatedApiKey(null);
+                                const resp = await api.apiKeys.create({
+                                  name: newApiKeyName || "API Key",
+                                  scopes: ["external:v1"],
+                                  expires_at: null,
+                                });
+                                const key = ((resp as any)?.key ||
+                                  (resp as any)?.data?.key) as
+                                  | ApiKeyRow
+                                  | undefined;
+                                if (key?.value) {
+                                  setCreatedApiKey(key);
+                                  toast({
+                                    title: "API key created",
+                                    description:
+                                      "Copy it now — it won’t be shown again.",
+                                  });
+                                } else {
+                                  toast({
+                                    variant: "destructive",
+                                    title: "Created, but key not returned",
+                                    description:
+                                      "The key was created, but the server did not return the raw value. Create a new key.",
+                                  });
+                                }
+                                await fetchApiKeys();
+                              } catch (e: any) {
+                                toast({
+                                  variant: "destructive",
+                                  title: "Failed to create API key",
+                                  description: e?.message || "Please try again.",
+                                });
+                              } finally {
+                                setApiKeyActionId(null);
+                              }
+                            }}
+                          >
+                            {apiKeyActionId === "create" ? (
+                              <>
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                Creating…
+                              </>
+                            ) : (
+                              "Create API key"
+                            )}
+                          </Button>
+                        </div>
+
+                        <Separator />
+
+                        {apiKeysError ? (
+                          <div className="rounded-2xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-700 dark:text-red-200">
+                            {apiKeysError}
+                          </div>
+                        ) : null}
+
+                        <div className="space-y-3">
+                          <div className="flex items-center justify-between gap-3">
+                            <div className="text-sm font-semibold text-foreground dark:text-white">
+                              Your keys
+                            </div>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              disabled={apiKeysLoading}
+                              onClick={fetchApiKeys}
+                            >
+                              Refresh
+                            </Button>
+                          </div>
+
+                          {apiKeysLoading ? (
+                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                              Loading keys…
+                            </div>
+                          ) : apiKeys.length === 0 ? (
+                            <div className="text-sm text-muted-foreground dark:text-gray-400">
+                              No API keys yet.
+                            </div>
+                          ) : (
+                            <div className="grid grid-cols-1 gap-3">
+                              {apiKeys.map((k) => (
+                                <div
+                                  key={k.id}
+                                  className="rounded-2xl border border-border bg-background/60 p-4 shadow-sm dark:bg-white/5"
+                                >
+                                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                                    <div className="min-w-0">
+                                      <div className="flex items-center gap-2">
+                                        <div className="truncate text-sm font-semibold text-foreground dark:text-white">
+                                          {k.name}
+                                        </div>
+                                        <Badge
+                                          variant="outline"
+                                          className={
+                                            k.is_active === false ? "opacity-60" : ""
+                                          }
+                                        >
+                                          {k.is_active === false ? "Revoked" : "Active"}
+                                        </Badge>
+                                      </div>
+                                      <div className="mt-1 text-xs text-muted-foreground dark:text-gray-400">
+                                        Created{" "}
+                                        {k.created_at
+                                          ? new Date(k.created_at).toLocaleString()
+                                          : "—"}
+                                        {" · "}
+                                        Last used{" "}
+                                        {k.last_used_at
+                                          ? new Date(k.last_used_at).toLocaleString()
+                                          : "Never"}
+                                      </div>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                      <Button
+                                        type="button"
+                                        variant="outline"
+                                        disabled={k.is_active === false || apiKeyActionId === k.id}
+                                        onClick={async () => {
+                                          try {
+                                            setApiKeyActionId(k.id);
+                                            await api.apiKeys.revoke(k.id);
+                                            toast({ title: "API key revoked" });
+                                            await fetchApiKeys();
+                                          } catch (e: any) {
+                                            toast({
+                                              variant: "destructive",
+                                              title: "Failed to revoke",
+                                              description: e?.message || "Please try again.",
+                                            });
+                                          } finally {
+                                            setApiKeyActionId(null);
+                                          }
+                                        }}
+                                      >
+                                        {apiKeyActionId === k.id ? (
+                                          <>
+                                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                            Revoking…
+                                          </>
+                                        ) : (
+                                          "Revoke"
+                                        )}
+                                      </Button>
+                                    </div>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="rounded-2xl border border-border bg-muted/30 p-4 text-xs text-muted-foreground dark:bg-white/5 dark:text-gray-300">
+                          <div className="font-semibold text-foreground dark:text-white mb-2">
+                            Example
+                          </div>
+                          <pre className="overflow-x-auto rounded-xl border border-border bg-background/70 p-3 dark:bg-black/30">
+{`curl -X GET \"${import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL || "https://api-sparefinder-org.onrender.com"}/api/external/v1/me\" \\\n  -H \"x-api-key: <YOUR_API_KEY>\"`}
+                          </pre>
                         </div>
                       </CardContent>
                     </Card>

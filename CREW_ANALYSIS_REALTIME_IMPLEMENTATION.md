@@ -1,7 +1,7 @@
-# Deep Research Real-Time Progress Implementation
+# SpareFinder Research Real-Time Progress Implementation
 
 ## Overview
-This implementation enables real-time Deep Research progress tracking in the History page. When users click "SpareFinder AI Research" on the upload page, they are redirected to the History page where they can watch the analysis progress in real-time.
+This implementation enables real-time SpareFinder Research progress tracking in the History page. When users click "SpareFinder AI Research" on the upload page, they are redirected to the History page where they can watch the analysis progress in real-time.
 
 ## What Was Implemented
 
@@ -17,20 +17,20 @@ This implementation enables real-time Deep Research progress tracking in the His
 
 ### 2. **Backend API Endpoints** ✅
 
-#### Create Deep Research Job
+#### Create SpareFinder Research Job
 - **Endpoint**: `POST /api/upload/crew-analysis`
 - **File**: `backend/src/routes/upload.ts` (lines 1479-1671)
-- **Function**: Creates a new Deep Research job in the database
+- **Function**: Creates a new SpareFinder Research job in the database
 - **Features**:
   - Uploads image to Supabase Storage
   - Creates job record with pending status
   - Automatically creates table if it doesn't exist
   - Returns jobId and imageUrl
 
-#### Get Deep Research Jobs
+#### Get SpareFinder Research Jobs
 - **Endpoint**: `GET /api/upload/crew-analysis-jobs`
 - **File**: `backend/src/routes/upload.ts` (lines 1418-1472)
-- **Function**: Fetches all Deep Research jobs for the current user
+- **Function**: Fetches all SpareFinder Research jobs for the current user
 - **Features**:
   - Returns jobs ordered by creation date
   - Handles missing table gracefully
@@ -50,9 +50,9 @@ This implementation enables real-time Deep Research progress tracking in the His
   - Automatically redirects to history page after 1.5 seconds
   - Displays error messages if job creation fails
 
-### 5. **Deep Research Job Service** ✅
+### 5. **SpareFinder Research Job Service** ✅
 - **File**: `src/services/crewAnalysisJobService.ts`
-- **Purpose**: Manages Deep Research jobs and automatically starts analysis
+- **Purpose**: Manages SpareFinder Research jobs and automatically starts analysis
 - **Features**:
   - Prevents duplicate processing
   - Converts image URLs to blobs
@@ -85,7 +85,7 @@ This implementation enables real-time Deep Research progress tracking in the His
 
 ## How to Integrate with History Page
 
-### Step 1: Fetch Deep Research Jobs
+### Step 1: Fetch SpareFinder Research Jobs
 
 Add this to your History page component:
 
@@ -98,7 +98,7 @@ import { crewAnalysisJobService, CrewAnalysisJob } from '@/services/crewAnalysis
 const [crewJobs, setCrewJobs] = useState<CrewAnalysisJob[]>([]);
 const [jobProgress, setJobProgress] = useState<Record<string, any>>({});
 
-// Fetch Deep Research jobs
+// Fetch SpareFinder Research jobs
 useEffect(() => {
   const fetchCrewJobs = async () => {
     try {
@@ -144,12 +144,12 @@ const startJobAnalysis = async (job: CrewAnalysisJob) => {
 };
 ```
 
-### Step 2: Display Deep Research Jobs in Cards
+### Step 2: Display SpareFinder Research Jobs in Cards
 
-Add Deep Research jobs to your existing job cards:
+Add SpareFinder Research jobs to your existing job cards:
 
 ```typescript
-{/* Deep Research Jobs */}
+{/* SpareFinder Research Jobs */}
 {crewJobs.map((job) => (
   <Card key={job.id} className="group hover:shadow-xl transition-all duration-300">
     <CardHeader className="border-b border-gray-700">
@@ -205,10 +205,10 @@ Add Deep Research jobs to your existing job cards:
 
 ### Step 3: Add Expanded View (Optional)
 
-When user clicks on a Deep Research job, show full progress:
+When user clicks on a SpareFinder Research job, show full progress:
 
 ```typescript
-{/* Expanded Deep Research Modal */}
+{/* Expanded SpareFinder Research Modal */}
 <Dialog open={isCrewJobOpen} onOpenChange={setIsCrewJobOpen}>
   <DialogContent className="max-w-2xl">
     <DialogHeader>
@@ -300,7 +300,7 @@ cat database-crew-analysis-jobs.sql | supabase db execute
 - ✅ `CREW_ANALYSIS_REALTIME_IMPLEMENTATION.md` (this file)
 
 ### Modified Files:
-- ✅ `backend/src/routes/upload.ts` - Added Deep Research endpoints
+- ✅ `backend/src/routes/upload.ts` - Added SpareFinder Research endpoints
 - ✅ `src/lib/api.ts` - Added API functions
 - ✅ `src/pages/Upload.tsx` - Modified button to redirect to history
 - ✅ `src/components/ComprehensiveAnalysisModal.tsx` - Auto-fill user email
@@ -333,7 +333,7 @@ cat database-crew-analysis-jobs.sql | supabase db execute
 
 ## Conclusion
 
-This implementation provides a complete solution for real-time Deep Research progress tracking. Users can now start an analysis and watch it progress in the History page, providing a much better user experience than a modal that blocks navigation.
+This implementation provides a complete solution for real-time SpareFinder Research progress tracking. Users can now start an analysis and watch it progress in the History page, providing a much better user experience than a modal that blocks navigation.
 
 The system is scalable, handles errors gracefully, and provides clear feedback to users at every step of the process.
 

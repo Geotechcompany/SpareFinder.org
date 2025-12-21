@@ -1,4 +1,4 @@
-# Deep Research UUID Fix
+# SpareFinder Research UUID Fix
 
 ## Problem
 

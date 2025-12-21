@@ -1,6 +1,7 @@
 import { Response, NextFunction } from "express";
 import { supabase } from "../server";
 import { AuthRequest } from "../types/auth";
+import { SUBSCRIPTION_LIMITS, isTier } from "../config/subscription-limits";
 
 /**
  * Middleware to verify user has an active subscription or trial
@@ -16,6 +17,9 @@ export const requireSubscriptionOrTrial = async (
 
     // Admins bypass subscription checks
     if (req.user?.role === "admin" || req.user?.role === "super_admin") {
+      // also expose tier/limits for downstream handlers
+      (res.locals as any).subscriptionTier = "enterprise";
+      (res.locals as any).subscriptionLimits = SUBSCRIPTION_LIMITS.enterprise;
       return next();
     }
 
@@ -61,6 +65,10 @@ export const requireSubscriptionOrTrial = async (
         expired_at: subscription.current_period_end,
       });
     }
+
+    const tier = isTier(subscription.tier) ? subscription.tier : "free";
+    (res.locals as any).subscriptionTier = tier;
+    (res.locals as any).subscriptionLimits = SUBSCRIPTION_LIMITS[tier];
 
     // User has valid subscription/trial, continue
     return next();

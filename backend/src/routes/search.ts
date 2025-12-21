@@ -7,6 +7,7 @@ import { supabase } from "../server";
 import axios, { AxiosResponse } from "axios";
 import { creditService } from "../services/credit-service";
 import { emailService } from "../services/email-service";
+import { incrementUsage } from "../services/usage-tracking";
 
 const router = Router();
 
@@ -207,6 +208,15 @@ router.post(
           });
         }
       }
+
+      // Track usage (best-effort): keyword searches count toward monthly recognitions
+      setImmediate(async () => {
+        try {
+          await incrementUsage({ userId, searches: 1 });
+        } catch (e) {
+          console.warn("⚠️ Failed to update usage_tracking for keyword search:", e);
+        }
+      });
 
       const aiServiceUrl =
         process.env.AI_SERVICE_INTERNAL_URL ||

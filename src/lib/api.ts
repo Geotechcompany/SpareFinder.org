@@ -1159,7 +1159,7 @@ export const uploadApi = {
 
       return response.data;
     } catch (error) {
-      console.error("Create Deep Research job error:", error);
+      console.error("Create SpareFinder Research job error:", error);
       throw error;
     }
   },
@@ -1169,7 +1169,7 @@ export const uploadApi = {
       const response = await apiClient.get("/upload/crew-analysis-jobs");
       return response.data;
     } catch (error) {
-      console.error("Get Deep Research jobs error:", error);
+      console.error("Get SpareFinder Research jobs error:", error);
       throw error;
     }
   },
@@ -1179,7 +1179,7 @@ export const uploadApi = {
       const response = await apiClient.delete(`/upload/crew-analysis/${jobId}`);
       return response.data;
     } catch (error) {
-      console.error("Delete Deep Research job error:", error);
+      console.error("Delete SpareFinder Research job error:", error);
       throw error;
     }
   },
@@ -1592,6 +1592,24 @@ export const api = {
   billing: billingApi,
   statistics: statisticsApi,
   credits: creditsApi,
+  apiKeys: {
+    list: async (): Promise<ApiResponse<{ keys: any[] }>> => {
+      const response = await apiClient.get("/api-keys");
+      return response.data;
+    },
+    create: async (payload: {
+      name?: string;
+      scopes?: string[];
+      expires_at?: string | null;
+    }): Promise<ApiResponse<{ key: any }>> => {
+      const response = await apiClient.post("/api-keys", payload);
+      return response.data;
+    },
+    revoke: async (id: string): Promise<ApiResponse> => {
+      const response = await apiClient.post(`/api-keys/${id}/revoke`);
+      return response.data;
+    },
+  },
   contact: contactApi,
   reviews: reviewsApi,
   analysisReviews: analysisReviewsApi,

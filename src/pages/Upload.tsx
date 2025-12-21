@@ -4535,7 +4535,7 @@ const Upload = () => {
                 <Button
                   onClick={async () => {
                     if (selectedMode === "image" || selectedMode === "both") {
-                      // Create Deep Research job and redirect to history
+                      // Create SpareFinder Research job and redirect to history
                       if (!uploadedFile) {
                         toast({
                           title: "No Image",
@@ -4548,7 +4548,7 @@ const Upload = () => {
                       try {
                         setIsAnalyzing(true);
 
-                        // Create Deep Research job
+                        // Create SpareFinder Research job
                         const response = await api.upload.createCrewAnalysisJob(
                           uploadedFile,
                           savedKeywords.join(" ")
@@ -4571,7 +4571,7 @@ const Upload = () => {
                           navigate("/dashboard/history");
                         }, 1500);
                       } catch (error) {
-                        console.error("Deep Research error:", error);
+                        console.error("SpareFinder Research error:", error);
                         setIsAnalyzing(false);
 
                         toast({

@@ -243,7 +243,7 @@ const PageSkeleton: React.FC<PageSkeletonProps> = ({
         ))}
       </motion.div>
 
-      {/* Deep Research Jobs Grid */}
+      {/* SpareFinder Research Jobs Grid */}
       <motion.div variants={itemVariants} className="space-y-4">
         <Skeleton className="h-5 w-40" variant="text" />
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">

@@ -12,8 +12,8 @@ const supabaseUrl = process.env.VITE_SUPABASE_URL || 'https://bharlmgxoqdafjeekn
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY;
 
 if (!supabaseServiceKey) {
-  console.error('❌ SUPABASE_SERVICE_KEY not found in environment variables');
-  process.exit(1);
+    console.error('❌ SUPABASE_SERVICE_KEY not found in environment variables');
+    process.exit(1);
 }
 
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
@@ -79,42 +79,35 @@ EXECUTE FUNCTION update_crew_jobs_updated_at();
 `;
 
 async function setupTable() {
-  try {
-    console.log('🚀 Creating crew_analysis_jobs table...');
-    
-    const { data, error } = await supabase.rpc('exec_sql', { sql });
-    
-    if (error) {
-      console.error('❌ Error:', error.message);
-      process.exit(1);
+    try {
+        console.log('🚀 Creating crew_analysis_jobs table...');
+
+        const { data, error } = await supabase.rpc('exec_sql', { sql });
+
+        if (error) {
+            console.error('❌ Error:', error.message);
+            process.exit(1);
+        }
+
+        console.log('✅ Table created successfully!');
+        console.log('✨ You can now use SpareFinder Research feature');
+
+        // Verify table exists
+        const { data: tables, error: verifyError } = await supabase
+            .from('crew_analysis_jobs')
+            .select('*')
+            .limit(0);
+
+        if (verifyError) {
+            console.warn('⚠️ Warning: Could not verify table:', verifyError.message);
+        } else {
+            console.log('✅ Table verified and ready to use!');
+        }
+
+    } catch (err) {
+        console.error('❌ Unexpected error:', err);
+        process.exit(1);
     }
-    
-    console.log('✅ Table created successfully!');
-    console.log('✨ You can now use Deep Research feature');
-    
-    // Verify table exists
-    const { data: tables, error: verifyError } = await supabase
-      .from('crew_analysis_jobs')
-      .select('*')
-      .limit(0);
-    
-    if (verifyError) {
-      console.warn('⚠️ Warning: Could not verify table:', verifyError.message);
-    } else {
-      console.log('✅ Table verified and ready to use!');
-    }
-    
-  } catch (err) {
-    console.error('❌ Unexpected error:', err);
-    process.exit(1);
-  }
 }
 
 setupTable();
-
-
-
-
-
-
-

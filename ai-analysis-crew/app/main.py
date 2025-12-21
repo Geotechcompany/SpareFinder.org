@@ -299,7 +299,7 @@ async def run_analysis_background(
     image_data: Optional[bytes],
     keywords: Optional[str]
 ):
-    """Run the Deep Research in the background and update database."""
+    """Run the SpareFinder Research in the background and update database."""
     try:
         # Update status to processing - Image Analysis stage
         update_crew_job_status(analysis_id, "processing", "image_analysis", 10)

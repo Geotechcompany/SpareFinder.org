@@ -15,6 +15,7 @@ import { z } from "zod";
 import { v4 as uuidv4 } from "uuid";
 import { emailService, AnalysisEmailData } from "../services/email-service";
 import { creditService, CreditResult } from "../services/credit-service";
+import { getUsageRow, incrementStorage, incrementUsage } from "../services/usage-tracking";
 
 const router = Router();
 
@@ -33,7 +34,7 @@ const sendAiErrorAlert = (subject: string, details: any) => {
     );
 };
 
-// Helper function to start Deep Research (reusable for retries)
+// Helper function to start SpareFinder Research (reusable for retries)
 async function startCrewAnalysis(
   jobId: string,
   imageBuffer: Buffer,
@@ -103,36 +104,19 @@ async function startCrewAnalysis(
 // Runs every 3 minutes to retry failed jobs
 
 // Helper function to determine if an error is retryable
-function isRetryableError(errorType: string, statusCode?: number): boolean {
-  // Retry transient errors: network, timeout, server errors (5xx), rate limits
-  const retryableTypes = [
-    "connection_refused",
-    "timeout",
-    "server_error",
-    "rate_limited",
-  ];
-  
-  if (retryableTypes.includes(errorType)) {
-    return true;
-  }
-  
-  // Retry 5xx server errors
-  if (statusCode && statusCode >= 500 && statusCode < 600) {
-    return true;
-  }
-  
-  // Don't retry client errors (4xx except 429), auth errors, file too large
-  if (statusCode && statusCode >= 400 && statusCode < 500 && statusCode !== 429) {
-    return false;
-  }
-  
-  return true; // Default to retryable for unknown errors
+function isRetryableError(_errorType: string, _statusCode?: number): boolean {
+  // User requirement: retry *all* failures until they eventually succeed.
+  // That includes 4xx "client_error", auth errors, and file size errors, since
+  // the underlying cause may be fixed later (config, service bug, etc.).
+  //
+  // NOTE: the actual retry cadence/backoff is still enforced elsewhere.
+  return true;
 }
 
-// Auto-retry failed Deep Research jobs (crew_analysis_jobs)
+// Auto-retry failed SpareFinder Research jobs (crew_analysis_jobs)
 setInterval(async () => {
   try {
-    console.log("🔄 Checking for failed Deep Research jobs to retry...");
+    console.log("🔄 Checking for failed SpareFinder Research jobs to retry...");
 
     // Get failed jobs that haven't exceeded retry limit
     // Only retry jobs that failed more than 2 minutes ago (avoid immediate retries)
@@ -142,12 +126,13 @@ setInterval(async () => {
       .from("crew_analysis_jobs")
       .select("*")
       .eq("status", "failed")
-      .or("retry_count.is.null,retry_count.lt.5") // Retry up to 5 times
+      // No max retry cap (keeps retrying until success)
+      .or("retry_count.is.null,retry_count.gte.0")
       .lt("updated_at", twoMinutesAgo) // Only retry jobs that failed at least 2 minutes ago
       .limit(10); // Process max 10 at a time
 
     if (error) {
-      console.error("❌ Error fetching failed Deep Research jobs:", error);
+      console.error("❌ Error fetching failed SpareFinder Research jobs:", error);
       return;
     }
 
@@ -155,12 +140,12 @@ setInterval(async () => {
       return;
     }
 
-    console.log(`🔄 Found ${failedJobs.length} failed Deep Research jobs to retry`);
+    console.log(`🔄 Found ${failedJobs.length} failed SpareFinder Research jobs to retry`);
 
     for (const job of failedJobs) {
       try {
         const retryCount = (job.retry_count || 0) + 1;
-        console.log(`🔄 Retrying Deep Research job ${job.id} (attempt ${retryCount}/5)`);
+        console.log(`🔄 Retrying SpareFinder Research job ${job.id} (attempt ${retryCount})`);
 
         // Calculate exponential backoff delay (2^retryCount minutes, max 30 minutes)
         const delayMinutes = Math.min(Math.pow(2, retryCount - 1), 30);
@@ -206,7 +191,7 @@ setInterval(async () => {
               job.keywords || ""
             );
           } catch (retryError) {
-            console.error(`❌ Retry failed for Deep Research job ${job.id}:`, retryError);
+            console.error(`❌ Retry failed for SpareFinder Research job ${job.id}:`, retryError);
 
             // Update to failed again
             await supabase
@@ -224,13 +209,13 @@ setInterval(async () => {
         });
       } catch (retryError) {
         console.error(
-          `❌ Error processing retry for Deep Research job ${job.id}:`,
+          `❌ Error processing retry for SpareFinder Research job ${job.id}:`,
           retryError
         );
       }
     }
   } catch (error) {
-    console.error("❌ Error in Deep Research auto-retry process:", error);
+    console.error("❌ Error in SpareFinder Research auto-retry process:", error);
   }
 }, 3 * 60 * 1000); // Run every 3 minutes
 
@@ -248,7 +233,8 @@ setInterval(async () => {
       .select("*")
       .eq("analysis_status", "failed")
       .not("image_url", "is", null) // Must have an image URL
-      .or("retry_count.is.null,retry_count.lt.5") // Retry up to 5 times
+      // No max retry cap (keeps retrying until success)
+      .or("retry_count.is.null,retry_count.gte.0")
       .lt("updated_at", twoMinutesAgo) // Only retry analyses that failed at least 2 minutes ago
       .limit(10); // Process max 10 at a time
 
@@ -269,16 +255,19 @@ setInterval(async () => {
         const errorType = (analysis.metadata as any)?.ai_service_error || "unknown";
         const errorDetails = (analysis.metadata as any)?.error_details;
         const statusCode = errorDetails?.status;
+        const statusText = errorDetails?.statusText;
 
         if (!isRetryableError(errorType, statusCode)) {
+          const statusSuffix = statusCode ? `, status: ${statusCode}` : "";
+          const statusTextSuffix = statusText ? ` ${statusText}` : "";
           console.log(
-            `⏭️ Skipping non-retryable analysis ${analysis.id} (error: ${errorType})`
+            `⏭️ Skipping non-retryable analysis ${analysis.id} (error: ${errorType}${statusSuffix}${statusTextSuffix})`
           );
           continue;
         }
 
         const retryCount = ((analysis.metadata as any)?.retry_count || 0) + 1;
-        console.log(`🔄 Retrying image analysis ${analysis.id} (attempt ${retryCount}/5)`);
+        console.log(`🔄 Retrying image analysis ${analysis.id} (attempt ${retryCount})`);
 
         // Calculate exponential backoff delay
         const delayMinutes = Math.min(Math.pow(2, retryCount - 1), 30);
@@ -335,6 +324,34 @@ setInterval(async () => {
           contentType: "image/jpeg",
         });
 
+        // AI crew requires user_email as multipart form field (422 if missing)
+        let userEmail: string | undefined =
+          (analysis as any)?.user_email ||
+          (analysis.metadata as any)?.user_email;
+
+        if (!userEmail && (analysis as any)?.user_id) {
+          try {
+            const { data: userProfile } = await supabase
+              .from("profiles")
+              .select("email")
+              .eq("id", (analysis as any).user_id)
+              .single();
+            userEmail = userProfile?.email || undefined;
+          } catch (e) {
+            // ignore, handled below
+          }
+        }
+
+        if (!userEmail) {
+          console.warn(
+            `⚠️ Cannot retry analysis ${analysis.id} - missing user_email (will try again later)`
+          );
+          continue;
+        }
+
+        formData.append("user_email", userEmail);
+        formData.append("analysis_id", analysis.id);
+
         if (analysis.search_term) {
           formData.append("keywords", analysis.search_term);
         }
@@ -345,7 +362,7 @@ setInterval(async () => {
             console.log(`🔄 Retrying analysis for ${analysis.id}...`);
             
             const aiResponse = await axios.post(
-              `${aiServiceUrl}/analyze-part/`,
+              `${aiServiceUrl}/analyze-part`,
               formData,
               {
                 headers: {
@@ -457,7 +474,7 @@ setInterval(async () => {
 }, 3 * 60 * 1000); // Run every 3 minutes
 
 // Long-running job notifier: send "Analysis Processing" email once for jobs that are still running.
-// This ensures users get an update while deep research is ongoing.
+// This ensures users get an update while SpareFinder Research is ongoing.
 setInterval(async () => {
   try {
     const thresholdMinutes = Math.max(
@@ -706,6 +723,33 @@ router.post(
         });
       }
 
+      // Step 1.5: Enforce storage quota per subscription tier
+      // (search limits are enforced via credits; storage is enforced here)
+      try {
+        const limits = (res.locals as any)?.subscriptionLimits as
+          | { storage: number }
+          | undefined;
+        const storageLimit = limits?.storage ?? -1;
+        if (storageLimit !== -1) {
+          const usage = await getUsageRow(userId);
+          const nextStorage = usage.storage_used + size;
+          if (nextStorage > storageLimit) {
+            return res.status(413).json({
+              success: false,
+              error: "storage_limit_exceeded",
+              message:
+                "Storage limit reached for your current plan. Please upgrade to upload more files.",
+              storage_used: usage.storage_used,
+              storage_limit: storageLimit,
+              bytes_attempted: size,
+              upgrade_required: true,
+            });
+          }
+        }
+      } catch (e) {
+        console.warn("⚠️ Storage quota check failed (allowing upload):", e);
+      }
+
       // Step 2: Upload image to Supabase Storage for persistence
       const bucketName = process.env.SUPABASE_BUCKET_NAME || "sparefinder";
       const fileName = `${userId}/${Date.now()}-${originalname}`;
@@ -733,6 +777,19 @@ router.post(
         fileName,
         publicUrl: urlData.publicUrl,
         bucketName,
+      });
+
+      // Track usage for billing dashboard
+      // - 1 search per analysis request
+      // - storage usage accumulates uploaded bytes
+      // Best-effort (don't fail upload if tracking fails)
+      setImmediate(async () => {
+        try {
+          await incrementUsage({ userId, searches: 1 });
+          await incrementStorage({ userId, bytes: size });
+        } catch (e) {
+          console.warn("⚠️ Failed to update usage_tracking for upload:", e);
+        }
       });
 
       // Step 3: Check AI service availability and send image for analysis
@@ -863,11 +920,11 @@ router.post(
 
         // Single-call logic for AI analysis (no client-side retry loop)
         console.log(
-          `🚀 Calling AI analyze-part endpoint: ${aiServiceUrl}/analyze-part/`
+          `🚀 Calling AI analyze-part endpoint: ${aiServiceUrl}/analyze-part`
         );
 
         aiResponse = await axios.post(
-          `${aiServiceUrl}/analyze-part/`,
+          `${aiServiceUrl}/analyze-part`,
           formData,
           {
             headers: {
@@ -2017,8 +2074,8 @@ router.post(
 );
 
 /**
- * Delete Deep Research Job
- * Deletes a specific Deep Research job
+ * Delete SpareFinder Research Job
+ * Deletes a specific SpareFinder Research job
  */
 router.delete(
   "/crew-analysis/:jobId",
@@ -2045,7 +2102,7 @@ router.delete(
       }
 
       console.log(
-        `🗑️ Deleting Deep Research job: ${jobId} for user: ${userId}`
+        `🗑️ Deleting SpareFinder Research job: ${jobId} for user: ${userId}`
       );
 
       // Delete the job (RLS will ensure user can only delete their own jobs)
@@ -2056,7 +2113,7 @@ router.delete(
         .eq("user_id", userId);
 
       if (deleteError) {
-        console.error("❌ Failed to delete Deep Research job:", deleteError);
+        console.error("❌ Failed to delete SpareFinder Research job:", deleteError);
         return res.status(500).json({
           success: false,
           error: "Failed to delete job",
@@ -2064,14 +2121,14 @@ router.delete(
         });
       }
 
-      console.log("✅ Deep Research job deleted successfully");
+      console.log("✅ SpareFinder Research job deleted successfully");
 
       return res.status(200).json({
         success: true,
-        message: "Deep Research job deleted successfully",
+        message: "SpareFinder Research job deleted successfully",
       });
     } catch (error) {
-      console.error("❌ Delete Deep Research job error:", error);
+      console.error("❌ Delete SpareFinder Research job error:", error);
       return res.status(500).json({
         success: false,
         error: "Internal server error",
@@ -2082,8 +2139,8 @@ router.delete(
 );
 
 /**
- * Get Deep Research Jobs
- * Returns all Deep Research jobs for the current user
+ * Get SpareFinder Research Jobs
+ * Returns all SpareFinder Research jobs for the current user
  */
 router.get(
   "/crew-analysis-jobs",
@@ -2100,7 +2157,7 @@ router.get(
         });
       }
 
-      // Fetch Deep Research jobs for this user
+      // Fetch SpareFinder Research jobs for this user
       const { data: jobs, error: jobsError } = await supabase
         .from("crew_analysis_jobs")
         .select("*")
@@ -2108,14 +2165,14 @@ router.get(
         .order("created_at", { ascending: false });
 
       if (jobsError) {
-        console.error("❌ Failed to fetch Deep Research jobs:", jobsError);
+        console.error("❌ Failed to fetch SpareFinder Research jobs:", jobsError);
 
         // Return empty array if table doesn't exist yet
         if (jobsError.code === "42P01") {
           return res.status(200).json({
             success: true,
             data: [],
-            message: "No Deep Research jobs found",
+            message: "No SpareFinder Research jobs found",
           });
         }
 
@@ -2131,7 +2188,7 @@ router.get(
         data: jobs || [],
       });
     } catch (error) {
-      console.error("❌ Get Deep Research jobs error:", error);
+      console.error("❌ Get SpareFinder Research jobs error:", error);
       return res.status(500).json({
         success: false,
         error: "Internal server error",
@@ -2142,8 +2199,8 @@ router.get(
 );
 
 /**
- * Create Deep Research Job
- * Creates a new Deep Research job in the database and returns the job ID
+ * Create SpareFinder Research Job
+ * Creates a new SpareFinder Research job in the database and returns the job ID
  * User will be redirected to history page to watch progress
  */
 router.post(
@@ -2170,26 +2227,26 @@ router.post(
         return res.status(400).json({
           success: false,
           error: "No file provided",
-          message: "Image file is required for Deep Research",
+          message: "Image file is required for SpareFinder Research",
         });
       }
 
-      console.log("🤖 Creating Deep Research job for user:", userId);
+      console.log("🤖 Creating SpareFinder Research job for user:", userId);
 
       // Credits: admins have unlimited access, others must have at least 1 credit
       if (req.user?.role === "admin" || req.user?.role === "super_admin") {
         console.log(
-          "Admin Deep Research detected - bypassing credits for user:",
+          "Admin SpareFinder Research detected - bypassing credits for user:",
           userId
         );
       } else {
-        console.log("Checking user credits for Deep Research analysis...");
+        console.log("Checking user credits for SpareFinder Research analysis...");
         const creditResult: CreditResult =
           await creditService.processAnalysisCredits(userId);
 
         if (!creditResult.success) {
           console.log(
-            "Insufficient credits for Deep Research user:",
+            "Insufficient credits for SpareFinder Research user:",
             userId,
             creditResult
           );
@@ -2204,7 +2261,7 @@ router.post(
           });
         }
 
-        console.log("Deep Research credits deducted successfully:", {
+        console.log("SpareFinder Research credits deducted successfully:", {
           userId,
           credits_before: creditResult.credits_before,
           credits_after: creditResult.credits_after,
@@ -2251,7 +2308,7 @@ router.post(
         (userProfile?.full_name as string | null) ||
         (userEmail.split("@")[0] ?? "User");
 
-      // Create Deep Research job in database
+      // Create SpareFinder Research job in database
       const jobId = uuidv4();
       const { error: jobError } = await supabase
         .from("crew_analysis_jobs")
@@ -2271,7 +2328,7 @@ router.post(
         .single();
 
       if (jobError) {
-        console.error("❌ Failed to create Deep Research job:", jobError);
+        console.error("❌ Failed to create SpareFinder Research job:", jobError);
 
         // Try to create table if it doesn't exist
         if (jobError.code === "42P01") {
@@ -2343,9 +2400,9 @@ router.post(
               throw retryError;
             }
 
-            console.log("✅ Deep Research job created:", jobId);
+            console.log("✅ SpareFinder Research job created:", jobId);
 
-            // Fire-and-forget: send "Analysis Started" email for Deep Research
+            // Fire-and-forget: send "Analysis Started" email for SpareFinder Research
             try {
               const currentDate = new Date().toLocaleDateString();
               const currentTime = new Date().toLocaleTimeString();
@@ -2405,7 +2462,7 @@ router.post(
 
             return res.status(201).json({
               success: true,
-              message: "Deep Research job created successfully",
+              message: "SpareFinder Research job created successfully",
               jobId: jobId,
               imageUrl: publicUrl,
             });
@@ -2419,9 +2476,9 @@ router.post(
         });
       }
 
-      console.log("✅ Deep Research job created:", jobId);
+      console.log("✅ SpareFinder Research job created:", jobId);
 
-      // Fire-and-forget: send "Analysis Started" email for Deep Research
+      // Fire-and-forget: send "Analysis Started" email for SpareFinder Research
       try {
         const currentDate = new Date().toLocaleDateString();
         const currentTime = new Date().toLocaleTimeString();
@@ -2484,12 +2541,12 @@ router.post(
 
       return res.status(201).json({
         success: true,
-        message: "Deep Research job created successfully",
+        message: "SpareFinder Research job created successfully",
         jobId: jobId,
         imageUrl: publicUrl,
       });
     } catch (error) {
-      console.error("❌ Deep Research job creation error:", error);
+      console.error("❌ SpareFinder Research job creation error:", error);
       return res.status(500).json({
         success: false,
         error: "Internal server error",

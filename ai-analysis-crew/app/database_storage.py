@@ -398,7 +398,7 @@ def create_crew_job(
     image_url: Optional[str] = None
 ) -> bool:
     """
-    Create a new Deep Research job entry in the database
+    Create a new SpareFinder Research job entry in the database
     
     Args:
         job_id: UUID for the job
@@ -463,7 +463,7 @@ def update_crew_job_status(
     error_message: Optional[str] = None
 ) -> bool:
     """
-    Update the status of a Deep Research job in the crew_analysis_jobs table
+    Update the status of a SpareFinder Research job in the crew_analysis_jobs table
     
     Args:
         job_id: UUID of the job to update
@@ -515,7 +515,7 @@ def complete_crew_job(
     pdf_url: Optional[str] = None
 ) -> bool:
     """
-    Mark a Deep Research job as completed with results
+    Mark a SpareFinder Research job as completed with results
     
     Args:
         job_id: UUID of the job

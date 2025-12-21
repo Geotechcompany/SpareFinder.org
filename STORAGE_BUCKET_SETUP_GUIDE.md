@@ -1,4 +1,4 @@
-# Storage Bucket Setup Guide for Deep Research
+# Storage Bucket Setup Guide for SpareFinder Research
 
 ## ✅ FIXED: Using Existing "sparefinder" Bucket
 
@@ -103,12 +103,12 @@ USING (bucket_id = 'part-images');
 After creating the bucket, test it:
 
 1. Go back to your app
-2. Try uploading an image for Deep Research
+2. Try uploading an image for SpareFinder Research
 3. You should see:
    ```json
    {
      "success": true,
-     "message": "Deep Research job created successfully",
+     "message": "SpareFinder Research job created successfully",
      "jobId": "...",
      "imageUrl": "https://bharlmgxoqdafjeeknmk.supabase.co/storage/v1/object/public/part-images/..."
    }
@@ -152,5 +152,5 @@ part-images/crew-analysis/550e8400-e29b-41d4-a716-446655440000/a1b2c3d4-e5f6.jpg
 ✅ **Set policies**: Insert, Select, Update, Delete
 ✅ **Test upload**: Should work immediately after bucket creation
 
-Once the bucket is created, the Deep Research upload will work! 🎉
+Once the bucket is created, the SpareFinder Research upload will work! 🎉
 

@@ -126,7 +126,7 @@ const History = () => {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [jobToDelete, setJobToDelete] = useState<any | null>(null);
 
-  // Deep Research Jobs state
+  // SpareFinder Research Jobs state
   const [crewJobs, setCrewJobs] = useState<any[]>([]);
   const [isCrewJobOpen, setIsCrewJobOpen] = useState(false);
   const [selectedCrewJob, setSelectedCrewJob] = useState<any | null>(null);
@@ -269,7 +269,7 @@ const History = () => {
               throw e;
             }
           })(),
-          // Fetch Deep Research jobs
+          // Fetch SpareFinder Research jobs
           (async () => {
             try {
               const resp = await api.upload.getCrewAnalysisJobs();
@@ -342,7 +342,7 @@ const History = () => {
         const crewAnalysisJobs: any[] = Array.isArray(crewData.data)
           ? crewData.data
           : [];
-        console.log("🤖 Deep Research jobs:", crewAnalysisJobs.length, "jobs");
+        console.log("🤖 SpareFinder Research jobs:", crewAnalysisJobs.length, "jobs");
 
         // Check for duplicate IDs
         const uniqueIds = new Set(crewAnalysisJobs.map((j: any) => j.id));
@@ -1048,7 +1048,7 @@ const History = () => {
     }
   }, [isAuthenticated, user?.id, authLoading, fetchAllData]);
 
-  // Real-time Supabase subscription for Deep Research jobs
+  // Real-time Supabase subscription for SpareFinder Research jobs
   useEffect(() => {
     if (!user?.id) return;
 
@@ -1593,7 +1593,7 @@ const History = () => {
                   <div className="text-center py-6 md:py-8">
                     <Sparkles className="mx-auto mb-3 h-8 w-8 text-purple-400/70 md:mb-4 md:h-12 md:w-12" />
                     <p className="text-sm text-muted-foreground md:text-base dark:text-gray-400">
-                      No Deep Research jobs yet
+                      No SpareFinder Research jobs yet
                     </p>
                     <p className="mt-2 text-xs text-muted-foreground/80 md:text-sm dark:text-gray-500">
                       Start a comprehensive SpareFinder AI Research from the
@@ -1602,7 +1602,7 @@ const History = () => {
                   </div>
                 ) : (
                   <div className="w-full">
-                    {/* Deep Research Jobs Grid */}
+                    {/* SpareFinder Research Jobs Grid */}
                     <div
                       id="tour-past-jobs-table"
                       className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"
@@ -1887,10 +1887,10 @@ const History = () => {
             <DialogContent className="bg-gradient-to-br from-slate-900/95 to-slate-800/95 backdrop-blur-xl border-white/10">
               <DialogHeader>
                 <DialogTitle className="text-white">
-                  Delete Deep Research
+                  Delete SpareFinder Research
                 </DialogTitle>
                 <DialogDescription className="text-gray-400">
-                  Are you sure you want to delete this Deep Research? This
+                  Are you sure you want to delete this SpareFinder Research? This
                   action cannot be undone and will permanently delete the
                   analysis results.
                 </DialogDescription>

@@ -1,5 +1,5 @@
 /**
- * Deep Research Progress Component
+ * SpareFinder Research Progress Component
  *
  * Shows real-time progress of SpareFinder AI Research in history cards
  * Displays agent progress and status for background tasks

@@ -1,7 +1,7 @@
 /**
- * Deep Research Job Service
+ * SpareFinder Research Job Service
  * 
- * Manages Deep Research jobs and automatically starts analysis for pending jobs
+ * Manages SpareFinder Research jobs and automatically starts analysis for pending jobs
  */
 
 import { aiAnalysisCrew, CrewProgressUpdate } from './aiAnalysisCrew';
@@ -48,7 +48,7 @@ class CrewAnalysisJobService {
     }
 
     try {
-      console.log(`🚀 Starting Deep Research for job ${job.id}`);
+      console.log(`🚀 Starting SpareFinder Research for job ${job.id}`);
 
       // Convert image URL to blob
       const imageBlob = await this.fetchImageAsBlob(job.image_url);

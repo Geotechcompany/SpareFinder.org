@@ -6,6 +6,7 @@ import { supabase } from "../server";
 import Stripe from "stripe";
 import { creditService } from "../services/credit-service";
 import { emailService } from "../services/email-service";
+import { SUBSCRIPTION_LIMITS } from "../config/subscription-limits";
 
 // Type definitions for better type safety
 interface StripeMetadata {
@@ -140,33 +141,7 @@ function getPlanPrice(planName: string): { amount: number; currency: string } {
   return PLAN_PRICING.free;
 }
 
-// Subscription limits by tier - synced with frontend configuration
-const SUBSCRIPTION_LIMITS = {
-  // Starter/Basic (mapped to 'free' tier key)
-  free: {
-    // 20 image recognitions per month
-    searches: 20,
-    // Web portal only (no API access)
-    api_calls: 0,
-    // Keep modest storage available
-    storage: 1 * 1024 * 1024 * 1024, // 1GB
-  },
-  // Professional/Business
-  pro: {
-    // 500 recognitions per month
-    searches: 500,
-    // API access enabled
-    api_calls: 5000,
-    // Catalogue storage
-    storage: 25 * 1024 * 1024 * 1024, // 25GB
-  },
-  // Enterprise
-  enterprise: {
-    searches: -1, // unlimited
-    api_calls: -1, // unlimited
-    storage: -1, // unlimited
-  },
-};
+// (limits moved to `backend/src/config/subscription-limits.ts`)
 
 // Get billing information
 router.get("/", authenticateToken, async (req: AuthRequest, res: Response) => {
