@@ -18,6 +18,14 @@ class EmailRequest(BaseModel):
     html: str
     text: str | None = None
 
+def _env_bool(name: str, default: bool = False) -> bool:
+    raw = (os.getenv(name) or "").strip().lower()
+    if raw in ("1", "true", "yes", "y", "on"):
+        return True
+    if raw in ("0", "false", "no", "n", "off"):
+        return False
+    return default
+
 
 def send_email_via_smtp(
     to_email: str,
@@ -26,12 +34,15 @@ def send_email_via_smtp(
     text: str | None = None,
 ) -> bool:
     """
-    Send a basic email via SMTP using Gmail (or any SMTP) settings from environment variables.
+    Send a basic email via SMTP using settings from environment variables.
     """
     host = os.getenv("SMTP_HOST", "smtp.gmail.com")
     port = int(os.getenv("SMTP_PORT", "587"))
     user = os.getenv("SMTP_USER")
-    password = os.getenv("SMTP_PASSWORD")
+    password = os.getenv("SMTP_PASSWORD") or os.getenv("SMTP_PASS")
+    from_email = (os.getenv("SMTP_FROM") or user or "").strip()
+    from_name = (os.getenv("SMTP_FROM_NAME") or "").strip()
+    is_secure = _env_bool("SMTP_SECURE", default=(port == 465))
 
     if not user or not password:
         logger.warning("SMTP_USER/SMTP_PASSWORD not set - skipping email send")
@@ -39,7 +50,7 @@ def send_email_via_smtp(
 
     msg = MIMEMultipart("alternative")
     msg["Subject"] = subject
-    msg["From"] = user
+    msg["From"] = f"{from_name} <{from_email}>" if from_name else from_email
     msg["To"] = to_email
 
     if text:
@@ -48,10 +59,16 @@ def send_email_via_smtp(
         msg.attach(MIMEText(html, "html"))
 
     try:
-        with smtplib.SMTP(host, port, timeout=30) as server:
-            server.starttls()
+        if is_secure:
+            server = smtplib.SMTP_SSL(host, port, timeout=30)
             server.login(user, password)
-            server.sendmail(user, [to_email], msg.as_string())
+            server.sendmail(from_email, [to_email], msg.as_string())
+            server.quit()
+        else:
+            with smtplib.SMTP(host, port, timeout=30) as server:
+                server.starttls()
+                server.login(user, password)
+                server.sendmail(from_email, [to_email], msg.as_string())
         logger.info(f"✅ Email sent to {to_email}")
         return True
     except Exception as e:

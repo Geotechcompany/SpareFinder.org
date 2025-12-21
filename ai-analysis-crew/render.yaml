@@ -10,16 +10,21 @@ services:
     envVars:
       - key: OPENAI_API_KEY
         sync: false
-      - key: GMAIL_USER
+      # SMTP (Hostinger / custom). Prefer these over legacy GMAIL_*.
+      - key: SMTP_USER
         sync: false
-      - key: GMAIL_PASS
+      - key: SMTP_PASSWORD
         sync: false
+      - key: SMTP_FROM
+        sync: false
+      - key: SMTP_FROM_NAME
+        value: SpareFinder
       - key: SMTP_HOST
-        value: smtp.gmail.com
+        value: smtp.hostinger.com
       - key: SMTP_PORT
-        value: 587
+        value: 465
       - key: SMTP_SECURE
-        value: false
+        value: true
       - key: SMTP_AUTH_METHOD
         value: PLAIN
       - key: EMAIL_SERVICE_URL

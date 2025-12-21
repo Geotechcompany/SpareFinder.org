@@ -198,7 +198,7 @@ export const useProfileData = () => {
       // Refresh periodically so achievements auto-update after uploads/searches.
       const intervalId = window.setInterval(() => {
         if (document.visibilityState !== "visible") return;
-        fetchProfileData();
+      fetchProfileData();
       }, 15_000);
 
       const onFocus = () => fetchProfileData();
@@ -228,4 +228,4 @@ export const useProfileData = () => {
   }, [fetchProfileData]);
 
   return { ...data, refetch };
-};
+}; 

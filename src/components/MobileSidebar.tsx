@@ -161,14 +161,14 @@ const MobileSidebar: React.FC<MobileSidebarProps> = ({ isOpen, onClose }) => {
             {/* Upgrade CTA */}
             <div className="px-4 pt-4">
               {planCtaLabel ? (
-                <Button
-                  type="button"
-                  onClick={handleUpgrade}
+              <Button
+                type="button"
+                onClick={handleUpgrade}
                   disabled={subscriptionLoading}
-                  className="h-11 w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 shadow-lg shadow-purple-500/20"
-                >
+                className="h-11 w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 shadow-lg shadow-purple-500/20"
+              >
                   {planCtaLabel}
-                </Button>
+              </Button>
               ) : null}
             </div>
 

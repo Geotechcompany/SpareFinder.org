@@ -1,6 +1,20 @@
 """FastAPI main application with WebSocket support for real-time updates."""
 
 import os
+from pathlib import Path
+
+# Load local env file for development (ai-analysis-crew/.env).
+# On Render/production, env vars are injected by the platform so this is a no-op.
+try:
+    from dotenv import load_dotenv  # type: ignore
+
+    _env_path = Path(__file__).resolve().parents[1] / ".env"
+    if _env_path.exists():
+        load_dotenv(dotenv_path=_env_path, override=False)
+except Exception:
+    # Keep startup resilient if python-dotenv isn't available
+    pass
+
 import asyncio
 import base64
 from typing import Optional
@@ -246,14 +260,29 @@ async def email_send(payload: EmailProxyRequest):
     Proxy endpoint to send emails through the separate email-service.
     Configure EMAIL_SERVICE_URL on this service (Render env var).
     """
-    ok = send_email_via_email_service(
-        to_email=payload.to,
-        subject=payload.subject,
-        html=payload.html,
-        text=payload.text,
+    # Prefer direct SMTP when configured (Hostinger/custom).
+    # Only fall back to the external email-service when SMTP isn't configured.
+    has_smtp_creds = bool(
+        (os.getenv("SMTP_USER") or os.getenv("GMAIL_USER") or "").strip()
+        and (
+            os.getenv("SMTP_PASSWORD")
+            or os.getenv("SMTP_PASS")
+            or os.getenv("GMAIL_PASS")
+            or ""
+        ).strip()
     )
-    if not ok:
+
+    ok = False
+    if has_smtp_creds:
         ok = send_basic_email_smtp(
+            to_email=payload.to,
+            subject=payload.subject,
+            html=payload.html,
+            text=payload.text,
+        )
+
+    if not ok:
+        ok = send_email_via_email_service(
             to_email=payload.to,
             subject=payload.subject,
             html=payload.html,

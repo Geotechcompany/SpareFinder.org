@@ -229,8 +229,10 @@ class EmailService {
       const smtpConfig = {
         host,
         port,
-        // Use TLS on port 465, otherwise use STARTTLS on 587/other ports
-        secure: port === 465,
+        // Prefer explicit flag, fall back to port convention
+        secure:
+          (process.env.SMTP_SECURE || "").trim().toLowerCase() === "true" ||
+          port === 465,
         auth: {
           user,
           pass,
@@ -239,9 +241,9 @@ class EmailService {
         connectionTimeout: 10000,
       } as const;
 
-      this.senderName = "SpareFinder";
-      // Force visible "From" address to use the SpareFinder domain
-      this.senderEmail = "noreply.sparefinder.org";
+      this.senderName = (process.env.SMTP_FROM_NAME || "SpareFinder").trim();
+      // Visible "From" address (must be a valid email)
+      this.senderEmail = (process.env.SMTP_FROM || user).trim() || "noreply@sparefinder.org";
 
       this.transporter = nodemailer.createTransport(smtpConfig);
       await this.transporter.verify();

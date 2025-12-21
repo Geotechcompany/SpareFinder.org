@@ -1,10 +1,22 @@
-"""Email sending functionality using Gmail SMTP."""
+"""Email sending functionality via SMTP or email-service.
+
+Supports Hostinger / custom SMTP via:
+- SMTP_HOST, SMTP_PORT
+- SMTP_USER, SMTP_PASSWORD
+- SMTP_SECURE=true (for implicit SSL/TLS, typically port 465)
+- SMTP_FROM, SMTP_FROM_NAME
+
+Back-compat (older deployments):
+- GMAIL_USER/GMAIL_PASS (treated as SMTP_USER/SMTP_PASSWORD)
+"""
 
 import os
 import smtplib
 import logging
 import socket
 from typing import Optional
+from email.utils import formataddr
+from email.header import Header
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.mime.base import MIMEBase
@@ -13,6 +25,24 @@ from pathlib import Path
 import httpx
 
 logger = logging.getLogger(__name__)
+
+def _env_bool(name: str, default: bool = False) -> bool:
+    raw = (os.getenv(name) or "").strip().lower()
+    if raw in ("1", "true", "yes", "y", "on"):
+        return True
+    if raw in ("0", "false", "no", "n", "off"):
+        return False
+    return default
+
+
+def _resolve_smtp_credentials() -> tuple[str, str] | None:
+    # Prefer generic SMTP_* vars; fall back to legacy Gmail vars.
+    user = (os.getenv("SMTP_USER") or os.getenv("GMAIL_USER") or "").strip()
+    password = (os.getenv("SMTP_PASSWORD") or os.getenv("SMTP_PASS") or os.getenv("GMAIL_PASS") or "").strip()
+    if not user or not password:
+        return None
+    return user, password
+
 
 def _resolve_smtp_host_port() -> tuple[str, int] | None:
     """
@@ -49,20 +79,26 @@ def send_basic_email_smtp(
     html: str,
     text: Optional[str] = None,
 ) -> bool:
-    """Send a basic email via SMTP using GMAIL_USER/GMAIL_PASS."""
-    gmail_user = os.getenv("GMAIL_USER")
-    gmail_pass = os.getenv("GMAIL_PASS")
-    if not gmail_user or not gmail_pass:
-        logger.warning("⚠️ Email not configured (GMAIL_USER/GMAIL_PASS not set) - skipping email send")
+    """Send a basic email via SMTP using SMTP_USER/SMTP_PASSWORD (or legacy GMAIL_*)."""
+    creds = _resolve_smtp_credentials()
+    if not creds:
+        logger.warning("⚠️ Email not configured (SMTP_USER/SMTP_PASSWORD not set) - skipping email send")
         return False
+    smtp_user, smtp_password = creds
 
     smtp_cfg = _resolve_smtp_host_port()
     if not smtp_cfg:
         return False
     smtp_host, smtp_port = smtp_cfg
+    is_secure = _env_bool("SMTP_SECURE", default=(smtp_port == 465))
+
+    from_email = (os.getenv("SMTP_FROM") or smtp_user).strip()
+    # Always prefer showing a brand display-name in inboxes
+    from_name = (os.getenv("SMTP_FROM_NAME") or "SpareFinder").strip()
+    from_header = formataddr((str(Header(from_name, "utf-8")), from_email))
 
     msg = MIMEMultipart("alternative")
-    msg["From"] = gmail_user
+    msg["From"] = from_header
     msg["To"] = to_email
     msg["Subject"] = subject
     if text:
@@ -86,12 +122,16 @@ def send_basic_email_smtp(
     try:
         server = None
         try:
-            # Pass host/port into constructor so smtplib stores a non-empty internal hostname for TLS SNI.
-            server = smtplib.SMTP(host=smtp_host, port=smtp_port, timeout=30)
-            server._host = smtp_host  # type: ignore[attr-defined]
-            server.starttls()
-            server.login(gmail_user, gmail_pass)
-            server.sendmail(gmail_user, [to_email], msg.as_string())
+            if is_secure:
+                server = smtplib.SMTP_SSL(host=smtp_host, port=smtp_port, timeout=30)
+            else:
+                # Pass host/port into constructor so smtplib stores a non-empty internal hostname for TLS SNI.
+                server = smtplib.SMTP(host=smtp_host, port=smtp_port, timeout=30)
+                server._host = smtp_host  # type: ignore[attr-defined]
+                server.starttls()
+
+            server.login(smtp_user, smtp_password)
+            server.sendmail(from_email, [to_email], msg.as_string())
             logger.info(f"✅ Email sent successfully to {to_email}")
             return True
         finally:
@@ -163,13 +203,11 @@ def send_email_with_attachment(
     Returns:
         True if successful, False otherwise
     """
-    gmail_user = os.getenv("GMAIL_USER")
-    gmail_pass = os.getenv("GMAIL_PASS")
-    
-    # Check if email is configured
-    if not gmail_user or not gmail_pass:
-        logger.warning("⚠️ Email not configured (GMAIL_USER/GMAIL_PASS not set) - skipping email send")
+    creds = _resolve_smtp_credentials()
+    if not creds:
+        logger.warning("⚠️ Email not configured (SMTP_USER/SMTP_PASSWORD not set) - skipping email send")
         return False
+    smtp_user, smtp_password = creds
     
     # Check if attachment exists
     if not Path(attachment_path).exists():
@@ -180,6 +218,12 @@ def send_email_with_attachment(
     if not smtp_cfg:
         return False
     smtp_host, smtp_port = smtp_cfg
+    is_secure = _env_bool("SMTP_SECURE", default=(smtp_port == 465))
+
+    from_email = (os.getenv("SMTP_FROM") or smtp_user).strip()
+    # Always prefer showing a brand display-name in inboxes
+    from_name = (os.getenv("SMTP_FROM_NAME") or "SpareFinder").strip()
+    from_header = formataddr((str(Header(from_name, "utf-8")), from_email))
     
     try:
         # Test network connectivity first
@@ -203,7 +247,7 @@ def send_email_with_attachment(
         
         # Create message
         msg = MIMEMultipart()
-        msg['From'] = gmail_user
+        msg['From'] = from_header
         msg['To'] = to_email
         msg['Subject'] = subject
         
@@ -225,12 +269,16 @@ def send_email_with_attachment(
         # Connect to SMTP server with timeout and better error handling
         server = None
         try:
-            server = smtplib.SMTP(host=smtp_host, port=smtp_port, timeout=30)  # 30 second timeout
-            server._host = smtp_host  # type: ignore[attr-defined]
-            server.starttls()
-            server.login(gmail_user, gmail_pass)
+            if is_secure:
+                server = smtplib.SMTP_SSL(host=smtp_host, port=smtp_port, timeout=30)
+            else:
+                server = smtplib.SMTP(host=smtp_host, port=smtp_port, timeout=30)  # 30 second timeout
+                server._host = smtp_host  # type: ignore[attr-defined]
+                server.starttls()
+
+            server.login(smtp_user, smtp_password)
             text = msg.as_string()
-            server.sendmail(gmail_user, to_email, text)
+            server.sendmail(from_email, to_email, text)
             logger.info(f"✅ Email sent successfully to {to_email}")
             return True
         finally:

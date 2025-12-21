@@ -171,14 +171,14 @@ const DashboardSidebar: React.FC<SidebarProps> = ({ isCollapsed = false, onToggl
       {!isCollapsed && (
         <div className="mt-3 grid grid-cols-1 gap-2">
           {planCtaLabel ? (
-            <Button
-              type="button"
+          <Button
+            type="button"
               onClick={handlePlanCta}
               disabled={subscriptionLoading}
-              className="w-full justify-center bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 shadow-lg shadow-purple-500/20"
-            >
+            className="w-full justify-center bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 shadow-lg shadow-purple-500/20"
+          >
               {planCtaLabel}
-            </Button>
+          </Button>
           ) : null}
           <Button 
             variant="ghost" 
