@@ -259,6 +259,12 @@ const Footer = () => {
               >
                 Security
               </Link>
+              <Link
+                to="/api-docs"
+                className="text-sm font-medium text-muted-foreground transition-colors duration-300 hover:text-primary dark:text-gray-500 dark:hover:text-purple-400"
+              >
+                API Docs
+              </Link>
             </div>
           </motion.div>
 

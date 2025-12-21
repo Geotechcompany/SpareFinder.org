@@ -104,6 +104,14 @@ const pageConfigs: PageSEOConfig = {
     description: "Read SpareFinder's terms of service to understand the terms and conditions for using our AI-powered spare parts identification platform.",
     type: "article",
   },
+  "/api-docs": {
+    title: "Developer API Documentation - SpareFinder",
+    description:
+      "SpareFinder Developer API documentation for Pro/Enterprise: create API keys, authenticate with x-api-key, and integrate with ERP/CMMS systems.",
+    keywords:
+      "SpareFinder API, spare parts API, ERP integration, CMMS integration, industrial parts API, x-api-key authentication",
+    type: "website",
+  },
   "/share/:token": {
     title: "Shared Analysis - SpareFinder",
     description: "View a shared spare parts analysis from SpareFinder's AI-powered identification system.",

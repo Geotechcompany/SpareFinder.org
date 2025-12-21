@@ -50,6 +50,7 @@ import DashboardLayout from "@/components/DashboardLayout";
 import SharedAnalysis from "@/pages/SharedAnalysis";
 import { PageSEO } from "@/components/PageSEO";
 import ClerkSsoCallback from "@/pages/ClerkSsoCallback";
+import ApiDocs from "@/pages/ApiDocs";
 
 const queryClient = new QueryClient();
 
@@ -66,6 +67,7 @@ const App = () => (
               <PageSEO />
               <Routes>
               <Route path="/" element={<Landing />} />
+              <Route path="/api-docs" element={<ApiDocs />} />
 
               {/* Clerk OAuth/SAML callback routes (required for social sign-in) */}
               <Route path="/login/sso-callback" element={<ClerkSsoCallback />} />
