@@ -136,13 +136,24 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     if (isSignedIn) tokenStorage.clearAll();
   }, [getToken, isLoaded, isSignedIn]);
 
-  // Ensure 401s never leave the app in a broken/blank state:
-  // clear auth state and return to /login.
+  // Handle auth failures - but don't auto-logout on token expiration
+  // Token refresh is handled in the API interceptor
   useEffect(() => {
     if (!isLoaded) return;
     setAuthFailureHandler(async ({ status, message }) => {
-      console.warn("🔒 Auth failure handler triggered:", { status, message });
-      // Clear local user immediately so ProtectedRoute won't bounce back to /dashboard
+      // Check if this is a token expiration error that should be handled by refresh
+      const isTokenExpired = message?.includes("expired") || 
+                            message?.includes("Token_expired") ||
+                            message?.includes("session has expired");
+      
+      if (isTokenExpired) {
+        console.warn("🔒 Token expired - refresh should handle this, not logging out");
+        // Don't logout - let the token refresh handle it
+        return;
+      }
+      
+      console.warn("🔒 Auth failure handler triggered (non-expiration):", { status, message });
+      // Only logout for truly invalid sessions, not expired tokens
       setUser(null);
       try {
         await signOut();

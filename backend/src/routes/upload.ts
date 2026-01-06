@@ -1310,8 +1310,10 @@ router.post(
           });
         }
 
-        // Set status to pending for retryable errors, failed for non-retryable
-        const analysisStatus = isRetryable ? "pending" : "failed";
+        // Always set to pending for auto-retry (except truly non-retryable errors)
+        // This ensures failed analyses don't show in UI
+        const shouldAutoRetry = isRetryable || errorType === "server_error" || errorType === "connection_refused" || errorType === "timeout";
+        const analysisStatus = shouldAutoRetry ? "pending" : "failed";
         
         // If AI service is down, save the upload with pending/failed status
         const fallbackData: PartSearchData = {
@@ -1322,9 +1324,9 @@ router.post(
           predictions: [],
           confidence_score: 0,
           processing_time: 0,
-          ai_model_version: isRetryable ? "pending" : "offline",
+          ai_model_version: shouldAutoRetry ? "pending" : "offline",
           analysis_status: analysisStatus,
-          error_message: isRetryable ? undefined : errorMessage, // Don't store error for pending
+          error_message: shouldAutoRetry ? undefined : errorMessage, // Don't store error for pending
           image_size_bytes: size,
           image_format: mimetype,
           upload_source: "web",
@@ -1367,8 +1369,56 @@ router.post(
         };
         await DatabaseLogger.logSearchHistory(searchHistoryDataError);
 
-        // Only refund credits for non-retryable (failed) errors
-        if (!isRetryable) {
+        // Auto-retry failed analyses via crew endpoint
+        // This ensures failed analyses don't show in UI and get processed automatically
+        if (shouldAutoRetry) {
+          console.log("🔄 Auto-retrying failed analysis via crew endpoint:", fallbackData.id);
+
+          // Retry via crew endpoint in background
+          setImmediate(async () => {
+            try {
+              // Download image from storage
+              const imagePath = urlData.publicUrl.replace(/^.*\/sparefinder\//, "");
+              const { data: imageData, error: downloadError } = await supabase.storage
+                .from("sparefinder")
+                .download(imagePath);
+
+              if (downloadError || !imageData) {
+                console.error("❌ Failed to download image for retry:", downloadError);
+                return;
+              }
+
+              // Convert blob to buffer
+              const arrayBuffer = await imageData.arrayBuffer();
+              const imageBuffer = Buffer.from(arrayBuffer);
+
+              // Get user email for crew analysis
+              const { data: userProfile } = await supabase
+                .from("profiles")
+                .select("email")
+                .eq("id", userId)
+                .single();
+
+              // Start crew analysis
+              await startCrewAnalysis(
+                fallbackData.id,
+                imageBuffer,
+                originalname,
+                mimetype,
+                userProfile?.email || "",
+                "" // No keywords for initial retry
+              );
+
+              console.log("✅ Auto-retry initiated for analysis:", fallbackData.id);
+            } catch (retryError) {
+              console.error("❌ Auto-retry failed for analysis:", fallbackData.id, retryError);
+              // Keep as pending - will be retried by the interval-based retry system
+            }
+          });
+
+          console.log("Analysis set to pending (auto-retry initiated), credits will be refunded if retry fails");
+        } else {
+          // Only refund credits for truly non-retryable errors (file too large, auth errors)
           console.log("Analysis failed (non-retryable), refunding credits to user:", userId);
           try {
             const refundResult = await creditService.refundAnalysisCredits(
@@ -1383,8 +1433,6 @@ router.post(
           } catch (refundError) {
             console.error("Error during credit refund:", refundError);
           }
-        } else {
-          console.log("Analysis set to pending (retryable error), credits will be refunded if retry fails");
         }
 
         // Send email notification to user (for both pending and failed)
@@ -1460,41 +1508,15 @@ router.post(
           // Don't fail the request if email fails
         }
 
-        // Return success for pending (retryable) errors, error for failed (non-retryable)
-        if (isRetryable) {
-          // Return success with pending status - don't show error to user
-          return res.status(200).json({
-            success: true,
-            status: "pending",
-            message: "Your analysis is being processed. You'll receive an email when it's complete.",
-            id: fallbackData.id,
-            image_url: urlData.publicUrl,
-          });
-        } else {
-          // Return error for non-retryable failures
-          const statusCode =
-            errorType === "file_too_large"
-              ? 413
-              : errorType === "unauthorized"
-              ? 401
-              : errorType === "client_error"
-              ? 400
-              : 503;
-
-          return res.status(statusCode).json({
-            success: false,
-            error: errorType,
-            message: errorMessage,
-            id: fallbackData.id,
-            image_url: urlData.publicUrl,
-            troubleshooting: {
-              ai_service_url: aiServiceUrl,
-              error_type: errorType,
-              timestamp: new Date().toISOString(),
-            },
-            credits_refunded: true,
-          });
-        }
+        // Always return success with pending status for auto-retry
+        // This ensures failed analyses don't show in UI and get processed automatically
+        return res.status(200).json({
+          success: true,
+          status: "pending",
+          message: "Your analysis is being processed. You'll receive an email when it's complete.",
+          id: fallbackData.id,
+          image_url: urlData.publicUrl,
+        });
       }
 
       console.log("AI service response received:", {

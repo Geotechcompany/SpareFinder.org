@@ -229,21 +229,33 @@ apiClient.interceptors.response.use(
               throw new Error("Failed to get fresh token from Clerk");
             }
           } catch (refreshError) {
-            console.warn("❌ Clerk token refresh failed - redirecting to login:", refreshError);
-            authFailureHandler?.({
-              status: error.response?.status,
-              message: error.response?.data?.message || "Session expired. Please log in again.",
-            });
-            if (!isPublicRoute) {
-              window.location.href = "/login";
-            }
+            // Only redirect to login if it's a truly invalid session (not just expired token)
+            // For expired tokens, we'll try to continue with the request
+            console.warn("⚠️ Clerk token refresh failed, but continuing request:", refreshError);
+            // Don't redirect - let the request fail naturally, user can retry
             return Promise.reject(error);
           }
         }
         
-        // For other Clerk auth errors, redirect to login
+        // For other Clerk auth errors, try one more refresh attempt before giving up
+        if (!originalRequest._retry) {
+          console.warn("🔒 Unauthorized (Clerk) - attempting token refresh...");
+          originalRequest._retry = true;
+          
+          try {
+            const freshToken = await authTokenProvider?.();
+            if (freshToken) {
+              console.log("✅ Clerk token refreshed on retry");
+              originalRequest.headers["Authorization"] = `Bearer ${freshToken}`;
+              return apiClient(originalRequest);
+            }
+          } catch (refreshError) {
+            console.warn("⚠️ Token refresh failed:", refreshError);
+          }
+        }
+        
+        // Only redirect to login if refresh truly failed and we're not on a public route
         console.warn("🔒 Unauthorized (Clerk) - redirecting to login");
-        originalRequest._retry = true;
         authFailureHandler?.({
           status: error.response?.status,
           message: error.response?.data?.message || error.message,
