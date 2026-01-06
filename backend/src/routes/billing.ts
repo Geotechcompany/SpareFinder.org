@@ -175,7 +175,7 @@ router.get("/", authenticateToken, async (req: AuthRequest, res: Response) => {
           const dbPeriodEnd = subscription.current_period_end
             ? new Date(subscription.current_period_end).getTime()
             : 0;
-          const stripePeriodEnd = ((stripeSub as any).current_period_end || 0) * 1000);
+          const stripePeriodEnd = ((stripeSub as any).current_period_end || 0) * 1000;
 
           // Update if dates differ by more than 1 hour (account for timezone/rounding)
           if (Math.abs(dbPeriodEnd - stripePeriodEnd) > 60 * 60 * 1000) {
