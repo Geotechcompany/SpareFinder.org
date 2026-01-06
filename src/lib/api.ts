@@ -154,9 +154,6 @@ const processQueue = (error: unknown, token: string | null = null) => {
 // Request interceptor to add token to every request
 apiClient.interceptors.request.use(
   async (config) => {
-    const token = await getAuthToken();
-    const hasToken = !!token;
-
     // Check if this is a public endpoint that doesn't require a token
     const isPublicEndpoint =
       config.url &&
@@ -168,8 +165,25 @@ apiClient.interceptors.request.use(
           config.method?.toLowerCase() === "get") ||
         config.url.includes("/health"));
 
+    // For public endpoints, skip token logic
+    if (isPublicEndpoint) {
+      return config;
+    }
+
+    // Get token - with retry logic for Clerk tokens that might not be ready yet
+    let token = await getAuthToken();
+    
+    // If using Clerk and token is null, wait a bit and try once more
+    // This handles race condition where Clerk is still initializing
+    if (isClerkAuthEnabled && !token) {
+      await new Promise(resolve => setTimeout(resolve, 200));
+      token = await getAuthToken();
+    }
+
+    const hasToken = !!token;
+
     // Only log detailed info for debugging when needed
-    if (!isPublicEndpoint) {
+    if (process.env.NODE_ENV === 'development') {
       console.log("🔍 Request interceptor:", {
         url: config.url,
         hasToken,
@@ -180,11 +194,11 @@ apiClient.interceptors.request.use(
 
     if (token) {
       config.headers["Authorization"] = `Bearer ${token}`;
-      if (!isPublicEndpoint) {
-        console.log("✅ Authorization header added");
+    } else {
+      // Don't log error for /auth/current-user as it's expected during initial load
+      if (!config.url?.includes("/auth/current-user")) {
+        console.warn("⚠️ No token available for request:", config.url);
       }
-    } else if (!isPublicEndpoint) {
-      console.log("❌ No token found - request will be unauthorized");
     }
     return config;
   },
