@@ -2,6 +2,7 @@
 
 import os
 import logging
+import re
 from typing import Dict, Optional, Any
 from openai import OpenAI
 
@@ -80,7 +81,7 @@ Generate compelling, personalized re-engagement EMAIL COPY (not HTML) for SpareF
 1. Create a catchy, personalized subject line (max 60 characters)
 2. Provide concise, scannable copy:
    - A compelling headline (short)
-   - A short intro paragraph (1–2 sentences)
+   - A short intro paragraph (1–2 sentences) **WITHOUT any greeting** (do NOT start with "Hi/Hello/Hey {user_name}" — greeting is handled by the template)
    - 3–5 benefit bullet points (plain text, no emojis)
    - A short closing line (optional)
    - CTA labels for 2 buttons (primary + secondary)
@@ -138,6 +139,7 @@ Only valid JSON. No markdown."""
             subject = (ai_content.get("subject") or f"Welcome back, {user_name}!").strip()
             headline = (ai_content.get("headline") or f"{user_name}, identify parts faster").strip()
             intro = (ai_content.get("intro") or "Upload a photo, get an instant match, and share clean results with your team.").strip()
+            intro = self._strip_greeting(intro, user_name=user_name)
             bullets = ai_content.get("bullets") or []
             if not isinstance(bullets, list):
                 bullets = []
@@ -448,6 +450,35 @@ Unsubscribe: {unsubscribe_url}
             f"Settings: {settings_url}\n\n"
             f"Unsubscribe: {unsubscribe_url}"
         )
+
+    def _strip_greeting(self, text: str, *, user_name: str) -> str:
+        """
+        Remove accidental greetings like 'Hi Arthur,' from AI-provided intro so we
+        don't duplicate the template greeting.
+        """
+        t = (text or "").strip()
+        if not t:
+            return t
+
+        # Common greeting patterns at the start of the intro.
+        # Examples:
+        # - "Hi Arthur," / "Hello Arthur -" / "Hey Arthur!"
+        # - "Hi," / "Hello," / "Hey!"
+        # Keep it conservative: only strip if greeting is at the very start.
+        name = re.escape(user_name.strip())
+        patterns = [
+            rf"^(hi|hello|hey)\s+{name}\s*[,!:-]\s*",
+            r"^(hi|hello|hey)\s*[,!:-]\s*",
+        ]
+        for p in patterns:
+            t2 = re.sub(p, "", t, flags=re.IGNORECASE)
+            if t2 != t:
+                t = t2.strip()
+                break
+
+        # If it still starts with the user's name (e.g., "Arthur,"), strip that too.
+        t = re.sub(rf"^{name}\s*[,!:-]\s*", "", t, flags=re.IGNORECASE).strip()
+        return t
 
 
 # Global instance
