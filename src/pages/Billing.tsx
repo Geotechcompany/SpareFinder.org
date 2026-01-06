@@ -104,27 +104,32 @@ interface CheckoutResponse {
 const getFeatureRequiredTier = (feature: string): PlanTier => {
   const lowerFeature = feature.toLowerCase();
   
-  // API-related features require Pro or higher
-  if (lowerFeature.includes("api") || lowerFeature.includes("erp") || lowerFeature.includes("cmms")) {
+  // Starter/Basic tier features (available to all)
+  if (lowerFeature.includes("20 image recognitions") || 
+      lowerFeature.includes("basic search") || 
+      lowerFeature.includes("web portal only")) {
+    return "free";
+  }
+  
+  // Professional tier features (includes Starter features)
+  if (lowerFeature.includes("500 recognitions") || 
+      lowerFeature.includes("catalogue storage") || 
+      lowerFeature.includes("part lists") || 
+      lowerFeature.includes("drawings") ||
+      lowerFeature.includes("api access") || 
+      lowerFeature.includes("erp") || 
+      lowerFeature.includes("cmms") ||
+      lowerFeature.includes("analytics dashboard")) {
     return "pro";
   }
   
-  // Catalogue storage requires Pro or higher
-  if (lowerFeature.includes("catalogue") || lowerFeature.includes("storage") || lowerFeature.includes("part lists")) {
-    return "pro";
-  }
-  
-  // Analytics requires Pro or higher
-  if (lowerFeature.includes("analytics") || lowerFeature.includes("dashboard")) {
-    return "pro";
-  }
-  
-  // Advanced features require Enterprise
-  if (lowerFeature.includes("unlimited") || 
-      lowerFeature.includes("advanced") || 
+  // Enterprise tier features (includes Starter + Professional features)
+  if (lowerFeature.includes("unlimited recognition") || 
+      lowerFeature.includes("advanced ai") || 
       lowerFeature.includes("customisation") || 
-      lowerFeature.includes("train") ||
-      lowerFeature.includes("predictive") ||
+      lowerFeature.includes("train on your data") ||
+      lowerFeature.includes("full integration") ||
+      lowerFeature.includes("predictive demand") ||
       lowerFeature.includes("dedicated support") ||
       lowerFeature.includes("sla")) {
     return "enterprise";

@@ -142,6 +142,15 @@ const Settings = () => {
   const { tier, isPlanActive, isLoading: isSubscriptionLoading } =
     useSubscription();
 
+  // Debug logging
+  React.useEffect(() => {
+    console.log("🔍 Settings - Subscription state:", {
+      tier,
+      isPlanActive,
+      isLoading: isSubscriptionLoading,
+    });
+  }, [tier, isPlanActive, isSubscriptionLoading]);
+
   const isApiKeysEnabled =
     isPlanActive && (tier === "pro" || tier === "enterprise");
 
@@ -1587,15 +1596,39 @@ const Settings = () => {
                   className="grid grid-cols-1 gap-4 sm:gap-6 lg:grid-cols-2 lg:gap-8"
                 >
                   <div className="relative lg:col-span-2">
-                    <FeatureLock
-                      requiredTier="pro"
-                      featureName="API Keys"
-                      description="Generate secure API keys for ERP/CMMS integrations. Available in Professional and Enterprise plans."
-                      showContent={!isApiKeysEnabled}
-                    >
-                      <div className="absolute inset-0 rounded-3xl bg-gradient-to-r from-[#3A5AFE0A] via-[#8B5CF60A] to-transparent blur-xl opacity-80 dark:from-purple-600/10 dark:to-blue-600/10" />
-                      <Card className="relative rounded-3xl border border-border bg-card text-foreground shadow-soft-elevated backdrop-blur-xl dark:bg-black/20 dark:border-white/10">
-                        <CardHeader>
+                    {!isApiKeysEnabled ? (
+                      <FeatureLock
+                        requiredTier="pro"
+                        featureName="API Keys"
+                        description="Generate secure API keys for ERP/CMMS integrations. Available in Professional and Enterprise plans."
+                        showContent={true}
+                      >
+                        <div className="absolute inset-0 rounded-3xl bg-gradient-to-r from-[#3A5AFE0A] via-[#8B5CF60A] to-transparent blur-xl opacity-80 dark:from-purple-600/10 dark:to-blue-600/10" />
+                        <Card className="relative rounded-3xl border border-border bg-card text-foreground shadow-soft-elevated backdrop-blur-xl dark:bg-black/20 dark:border-white/10">
+                          <CardHeader>
+                            <CardTitle className="flex items-center gap-2 text-foreground dark:text-white">
+                              <KeyRound className="h-5 w-5 text-[#8B5CF6]" />
+                              <span>API Keys</span>
+                              <Badge className="bg-emerald-500/15 text-emerald-700 border-emerald-500/20 dark:bg-emerald-500/15 dark:text-emerald-300 dark:border-emerald-500/30">
+                                {tier === "enterprise" ? "Enterprise" : "Pro"}
+                              </Badge>
+                            </CardTitle>
+                            <CardDescription className="text-muted-foreground dark:text-gray-400">
+                              Generate keys for ERP/CMMS integrations. Keep keys secret — we only show the full key once.
+                            </CardDescription>
+                          </CardHeader>
+                          <CardContent className="space-y-5">
+                            <div className="text-center py-8 text-muted-foreground">
+                              Content locked
+                            </div>
+                          </CardContent>
+                        </Card>
+                      </FeatureLock>
+                    ) : (
+                      <>
+                        <div className="absolute inset-0 rounded-3xl bg-gradient-to-r from-[#3A5AFE0A] via-[#8B5CF60A] to-transparent blur-xl opacity-80 dark:from-purple-600/10 dark:to-blue-600/10" />
+                        <Card className="relative rounded-3xl border border-border bg-card text-foreground shadow-soft-elevated backdrop-blur-xl dark:bg-black/20 dark:border-white/10">
+                          <CardHeader>
                           <CardTitle className="flex items-center gap-2 text-foreground dark:text-white">
                             <KeyRound className="h-5 w-5 text-[#8B5CF6]" />
                             <span>API Keys</span>
@@ -1827,7 +1860,8 @@ const Settings = () => {
                         </div>
                       </CardContent>
                     </Card>
-                    </FeatureLock>
+                      </>
+                    )}
                   </div>
                 </motion.div>
               )}

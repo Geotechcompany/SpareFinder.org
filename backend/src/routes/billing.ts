@@ -175,16 +175,16 @@ router.get("/", authenticateToken, async (req: AuthRequest, res: Response) => {
           const dbPeriodEnd = subscription.current_period_end
             ? new Date(subscription.current_period_end).getTime()
             : 0;
-          const stripePeriodEnd = stripeSub.current_period_end * 1000;
+          const stripePeriodEnd = (stripeSub.current_period_end || 0) * 1000;
 
           // Update if dates differ by more than 1 hour (account for timezone/rounding)
           if (Math.abs(dbPeriodEnd - stripePeriodEnd) > 60 * 60 * 1000) {
             const updateData = {
               current_period_start: new Date(
-                stripeSub.current_period_start * 1000
+                (stripeSub.current_period_start || 0) * 1000
               ).toISOString(),
               current_period_end: new Date(
-                stripeSub.current_period_end * 1000
+                (stripeSub.current_period_end || 0) * 1000
               ).toISOString(),
               cancel_at_period_end: stripeSub.cancel_at_period_end || false,
               status: stripeSub.status === "active" ? "active" : subscription.status,
@@ -1480,20 +1480,24 @@ async function handleCreditsCheckoutCompleted(
 // Helper function to handle successful invoice payments
 async function handleInvoicePaymentSucceeded(invoice: Stripe.Invoice) {
   try {
+    const subscriptionId = typeof invoice.subscription === "string" 
+      ? invoice.subscription 
+      : invoice.subscription?.id || null;
+
     console.log("Invoice payment succeeded:", {
       invoiceId: invoice.id,
       customerId: invoice.customer,
       amount: invoice.amount_paid,
-      subscriptionId: invoice.subscription,
+      subscriptionId: subscriptionId,
     });
 
     // Get subscription details from Stripe if available
     const stripe = await getStripeInstance();
     let stripeSubscription: Stripe.Subscription | null = null;
     
-    if (invoice.subscription && typeof invoice.subscription === "string" && stripe) {
+    if (subscriptionId && stripe) {
       try {
-        stripeSubscription = await stripe.subscriptions.retrieve(invoice.subscription);
+        stripeSubscription = await stripe.subscriptions.retrieve(subscriptionId);
       } catch (err) {
         console.warn("Failed to retrieve Stripe subscription:", err);
       }
@@ -1511,7 +1515,7 @@ async function handleInvoicePaymentSucceeded(invoice: Stripe.Invoice) {
         const tier = subscription.tier;
 
         // Update subscription period dates from Stripe subscription or invoice
-        if (stripeSubscription) {
+        if (stripeSubscription && stripeSubscription.current_period_start && stripeSubscription.current_period_end) {
           const updateData: any = {
             status: "active",
             current_period_start: new Date(
@@ -1602,7 +1606,7 @@ async function handleInvoicePaymentSucceeded(invoice: Stripe.Invoice) {
                     day: "numeric",
                   }
                 )
-              : stripeSubscription
+              : stripeSubscription && stripeSubscription.current_period_end
               ? new Date(
                   stripeSubscription.current_period_end * 1000
                 ).toLocaleDateString("en-GB", {
@@ -1665,10 +1669,14 @@ async function handleInvoicePaymentSucceeded(invoice: Stripe.Invoice) {
 // Helper function to handle failed invoice payments
 async function handleInvoicePaymentFailed(invoice: Stripe.Invoice) {
   try {
+    const subscriptionId = typeof invoice.subscription === "string" 
+      ? invoice.subscription 
+      : invoice.subscription?.id || null;
+
     console.log("Invoice payment failed:", {
       invoiceId: invoice.id,
       customerId: invoice.customer,
-      subscriptionId: invoice.subscription,
+      subscriptionId: subscriptionId,
       attemptCount: invoice.attempt_count,
     });
 
