@@ -49,7 +49,7 @@ export interface PartSearchData {
   image_size_bytes?: number;
   image_format?: string;
   upload_source?: string;
-  analysis_status?: 'completed' | 'failed' | 'processing';
+  analysis_status?: 'completed' | 'failed' | 'processing' | 'pending';
   error_message?: string;
   description?: string;
   retry_count?: number;

@@ -1678,6 +1678,8 @@ const History = () => {
                                           ? "✅ SpareFinder AI Research"
                                           : job.status === "failed"
                                           ? "❌ Analysis Failed"
+                                          : job.status === "pending"
+                                          ? "⏳ Analysis Pending"
                                           : "🤖SpareFinder research Ongoing..."}
                                       </h3>
                                       <p className="mt-1 text-xs font-mono text-muted-foreground truncate dark:text-gray-400">
@@ -1688,6 +1690,7 @@ const History = () => {
                                     {/* Progress Display */}
                                     {job.status !== "completed" &&
                                       job.status !== "failed" &&
+                                      job.status !== "pending" &&
                                       job.id && (
                                         <CrewAnalysisProgress
                                           key={`progress-${cardUniqueKey}`}
@@ -1743,10 +1746,14 @@ const History = () => {
                                           )}
                                         </>
                                       )}
+                                      {job.status === "pending" && (
+                                        <div className="flex-1 text-xs text-yellow-400 p-2 bg-yellow-900/20 rounded">
+                                          Analysis is queued and will be processed automatically. You'll receive an email when complete.
+                                        </div>
+                                      )}
                                       {job.status === "failed" && (
                                         <div className="flex-1 text-xs text-red-400 p-2 bg-red-900/20 rounded">
-                                          {job.error_message ||
-                                            "Analysis failed"}
+                                          Analysis could not be completed. Please try uploading again.
                                         </div>
                                       )}
                                       <Button

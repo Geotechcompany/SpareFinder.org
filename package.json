@@ -47,6 +47,7 @@
         "@react-three/fiber": "8.18.0",
         "@supabase/auth-ui-react": "^0.4.7",
         "@supabase/auth-ui-shared": "^0.1.8",
+        "@supabase/supabase-js": "^2.89.0",
         "@tanstack/react-query": "^5.56.2",
         "@types/uuid": "^10.0.0",
         "axios": "^1.9.0",
@@ -89,6 +90,7 @@
         "@types/react-dom": "^18.3.0",
         "@vitejs/plugin-react-swc": "^3.5.0",
         "autoprefixer": "^10.4.20",
+        "es-abstract": "^1.24.1",
         "eslint": "^9.9.0",
         "eslint-plugin-react-hooks": "^5.1.0-rc.0",
         "eslint-plugin-react-refresh": "^0.4.9",
@@ -96,10 +98,18 @@
         "jest": "^30.0.4",
         "lovable-tagger": "^1.1.7",
         "postcss": "^8.4.47",
+        "string.prototype.matchall": "^4.0.10",
         "tailwindcss": "^3.4.11",
         "ts-jest": "^29.4.0",
         "typescript": "^5.5.3",
         "typescript-eslint": "^8.0.1",
-        "vite": "^5.4.19"
+        "vite": "^5.4.19",
+        "vite-plugin-pwa": "^0.21.2",
+        "workbox-build": "^7.4.0",
+        "workbox-core": "^7.4.0",
+        "workbox-expiration": "^7.4.0",
+        "workbox-precaching": "^7.4.0",
+        "workbox-routing": "^7.4.0",
+        "workbox-strategies": "^7.4.0"
     }
 }

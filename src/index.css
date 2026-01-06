@@ -402,3 +402,14 @@
 .analysis-markdown .section-content li {
     @apply my-1 pl-2;
 }
+
+/* PWA Install Banner - Adjust header position when banner is visible */
+body.pwa-banner-visible header[class*="sticky"] {
+    top: 60px !important;
+}
+
+@media (min-width: 768px) {
+    body.pwa-banner-visible header[class*="sticky"] {
+        top: 64px !important;
+    }
+}

@@ -1041,7 +1041,7 @@ router.post(
       } catch (aiError: any) {
         console.error("AI service error:", aiError);
 
-        // Check if this is a 429 rate limit error
+        // Check if this is a 429 rate limit error - set to pending instead of failed
         if (axios.isAxiosError(aiError) && aiError.response?.status === 429) {
           const duration = Date.now() - start;
 
@@ -1051,32 +1051,129 @@ router.post(
             data: aiError.response.data,
           });
 
-          return res.status(502).json({
-            success: false,
-            error: "ai_service_rate_limited",
-            message:
-              "The AI analysis service is temporarily rate limited by its provider. Please try again shortly.",
+          // Determine if error is retryable (429 is always retryable)
+          const isRetryable = true;
+          const analysisStatus = isRetryable ? "pending" : "failed";
+          
+          // Save as pending for retry
+          const pendingData: PartSearchData = {
+            id: uuidv4(),
+            user_id: userId,
+            image_url: urlData.publicUrl,
+            image_name: originalname,
+            predictions: [],
+            confidence_score: 0,
+            processing_time: 0,
+            ai_model_version: "pending",
+            analysis_status: analysisStatus,
+            error_message: undefined, // Don't store error message for pending
+            image_size_bytes: size,
+            image_format: mimetype,
+            upload_source: "web",
+            web_scraping_used: false,
+            sites_searched: 0,
+            parts_found: 0,
+            metadata: {
+              ai_service_error: "ai_service_rate_limited",
+              ai_service_url: aiServiceUrl,
+              retry_count: 0,
+              error_details: {
+                code: aiError.code,
+                status: aiError.response?.status,
+                statusText: aiError.response?.statusText,
+              },
+            },
+          };
+
+          // Save pending analysis to database
+          const logResult429 = await DatabaseLogger.logPartSearch(pendingData);
+          if (!logResult429.success) {
+            console.error("Database logging error for pending upload:", logResult429.error);
+          }
+
+          // Also log search history
+          const searchHistoryData429: SearchHistoryData = {
+            user_id: userId,
+            part_search_id: pendingData.id,
+            search_type: "image_upload",
+            search_query: originalname,
+            results_count: 0,
+            session_id: req.headers["x-session-id"] as string,
+            ip_address: req.ip,
+            user_agent: req.headers["user-agent"],
+          };
+          await DatabaseLogger.logSearchHistory(searchHistoryData429);
+
+          // Send email notification to user
+          try {
+            const { data: userProfile } = await supabase
+              .from("profiles")
+              .select("email, full_name")
+              .eq("id", userId)
+              .single();
+
+            if (userProfile?.email) {
+              const currentDate = new Date().toLocaleDateString();
+              const currentTime = new Date().toLocaleTimeString();
+              const dashboardUrl = `${
+                process.env.FRONTEND_URL || "https://sparefinder.org"
+              }/dashboard`;
+
+              await emailService
+                .sendTemplateEmail({
+                  templateName: "Analysis Failed",
+                  userEmail: userProfile.email,
+                  variables: {
+                    userName: userProfile.full_name || "User",
+                    errorMessage: "AI service is temporarily rate limited. Your analysis is queued and will be processed automatically when the service is available.",
+                    dashboardUrl: dashboardUrl,
+                    currentDate: currentDate,
+                    currentTime: currentTime,
+                  },
+                })
+                .catch((error) => {
+                  console.error("Failed to send pending analysis email:", error);
+                });
+
+              console.log("📧 Pending analysis email sent to:", userProfile.email);
+            }
+          } catch (emailError) {
+            console.error("Error sending pending analysis email:", emailError);
+          }
+
+          // Return success with pending status - don't show error to user
+          return res.status(200).json({
+            success: true,
+            status: "pending",
+            message: "Your analysis is being processed. You'll receive an email when it's complete.",
+            id: pendingData.id,
+            image_url: urlData.publicUrl,
             elapsed_ms: duration,
           });
         }
 
-        // Determine error type
+        // Determine error type and if it's retryable
         let errorType = "unknown";
         let errorMessage = "AI service unavailable";
+        let isRetryable = false;
 
         if (axios.isAxiosError(aiError)) {
           if (aiError.code === "ECONNREFUSED" || aiError.code === "ENOTFOUND") {
             errorType = "connection_refused";
             errorMessage = "Cannot connect to AI service";
+            isRetryable = true;
           } else if (aiError.code === "ECONNABORTED") {
             errorType = "timeout";
             errorMessage = "AI service request timed out";
+            isRetryable = true;
           } else if (aiError.response?.status === 401) {
             errorType = "unauthorized";
             errorMessage = "AI service authentication failed";
+            isRetryable = false; // Auth errors are not retryable
           } else if (aiError.response?.status === 413) {
             errorType = "file_too_large";
             errorMessage = "Image file is too large for AI service";
+            isRetryable = false; // File size errors are not retryable
           } else if (
             aiError.response?.status &&
             aiError.response.status >= 400 &&
@@ -1087,9 +1184,11 @@ router.post(
             errorMessage = `AI service error: ${
               aiError.response.data?.message || aiError.response.statusText
             }`;
+            isRetryable = false; // Client errors are usually not retryable
           } else {
             errorType = "server_error";
             errorMessage = "AI service is experiencing issues";
+            isRetryable = true; // Server errors are retryable
           }
 
           // Send a compact error alert email for non-429 Axios errors
@@ -1100,13 +1199,19 @@ router.post(
             data: aiError.response?.data,
           });
         } else {
-          // Non-Axios error
+          // Non-Axios error - treat as retryable
+          errorType = "unknown";
+          errorMessage = "AI service unavailable";
+          isRetryable = true;
           sendAiErrorAlert("AI image analysis unexpected error", {
             message: String(aiError),
           });
         }
 
-        // If AI service is down, save the upload with a placeholder response
+        // Set status to pending for retryable errors, failed for non-retryable
+        const analysisStatus = isRetryable ? "pending" : "failed";
+        
+        // If AI service is down, save the upload with pending/failed status
         const fallbackData: PartSearchData = {
           id: uuidv4(),
           user_id: userId,
@@ -1115,9 +1220,9 @@ router.post(
           predictions: [],
           confidence_score: 0,
           processing_time: 0,
-          ai_model_version: "offline",
-          analysis_status: "failed",
-          error_message: errorMessage,
+          ai_model_version: isRetryable ? "pending" : "offline",
+          analysis_status: analysisStatus,
+          error_message: isRetryable ? undefined : errorMessage, // Don't store error for pending
           image_size_bytes: size,
           image_format: mimetype,
           upload_source: "web",
@@ -1138,17 +1243,17 @@ router.post(
           },
         };
 
-        // Save the failed attempt to database using enhanced logger
-        const logResult = await DatabaseLogger.logPartSearch(fallbackData);
-        if (!logResult.success) {
+        // Save the failed/pending attempt to database using enhanced logger
+        const logResultError = await DatabaseLogger.logPartSearch(fallbackData);
+        if (!logResultError.success) {
           console.error(
-            "Database logging error for failed upload:",
-            logResult.error
+            "Database logging error for upload:",
+            logResultError.error
           );
         }
 
         // Also log search history
-        const searchHistoryData: SearchHistoryData = {
+        const searchHistoryDataError: SearchHistoryData = {
           user_id: userId,
           part_search_id: fallbackData.id,
           search_type: "image_upload",
@@ -1158,25 +1263,29 @@ router.post(
           ip_address: req.ip,
           user_agent: req.headers["user-agent"],
         };
-        await DatabaseLogger.logSearchHistory(searchHistoryData);
+        await DatabaseLogger.logSearchHistory(searchHistoryDataError);
 
-        // Refund credits since analysis failed
-        console.log("Analysis failed, refunding credits to user:", userId);
-        try {
-          const refundResult = await creditService.refundAnalysisCredits(
-            userId,
-            `Analysis failed: ${errorMessage}`
-          );
-          if (refundResult.success) {
-            console.log("Credits refunded successfully:", refundResult);
-          } else {
-            console.error("Failed to refund credits:", refundResult.error);
+        // Only refund credits for non-retryable (failed) errors
+        if (!isRetryable) {
+          console.log("Analysis failed (non-retryable), refunding credits to user:", userId);
+          try {
+            const refundResult = await creditService.refundAnalysisCredits(
+              userId,
+              `Analysis failed: ${errorMessage}`
+            );
+            if (refundResult.success) {
+              console.log("Credits refunded successfully:", refundResult);
+            } else {
+              console.error("Failed to refund credits:", refundResult.error);
+            }
+          } catch (refundError) {
+            console.error("Error during credit refund:", refundError);
           }
-        } catch (refundError) {
-          console.error("Error during credit refund:", refundError);
+        } else {
+          console.log("Analysis set to pending (retryable error), credits will be refunded if retry fails");
         }
 
-        // Send "Analysis Failed" email notification
+        // Send email notification to user (for both pending and failed)
         try {
           const { data: userProfile } = await supabase
             .from("profiles")
@@ -1191,58 +1300,67 @@ router.post(
               process.env.FRONTEND_URL || "https://app.sparefinder.org"
             }/dashboard`;
 
-            // Send analysis failed email using template
+            // Send email notification
             await emailService
               .sendTemplateEmail({
                 templateName: "Analysis Failed",
                 userEmail: userProfile.email,
                 variables: {
                   userName: userProfile.full_name || "User",
-                  errorMessage: errorMessage,
+                  errorMessage: isRetryable 
+                    ? "AI service is temporarily unavailable. Your analysis is queued and will be processed automatically when the service is available. You'll receive an email when it's complete."
+                    : errorMessage,
                   dashboardUrl: dashboardUrl,
                   currentDate: currentDate,
                   currentTime: currentTime,
                 },
               })
               .catch((error) => {
-                console.error("Failed to send analysis failed email:", error);
+                console.error("Failed to send analysis notification email:", error);
               });
 
-            console.log("⚠️ Analysis failed email sent to:", userProfile.email);
+            console.log(`📧 Analysis ${analysisStatus} email sent to:`, userProfile.email);
           }
         } catch (emailError) {
-          console.error("Error sending analysis failed email:", emailError);
+          console.error("Error sending analysis notification email:", emailError);
           // Don't fail the request if email fails
         }
 
-        // Return appropriate error based on type
-        const statusCode =
-          errorType === "file_too_large"
-            ? 413
-            : errorType === "unauthorized"
-            ? 401
-            : errorType === "client_error"
-            ? 400
-            : 503;
+        // Return success for pending (retryable) errors, error for failed (non-retryable)
+        if (isRetryable) {
+          // Return success with pending status - don't show error to user
+          return res.status(200).json({
+            success: true,
+            status: "pending",
+            message: "Your analysis is being processed. You'll receive an email when it's complete.",
+            id: fallbackData.id,
+            image_url: urlData.publicUrl,
+          });
+        } else {
+          // Return error for non-retryable failures
+          const statusCode =
+            errorType === "file_too_large"
+              ? 413
+              : errorType === "unauthorized"
+              ? 401
+              : errorType === "client_error"
+              ? 400
+              : 503;
 
-        return res.status(statusCode).json({
-          success: false,
-          error: errorType,
-          message: errorMessage,
-          id: fallbackData.id,
-          image_url: urlData.publicUrl,
-          retry_suggested: [
-            "connection_refused",
-            "timeout",
-            "server_error",
-          ].includes(errorType),
-          troubleshooting: {
-            ai_service_url: aiServiceUrl,
-            error_type: errorType,
-            timestamp: new Date().toISOString(),
-          },
-          credits_refunded: true,
-        });
+          return res.status(statusCode).json({
+            success: false,
+            error: errorType,
+            message: errorMessage,
+            id: fallbackData.id,
+            image_url: urlData.publicUrl,
+            troubleshooting: {
+              ai_service_url: aiServiceUrl,
+              error_type: errorType,
+              timestamp: new Date().toISOString(),
+            },
+            credits_refunded: true,
+          });
+        }
       }
 
       console.log("AI service response received:", {

@@ -125,10 +125,10 @@ def send_basic_email_smtp(
             if is_secure:
                 server = smtplib.SMTP_SSL(host=smtp_host, port=smtp_port, timeout=30)
             else:
-                # Pass host/port into constructor so smtplib stores a non-empty internal hostname for TLS SNI.
-                server = smtplib.SMTP(host=smtp_host, port=smtp_port, timeout=30)
-                server._host = smtp_host  # type: ignore[attr-defined]
-                server.starttls()
+            # Pass host/port into constructor so smtplib stores a non-empty internal hostname for TLS SNI.
+            server = smtplib.SMTP(host=smtp_host, port=smtp_port, timeout=30)
+            server._host = smtp_host  # type: ignore[attr-defined]
+            server.starttls()
 
             server.login(smtp_user, smtp_password)
             server.sendmail(from_email, [to_email], msg.as_string())
@@ -272,9 +272,9 @@ def send_email_with_attachment(
             if is_secure:
                 server = smtplib.SMTP_SSL(host=smtp_host, port=smtp_port, timeout=30)
             else:
-                server = smtplib.SMTP(host=smtp_host, port=smtp_port, timeout=30)  # 30 second timeout
-                server._host = smtp_host  # type: ignore[attr-defined]
-                server.starttls()
+            server = smtplib.SMTP(host=smtp_host, port=smtp_port, timeout=30)  # 30 second timeout
+            server._host = smtp_host  # type: ignore[attr-defined]
+            server.starttls()
 
             server.login(smtp_user, smtp_password)
             text = msg.as_string()

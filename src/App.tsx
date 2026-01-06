@@ -51,6 +51,7 @@ import SharedAnalysis from "@/pages/SharedAnalysis";
 import { PageSEO } from "@/components/PageSEO";
 import ClerkSsoCallback from "@/pages/ClerkSsoCallback";
 import ApiDocs from "@/pages/ApiDocs";
+import { InstallPrompt } from "@/components/InstallPrompt";
 
 const queryClient = new QueryClient();
 
@@ -65,6 +66,7 @@ const App = () => (
             <Sonner />
             <BrowserRouter>
               <PageSEO />
+              <InstallPrompt />
               <Routes>
               <Route path="/" element={<Landing />} />
               <Route path="/api-docs" element={<ApiDocs />} />

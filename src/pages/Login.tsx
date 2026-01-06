@@ -387,32 +387,32 @@ const Login = () => {
     >
       <div className="space-y-4">
         {oauthStrategies.length ? (
-          <div className="grid gap-2">
+        <div className="grid gap-2">
             {oauthStrategies.map((strategy) => (
-              <Button
+          <Button
                 key={strategy}
-                type="button"
-                variant="outline"
-                className="w-full"
+            type="button"
+            variant="outline"
+            className="w-full"
                 onClick={() => handleOauth(strategy)}
-                disabled={!isLoaded || isSubmitting}
-              >
+            disabled={!isLoaded || isSubmitting}
+          >
                 Continue with {formatStrategyLabel(strategy)}
-              </Button>
+          </Button>
             ))}
-          </div>
+        </div>
         ) : null}
 
         {oauthStrategies.length ? (
-          <div className="flex items-center gap-3">
-            <div className="h-px flex-1 bg-border" />
-            <span className="text-xs text-muted-foreground">or</span>
-            <div className="h-px flex-1 bg-border" />
-          </div>
+        <div className="flex items-center gap-3">
+          <div className="h-px flex-1 bg-border" />
+          <span className="text-xs text-muted-foreground">or</span>
+          <div className="h-px flex-1 bg-border" />
+        </div>
         ) : null}
 
         {loginStep === "credentials" ? (
-          <form onSubmit={handleSubmit} className="space-y-3">
+        <form onSubmit={handleSubmit} className="space-y-3">
           <div className="space-y-1.5">
             <label className="text-xs font-medium text-muted-foreground">
               Email address

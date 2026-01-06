@@ -222,16 +222,16 @@ const MobileSidebar: React.FC<MobileSidebarProps> = ({ isOpen, onClose }) => {
                       {group.items.map((item) => {
                         const active = isActiveRoute(item.href);
                         return (
-                          <Link
-                            key={item.href}
-                            to={item.href}
-                            onClick={onClose}
+                <Link
+                  key={item.href}
+                  to={item.href}
+                  onClick={onClose}
                             className={`relative flex items-center gap-3 rounded-2xl px-3 py-3 transition-all duration-200 border ${
                               active
                                 ? "bg-sidebar-accent/80 text-sidebar-accent-foreground border-sidebar-border shadow-soft-elevated dark:bg-gradient-to-r dark:from-purple-600/15 dark:to-blue-600/15 dark:border-purple-500/25"
                                 : "border-transparent text-sidebar-foreground/80 hover:text-sidebar-foreground hover:bg-sidebar-accent/60 dark:text-gray-300 dark:hover:text-white dark:hover:bg-white/5"
-                            }`}
-                          >
+                  }`}
+                >
                             {active ? (
                               <span className="absolute left-0 top-1/2 h-7 w-1 -translate-y-1/2 rounded-r-full bg-gradient-to-b from-purple-500 to-blue-500" />
                             ) : null}
@@ -257,7 +257,7 @@ const MobileSidebar: React.FC<MobileSidebarProps> = ({ isOpen, onClose }) => {
                       })}
                     </div>
                   </div>
-                ))}
+              ))}
               </div>
             </div>
 

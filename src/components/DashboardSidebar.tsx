@@ -121,7 +121,7 @@ const DashboardSidebar: React.FC<SidebarProps> = ({ isCollapsed = false, onToggl
     .map((g) => ({
       ...g,
       items: g.items.filter((i) => {
-        // Hide feature usage until a plan is active. Keep Billing/Profile/Settings visible.
+  // Hide feature usage until a plan is active. Keep Billing/Profile/Settings visible.
         if (!subscriptionLoading && !isPlanActive && i.requiresPlan) return false;
         return true;
       }),
@@ -295,21 +295,21 @@ const DashboardSidebar: React.FC<SidebarProps> = ({ isCollapsed = false, onToggl
                   {group.items.map((item, index) => {
                     const active = isActiveRoute(item.href);
                     return (
-                      <motion.div
-                        key={item.href}
+            <motion.div
+              key={item.href}
                         initial={{ opacity: 0, x: -14 }}
-                        animate={{ opacity: 1, x: 0 }}
+              animate={{ opacity: 1, x: 0 }}
                         transition={{ delay: groupIdx * 0.04 + index * 0.03 }}
-                      >
-                        <Link
-                          to={item.href}
-                          onClick={toggleMobileMenu}
+            >
+              <Link
+                to={item.href}
+                onClick={toggleMobileMenu}
                           className={`relative flex items-center gap-3 rounded-2xl px-3 py-3 transition-all duration-200 border ${
                             active
                               ? "bg-sidebar-accent/80 text-sidebar-accent-foreground border-sidebar-border shadow-soft-elevated dark:bg-gradient-to-r dark:from-purple-600/15 dark:to-blue-600/15 dark:border-purple-500/25"
                               : "border-transparent text-sidebar-foreground/80 hover:text-sidebar-foreground hover:bg-sidebar-accent/60 dark:text-gray-300 dark:hover:text-white dark:hover:bg-white/5"
-                          }`}
-                        >
+                }`}
+              >
                           {active ? (
                             <span className="absolute left-0 top-1/2 h-7 w-1 -translate-y-1/2 rounded-r-full bg-gradient-to-b from-purple-500 to-blue-500" />
                           ) : null}
@@ -331,14 +331,14 @@ const DashboardSidebar: React.FC<SidebarProps> = ({ isCollapsed = false, onToggl
                             <div className="truncate text-[11px] text-muted-foreground dark:text-gray-400">
                               {item.description}
                             </div>
-                          </div>
-                        </Link>
-                      </motion.div>
+                </div>
+              </Link>
+            </motion.div>
                     );
                   })}
                 </div>
               </div>
-            ))}
+          ))}
           </div>
         </div>
 
@@ -447,15 +447,15 @@ const DashboardSidebar: React.FC<SidebarProps> = ({ isCollapsed = false, onToggl
                   {group.items.map((item, index) => {
                     const active = isActiveRoute(item.href);
                     const linkEl = (
-                      <Link
-                        to={item.href}
+              <Link
+                to={item.href}
                         title={isCollapsed ? item.label : undefined}
                         className={`relative flex items-center gap-3 rounded-2xl px-3 py-2.5 transition-all duration-200 group border ${
                           active
                             ? "bg-sidebar-accent/80 text-sidebar-accent-foreground border-sidebar-border shadow-soft-elevated dark:bg-gradient-to-r dark:from-purple-600/15 dark:to-blue-600/15 dark:border-purple-500/25"
                             : "border-transparent text-sidebar-foreground/80 hover:text-sidebar-foreground hover:bg-sidebar-accent/60 dark:text-gray-300 dark:hover:text-white dark:hover:bg-white/5"
-                        }`}
-                      >
+                }`}
+              >
                         {active ? (
                           <span className="absolute left-0 top-1/2 h-7 w-1 -translate-y-1/2 rounded-r-full bg-gradient-to-b from-purple-500 to-blue-500" />
                         ) : null}
@@ -499,7 +499,7 @@ const DashboardSidebar: React.FC<SidebarProps> = ({ isCollapsed = false, onToggl
                   })}
                 </div>
               </div>
-            ))}
+          ))}
           </div>
         </div>
 

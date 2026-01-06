@@ -65,9 +65,9 @@ def send_email_via_smtp(
             server.sendmail(from_email, [to_email], msg.as_string())
             server.quit()
         else:
-            with smtplib.SMTP(host, port, timeout=30) as server:
-                server.starttls()
-                server.login(user, password)
+        with smtplib.SMTP(host, port, timeout=30) as server:
+            server.starttls()
+            server.login(user, password)
                 server.sendmail(from_email, [to_email], msg.as_string())
         logger.info(f"✅ Email sent to {to_email}")
         return True

@@ -1509,19 +1509,15 @@ const Upload = () => {
       if (axios.isAxiosError(error)) {
         const response = error.response;
 
-        // Handle rate limiting errors (429) - highest priority
+        // Handle rate limiting errors (429) - set to pending, don't show error
         if (response?.status === 429) {
-          const errorData = response.data;
-          const retryAfter = errorData?.retryAfter;
-          const retrySeconds = retryAfter ? parseInt(retryAfter, 10) : null;
-          errorTitle = "Service Busy";
-          errorMessage =
-            errorData?.message ||
-            "The AI service is currently experiencing high demand. " +
-              (retrySeconds
-                ? `Please try again in ${retrySeconds} seconds.`
-                : "Please try again in a few moments.");
-          retryable = true;
+          // Don't show error to user, analysis is pending
+          onProgress?.({
+            status: "pending",
+            message: "Your analysis is being processed. You'll receive an email when it's complete.",
+            progress: 0,
+          });
+          return; // Exit early, don't show error
         }
         // Handle subscription errors - redirect to billing
         else if (response?.status === 403) {
@@ -1607,6 +1603,16 @@ const Upload = () => {
               retryable = true;
           }
         }
+      }
+
+      // Check if this is a pending/retryable error - don't show error to user
+      if (axios.isAxiosError(error) && (error.response?.data?.status === "pending" || error.response?.data?.retry_suggested)) {
+        onProgress?.({
+          status: "pending",
+          message: "Your analysis is being processed. You'll receive an email when it's complete.",
+          progress: 0,
+        });
+        return; // Exit early, don't show error
       }
 
       onProgress?.({
