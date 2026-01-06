@@ -34,6 +34,76 @@ const sendAiErrorAlert = (subject: string, details: any) => {
     );
 };
 
+// Helper function to collect comprehensive error logs
+const collectErrorLogs = (
+  error: any,
+  errorType: string,
+  errorMessage: string,
+  userId: string,
+  originalname: string,
+  size: number,
+  mimetype: string,
+  aiServiceUrl: string,
+  req: any
+): string => {
+  const errorLogs: any = {
+    timestamp: new Date().toISOString(),
+    error_type: errorType,
+    error_message: errorMessage,
+    user_id: userId,
+    file_info: {
+      filename: originalname,
+      size_bytes: size,
+      mime_type: mimetype,
+    },
+    ai_service_url: aiServiceUrl,
+    request_info: {
+      method: req.method,
+      url: req.url,
+      ip: req.ip,
+      user_agent: req.headers["user-agent"],
+      session_id: req.headers["x-session-id"],
+    },
+  };
+
+  // Add error-specific details
+  if (axios.isAxiosError(error)) {
+    errorLogs.axios_error = {
+      message: error.message,
+      code: error.code,
+      response: {
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        data: error.response?.data,
+        headers: error.response?.headers,
+      },
+      request: {
+        url: error.config?.url,
+        method: error.config?.method,
+        headers: error.config?.headers,
+        timeout: error.config?.timeout,
+      },
+    };
+  } else if (error instanceof Error) {
+    errorLogs.error_object = {
+      name: error.name,
+      message: error.message,
+      stack: error.stack,
+    };
+  } else {
+    errorLogs.error_raw = String(error);
+  }
+
+  // Add full error object if available
+  try {
+    errorLogs.full_error = JSON.stringify(error, Object.getOwnPropertyNames(error), 2);
+  } catch (e) {
+    errorLogs.full_error = "Could not stringify error object";
+  }
+
+  return JSON.stringify(errorLogs, null, 2);
+};
+
 // Helper function to start SpareFinder Research (reusable for retries)
 async function startCrewAnalysis(
   jobId: string,
@@ -1119,6 +1189,19 @@ router.post(
                 process.env.FRONTEND_URL || "https://sparefinder.org"
               }/dashboard`;
 
+              // Collect detailed error logs
+              const errorLogs = collectErrorLogs(
+                aiError,
+                "ai_service_rate_limited",
+                aiError.message || "Rate limit error",
+                userId,
+                originalname,
+                size,
+                mimetype,
+                aiServiceUrl,
+                req
+              );
+
               await emailService
                 .sendTemplateEmail({
                   templateName: "Analysis Failed",
@@ -1129,6 +1212,7 @@ router.post(
                     dashboardUrl: dashboardUrl,
                     currentDate: currentDate,
                     currentTime: currentTime,
+                    errorLogs: errorLogs, // Include detailed logs
                   },
                 })
                 .catch((error) => {
@@ -1300,7 +1384,20 @@ router.post(
               process.env.FRONTEND_URL || "https://app.sparefinder.org"
             }/dashboard`;
 
-            // Send email notification
+            // Collect detailed error logs
+            const errorLogs = collectErrorLogs(
+              aiError,
+              errorType,
+              errorMessage,
+              userId,
+              originalname,
+              size,
+              mimetype,
+              aiServiceUrl,
+              req
+            );
+
+            // Send email notification with detailed logs
             await emailService
               .sendTemplateEmail({
                 templateName: "Analysis Failed",
@@ -1313,6 +1410,7 @@ router.post(
                   dashboardUrl: dashboardUrl,
                   currentDate: currentDate,
                   currentTime: currentTime,
+                  errorLogs: errorLogs, // Include detailed logs
                 },
               })
               .catch((error) => {
@@ -1526,7 +1624,28 @@ router.post(
             const errorMessage =
               aiResponse.data.error || "Analysis failed due to unknown reasons";
 
-            // Send analysis failed email using template
+            // Collect error logs from AI response
+            const errorLogs = JSON.stringify({
+              timestamp: new Date().toISOString(),
+              error_type: "analysis_failed",
+              error_message: errorMessage,
+              user_id: userId,
+              file_info: {
+                filename: originalname,
+                size_bytes: size,
+                mime_type: mimetype,
+              },
+              ai_service_response: aiResponse.data,
+              request_info: {
+                method: req.method,
+                url: req.url,
+                ip: req.ip,
+                user_agent: req.headers["user-agent"],
+                session_id: req.headers["x-session-id"],
+              },
+            }, null, 2);
+
+            // Send analysis failed email using template with error logs
             await emailService
               .sendTemplateEmail({
                 templateName: "Analysis Failed",
@@ -1537,6 +1656,7 @@ router.post(
                   dashboardUrl: dashboardUrl,
                   currentDate: currentDate,
                   currentTime: currentTime,
+                  errorLogs: errorLogs, // Include detailed logs
                 },
               })
               .catch((error) => {
@@ -1621,7 +1741,7 @@ router.post(
         });
       }
 
-      // Refund credits since upload/analysis failed
+      // Refund credits and send email notification
       try {
         const userId = req.user?.userId;
         if (userId) {
@@ -1640,6 +1760,57 @@ router.post(
               "Credits refunded successfully after general error:",
               refundResult
             );
+          }
+
+          // Send email notification with detailed error logs
+          try {
+            const { data: userProfile } = await supabase
+              .from("profiles")
+              .select("email, full_name")
+              .eq("id", userId)
+              .single();
+
+            if (userProfile?.email) {
+              const currentDate = new Date().toLocaleDateString();
+              const currentTime = new Date().toLocaleTimeString();
+              const dashboardUrl = `${
+                process.env.FRONTEND_URL || "https://app.sparefinder.org"
+              }/dashboard`;
+
+              // Collect comprehensive error logs
+              const errorLogs = collectErrorLogs(
+                error,
+                "general_upload_error",
+                error instanceof Error ? error.message : "Unknown error",
+                userId,
+                req.file?.originalname || "unknown",
+                req.file?.size || 0,
+                req.file?.mimetype || "unknown",
+                process.env.AI_SERVICE_URL || "unknown",
+                req
+              );
+
+              await emailService
+                .sendTemplateEmail({
+                  templateName: "Analysis Failed",
+                  userEmail: userProfile.email,
+                  variables: {
+                    userName: userProfile.full_name || "User",
+                    errorMessage: error instanceof Error ? error.message : "Unknown error occurred during upload",
+                    dashboardUrl: dashboardUrl,
+                    currentDate: currentDate,
+                    currentTime: currentTime,
+                    errorLogs: errorLogs, // Include detailed logs
+                  },
+                })
+                .catch((emailErr) => {
+                  console.error("Failed to send error notification email:", emailErr);
+                });
+
+              console.log("📧 Error notification email sent to:", userProfile.email);
+            }
+          } catch (emailError) {
+            console.error("Error sending error notification email:", emailError);
           }
         }
       } catch (refundError) {
