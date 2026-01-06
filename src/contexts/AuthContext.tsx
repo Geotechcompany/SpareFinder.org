@@ -63,6 +63,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         return;
       }
 
+      // Wait a bit to ensure token provider is set
+      // This prevents race condition where checkAuth runs before token provider is configured
+      await new Promise(resolve => setTimeout(resolve, 100));
+
       setIsProfileLoading(true);
 
       // Verify / sync app profile via backend (also performs Clerk→profiles linking server-side)
