@@ -131,6 +131,12 @@ export const useProfileData = () => {
           achievements = builtAchievements;
           totalEarned = earned;
           totalAvailable = available;
+
+          // Check and unlock achievements (async, non-blocking)
+          // This will also send email notifications for newly unlocked achievements
+          api.statistics.checkAchievements().catch((error) => {
+            console.warn("Failed to check achievements:", error);
+          });
         } else {
           const built = buildAchievementsFromStats(null);
           achievements = built.achievements;

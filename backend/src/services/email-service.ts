@@ -2,6 +2,7 @@ import nodemailer from "nodemailer";
 import axios from "axios";
 import { createClient } from "@supabase/supabase-js";
 import dotenv from "dotenv";
+import { huggingFaceService } from "./huggingface-service";
 
 // Load environment variables
 dotenv.config();
@@ -93,6 +94,14 @@ interface SubscriptionEmailData {
   trialEndDate?: string;
   subscriptionStartDate?: string;
   subscriptionEndDate?: string;
+}
+
+interface AchievementEmailData {
+  userEmail: string;
+  userName: string;
+  achievementName: string;
+  achievementDescription: string;
+  achievementId: string;
 }
 
 class EmailService {
@@ -819,6 +828,7 @@ class EmailService {
 
   /**
    * Re‑engagement email for inactive users who used the app before
+   * Now with AI-generated unique images and dynamic content
    */
   async sendReengagementEmail(
     data: WelcomeEmailData & { copy?: ReminderCopy }
@@ -827,13 +837,18 @@ class EmailService {
       const emailEnabled = await this.isEmailEnabled();
       if (!emailEnabled) return false;
 
+      const userName = data.userName || "there";
+      
+      // Generate unique dynamic content using Hugging Face service
+      const dynamicContent = huggingFaceService.generateEmailContent(userName);
+      
+      // Use provided copy or fall back to dynamic content
       const copy = this.normalizeReminderCopy({
         copy: data.copy,
-        userName: data.userName || "there",
+        userName: userName,
       });
 
-      const subject =
-        copy?.subject || "See what SpareFinder can do for your next job";
+      const subject = copy?.subject || dynamicContent.subject;
       const frontendUrl =
         process.env.FRONTEND_URL || "https://sparefinder.org";
       const baseUrl = frontendUrl.replace(/\/$/, "");
@@ -843,25 +858,21 @@ class EmailService {
       const helpUrl = `${baseUrl}/help`;
       const contactUrl = `${baseUrl}/contact`;
       const settingsUrl = `${baseUrl}/dashboard/settings`;
-      const heroImageUrl =
-        "https://images.unsplash.com/photo-1581092580497-e0d23cbdf1dc?auto=format&fit=crop&w=1200&q=80";
+      
+      // Generate unique AI image for this email
+      const heroImageUrl = await huggingFaceService.generateReengagementImage(
+        dynamicContent.theme as "industrial" | "parts" | "maintenance" | "technology"
+      ) || "https://images.unsplash.com/photo-1581092580497-e0d23cbdf1dc?auto=format&fit=crop&w=1200&q=80";
+      
       const year = new Date().getFullYear();
 
-      const headline =
-        copy?.headline ||
-        `${data.userName || "There"}, spare parts shouldn’t slow your team down`;
-      const subhead =
-        copy?.subhead ||
-        "Upload a photo (or add keywords), get a confident match, and share a clean result with your team—without digging through old catalogues.";
+      const headline = copy?.headline || dynamicContent.headline;
+      const subhead = copy?.subhead || dynamicContent.subhead;
       const bullets =
         (copy?.bullets && copy.bullets.length > 0
           ? copy.bullets
-          : [
-              "Field engineers needing fast identification from site.",
-              "Stores teams dealing with unlabelled or legacy stock.",
-              "Maintenance teams logging parts for repeat orders.",
-            ]) ?? [];
-      const ctaLabel = copy?.ctaLabel || "Upload a part photo";
+          : dynamicContent.bullets) ?? [];
+      const ctaLabel = copy?.ctaLabel || dynamicContent.ctaLabel;
 
       const html = `
 <!doctype html>
@@ -2509,6 +2520,163 @@ class EmailService {
       senderEmail: this.senderEmail,
     };
   }
+
+  async sendAchievementUnlockedEmail(data: AchievementEmailData): Promise<boolean> {
+    try {
+      const emailEnabled = await this.isEmailEnabled();
+      if (!emailEnabled) return false;
+
+      // Check user's email notification preferences
+      const { data: userProfile } = await supabase
+        .from("profiles")
+        .select("preferences")
+        .eq("email", data.userEmail)
+        .single();
+
+      const preferences = userProfile?.preferences || {};
+      const emailNotificationsEnabled =
+        preferences.notifications?.email !== false; // Default to true
+
+      if (!emailNotificationsEnabled) {
+        console.log(`Email notifications disabled for user: ${data.userEmail}`);
+        return false;
+      }
+
+      const subject = `🎉 Achievement Unlocked: ${data.achievementName}!`;
+      const frontendUrl =
+        process.env.FRONTEND_URL || "https://sparefinder.org";
+      const baseUrl = frontendUrl.replace(/\/$/, "");
+      const logoUrl = `${baseUrl}/sparefinderlogo.png`;
+      const dashboardUrl = `${baseUrl}/dashboard`;
+
+      // Achievement icon mapping
+      const achievementIcons: Record<string, string> = {
+        'first-upload': '🏆',
+        'power-user': '📈',
+        'accuracy-master': '🎯',
+        'web-explorer': '⚡',
+        'consistent-identifier': '🏅',
+      };
+
+      const icon = achievementIcons[data.achievementId] || '🎉';
+
+      const html = `
+<!doctype html>
+<html>
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  </head>
+  <body style="margin:0;padding:0;background:#020617;color:#e2e8f0;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica,Arial,sans-serif;">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:radial-gradient(circle at top,#1d4ed8 0,#020617 55%,#000 100%);padding:32px 0;">
+      <tr>
+        <td>
+          <table role="presentation" width="600" align="center" cellspacing="0" cellpadding="0" style="width:100%;max-width:600px;background:#020617;border-radius:18px;overflow:hidden;box-shadow:0 22px 60px rgba(15,23,42,.9);border:1px solid rgba(148,163,184,.22);">
+            <tr>
+              <td style="padding:18px 30px 16px 30px;background:#020617;color:#f9fafb;border-bottom:1px solid rgba(15,23,42,.9);">
+                <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
+                  <tr>
+                    <td style="text-align:left;vertical-align:middle;">
+                      <img src="${logoUrl}" alt="SpareFinder" style="max-height:30px;width:auto;display:block;border-radius:6px;" />
+                    </td>
+                    <td style="text-align:right;vertical-align:middle;font-size:11px;color:#94a3b8;">
+                      AI-powered industrial spare parts identification
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:22px 30px 22px 30px;background:linear-gradient(135deg,#10b981,#06b6d4,#3b82f6);color:#f9fafb;text-align:center;">
+                <div style="font-size:48px;margin-bottom:8px;">${icon}</div>
+                <div style="font-size:12px;letter-spacing:.16em;text-transform:uppercase;opacity:.9;margin-bottom:4px;">Achievement Unlocked</div>
+                <h1 style="margin:0;font-size:24px;line-height:1.2;">${data.achievementName}</h1>
+                <p style="margin:6px 0 0 0;font-size:14px;opacity:.9;">
+                  ${data.achievementDescription}
+                </p>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:26px 30px;">
+                <p style="margin:0 0 16px 0;color:#cbd5e1;font-size:14px;line-height:1.6;">
+                  Congratulations, ${data.userName || "there"}! 🎉
+                </p>
+                <p style="margin:0 0 16px 0;color:#cbd5e1;font-size:14px;line-height:1.6;">
+                  You've just unlocked the <strong style="color:#e5e7eb;">${data.achievementName}</strong> achievement! 
+                  ${data.achievementDescription}
+                </p>
+                <p style="margin:0 0 24px 0;color:#cbd5e1;font-size:14px;line-height:1.6;">
+                  Keep up the great work! Continue using SpareFinder to unlock more achievements and track your progress.
+                </p>
+                <div style="margin:22px 0 8px 0;text-align:center;">
+                  <a href="${dashboardUrl}" style="display:inline-block;background:linear-gradient(135deg,#3b82f6,#2563eb);color:#f9fafb;text-decoration:none;padding:11px 22px;border-radius:999px;font-weight:600;font-size:14px;box-shadow:0 12px 30px rgba(37,99,235,.55);">
+                    View Dashboard →
+                  </a>
+                </div>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:20px 30px;background:#0f172a;border-top:1px solid rgba(15,23,42,.9);text-align:center;">
+                <p style="margin:0;color:#64748b;font-size:12px;line-height:1.5;">
+                  This is an automated notification from SpareFinder AI.<br />
+                  You're receiving this because you've unlocked a new achievement.
+                </p>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>`;
+
+      const text = `
+🎉 Achievement Unlocked: ${data.achievementName}!
+
+Congratulations, ${data.userName || "there"}!
+
+You've just unlocked the ${data.achievementName} achievement!
+${data.achievementDescription}
+
+Keep up the great work! Continue using SpareFinder to unlock more achievements and track your progress.
+
+View your dashboard: ${dashboardUrl}
+
+---
+This is an automated notification from SpareFinder AI.
+`;
+
+      const success = await this.sendEmail({
+        to: data.userEmail,
+        subject,
+        html,
+        text,
+      });
+
+      if (success) {
+        // Create notification record in database
+        const userId = await this.getUserIdByEmail(data.userEmail);
+        if (userId) {
+          await supabase.from("notifications").insert({
+            user_id: userId,
+            title: "Achievement Unlocked",
+            message: `You've unlocked: ${data.achievementName}`,
+            type: "success",
+            metadata: {
+              email_sent: true,
+              achievement_id: data.achievementId,
+              achievement_name: data.achievementName,
+            },
+          });
+        }
+      }
+
+      return success;
+    } catch (error) {
+      console.error("Failed to send achievement unlocked email:", error);
+      return false;
+    }
+  }
 }
 
 export const emailService = new EmailService();
@@ -2519,5 +2687,6 @@ export {
   AnalysisFailedEmailData,
   AnalysisProcessingEmailData,
   AnalysisRetryingEmailData,
+  AchievementEmailData,
   SubscriptionEmailData,
 };

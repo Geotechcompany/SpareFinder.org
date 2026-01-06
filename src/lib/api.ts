@@ -1281,6 +1281,16 @@ export const statisticsApi = {
     }
   },
 
+  checkAchievements: async (): Promise<ApiResponse> => {
+    try {
+      const response = await apiClient.post("/statistics/check-achievements");
+      return response.data;
+    } catch (error) {
+      console.error("Achievement check error:", error);
+      throw error;
+    }
+  },
+
   deleteUserData: async (password: string): Promise<ApiResponse> => {
     try {
       const response = await apiClient.delete("/statistics/user-data", {

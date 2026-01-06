@@ -2,6 +2,16 @@ import { Router, Response } from 'express';
 import { authenticateToken, requireRole } from '../middleware/auth';
 import { AuthRequest } from '../types/auth';
 import { DatabaseLogger } from '../services/database-logger';
+import { emailService } from '../services/email-service';
+import { createClient } from '@supabase/supabase-js';
+import dotenv from 'dotenv';
+
+dotenv.config();
+
+const supabase = createClient(
+  process.env.SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_KEY!
+);
 
 const router = Router();
 
@@ -34,26 +44,104 @@ router.get('/', authenticateToken, async (req: AuthRequest, res: Response) => {
       }
     }
 
+    // If statistics still don't exist, calculate directly from part_searches
+    // (same approach as dashboard stats endpoint)
     if (!statistics) {
-      // Return default statistics if none exist
-      return res.json({
-        success: true,
-        statistics: {
-          user_id: userId,
-          total_uploads: 0,
-          total_successful_identifications: 0,
-          total_failed_identifications: 0,
-          total_web_scraping_searches: 0,
-          total_similar_parts_found: 0,
-          average_confidence_score: 0.0,
-          average_processing_time: 0,
-          preferred_categories: [],
-          most_searched_parts: [],
-          last_upload_at: null,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
+      console.log(`📊 Statistics not found in user_statistics table, calculating from part_searches for user ${userId}...`);
+      
+      const { data: searchData, error: searchError } = await supabase
+        .from('part_searches')
+        .select('*')
+        .eq('user_id', userId);
+
+      if (searchError) {
+        console.error('❌ Error fetching part_searches:', searchError);
+        return res.status(500).json({
+          success: false,
+          error: 'Failed to fetch statistics'
+        });
+      }
+
+      if (!searchData || searchData.length === 0) {
+        // Return default statistics if no uploads exist
+        return res.json({
+          success: true,
+          statistics: {
+            user_id: userId,
+            total_uploads: 0,
+            total_successful_identifications: 0,
+            total_failed_identifications: 0,
+            total_web_scraping_searches: 0,
+            total_similar_parts_found: 0,
+            average_confidence_score: 0.0,
+            average_processing_time: 0,
+            preferred_categories: [],
+            most_searched_parts: [],
+            last_upload_at: null,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          }
+        });
+      }
+
+      // Calculate statistics from part_searches (same logic as updateUserStatistics)
+      const totalUploads = searchData.length;
+      const totalSuccessful = searchData.filter(s => 
+        s.analysis_status === 'completed' && s.predictions && Array.isArray(s.predictions) && s.predictions.length > 0
+      ).length;
+      const totalFailed = searchData.filter(s => s.analysis_status === 'failed').length;
+      const totalWebScraping = searchData.filter(s => s.web_scraping_used).length;
+      const totalSimilarParts = searchData.reduce((sum, s) => 
+        sum + (Array.isArray(s.similar_images) ? s.similar_images.length : 0), 0
+      );
+      const avgConfidence = searchData.reduce((sum, s) => sum + (typeof s.confidence_score === 'number' ? s.confidence_score : 0), 0) / totalUploads;
+      const avgProcessingTime = searchData.reduce((sum, s) => sum + (typeof s.processing_time === 'number' ? s.processing_time : 0), 0) / totalUploads;
+      const lastUpload = searchData.sort((a, b) => {
+        const dateA = typeof a.created_at === 'string' ? new Date(a.created_at).getTime() : 0;
+        const dateB = typeof b.created_at === 'string' ? new Date(b.created_at).getTime() : 0;
+        return dateB - dateA;
+      })[0]?.created_at;
+
+      // Extract preferred categories and most searched parts
+      const categoryCounts: Record<string, number> = {};
+      const partCounts: Record<string, number> = {};
+      
+      searchData.forEach(s => {
+        if (s.predictions && Array.isArray(s.predictions) && s.predictions.length > 0) {
+          const category = s.predictions[0].category || 'Unknown';
+          const partName = s.predictions[0].class_name || 'Unknown';
+          categoryCounts[category] = (categoryCounts[category] || 0) + 1;
+          partCounts[partName] = (partCounts[partName] || 0) + 1;
         }
       });
+
+      const preferredCategories = Object.entries(categoryCounts)
+        .sort(([, a], [, b]) => b - a)
+        .slice(0, 5)
+        .map(([category]) => category);
+
+      const mostSearchedParts = Object.entries(partCounts)
+        .sort(([, a], [, b]) => b - a)
+        .slice(0, 5)
+        .map(([part]) => part);
+
+      statistics = {
+        user_id: userId,
+        total_uploads: totalUploads,
+        total_successful_identifications: totalSuccessful,
+        total_failed_identifications: totalFailed,
+        total_web_scraping_searches: totalWebScraping,
+        total_similar_parts_found: totalSimilarParts,
+        average_confidence_score: avgConfidence,
+        average_processing_time: avgProcessingTime,
+        preferred_categories: preferredCategories,
+        most_searched_parts: mostSearchedParts,
+        last_upload_at: lastUpload,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
+
+      console.log(`✅ Calculated statistics from part_searches: ${totalUploads} uploads, ${totalSuccessful} successful`);
     }
 
     return res.json({
@@ -260,6 +348,119 @@ router.get('/admin/daily', authenticateToken, requireRole(['admin', 'super_admin
     return res.status(500).json({
       success: false,
       error: 'Failed to fetch daily statistics'
+    });
+  }
+});
+
+// Check and unlock achievements
+router.post('/check-achievements', authenticateToken, async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user!.userId;
+    
+    // Get user statistics first - refresh if missing
+    let statistics = await DatabaseLogger.getUserStatistics(userId);
+    if (!statistics) {
+      // Try to refresh statistics from part_searches
+      console.log(`📊 Statistics not found for user ${userId}, refreshing...`);
+      const refreshResult = await DatabaseLogger.updateUserStatistics(userId);
+      if (refreshResult.success) {
+        statistics = await DatabaseLogger.getUserStatistics(userId);
+      }
+    }
+
+    // If still no statistics, calculate directly from part_searches
+    if (!statistics) {
+      console.log(`📊 Calculating statistics directly from part_searches for user ${userId}...`);
+      const { data: searchData, error: searchError } = await supabase
+        .from('part_searches')
+        .select('*')
+        .eq('user_id', userId);
+
+      if (searchError || !searchData || searchData.length === 0) {
+        return res.json({
+          success: true,
+          message: 'No uploads found',
+          newlyUnlocked: []
+        });
+      }
+
+      // Calculate statistics manually
+      const totalUploads = searchData.length;
+      const totalSuccessful = searchData.filter(s => 
+        s.analysis_status === 'completed' && s.predictions && Array.isArray(s.predictions) && s.predictions.length > 0
+      ).length;
+      const totalFailed = searchData.filter(s => s.analysis_status === 'failed').length;
+      const totalWebScraping = searchData.filter(s => s.web_scraping_used).length;
+      const avgConfidence = searchData.reduce((sum, s) => sum + (typeof s.confidence_score === 'number' ? s.confidence_score : 0), 0) / totalUploads;
+
+      // Create a statistics-like object
+      statistics = {
+        user_id: userId,
+        total_uploads: totalUploads,
+        total_successful_identifications: totalSuccessful,
+        total_failed_identifications: totalFailed,
+        total_web_scraping_searches: totalWebScraping,
+        average_confidence_score: avgConfidence,
+      };
+    }
+
+    // Check and unlock achievements (pass statistics to avoid re-fetching)
+    const result = await DatabaseLogger.checkAndUnlockAchievements(userId, statistics);
+
+    if (!result.success) {
+      return res.status(500).json({
+        success: false,
+        error: result.error || 'Failed to check achievements'
+      });
+    }
+
+    // Send email notifications for newly unlocked achievements
+    if (result.newlyUnlocked.length > 0) {
+      // Get user profile for email
+      const { data: userProfile } = await supabase
+        .from('profiles')
+        .select('email, full_name')
+        .eq('id', userId)
+        .single();
+
+      if (userProfile?.email) {
+        // Get achievement details from database
+        const { data: achievements } = await supabase
+          .from('user_achievements')
+          .select('achievement_id, achievement_name, achievement_description')
+          .eq('user_id', userId)
+          .in('achievement_id', result.newlyUnlocked)
+          .order('earned_at', { ascending: false });
+
+        // Send email for each newly unlocked achievement
+        for (const achievement of achievements || []) {
+          try {
+            await emailService.sendAchievementUnlockedEmail({
+              userEmail: userProfile.email,
+              userName: userProfile.full_name || 'User',
+              achievementName: achievement.achievement_name,
+              achievementDescription: achievement.achievement_description || '',
+              achievementId: achievement.achievement_id,
+            });
+            console.log(`✅ Achievement email sent for: ${achievement.achievement_name}`);
+          } catch (emailError) {
+            console.error(`❌ Failed to send achievement email for ${achievement.achievement_id}:`, emailError);
+          }
+        }
+      }
+    }
+
+    return res.json({
+      success: true,
+      message: `Checked achievements. ${result.newlyUnlocked.length} newly unlocked.`,
+      newlyUnlocked: result.newlyUnlocked
+    });
+
+  } catch (error) {
+    console.error('Achievement check error:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to check achievements'
     });
   }
 });

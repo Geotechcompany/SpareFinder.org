@@ -167,15 +167,28 @@ const Profile = () => {
           totalSaved?: number;
           totalAchievements?: number;
         };
+        // Normalize confidence score (handle both 0-1 decimal and 0-100 percentage formats)
+        let normalizedConfidence = stats.avgConfidence || 0;
+        if (normalizedConfidence > 100) {
+          // If value is over 100, it's likely incorrectly multiplied
+          normalizedConfidence = Math.round(normalizedConfidence / 100);
+        } else if (normalizedConfidence > 0 && normalizedConfidence <= 1) {
+          // If value is 0-1, convert to percentage
+          normalizedConfidence = Math.round(normalizedConfidence * 100);
+        } else {
+          // Already 0-100, just round it
+          normalizedConfidence = Math.round(normalizedConfidence);
+        }
+
         setUserStats({
           totalUploads: stats.totalUploads || 0,
           successRate:
             stats.successfulUploads && stats.totalUploads
               ? Math.round(
-                  (stats.successfulUploads / stats.totalUploads) * 100 * 100
-                ) / 100
+                  (stats.successfulUploads / stats.totalUploads) * 100
+                )
               : 0,
-          avgConfidence: stats.avgConfidence || 0,
+          avgConfidence: normalizedConfidence,
           memberSince: profile?.created_at
             ? new Date(profile.created_at).toLocaleDateString("en-US", {
                 month: "long",
@@ -667,14 +680,30 @@ const Profile = () => {
                             <h4 className="font-medium text-foreground dark:text-white">
                               {activity.action}
                             </h4>
-                            {activity.details.confidence && (
-                              <Badge
-                                variant="secondary"
-                                className="border border-emerald-200 bg-emerald-100 text-xs text-emerald-700 dark:bg-green-600/20 dark:text-green-400 dark:border-green-500/30"
-                              >
-                                {Math.round(activity.details.confidence)}%
-                              </Badge>
-                            )}
+                            {activity.details.confidence && (() => {
+                              // Normalize confidence (handle both 0-1 decimal and 0-100 percentage formats)
+                              let confidence = activity.details.confidence;
+                              if (typeof confidence === "number") {
+                                // If value is over 100, it's likely already a percentage but multiplied incorrectly
+                                if (confidence > 100) {
+                                  confidence = Math.round(confidence / 100);
+                                } else if (confidence <= 1) {
+                                  // If value is 0-1, convert to percentage
+                                  confidence = Math.round(confidence * 100);
+                                } else {
+                                  // Already 0-100, just round it
+                                  confidence = Math.round(confidence);
+                                }
+                              }
+                              return (
+                                <Badge
+                                  variant="secondary"
+                                  className="border border-emerald-200 bg-emerald-100 text-xs text-emerald-700 dark:bg-green-600/20 dark:text-green-400 dark:border-green-500/30"
+                                >
+                                  {confidence}%
+                                </Badge>
+                              );
+                            })()}
                           </div>
                           <div className="flex items-center justify-between text-sm">
                             <span className="text-sm text-muted-foreground dark:text-gray-400">

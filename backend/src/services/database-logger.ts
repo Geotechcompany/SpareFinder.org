@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import dotenv from 'dotenv';
+import { emailService } from '../services/email-service';
 
 // Ensure environment variables are loaded
 dotenv.config();
@@ -409,11 +410,218 @@ export class DatabaseLogger {
         return { success: false, error: upsertError.message };
       }
 
+      // Check and unlock achievements after stats update (async, non-blocking)
+      // Pass the calculated statistics to avoid re-fetching
+      const calculatedStats = {
+        user_id: userId,
+        total_uploads: totalUploads,
+        total_successful_identifications: totalSuccessful,
+        total_failed_identifications: totalFailed,
+        total_web_scraping_searches: totalWebScraping,
+        average_confidence_score: avgConfidence,
+      };
+      
+      setImmediate(async () => {
+        try {
+          const achievementResult = await this.checkAndUnlockAchievements(userId, calculatedStats);
+          if (achievementResult.success && achievementResult.newlyUnlocked.length > 0) {
+            console.log(`✅ Unlocked ${achievementResult.newlyUnlocked.length} achievement(s) for user ${userId}`);
+            
+            // Send email notifications for newly unlocked achievements
+            try {
+              // Get user profile for email
+              const { data: userProfile } = await supabase
+                .from('profiles')
+                .select('email, full_name')
+                .eq('id', userId)
+                .single();
+
+              if (userProfile?.email) {
+                // Get achievement details from database
+                const { data: achievements } = await supabase
+                  .from('user_achievements')
+                  .select('achievement_id, achievement_name, achievement_description')
+                  .eq('user_id', userId)
+                  .in('achievement_id', achievementResult.newlyUnlocked)
+                  .order('earned_at', { ascending: false });
+
+                // Send email for each newly unlocked achievement
+                if (achievements && Array.isArray(achievements)) {
+                  for (const achievement of achievements) {
+                    try {
+                      const achievementName = String((achievement as any)?.achievement_name || '');
+                      const achievementDescription = String((achievement as any)?.achievement_description || '');
+                      const achievementId = String((achievement as any)?.achievement_id || '');
+                      
+                      if (achievementName && achievementId) {
+                        await emailService.sendAchievementUnlockedEmail({
+                          userEmail: String(userProfile.email || ''),
+                          userName: String(userProfile.full_name || 'User'),
+                          achievementName,
+                          achievementDescription,
+                          achievementId,
+                        });
+                        console.log(`✅ Achievement email sent for: ${achievementName}`);
+                      }
+                    } catch (emailError) {
+                      console.error(`❌ Failed to send achievement email:`, emailError);
+                    }
+                  }
+                }
+              }
+            } catch (emailError) {
+              console.warn("⚠️ Failed to send achievement emails:", emailError);
+            }
+          }
+        } catch (e) {
+          console.warn("⚠️ Failed to check achievements:", e);
+        }
+      });
+
       return { success: true };
 
     } catch (error) {
       console.error('❌ Error updating user statistics:', error);
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+    }
+  }
+
+  /**
+   * Check and unlock achievements based on user statistics
+   * Returns list of newly unlocked achievements
+   */
+  static async checkAndUnlockAchievements(userId: string, statistics?: any): Promise<{ 
+    success: boolean; 
+    newlyUnlocked: string[]; 
+    error?: string 
+  }> {
+    try {
+      if (!supabase) {
+        console.warn('⚠️ Supabase not initialized. Cannot check achievements.');
+        return { success: false, newlyUnlocked: [], error: 'Database not available' };
+      }
+
+      // Get user statistics if not provided
+      if (!statistics) {
+        statistics = await this.getUserStatistics(userId);
+      }
+
+      // If still no statistics, calculate directly from part_searches
+      if (!statistics) {
+        const { data: searchData, error: searchError } = await supabase
+          .from('part_searches')
+          .select('*')
+          .eq('user_id', userId);
+
+        if (searchError || !searchData || searchData.length === 0) {
+          return { success: true, newlyUnlocked: [] };
+        }
+
+        // Calculate statistics manually
+        const totalUploads = searchData.length;
+        const totalSuccessful = searchData.filter(s => 
+          s.analysis_status === 'completed' && s.predictions && Array.isArray(s.predictions) && s.predictions.length > 0
+        ).length;
+        const totalFailed = searchData.filter(s => s.analysis_status === 'failed').length;
+        const totalWebScraping = searchData.filter(s => s.web_scraping_used).length;
+        const avgConfidence = searchData.reduce((sum, s) => sum + (typeof s.confidence_score === 'number' ? s.confidence_score : 0), 0) / totalUploads;
+
+        statistics = {
+          user_id: userId,
+          total_uploads: totalUploads,
+          total_successful_identifications: totalSuccessful,
+          total_failed_identifications: totalFailed,
+          total_web_scraping_searches: totalWebScraping,
+          average_confidence_score: avgConfidence,
+        };
+      }
+
+      // Get existing achievements
+      const { data: existingAchievements } = await supabase
+        .from('user_achievements')
+        .select('achievement_id')
+        .eq('user_id', userId);
+
+      const existingIds = new Set(existingAchievements?.map(a => a.achievement_id) || []);
+
+      // Define achievement criteria
+      const totalUploads = statistics.total_uploads || 0;
+      const totalSuccessful = statistics.total_successful_identifications || 0;
+      const avgConfidence = Number(statistics.average_confidence_score || 0) * 100; // Convert to percentage
+      const webScraping = statistics.total_web_scraping_searches || 0;
+
+      const achievements = [
+        {
+          id: 'first-upload',
+          name: 'First Upload',
+          description: 'Upload your first part image',
+          earned: totalUploads >= 1,
+        },
+        {
+          id: 'power-user',
+          name: 'Power User',
+          description: 'Complete 50 uploads',
+          earned: totalUploads >= 50,
+        },
+        {
+          id: 'accuracy-master',
+          name: 'Accuracy Master',
+          description: 'Reach 90% average confidence',
+          earned: avgConfidence >= 90,
+        },
+        {
+          id: 'web-explorer',
+          name: 'Web Scraping Explorer',
+          description: 'Run 5 web-enhanced searches',
+          earned: webScraping >= 5,
+        },
+        {
+          id: 'consistent-identifier',
+          name: 'Consistent Identifier',
+          description: 'Achieve 20 successful identifications',
+          earned: totalSuccessful >= 20,
+        },
+      ];
+
+      // Find newly unlocked achievements
+      const newlyUnlocked: string[] = [];
+      for (const achievement of achievements) {
+        if (achievement.earned && !existingIds.has(achievement.id)) {
+          // Insert new achievement
+          const { error: insertError } = await supabase
+            .from('user_achievements')
+            .insert({
+              user_id: userId,
+              achievement_id: achievement.id,
+              achievement_name: achievement.name,
+              achievement_description: achievement.description,
+              earned_at: new Date().toISOString(),
+              metadata: {
+                total_uploads: totalUploads,
+                total_successful: totalSuccessful,
+                avg_confidence: avgConfidence,
+                web_scraping: webScraping,
+              },
+            });
+
+          if (insertError) {
+            console.error(`❌ Failed to save achievement ${achievement.id}:`, insertError);
+          } else {
+            newlyUnlocked.push(achievement.id);
+            console.log(`✅ Achievement unlocked: ${achievement.name} (${achievement.id})`);
+          }
+        }
+      }
+
+      return { success: true, newlyUnlocked };
+
+    } catch (error) {
+      console.error('❌ Error checking achievements:', error);
+      return { 
+        success: false, 
+        newlyUnlocked: [], 
+        error: error instanceof Error ? error.message : 'Unknown error' 
+      };
     }
   }
 

@@ -33,3 +33,6 @@ stagehand==0.5.6
 anthropic==0.52.1
 google-genai==1.55.0
 
+# Hugging Face for image generation
+huggingface_hub>=0.20.0
+

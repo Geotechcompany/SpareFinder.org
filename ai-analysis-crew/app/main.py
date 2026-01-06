@@ -293,6 +293,128 @@ async def email_send(payload: EmailProxyRequest):
     return {"success": True}
 
 
+class TestReengagementEmailRequest(BaseModel):
+    email: str
+    user_name: str | None = None
+
+
+@app.post("/test/reengagement-email")
+async def test_reengagement_email(payload: TestReengagementEmailRequest):
+    """
+    Test endpoint to send a reengagement email with AI-generated image.
+    Useful for testing the email generation and image creation.
+    """
+    try:
+        from .cron_reminders import _send_reengagement_email
+        
+        user_name = payload.user_name or (payload.email.split("@")[0] if "@" in payload.email else "there")
+        
+        success = _send_reengagement_email(
+            to_email=payload.email,
+            user_name=user_name
+        )
+        
+        if success:
+            return {
+                "success": True,
+                "message": f"Reengagement email sent successfully to {payload.email}",
+                "user_name": user_name
+            }
+        else:
+            raise HTTPException(
+                status_code=502,
+                detail="Failed to send reengagement email"
+            )
+    except Exception as e:
+        logger.error(f"❌ Failed to send test reengagement email: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error sending test email: {str(e)}"
+        )
+
+
+@app.get("/unsubscribe")
+async def unsubscribe_email(token: str, reason: str | None = None):
+    """
+    Unsubscribe endpoint for marketing emails.
+    Users can click the unsubscribe link in emails to opt out.
+    """
+    try:
+        from .unsubscribe_utils import unsubscribe_user
+        
+        result = unsubscribe_user(token=token, reason=reason, source="email_link")
+        
+        if result.get("success"):
+            # Return HTML page confirming unsubscribe
+            html_content = f"""
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Unsubscribed - SpareFinder</title>
+    <style>
+        body {{
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background: #f8fafc;
+            margin: 0;
+            padding: 40px 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }}
+        .container {{
+            background: white;
+            border-radius: 12px;
+            padding: 40px;
+            max-width: 500px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            text-align: center;
+        }}
+        h1 {{
+            color: #0f172a;
+            margin-bottom: 16px;
+        }}
+        p {{
+            color: #64748b;
+            line-height: 1.6;
+            margin-bottom: 24px;
+        }}
+        .success-icon {{
+            font-size: 48px;
+            margin-bottom: 16px;
+        }}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="success-icon">✓</div>
+        <h1>You've been unsubscribed</h1>
+        <p>You have successfully been unsubscribed from SpareFinder marketing emails.</p>
+        <p>You will no longer receive reengagement or promotional emails from us.</p>
+        <p style="font-size: 14px; margin-top: 32px;">
+            <a href="https://sparefinder.org" style="color: #2563eb; text-decoration: none;">Return to SpareFinder</a>
+        </p>
+    </div>
+</body>
+</html>
+"""
+            from fastapi.responses import HTMLResponse
+            return HTMLResponse(content=html_content)
+        else:
+            raise HTTPException(
+                status_code=400,
+                detail=result.get("message", "Invalid unsubscribe token")
+            )
+    except Exception as e:
+        logger.error(f"❌ Failed to process unsubscribe: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error processing unsubscribe: {str(e)}"
+        )
+
+
 async def run_analysis_background(
     analysis_id: str,
     user_email: str,
