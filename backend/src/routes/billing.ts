@@ -108,6 +108,13 @@ const PLAN_PRICING = {
   enterprise: { amount: 460, currency: "gbp" },
 };
 
+const ANNUAL_DISCOUNT_PERCENT = 20;
+const annualAmountFromMonthly = (monthly: number): number => {
+  const factor = 1 - ANNUAL_DISCOUNT_PERCENT / 100;
+  // Round to 2dp (GBP)
+  return Math.round(monthly * 12 * factor * 100) / 100;
+};
+
 function getPlanPrice(planName: string): { amount: number; currency: string } {
   const plan = planName.toLowerCase().replace(/[\s/]/g, "");
 
@@ -800,9 +807,16 @@ router.post(
         });
       }
 
+      const billingCycle = (_billing_cycle || "monthly").toLowerCase();
+
       // Determine plan pricing
       const planPricing = getPlanPrice(plan);
-      const finalAmount = amount || planPricing.amount;
+      const finalAmount =
+        typeof amount === "number" && amount > 0
+          ? amount
+          : billingCycle === "annual" || billingCycle === "year" || billingCycle === "yearly"
+          ? annualAmountFromMonthly(planPricing.amount)
+          : planPricing.amount;
       const finalCurrency = currency || planPricing.currency;
 
       // Convert to pence (Stripe expects smallest currency unit)
@@ -828,11 +842,17 @@ router.post(
               currency: finalCurrency,
               product_data: {
                 name: `SpareFinder AI - ${plan} Plan`,
-                description: `Monthly subscription to SpareFinder AI ${plan} plan`,
+                description:
+                  billingCycle === "annual" || billingCycle === "year" || billingCycle === "yearly"
+                    ? `Annual subscription to SpareFinder AI ${plan} plan`
+                    : `Monthly subscription to SpareFinder AI ${plan} plan`,
               },
               unit_amount: unitAmount,
               recurring: {
-                interval: "month",
+                interval:
+                  billingCycle === "annual" || billingCycle === "year" || billingCycle === "yearly"
+                    ? "year"
+                    : "month",
                 interval_count: 1,
               },
             },
@@ -846,6 +866,7 @@ router.post(
           plan: plan,
           amount: finalAmount.toString(),
           currency: finalCurrency,
+          billing_cycle: billingCycle,
         },
       };
       if (trialDays) {

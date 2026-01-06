@@ -13,60 +13,22 @@ interface Review {
   verified: boolean;
 }
 
-// Mock review generation (used to append extra reviews for demo density)
-const SAMPLE_NAMES = [
-  "Alex Johnson", "Taylor Smith", "Jordan Lee", "Riley Brown", "Casey Davis",
-  "Morgan Wilson", "Jamie Martinez", "Cameron Anderson", "Avery Thomas", "Quinn Jackson",
-  "Parker White", "Rowan Harris", "Skyler Clark", "Emerson Lewis", "Reese Walker",
-  "Kendall Hall", "Sawyer Allen", "Dakota Young", "Payton King", "Harper Wright"
-];
+function fillToTarget(reviews: Review[], target: number): Review[] {
+  if (reviews.length >= target) return reviews;
+  if (reviews.length === 0) return reviews;
 
-const SAMPLE_COMPANIES = [
-  "AutoTech Solutions", "Precision Motors", "GearWorks Ltd.", "DriveLine Co.",
-  "TorqueLabs", "Engineered Parts Inc.", "Vector Auto", "Prime Mechanics",
-  "Apex Components", "Fusion Auto Parts"
-];
-
-const SAMPLE_TITLES = [
-  "Fast and accurate", "Game changer for sourcing", "Saved us hours weekly",
-  "Impressive precision", "Reliable and efficient", "Excellent tool for our shop",
-  "Seamless workflow", "Highly recommended", "Great ROI", "Outstanding support"
-];
-
-const SAMPLE_MESSAGES = [
-  "Identified the part within seconds and matched suppliers effortlessly.",
-  "We've reduced misorders significantly using this tool.",
-  "Setup was easy and the team found it intuitive from day one.",
-  "Confidence scoring helped our juniors make better decisions.",
-  "The image analysis is shockingly good even on older phone photos.",
-  "We integrated it into our process and cut turnaround time in half.",
-  "Reliable matches and the supplier links are spot on.",
-  "Exactly what we needed to scale our parts desk.",
-  "Helps us verify part numbers before committing to orders.",
-  "Solid platform with frequent, useful updates."
-];
-
-function generateMockReviews(count: number): Review[] {
-  const reviews: Review[] = [];
-  for (let i = 0; i < count; i++) {
-    const name = SAMPLE_NAMES[i % SAMPLE_NAMES.length];
-    const company = SAMPLE_COMPANIES[i % SAMPLE_COMPANIES.length];
-    const title = SAMPLE_TITLES[i % SAMPLE_TITLES.length];
-    const message = SAMPLE_MESSAGES[i % SAMPLE_MESSAGES.length];
-    const rating = 4 + (i % 2); // 4 or 5 stars
-
-    reviews.push({
-      id: `mock-review-${i + 1}`,
-      name,
-      company,
-      rating,
-      title,
-      message,
-      created_at: new Date(Date.now() - i * 86400000).toISOString(),
-      verified: true,
+  const filled: Review[] = [...reviews];
+  let i = 0;
+  while (filled.length < target) {
+    const base = reviews[i % reviews.length];
+    filled.push({
+      ...base,
+      // Make IDs unique to avoid React key collisions + diversify image selection
+      id: `${base.id}-dup-${filled.length - reviews.length + 1}`,
     });
+    i += 1;
   }
-  return reviews;
+  return filled;
 }
 
 // Generate a hash from string to ensure consistent image selection
@@ -147,9 +109,8 @@ const ReviewsSphere: React.FC = () => {
         
         if (response.success && response.data) {
           const fetched = response.data.reviews || [];
-          // Append 30 additional mock reviews to increase visual density
-          const additional = generateMockReviews(30);
-          setReviews([...fetched, ...additional]);
+          // Only real reviews from the database; if we need more density, duplicate real ones.
+          setReviews(fillToTarget(fetched, 80));
         }
       } catch (error) {
         console.error('Failed to load reviews:', error);

@@ -135,8 +135,8 @@ const Trial: React.FC = () => {
                       </div>
                       <div className="text-xs text-muted-foreground">
                         {isUnlimited(plan.limits.searches)
-                          ? "Unlimited recognitions"
-                          : `${plan.limits.searches} recognitions/month`}
+                          ? "Unlimited analyses"
+                          : `${plan.limits.searches} analyses/month`}
                       </div>
                     </div>
                   </div>

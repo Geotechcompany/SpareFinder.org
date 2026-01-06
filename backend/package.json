@@ -13,7 +13,8 @@
         "migrate": "node scripts/migrate-to-supabase.js",
         "migrate:manual": "node scripts/migrate-to-supabase.js --manual",
         "test:migration": "node scripts/test-migration.js",
-        "email:test:welcome": "tsx src/scripts/send-test-welcome-email.ts"
+        "email:test:welcome": "tsx src/scripts/send-test-welcome-email.ts",
+        "reviews:seed:more": "tsx src/scripts/seed-more-reviews.ts"
     },
     "dependencies": {
         "@supabase/supabase-js": "^2.38.5",

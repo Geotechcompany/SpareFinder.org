@@ -696,12 +696,12 @@ const Profile = () => {
                                 }
                               }
                               return (
-                                <Badge
-                                  variant="secondary"
-                                  className="border border-emerald-200 bg-emerald-100 text-xs text-emerald-700 dark:bg-green-600/20 dark:text-green-400 dark:border-green-500/30"
-                                >
+                              <Badge
+                                variant="secondary"
+                                className="border border-emerald-200 bg-emerald-100 text-xs text-emerald-700 dark:bg-green-600/20 dark:text-green-400 dark:border-green-500/30"
+                              >
                                   {confidence}%
-                                </Badge>
+                              </Badge>
                               );
                             })()}
                           </div>

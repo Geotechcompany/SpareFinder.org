@@ -105,14 +105,14 @@ const getFeatureRequiredTier = (feature: string): PlanTier => {
   const lowerFeature = feature.toLowerCase();
   
   // Starter/Basic tier features (available to all)
-  if (lowerFeature.includes("20 image recognitions") || 
+  if (lowerFeature.includes("20 analyses") ||
       lowerFeature.includes("basic search") || 
-      lowerFeature.includes("web portal only")) {
+      (lowerFeature.includes("web portal") && !lowerFeature.includes("api"))) {
     return "free";
   }
   
   // Professional tier features (includes Starter features)
-  if (lowerFeature.includes("500 recognitions") || 
+  if (lowerFeature.includes("500 analyses") ||
       lowerFeature.includes("catalogue storage") || 
       lowerFeature.includes("part lists") || 
       lowerFeature.includes("drawings") ||
@@ -124,7 +124,7 @@ const getFeatureRequiredTier = (feature: string): PlanTier => {
   }
   
   // Enterprise tier features (includes Starter + Professional features)
-  if (lowerFeature.includes("unlimited recognition") || 
+  if (lowerFeature.includes("unlimited analyses") ||
       lowerFeature.includes("advanced ai") || 
       lowerFeature.includes("customisation") || 
       lowerFeature.includes("train on your data") ||

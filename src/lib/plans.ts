@@ -3,6 +3,18 @@ import { Shield, Zap, Crown, LucideIcon } from "lucide-react";
 // Centralized plan configuration to ensure consistency across the entire app
 export type PlanTier = "free" | "pro" | "enterprise";
 
+// Annual billing discount (derived from current monthly prices)
+export const ANNUAL_DISCOUNT_PERCENT = 20;
+export const ANNUAL_DISCOUNT_FACTOR = 1 - ANNUAL_DISCOUNT_PERCENT / 100;
+
+export const roundMoney = (value: number): number => {
+  return Math.round((value + Number.EPSILON) * 100) / 100;
+};
+
+export const calculateAnnualPrice = (monthlyPrice: number): number => {
+  return roundMoney(monthlyPrice * 12 * ANNUAL_DISCOUNT_FACTOR);
+};
+
 export interface PlanFeature {
   id: string;
   name: string;
@@ -25,40 +37,34 @@ export interface PlanFeature {
   };
 }
 
-// Base features for each tier (only tier-specific features)
-const BASE_FEATURES: Record<PlanTier, string[]> = {
+/**
+ * Tier features are intentionally **not cumulative**.
+ *
+ * Cumulative feature lists caused misleading/duplicated UI like:
+ * - "20 analyses per month" + "500 analyses per month" on Pro
+ * - "Web portal only" showing up on tiers that include API access
+ */
+const TIER_FEATURES: Record<PlanTier, string[]> = {
   free: [
-    "20 image recognitions per month",
+    "20 analyses per month",
     "Basic search & match results",
-    "Access via web portal only",
+    "Web portal access",
   ],
   pro: [
-    "500 recognitions per month",
+    "500 analyses per month",
     "Catalogue storage (part lists, drawings)",
     "API access for ERP/CMMS",
     "Analytics dashboard",
+    "Web portal access",
   ],
   enterprise: [
-    "Unlimited recognition",
+    "Unlimited analyses",
     "Advanced AI customisation (train on your data)",
     "ERP/CMMS full integration",
     "Predictive demand analytics",
     "Dedicated support & SLA",
+    "Web portal access",
   ],
-};
-
-// Helper function to get cumulative features (includes all previous tier features)
-const getCumulativeFeatures = (tier: PlanTier): string[] => {
-  const tiers: PlanTier[] = ["free", "pro", "enterprise"];
-  const currentTierIndex = tiers.indexOf(tier);
-  const features: string[] = [];
-  
-  // Include all features from previous tiers
-  for (let i = 0; i <= currentTierIndex; i++) {
-    features.push(...BASE_FEATURES[tiers[i]]);
-  }
-  
-  return features;
 };
 
 // Master plan configuration - UPDATE THIS TO CHANGE PLANS ACROSS THE ENTIRE APP
@@ -70,7 +76,7 @@ export const PLAN_CONFIG: Record<PlanTier, PlanFeature> = {
     currency: "GBP",
     period: "month",
     description: "For small users testing the service",
-    features: getCumulativeFeatures("free"),
+    features: TIER_FEATURES.free,
     popular: false,
     color: "from-gray-600 to-gray-700",
     icon: Shield,
@@ -91,7 +97,7 @@ export const PLAN_CONFIG: Record<PlanTier, PlanFeature> = {
     currency: "GBP",
     period: "month",
     description: "For SMEs managing spare parts more actively",
-    features: getCumulativeFeatures("pro"),
+    features: TIER_FEATURES.pro,
     popular: true,
     color: "from-purple-600 to-blue-600",
     icon: Zap,
@@ -111,7 +117,7 @@ export const PLAN_CONFIG: Record<PlanTier, PlanFeature> = {
     currency: "GBP",
     period: "month",
     description: "For OEMs, large factories, distributors",
-    features: getCumulativeFeatures("enterprise"),
+    features: TIER_FEATURES.enterprise,
     popular: false,
     color: "from-emerald-600 to-green-600",
     icon: Crown,

@@ -4,7 +4,7 @@ import { Factory } from "lucide-react";
 const IndustrialApplications = () => {
   const applications = [
     {
-      title: "Engineering spares Engineering spares",
+      title: "Engineering spares",
       subtitle: "Streamline assembly lines with instant part identification for vehicles, engines, and transmission systems.",
       image: "https://images.unsplash.com/photo-1486262715619-67b85e0b08d3?auto=format&fit=crop&w=800&h=600&q=80",
     },

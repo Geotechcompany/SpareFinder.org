@@ -46,7 +46,7 @@ import { DashboardScrollDemo } from "@/components/DashboardScrollDemo";
 import { HowItWorks } from "@/components/ui/how-it-works";
 import CoreValueStatsDemo from "@/components/CoreValueStatsDemo";
 import StaggerTestimonialsDemo from "@/components/StaggerTestimonialsDemo";
-import ReviewsSphere from "@/components/ReviewsSphere";
+import Marquee from "@/components/ui/marquee";
 import IndustrialApplications from "@/components/IndustrialApplications";
 import FAQDemo from "@/components/FAQDemo";
 import Orb from "@/components/ui/Orb";
@@ -68,6 +68,8 @@ import {
   formatPriceWithPeriod,
   type PlanFeature,
 } from "@/lib/plans";
+import { calculateAnnualPrice, ANNUAL_DISCOUNT_PERCENT } from "@/lib/plans";
+import { PricingSection } from "@/components/ui/pricing-section";
 
 interface FeatureItem {
   title: string;
@@ -90,16 +92,7 @@ interface CheckoutResponse {
   error?: string;
 }
 
-interface PricingPlan {
-  name: string;
-  price: {
-    monthly: string;
-    annual: string;
-  };
-  features: string[];
-  cta: string;
-  featured: boolean;
-}
+type BillingCycle = "monthly" | "annually";
 
 // Cookie consent component
 const CookieConsent = () => {
@@ -152,7 +145,7 @@ const loadImage = (url: string) => {
 
 const Landing = () => {
   const [loadedImages, setLoadedImages] = useState<Set<string>>(new Set());
-  const [isAnnual, setIsAnnual] = useState(true);
+  const [billingCycle, setBillingCycle] = useState<BillingCycle>("annually");
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const { scrollY, scrollYProgress } = useScroll();
   const y1 = useTransform(scrollY, [0, 300], [0, 50]);
@@ -162,7 +155,7 @@ const Landing = () => {
 
   // Payment modal state
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
-  const [selectedPlan, setSelectedPlan] = useState<PricingPlan | null>(null);
+  const [selectedPlan, setSelectedPlan] = useState<PlanFeature | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
 
   const { toast } = useToast();
@@ -171,16 +164,18 @@ const Landing = () => {
   const navigate = useNavigate();
 
   // Stripe Checkout function
-  const processStripePayment = async (plan: PricingPlan) => {
+  const processStripePayment = async (plan: PlanFeature) => {
     try {
       setIsProcessing(true);
 
       // Create Stripe checkout session
+      const isAnnual = billingCycle === "annually";
+      const amount = isAnnual ? calculateAnnualPrice(plan.price) : plan.price;
       const checkoutData = {
         plan: plan.name,
-        amount: parseFloat(plan.price[isAnnual ? "annual" : "monthly"]),
+        amount,
         currency: "GBP",
-        billing_cycle: "monthly",
+        billing_cycle: isAnnual ? "annual" : "monthly",
         success_url: `${window.location.origin}/dashboard/billing?payment_success=true`,
         cancel_url: `${window.location.origin}/dashboard/billing?payment_cancelled=true`,
       };
@@ -210,7 +205,7 @@ const Landing = () => {
   };
 
   // Handle plan selection: require login first, then purchase inside app
-  const handlePlanSelect = (plan: PricingPlan) => {
+  const handlePlanSelect = (plan: PlanFeature) => {
     if (!isAuthenticated) {
       const planParam =
         typeof plan.name === "string"
@@ -223,10 +218,7 @@ const Landing = () => {
     }
 
     // Authenticated users can purchase directly via Stripe modal
-    if (
-      typeof plan.name === "string" &&
-      plan.name.toLowerCase().includes("enterprise")
-    ) {
+    if (plan.id === "enterprise") {
       toast({
         title: "Enterprise Plan",
         description:
@@ -312,21 +304,7 @@ const Landing = () => {
   const aiInterfaceImage =
     "https://images.unsplash.com/photo-1639322537228-f710d8465a4d?auto=format&fit=crop&w=1920";
 
-  const pricing: PricingPlan[] = getAllPlans().map((plan) => ({
-    name: plan.name,
-    price: {
-      monthly: plan.price.toString(),
-      annual: plan.price.toString(),
-    },
-    features: plan.features,
-    cta:
-      plan.id === "enterprise"
-        ? "Contact Sales"
-        : plan.popular
-        ? "Go Professional"
-        : "Get Started",
-    featured: plan.popular,
-  }));
+  const pricingPlans = getAllPlans();
 
   useEffect(() => {
     const allImages = [aiInterfaceImage, ...features.map((f) => f.image)];
@@ -505,7 +483,10 @@ const Landing = () => {
             transition={{ duration: 0.8, delay: 0.2 }}
             viewport={{ once: true }}
           >
-            <ReviewsSphere />
+            {/* Full-bleed marquee (break out of max-width container to touch page edges) */}
+            <div className="relative left-1/2 w-screen -translate-x-1/2">
+              <Marquee />
+            </div>
           </motion.div>
 
           <motion.div
@@ -537,96 +518,12 @@ const Landing = () => {
         </div>
 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            className="text-center"
-          >
-            <span className="mb-6 inline-block rounded-full border border-border bg-gradient-to-r from-[#3A5AFE14] via-[#06B6D414] to-transparent px-4 py-1.5 text-sm font-medium text-muted-foreground backdrop-blur-xl dark:border-purple-500/20 dark:from-purple-500/10 dark:to-blue-500/10 dark:text-purple-400">
-              Flexible Pricing
-            </span>
-            <h2 className="mb-4 text-4xl font-bold tracking-tight text-foreground dark:text-white">
-              Choose Your Plan
-            </h2>
-            <p className="mx-auto mb-12 max-w-2xl text-muted-foreground">
-              Start with our free tier and scale as you grow. All plans include
-              core AI features.
-            </p>
-          </motion.div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            {pricing.map((plan, index) => (
-              <motion.div
-                key={plan.name}
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: index * 0.2 }}
-                className={`relative group rounded-2xl p-8 ${
-                  plan.featured
-                    ? "bg-gradient-to-b from-[#3A5AFE0F] via-[#4C5DFF0F] to-[#06B6D40F] border-2 border-[#3A5AFE66] shadow-soft-elevated dark:from-purple-900/30 dark:to-blue-900/30 dark:border-purple-500/30"
-                    : "bg-card/95 border border-border shadow-soft-elevated dark:bg-gray-800/30 dark:border-gray-700/50"
-                }`}
-              >
-                {plan.featured && (
-                  <div className="absolute -top-4 left-1/2 -translate-x-1/2 rounded-full bg-gradient-to-r from-[#3A5AFE] via-[#4C5DFF] to-[#06B6D4] px-4 py-1 text-sm font-medium text-white shadow-[0_12px_30px_rgba(15,23,42,0.45)] dark:from-purple-600 dark:to-blue-600">
-                    Most Popular
-                  </div>
-                )}
-
-                <div className="text-center">
-                  <h3 className="mb-4 text-2xl font-semibold text-foreground dark:text-white">
-                    {plan.name}
-                  </h3>
-                  <div className="mb-6">
-                    <div className="flex items-center justify-center">
-                      <span className="text-5xl font-bold bg-gradient-to-r from-[#3A5AFE] via-[#4C5DFF] to-[#06B6D4] bg-clip-text text-transparent">
-                        £{plan.price.monthly}
-                      </span>
-                      {plan.price.monthly !== "Custom" && (
-                        <span className="ml-2 text-muted-foreground">/mo</span>
-                      )}
-                    </div>
-                  </div>
-
-                  <ul className="space-y-4 mb-8">
-                    {plan.features.map((feature) => (
-                      <li
-                        key={feature}
-                        className="flex items-center text-muted-foreground"
-                      >
-                        <div className="mr-2 rounded-full p-1 bg-green-500/10">
-                          <Check className="h-4 w-4 text-green-400" />
-                        </div>
-                        {feature}
-                      </li>
-                    ))}
-                  </ul>
-
-                  <Button
-                    onClick={() => handlePlanSelect(plan)}
-                    className={`w-full group relative overflow-hidden ${
-                      plan.featured
-                        ? "bg-gradient-to-r from-[#3A5AFE] via-[#4C5DFF] to-[#06B6D4] text-white shadow-[0_16px_40px_rgba(15,23,42,0.35)] hover:from-[#324EDC] hover:via-[#3A5AFE] hover:to-[#0891B2] dark:from-purple-600 dark:to-blue-600 dark:hover:from-purple-700 dark:hover:to-blue-700"
-                        : "bg-muted text-foreground hover:bg-muted/80 border border-border dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-white"
-                    }`}
-                    size="lg"
-                  >
-                    {plan.cta}
-                    {plan.featured && (
-                      <motion.div
-                        className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent"
-                        initial={{ x: "-100%" }}
-                        whileHover={{ x: "100%" }}
-                        transition={{ duration: 0.6 }}
-                      />
-                    )}
-                  </Button>
-                </div>
-              </motion.div>
-            ))}
-          </div>
+          <PricingSection
+            plans={pricingPlans}
+            billingCycle={billingCycle}
+            onBillingCycleChange={setBillingCycle}
+            onSelectPlan={handlePlanSelect}
+          />
         </div>
       </section>
 
@@ -643,9 +540,15 @@ const Landing = () => {
                 </DialogTitle>
                 <DialogDescription className="text-muted-foreground dark:text-gray-300">
                   {selectedPlan
-                    ? `Subscribe to ${selectedPlan.name} plan for £${
-                        selectedPlan.price[isAnnual ? "annual" : "monthly"]
-                      }/${isAnnual ? "year" : "month"}`
+                    ? (() => {
+                        const isAnnual = billingCycle === "annually";
+                        const amount = isAnnual
+                          ? calculateAnnualPrice(selectedPlan.price)
+                          : selectedPlan.price;
+                        return `Subscribe to ${selectedPlan.name} plan for £${amount.toFixed(
+                          2
+                        )}/${isAnnual ? "year" : "month"}`;
+                      })()
                     : "Please select a plan to proceed with payment."}
                 </DialogDescription>
               </DialogHeader>
@@ -668,17 +571,25 @@ const Landing = () => {
                       <div className="flex items-center justify-between text-muted-foreground dark:text-gray-300">
                         <span>
                           {selectedPlan?.name} Plan (
-                          {isAnnual ? "Annual" : "Monthly"})
+                          {billingCycle === "annually" ? "Annual" : "Monthly"})
                         </span>
                         <span className="text-xl font-bold text-foreground dark:text-white">
-                          £
-                          {selectedPlan?.price[isAnnual ? "annual" : "monthly"]}
-                          /{isAnnual ? "year" : "month"}
+                          {(() => {
+                            const isAnnual = billingCycle === "annually";
+                            const amount = selectedPlan
+                              ? isAnnual
+                                ? calculateAnnualPrice(selectedPlan.price)
+                                : selectedPlan.price
+                              : 0;
+                            return `£${amount.toFixed(2)}/${
+                              isAnnual ? "year" : "month"
+                            }`;
+                          })()}
                         </span>
                       </div>
-                      {isAnnual && (
+                      {billingCycle === "annually" && (
                         <div className="text-sm text-green-400 mt-1">
-                          💰 Save 20% with annual billing
+                          💰 Save {ANNUAL_DISCOUNT_PERCENT}% with annual billing
                         </div>
                       )}
                     </div>
