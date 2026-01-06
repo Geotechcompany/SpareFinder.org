@@ -1378,10 +1378,18 @@ router.post(
           setImmediate(async () => {
             try {
               // Download image from storage
-              const imagePath = urlData.publicUrl.replace(/^.*\/sparefinder\//, "");
+              // Extract file path from publicUrl (e.g., "https://...sparefinder.org/storage/v1/object/public/sparefinder/uploads/...")
+              // or use fileName directly if available
+              const filePath = fileName || urlData.publicUrl.split("/sparefinder/")[1]?.split("?")[0] || urlData.publicUrl.split("/").pop()?.split("?")[0];
+              
+              if (!filePath) {
+                console.error("❌ Could not extract file path from URL:", urlData.publicUrl);
+                return;
+              }
+              
               const { data: imageData, error: downloadError } = await supabase.storage
                 .from("sparefinder")
-                .download(imagePath);
+                .download(filePath);
 
               if (downloadError || !imageData) {
                 console.error("❌ Failed to download image for retry:", downloadError);
