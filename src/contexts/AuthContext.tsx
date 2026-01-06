@@ -119,15 +119,26 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   };
 
   // Configure Axios token injection to use Clerk getToken()
+  // This must run BEFORE checkAuth to ensure token provider is set
   useEffect(() => {
-    if (!isLoaded) return;
+    if (!isLoaded) {
+      // Clear token provider while Clerk is loading
+      setAuthTokenProvider(null);
+      return;
+    }
+    
     setAuthTokenProvider(
       isSignedIn
         ? async () => {
-            // Force token refresh by using template option
-            // This ensures we get a fresh token even if current one is expired
-            const token = await getToken({ template: "default" });
-            return token || null;
+            try {
+              // Force token refresh by using template option
+              // This ensures we get a fresh token even if current one is expired
+              const token = await getToken({ template: "default" });
+              return token || null;
+            } catch (error) {
+              console.warn("⚠️ Failed to get Clerk token:", error);
+              return null;
+            }
           }
         : null
     );

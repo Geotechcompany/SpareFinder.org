@@ -101,8 +101,17 @@ export const setAuthFailureHandler = (handler: AuthFailureHandler | null) => {
 
 export const getAuthToken = async (): Promise<string | null> => {
   if (authTokenProvider) {
-    return await authTokenProvider().catch(() => null);
+    try {
+      const token = await authTokenProvider();
+      if (token) {
+        return token;
+      }
+    } catch (error) {
+      console.warn("⚠️ Token provider error:", error);
+      // Fall through to try legacy token storage
+    }
   }
+  // Fallback to legacy token storage for Supabase auth
   return tokenStorage.getToken();
 };
 
