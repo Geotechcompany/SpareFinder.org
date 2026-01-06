@@ -69,32 +69,56 @@ export const verifyClerkSessionToken = async (token: string) => {
   const issuer = decoded.iss;
   if (typeof issuer !== "string" || issuer.length === 0) return null;
 
+  // Check if token is expired or about to expire (with 30 second grace period)
+  const now = Math.floor(Date.now() / 1000);
+  const exp = decoded.exp as number | undefined;
+  const gracePeriod = 30; // 30 seconds grace period for clock skew and network delays
+  
+  if (exp && exp < (now - gracePeriod)) {
+    // Token is expired beyond grace period - provide helpful error
+    const expiredSecondsAgo = now - exp;
+    throw new Error(
+      `Clerk token expired ${expiredSecondsAgo} seconds ago. Please refresh your session.`
+    );
+  }
+
   // Prefer offline verification if CLERK_JWT_PUBLIC_KEY is configured.
   const spkiKey = await getSpkiKey();
   if (!spkiKey && !isAllowedIssuerForRemoteJwks(issuer)) return null;
-  const { payload } = spkiKey
-    ? await jwtVerify(token, spkiKey, { issuer })
-    : await jwtVerify(
-        token,
-        jwksByIssuer.get(issuer) ??
-          (() => {
-            const jwks = createRemoteJWKSet(buildClerkJwksUrl(issuer), {
-              // Default jose timeout can be too aggressive on some networks.
-              timeoutDuration: 20_000,
-              cooldownDuration: 60_000,
-            });
-            jwksByIssuer.set(issuer, jwks);
-            return jwks;
-          })(),
-        { issuer }
+  
+  try {
+    const { payload } = spkiKey
+      ? await jwtVerify(token, spkiKey, { issuer })
+      : await jwtVerify(
+          token,
+          jwksByIssuer.get(issuer) ??
+            (() => {
+              const jwks = createRemoteJWKSet(buildClerkJwksUrl(issuer), {
+                // Default jose timeout can be too aggressive on some networks.
+                timeoutDuration: 20_000,
+                cooldownDuration: 60_000,
+              });
+              jwksByIssuer.set(issuer, jwks);
+              return jwks;
+            })(),
+          { issuer }
+        );
+
+    const clerkUserId = payload.sub;
+    if (!clerkUserId) {
+      throw new Error("Clerk token missing subject (sub)");
+    }
+
+    return { clerkUserId, issuer, payload } satisfies VerifiedClerkToken;
+  } catch (error: any) {
+    // If it's an expiration error, provide a clearer message
+    if (error.code === 'ERR_JWT_EXPIRED' || error.message?.includes('expired')) {
+      throw new Error(
+        `Clerk token has expired. Please refresh your session by logging in again.`
       );
-
-  const clerkUserId = payload.sub;
-  if (!clerkUserId) {
-    throw new Error("Clerk token missing subject (sub)");
+    }
+    throw error;
   }
-
-  return { clerkUserId, issuer, payload } satisfies VerifiedClerkToken;
 };
 
 export type ClerkUserSummary = {

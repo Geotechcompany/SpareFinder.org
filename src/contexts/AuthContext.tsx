@@ -124,7 +124,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     setAuthTokenProvider(
       isSignedIn
         ? async () => {
-            const token = await getToken();
+            // Force token refresh by using template option
+            // This ensures we get a fresh token even if current one is expired
+            const token = await getToken({ template: "default" });
             return token || null;
           }
         : null

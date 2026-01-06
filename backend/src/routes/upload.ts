@@ -1202,6 +1202,7 @@ router.post(
                 req
               );
 
+              // Send user-friendly email
               await emailService
                 .sendTemplateEmail({
                   templateName: "Analysis Failed",
@@ -1212,14 +1213,31 @@ router.post(
                     dashboardUrl: dashboardUrl,
                     currentDate: currentDate,
                     currentTime: currentTime,
-                    errorLogs: errorLogs, // Include detailed logs
                   },
                 })
                 .catch((error) => {
                   console.error("Failed to send pending analysis email:", error);
                 });
 
-              console.log("📧 Pending analysis email sent to:", userProfile.email);
+              // Send detailed error logs email
+              await emailService
+                .sendEmail({
+                  to: userProfile.email,
+                  subject: `[SpareFinder] Detailed Error Logs - Analysis ID: ${pendingData.id}`,
+                  html: `
+                    <h2>Detailed Error Logs</h2>
+                    <p>Your analysis encountered an error. Below are the detailed logs for troubleshooting:</p>
+                    <pre style="background: #f4f4f4; padding: 15px; border-radius: 5px; overflow-x: auto; font-family: monospace; font-size: 12px;">${errorLogs}</pre>
+                    <p><strong>Analysis ID:</strong> ${pendingData.id}</p>
+                    <p><strong>Status:</strong> Pending (will be retried automatically)</p>
+                    <p><a href="${dashboardUrl}">View Dashboard</a></p>
+                  `,
+                })
+                .catch((error) => {
+                  console.error("Failed to send error logs email:", error);
+                });
+
+              console.log("📧 Pending analysis email and error logs sent to:", userProfile.email);
             }
           } catch (emailError) {
             console.error("Error sending pending analysis email:", emailError);
@@ -1397,7 +1415,7 @@ router.post(
               req
             );
 
-            // Send email notification with detailed logs
+            // Send user-friendly email notification
             await emailService
               .sendTemplateEmail({
                 templateName: "Analysis Failed",
@@ -1410,14 +1428,32 @@ router.post(
                   dashboardUrl: dashboardUrl,
                   currentDate: currentDate,
                   currentTime: currentTime,
-                  errorLogs: errorLogs, // Include detailed logs
                 },
               })
               .catch((error) => {
                 console.error("Failed to send analysis notification email:", error);
               });
 
-            console.log(`📧 Analysis ${analysisStatus} email sent to:`, userProfile.email);
+            // Send detailed error logs email
+            await emailService
+              .sendEmail({
+                to: userProfile.email,
+                subject: `[SpareFinder] Detailed Error Logs - Analysis ID: ${fallbackData.id}`,
+                html: `
+                  <h2>Detailed Error Logs</h2>
+                  <p>Your analysis encountered an error. Below are the detailed logs for troubleshooting:</p>
+                  <pre style="background: #f4f4f4; padding: 15px; border-radius: 5px; overflow-x: auto; font-family: monospace; font-size: 12px;">${errorLogs}</pre>
+                  <p><strong>Analysis ID:</strong> ${fallbackData.id}</p>
+                  <p><strong>Status:</strong> ${analysisStatus}</p>
+                  <p><strong>Error Type:</strong> ${errorType}</p>
+                  <p><a href="${dashboardUrl}">View Dashboard</a></p>
+                `,
+              })
+              .catch((error) => {
+                console.error("Failed to send error logs email:", error);
+              });
+
+            console.log(`📧 Analysis ${analysisStatus} email and error logs sent to:`, userProfile.email);
           }
         } catch (emailError) {
           console.error("Error sending analysis notification email:", emailError);
@@ -1645,7 +1681,7 @@ router.post(
               },
             }, null, 2);
 
-            // Send analysis failed email using template with error logs
+            // Send user-friendly analysis failed email
             await emailService
               .sendTemplateEmail({
                 templateName: "Analysis Failed",
@@ -1656,14 +1692,30 @@ router.post(
                   dashboardUrl: dashboardUrl,
                   currentDate: currentDate,
                   currentTime: currentTime,
-                  errorLogs: errorLogs, // Include detailed logs
                 },
               })
               .catch((error) => {
                 console.error("Failed to send analysis failed email:", error);
               });
 
-            console.log("⚠️ Email notification triggered for failed analysis");
+            // Send detailed error logs email
+            await emailService
+              .sendEmail({
+                to: userProfile.email,
+                subject: `[SpareFinder] Detailed Error Logs - Analysis Failed`,
+                html: `
+                  <h2>Detailed Error Logs</h2>
+                  <p>Your analysis failed. Below are the detailed logs for troubleshooting:</p>
+                  <pre style="background: #f4f4f4; padding: 15px; border-radius: 5px; overflow-x: auto; font-family: monospace; font-size: 12px;">${errorLogs}</pre>
+                  <p><strong>Error Message:</strong> ${errorMessage}</p>
+                  <p><a href="${dashboardUrl}">View Dashboard</a></p>
+                `,
+              })
+              .catch((error) => {
+                console.error("Failed to send error logs email:", error);
+              });
+
+            console.log("⚠️ Email notification and error logs sent for failed analysis");
           }
         }
       } catch (emailError) {
@@ -1790,6 +1842,7 @@ router.post(
                 req
               );
 
+              // Send user-friendly error email
               await emailService
                 .sendTemplateEmail({
                   templateName: "Analysis Failed",
@@ -1800,14 +1853,30 @@ router.post(
                     dashboardUrl: dashboardUrl,
                     currentDate: currentDate,
                     currentTime: currentTime,
-                    errorLogs: errorLogs, // Include detailed logs
                   },
                 })
                 .catch((emailErr) => {
                   console.error("Failed to send error notification email:", emailErr);
                 });
 
-              console.log("📧 Error notification email sent to:", userProfile.email);
+              // Send detailed error logs email
+              await emailService
+                .sendEmail({
+                  to: userProfile.email,
+                  subject: `[SpareFinder] Detailed Error Logs - Upload Failed`,
+                  html: `
+                    <h2>Detailed Error Logs</h2>
+                    <p>Your upload encountered an error. Below are the detailed logs for troubleshooting:</p>
+                    <pre style="background: #f4f4f4; padding: 15px; border-radius: 5px; overflow-x: auto; font-family: monospace; font-size: 12px;">${errorLogs}</pre>
+                    <p><strong>Error Message:</strong> ${error instanceof Error ? error.message : "Unknown error"}</p>
+                    <p><a href="${dashboardUrl}">View Dashboard</a></p>
+                  `,
+                })
+                .catch((emailErr) => {
+                  console.error("Failed to send error logs email:", emailErr);
+                });
+
+              console.log("📧 Error notification email and error logs sent to:", userProfile.email);
             }
           } catch (emailError) {
             console.error("Error sending error notification email:", emailError);

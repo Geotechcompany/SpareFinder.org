@@ -288,6 +288,23 @@ export const authenticateToken = async (req: AuthRequest, res: Response, next: N
       })();
 
       if (looksLikeClerkToken) {
+        // Check if it's an expiration error
+        const isExpiredError = 
+          clerkError instanceof Error && 
+          (clerkError.message?.includes('expired') || 
+           clerkError.message?.includes('exp') ||
+           (clerkError as any).code === 'ERR_JWT_EXPIRED');
+        
+        if (isExpiredError) {
+          console.warn("⚠️ Clerk token expired:", clerkError.message);
+          return res.status(401).json({
+            success: false,
+            error: "Token_expired",
+            message: "Your session has expired. Please refresh the page or log in again.",
+            requires_refresh: true,
+          });
+        }
+        
         console.warn("⚠️ Clerk token verification failed (likely key/instance mismatch):", clerkError);
         return res.status(401).json({
           success: false,

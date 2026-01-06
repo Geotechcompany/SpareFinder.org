@@ -205,9 +205,43 @@ apiClient.interceptors.response.use(
         pathname.startsWith("/admin/login/sso-callback") ||
         pathname.startsWith("/account/sso-callback");
 
-      // If we're using Clerk, there is no refresh-token dance in this client.
-      // Clerk manages session/token rotation; we just redirect to login if needed.
+      // If we're using Clerk, try to refresh the token if it's expired
       if (isClerkAuthEnabled) {
+        const isExpiredError = error.response?.data?.error === "Token_expired" || 
+                               error.response?.data?.error === "clerk_token_expired" ||
+                               error.response?.data?.requires_refresh === true;
+        
+        if (isExpiredError && !originalRequest._retry) {
+          console.warn("🔄 Clerk token expired - attempting to refresh...");
+          originalRequest._retry = true;
+          
+          try {
+            // Get a fresh token from Clerk (this will refresh if session is still valid)
+            const freshToken = await authTokenProvider?.();
+            
+            if (freshToken) {
+              console.log("✅ Clerk token refreshed successfully");
+              // Update the authorization header with the fresh token
+              originalRequest.headers["Authorization"] = `Bearer ${freshToken}`;
+              // Retry the original request with the fresh token
+              return apiClient(originalRequest);
+            } else {
+              throw new Error("Failed to get fresh token from Clerk");
+            }
+          } catch (refreshError) {
+            console.warn("❌ Clerk token refresh failed - redirecting to login:", refreshError);
+            authFailureHandler?.({
+              status: error.response?.status,
+              message: error.response?.data?.message || "Session expired. Please log in again.",
+            });
+            if (!isPublicRoute) {
+              window.location.href = "/login";
+            }
+            return Promise.reject(error);
+          }
+        }
+        
+        // For other Clerk auth errors, redirect to login
         console.warn("🔒 Unauthorized (Clerk) - redirecting to login");
         originalRequest._retry = true;
         authFailureHandler?.({
