@@ -175,16 +175,16 @@ router.get("/", authenticateToken, async (req: AuthRequest, res: Response) => {
           const dbPeriodEnd = subscription.current_period_end
             ? new Date(subscription.current_period_end).getTime()
             : 0;
-          const stripePeriodEnd = (stripeSub.current_period_end || 0) * 1000;
+          const stripePeriodEnd = ((stripeSub as any).current_period_end || 0) * 1000);
 
           // Update if dates differ by more than 1 hour (account for timezone/rounding)
           if (Math.abs(dbPeriodEnd - stripePeriodEnd) > 60 * 60 * 1000) {
             const updateData = {
               current_period_start: new Date(
-                (stripeSub.current_period_start || 0) * 1000
+                ((stripeSub as any).current_period_start || 0) * 1000
               ).toISOString(),
               current_period_end: new Date(
-                (stripeSub.current_period_end || 0) * 1000
+                ((stripeSub as any).current_period_end || 0) * 1000
               ).toISOString(),
               cancel_at_period_end: stripeSub.cancel_at_period_end || false,
               status: stripeSub.status === "active" ? "active" : subscription.status,
@@ -1480,9 +1480,9 @@ async function handleCreditsCheckoutCompleted(
 // Helper function to handle successful invoice payments
 async function handleInvoicePaymentSucceeded(invoice: Stripe.Invoice) {
   try {
-    const subscriptionId = typeof invoice.subscription === "string" 
-      ? invoice.subscription 
-      : invoice.subscription?.id || null;
+    const subscriptionId = typeof (invoice as any).subscription === "string" 
+      ? (invoice as any).subscription 
+      : (invoice as any).subscription?.id || null;
 
     console.log("Invoice payment succeeded:", {
       invoiceId: invoice.id,
@@ -1515,14 +1515,16 @@ async function handleInvoicePaymentSucceeded(invoice: Stripe.Invoice) {
         const tier = subscription.tier;
 
         // Update subscription period dates from Stripe subscription or invoice
-        if (stripeSubscription && stripeSubscription.current_period_start && stripeSubscription.current_period_end) {
+        const subPeriodStart = (stripeSubscription as any)?.current_period_start;
+        const subPeriodEnd = (stripeSubscription as any)?.current_period_end;
+        if (stripeSubscription && subPeriodStart && subPeriodEnd) {
           const updateData: any = {
             status: "active",
             current_period_start: new Date(
-              stripeSubscription.current_period_start * 1000
+              subPeriodStart * 1000
             ).toISOString(),
             current_period_end: new Date(
-              stripeSubscription.current_period_end * 1000
+              subPeriodEnd * 1000
             ).toISOString(),
             cancel_at_period_end: stripeSubscription.cancel_at_period_end || false,
             updated_at: new Date().toISOString(),
@@ -1606,9 +1608,9 @@ async function handleInvoicePaymentSucceeded(invoice: Stripe.Invoice) {
                     day: "numeric",
                   }
                 )
-              : stripeSubscription && stripeSubscription.current_period_end
+              : stripeSubscription && (stripeSubscription as any).current_period_end
               ? new Date(
-                  stripeSubscription.current_period_end * 1000
+                  (stripeSubscription as any).current_period_end * 1000
                 ).toLocaleDateString("en-GB", {
                   weekday: "long",
                   year: "numeric",
@@ -1669,9 +1671,9 @@ async function handleInvoicePaymentSucceeded(invoice: Stripe.Invoice) {
 // Helper function to handle failed invoice payments
 async function handleInvoicePaymentFailed(invoice: Stripe.Invoice) {
   try {
-    const subscriptionId = typeof invoice.subscription === "string" 
-      ? invoice.subscription 
-      : invoice.subscription?.id || null;
+    const subscriptionId = typeof (invoice as any).subscription === "string" 
+      ? (invoice as any).subscription 
+      : (invoice as any).subscription?.id || null;
 
     console.log("Invoice payment failed:", {
       invoiceId: invoice.id,
