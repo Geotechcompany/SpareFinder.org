@@ -63,7 +63,7 @@ app.use(
         "https://part-finder-ai-vision.netlify.app",
         "https://sparefinder.org",
         "https://www.sparefinder.org",
-        "https://api-sparefinder-org.onrender.com",
+        "https://sparefinder-org-pp8y.onrender.com",
       ];
 
       console.log("🌐 CORS Request from origin:", origin);

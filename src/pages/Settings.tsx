@@ -47,6 +47,7 @@ import MobileSidebar from "@/components/MobileSidebar";
 import { useDashboardLayout } from "@/contexts/DashboardLayoutContext";
 import { PageSkeleton } from "@/components/skeletons";
 import { useTheme } from "@/contexts/ThemeContext";
+import { FeatureLock } from "@/components/FeatureLock";
 
 // Define a type for API response
 interface ApiResponse {
@@ -1586,21 +1587,27 @@ const Settings = () => {
                   className="grid grid-cols-1 gap-4 sm:gap-6 lg:grid-cols-2 lg:gap-8"
                 >
                   <div className="relative lg:col-span-2">
-                    <div className="absolute inset-0 rounded-3xl bg-gradient-to-r from-[#3A5AFE0A] via-[#8B5CF60A] to-transparent blur-xl opacity-80 dark:from-purple-600/10 dark:to-blue-600/10" />
-                    <Card className="relative rounded-3xl border border-border bg-card text-foreground shadow-soft-elevated backdrop-blur-xl dark:bg-black/20 dark:border-white/10">
-                      <CardHeader>
-                        <CardTitle className="flex items-center gap-2 text-foreground dark:text-white">
-                          <KeyRound className="h-5 w-5 text-[#8B5CF6]" />
-                          <span>API Keys</span>
-                          <Badge className="bg-emerald-500/15 text-emerald-700 border-emerald-500/20 dark:bg-emerald-500/15 dark:text-emerald-300 dark:border-emerald-500/30">
-                            {tier === "enterprise" ? "Enterprise" : "Pro"}
-                          </Badge>
-                        </CardTitle>
-                        <CardDescription className="text-muted-foreground dark:text-gray-400">
-                          Generate keys for ERP/CMMS integrations. Keep keys secret — we only show the full key once.
-                        </CardDescription>
-                      </CardHeader>
-                      <CardContent className="space-y-5">
+                    <FeatureLock
+                      requiredTier="pro"
+                      featureName="API Keys"
+                      description="Generate secure API keys for ERP/CMMS integrations. Available in Professional and Enterprise plans."
+                      showContent={!isApiKeysEnabled}
+                    >
+                      <div className="absolute inset-0 rounded-3xl bg-gradient-to-r from-[#3A5AFE0A] via-[#8B5CF60A] to-transparent blur-xl opacity-80 dark:from-purple-600/10 dark:to-blue-600/10" />
+                      <Card className="relative rounded-3xl border border-border bg-card text-foreground shadow-soft-elevated backdrop-blur-xl dark:bg-black/20 dark:border-white/10">
+                        <CardHeader>
+                          <CardTitle className="flex items-center gap-2 text-foreground dark:text-white">
+                            <KeyRound className="h-5 w-5 text-[#8B5CF6]" />
+                            <span>API Keys</span>
+                            <Badge className="bg-emerald-500/15 text-emerald-700 border-emerald-500/20 dark:bg-emerald-500/15 dark:text-emerald-300 dark:border-emerald-500/30">
+                              {tier === "enterprise" ? "Enterprise" : "Pro"}
+                            </Badge>
+                          </CardTitle>
+                          <CardDescription className="text-muted-foreground dark:text-gray-400">
+                            Generate keys for ERP/CMMS integrations. Keep keys secret — we only show the full key once.
+                          </CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-5">
                         {createdApiKey?.value ? (
                           <div className="rounded-2xl border border-border bg-muted/40 p-4 dark:bg-white/5">
                             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -1815,11 +1822,12 @@ const Settings = () => {
                             Example
                           </div>
                           <pre className="overflow-x-auto rounded-xl border border-border bg-background/70 p-3 dark:bg-black/30">
-{`curl -X GET \"${import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL || "https://api-sparefinder-org.onrender.com"}/api/external/v1/me\" \\\n  -H \"x-api-key: <YOUR_API_KEY>\"`}
+{`curl -X GET \"${import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL || "https://sparefinder-org-pp8y.onrender.com"}/api/external/v1/me\" \\\n  -H \"x-api-key: <YOUR_API_KEY>\"`}
                           </pre>
                         </div>
                       </CardContent>
                     </Card>
+                    </FeatureLock>
                   </div>
                 </motion.div>
               )}

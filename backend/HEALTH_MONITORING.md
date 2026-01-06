@@ -184,7 +184,7 @@ SUPABASE_BUCKET_NAME=sparefinder
 ### UptimeRobot Configuration
 ```
 Monitor Type: HTTP(s)
-URL: https://api-sparefinder-org.onrender.com/health/simple
+URL: https://sparefinder-org-pp8y.onrender.com/health/simple
 Interval: 5 minutes
 HTTP Method: GET
 Expected Status: 200

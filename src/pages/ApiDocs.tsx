@@ -7,6 +7,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Code, KeyRound, ShieldCheck, Zap } from "lucide-react";
+import { FeatureLock } from "@/components/FeatureLock";
+import { useSubscription } from "@/contexts/SubscriptionContext";
 
 const CodeBlock: React.FC<{ children: string }> = ({ children }) => {
   return (
@@ -17,13 +19,16 @@ const CodeBlock: React.FC<{ children: string }> = ({ children }) => {
 };
 
 const ApiDocs: React.FC = () => {
+  const { tier, isPlanActive } = useSubscription();
   const apiBaseUrl = useMemo(() => {
     return (
       import.meta.env.VITE_API_BASE_URL ||
       import.meta.env.VITE_API_URL ||
-      "https://api-sparefinder-org.onrender.com"
+      "https://sparefinder-org-pp8y.onrender.com"
     );
   }, []);
+
+  const hasApiAccess = isPlanActive && (tier === "pro" || tier === "enterprise");
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-[#F0F2F5] to-[#E8EBF1] text-foreground dark:from-gray-950 dark:via-purple-900/10 dark:to-blue-900/10">
@@ -62,7 +67,13 @@ const ApiDocs: React.FC = () => {
 
         <Separator className="my-8" />
 
-        <div className="grid grid-cols-1 gap-6">
+        <FeatureLock
+          requiredTier="pro"
+          featureName="API Access"
+          description="Integrate SpareFinder with your ERP/CMMS tools using secure API keys. Available in Professional and Enterprise plans."
+          showContent={!hasApiAccess}
+        >
+          <div className="grid grid-cols-1 gap-6">
           <Card className="rounded-3xl border border-border bg-card/95 shadow-soft-elevated backdrop-blur-xl dark:bg-black/20 dark:border-white/10">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -175,7 +186,8 @@ const ApiDocs: React.FC = () => {
               </ul>
             </CardContent>
           </Card>
-        </div>
+          </div>
+        </FeatureLock>
       </div>
 
       <Footer />

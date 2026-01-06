@@ -49,7 +49,7 @@ export type AdminStatsApiResponse = {
 const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL ||
   import.meta.env.VITE_API_URL ||
-  "https://api-sparefinder-org.onrender.com";
+  "https://sparefinder-org-pp8y.onrender.com";
 
 console.log("🔧 API Client Config:", {
   baseURL: API_BASE_URL,

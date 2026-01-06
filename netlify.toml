@@ -8,7 +8,7 @@
   NPM_VERSION = "9"
   NPM_CONFIG_PRODUCTION = "false"
   # Backend API URL for production
-  VITE_API_URL = "https://api-sparefinder-org.onrender.com"
+  VITE_API_URL = "https://sparefinder-org-pp8y.onrender.com"
   # AI Service URL
   VITE_AI_SERVICE_URL = "https://ai-sparefinder-com.onrender.com"
   VITE_AI_SERVICE_API_KEY = "geotech-dev-key-2024"

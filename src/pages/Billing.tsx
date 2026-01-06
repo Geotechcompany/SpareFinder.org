@@ -43,11 +43,19 @@ import {
   ArrowLeft,
   ExternalLink,
   X,
+  Lock,
+  ArrowUpRight,
 } from "lucide-react";
 import DashboardSidebar from "@/components/DashboardSidebar";
 import MobileSidebar from "@/components/MobileSidebar";
 import { useDashboardLayout } from "@/contexts/DashboardLayoutContext";
 import { PageSkeleton } from "@/components/skeletons";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 interface BillingData {
   subscription?: {
@@ -92,6 +100,49 @@ interface CheckoutResponse {
   error?: string;
 }
 
+// Feature availability mapping - determines which plan tier is required for each feature
+const getFeatureRequiredTier = (feature: string): PlanTier => {
+  const lowerFeature = feature.toLowerCase();
+  
+  // API-related features require Pro or higher
+  if (lowerFeature.includes("api") || lowerFeature.includes("erp") || lowerFeature.includes("cmms")) {
+    return "pro";
+  }
+  
+  // Catalogue storage requires Pro or higher
+  if (lowerFeature.includes("catalogue") || lowerFeature.includes("storage") || lowerFeature.includes("part lists")) {
+    return "pro";
+  }
+  
+  // Analytics requires Pro or higher
+  if (lowerFeature.includes("analytics") || lowerFeature.includes("dashboard")) {
+    return "pro";
+  }
+  
+  // Advanced features require Enterprise
+  if (lowerFeature.includes("unlimited") || 
+      lowerFeature.includes("advanced") || 
+      lowerFeature.includes("customisation") || 
+      lowerFeature.includes("train") ||
+      lowerFeature.includes("predictive") ||
+      lowerFeature.includes("dedicated support") ||
+      lowerFeature.includes("sla")) {
+    return "enterprise";
+  }
+  
+  // Default: available in free tier
+  return "free";
+};
+
+// Helper to check if current plan has access to a feature
+const hasFeatureAccess = (currentTier: string, feature: string): boolean => {
+  const requiredTier = getFeatureRequiredTier(feature);
+  const tierOrder: PlanTier[] = ["free", "pro", "enterprise"];
+  const currentIndex = tierOrder.indexOf(currentTier as PlanTier);
+  const requiredIndex = tierOrder.indexOf(requiredTier);
+  return currentIndex >= requiredIndex;
+};
+
 const Billing = () => {
   const [currentPlan, setCurrentPlan] = useState("free");
   const { inLayout } = useDashboardLayout();
@@ -104,6 +155,7 @@ const Billing = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const [hoveredFeature, setHoveredFeature] = useState<string | null>(null);
 
   const handleToggleSidebar = () => {
     setIsCollapsed(!isCollapsed);
@@ -935,19 +987,88 @@ const Billing = () => {
                               </div>
                             </div>
 
-                            <div className="mb-6 grid grid-cols-1 gap-3 md:grid-cols-2">
-                              {plan.features.map((feature, featureIndex) => (
-                                <div
-                                  key={featureIndex}
-                                  className="flex items-center space-x-2 text-sm"
-                                >
-                                  <Check className="h-4 w-4 flex-shrink-0 text-emerald-500 dark:text-green-400" />
-                                  <span className="text-muted-foreground dark:text-gray-300">
-                                    {feature}
-                                  </span>
-                                </div>
-                              ))}
-                            </div>
+                            <TooltipProvider delayDuration={300}>
+                              <div className="mb-6 grid grid-cols-1 gap-3 md:grid-cols-2">
+                                {plan.features.map((feature, featureIndex) => {
+                                  const isLocked = !hasFeatureAccess(currentPlan, feature);
+                                  const requiredTier = getFeatureRequiredTier(feature);
+                                  const isCurrentPlan = currentPlan === plan.id;
+                                  const requiredPlanName = requiredTier === "enterprise" ? "Enterprise" : requiredTier === "pro" ? "Professional" : "Starter";
+                                  
+                                  return (
+                                    <Tooltip key={featureIndex}>
+                                      <TooltipTrigger asChild>
+                                        <motion.div
+                                          className={`group relative flex items-center space-x-2 text-sm rounded-lg p-2.5 transition-all duration-200 ${
+                                            isLocked && isCurrentPlan
+                                              ? "bg-gradient-to-r from-amber-500/10 via-orange-500/10 to-amber-500/10 border border-amber-500/30 hover:border-amber-500/50 hover:from-amber-500/15 hover:via-orange-500/15 hover:to-amber-500/15 cursor-pointer shadow-sm hover:shadow-md"
+                                              : "hover:bg-muted/50"
+                                          }`}
+                                          whileHover={isLocked && isCurrentPlan ? { scale: 1.02 } : {}}
+                                          onClick={() => {
+                                            if (isLocked && isCurrentPlan) {
+                                              // Scroll to upgrade section or trigger upgrade
+                                              const upgradePlan = requiredTier === "enterprise" ? "enterprise" : "pro";
+                                              handlePlanChange(upgradePlan);
+                                            }
+                                          }}
+                                        >
+                                          {isLocked && isCurrentPlan ? (
+                                            <>
+                                              <motion.div
+                                                animate={{ rotate: [0, -10, 10, -10, 0] }}
+                                                transition={{ duration: 0.5, repeat: Infinity, repeatDelay: 2 }}
+                                                className="relative"
+                                              >
+                                                <Lock className="h-4 w-4 flex-shrink-0 text-amber-500 dark:text-amber-400" />
+                                                <motion.div
+                                                  className="absolute inset-0 rounded-full bg-amber-500/20"
+                                                  animate={{ scale: [1, 1.2, 1] }}
+                                                  transition={{ duration: 2, repeat: Infinity }}
+                                                />
+                                              </motion.div>
+                                              <span className="text-muted-foreground dark:text-gray-400 line-through opacity-60 flex-1">
+                                                {feature}
+                                              </span>
+                                              <Badge 
+                                                variant="outline" 
+                                                className="ml-auto text-xs border-amber-500/40 text-amber-600 dark:text-amber-400 bg-gradient-to-r from-amber-500/20 to-orange-500/20 hover:from-amber-500/30 hover:to-orange-500/30 transition-colors"
+                                              >
+                                                <Lock className="w-3 h-3 mr-1" />
+                                                Locked
+                                              </Badge>
+                                            </>
+                                          ) : (
+                                            <>
+                                              <Check className="h-4 w-4 flex-shrink-0 text-emerald-500 dark:text-green-400" />
+                                              <span className="text-muted-foreground dark:text-gray-300">
+                                                {feature}
+                                              </span>
+                                            </>
+                                          )}
+                                        </motion.div>
+                                      </TooltipTrigger>
+                                      {isLocked && isCurrentPlan && (
+                                        <TooltipContent 
+                                          side="top" 
+                                          className="bg-gradient-to-r from-purple-600 to-blue-600 text-white border-0 shadow-lg max-w-xs"
+                                        >
+                                          <div className="flex items-center space-x-2">
+                                            <ArrowUpRight className="w-4 h-4" />
+                                            <div>
+                                              <p className="font-semibold">Upgrade Required</p>
+                                              <p className="text-xs text-purple-100">
+                                                This feature is available in the {requiredPlanName} plan
+                                              </p>
+                                            </div>
+                                          </div>
+                                        </TooltipContent>
+                                      )}
+                                    </Tooltip>
+                                  );
+                                })}
+                              </div>
+                            </TooltipProvider>
 
                             <motion.div
                               whileHover={{ scale: 1.05 }}
