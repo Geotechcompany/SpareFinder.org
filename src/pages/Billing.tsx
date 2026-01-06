@@ -177,19 +177,45 @@ const Billing = () => {
           signal: controller.signal,
         });
 
+        console.log("🔍 Raw billing response:", billingResponse);
+
         if (isMounted && billingResponse) {
-          const nextBillingData = billingResponse as BillingData;
+          // The backend returns: { subscription, usage: { current_period, limits }, invoices }
+          // axios already unwraps response.data, so billingResponse is the actual data
+          // But it might also be wrapped in { success: true, data: {...} } or just be the data directly
+          
+          let nextBillingData: BillingData;
+          let invoicesFromResponse: Invoice[] | undefined;
+          
+          // Check if response is wrapped in ApiResponse format
+          if ((billingResponse as any).data && (billingResponse as any).success !== undefined) {
+            // Wrapped in { success, data }
+            nextBillingData = (billingResponse as any).data as BillingData;
+            invoicesFromResponse = nextBillingData.invoices || (billingResponse as any).data?.invoices;
+          } else if ((billingResponse as any).invoices !== undefined) {
+            // Direct response: { subscription, usage, invoices }
+            nextBillingData = billingResponse as BillingData;
+            invoicesFromResponse = (billingResponse as any).invoices;
+          } else {
+            // Fallback
+            nextBillingData = billingResponse as BillingData;
+            invoicesFromResponse = nextBillingData.invoices;
+          }
+          
+          console.log("📄 Extracted invoices:", invoicesFromResponse);
+          console.log("📄 Is array?", Array.isArray(invoicesFromResponse));
+          console.log("📄 Length:", invoicesFromResponse?.length);
+
           setBillingData(nextBillingData);
           const sub = nextBillingData.subscription;
           const isActive = sub?.status === "active" || sub?.status === "trialing";
           setCurrentPlan(isActive ? sub?.tier || "free" : "none");
 
           // If the billing info already contains invoices, use them first
-          const preloaded = nextBillingData.invoices as
-            | Invoice[]
-            | undefined;
-          if (preloaded && preloaded.length > 0) {
-            const normalized = preloaded.map((inv: Invoice) => ({
+          let hasInvoicesFromBilling = false;
+          if (invoicesFromResponse && Array.isArray(invoicesFromResponse) && invoicesFromResponse.length > 0) {
+            console.log("✅ Processing invoices from billing response:", invoicesFromResponse.length);
+            const normalized = invoicesFromResponse.map((inv: Invoice) => ({
               id: inv.id,
               amount: Number(inv.amount ?? inv.total ?? 0),
               currency: String(inv.currency || "GBP").toUpperCase(),
@@ -198,28 +224,49 @@ const Billing = () => {
               invoice: inv.invoice_url || inv.hosted_invoice_url || "",
               description: inv.description || `Invoice ${inv.id}`,
             }));
+            console.log("✅ Normalized invoices:", normalized);
             setInvoices(normalized);
+            hasInvoicesFromBilling = true;
+          } else {
+            console.warn("⚠️ No invoices found in billing response or empty array");
           }
-        }
 
-        // Fetch invoices
-        const invoicesResponse = await api.billing.getInvoices({
-          signal: controller.signal,
-        });
+          // Fetch invoices separately only if we didn't get them from billing info
+          if (!hasInvoicesFromBilling) {
+            try {
+              const invoicesResponse = await api.billing.getInvoices({
+                signal: controller.signal,
+              });
 
-        if (isMounted && (invoicesResponse as { invoices?: Invoice[] })) {
-          const raw =
-            (invoicesResponse as { invoices?: Invoice[] }).invoices || [];
-          const normalized = raw.map((inv: Invoice) => ({
-            id: inv.id,
-            amount: Number(inv.amount ?? inv.total ?? 0),
-            currency: String(inv.currency || "GBP").toUpperCase(),
-            status: inv.status || "paid",
-            date: inv.created_at || inv.created || new Date().toISOString(),
-            invoice: inv.invoice_url || inv.hosted_invoice_url || "",
-            description: inv.description || `Invoice ${inv.id}`,
-          }));
-          setInvoices(normalized);
+              if (isMounted && invoicesResponse) {
+                // Handle different response structures
+                let raw: Invoice[] = [];
+                if ((invoicesResponse as any).data?.invoices) {
+                  raw = (invoicesResponse as any).data.invoices;
+                } else if ((invoicesResponse as any).invoices) {
+                  raw = (invoicesResponse as any).invoices;
+                } else if (Array.isArray(invoicesResponse)) {
+                  raw = invoicesResponse as Invoice[];
+                }
+
+                if (raw && raw.length > 0) {
+                  const normalized = raw.map((inv: Invoice) => ({
+                    id: inv.id,
+                    amount: Number(inv.amount ?? inv.total ?? 0),
+                    currency: String(inv.currency || "GBP").toUpperCase(),
+                    status: inv.status || "paid",
+                    date: inv.created_at || inv.created || new Date().toISOString(),
+                    invoice: inv.invoice_url || inv.hosted_invoice_url || "",
+                    description: inv.description || `Invoice ${inv.id}`,
+                  }));
+                  setInvoices(normalized);
+                }
+              }
+            } catch (invoiceError) {
+              // If getInvoices fails, we still have invoices from getBillingInfo (if any)
+              console.warn("Failed to fetch invoices separately:", invoiceError);
+            }
+          }
         }
       } catch (error) {
         if (isMounted) {
@@ -407,11 +454,14 @@ const Billing = () => {
           billingData.subscription.status === "trialing"
             ? getPlan(billingData.subscription.tier as PlanTier).price
             : 0,
-        daysLeft: Math.ceil(
-          (new Date(billingData.subscription.current_period_end).getTime() -
-            new Date().getTime()) /
-            (1000 * 60 * 60 * 24)
-        ),
+        daysLeft: (() => {
+          const periodEnd = new Date(billingData.subscription.current_period_end);
+          const now = new Date();
+          const diffMs = periodEnd.getTime() - now.getTime();
+          const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+          // Return 0 if date is in the past (shouldn't happen, but handle gracefully)
+          return Math.max(0, diffDays);
+        })(),
       }
     : {
         plan: "Starter",
@@ -695,13 +745,35 @@ const Billing = () => {
                             <span className="font-semibold text-foreground dark:text-white">
                               £{currentSubscription.amount}/month
                             </span>{" "}
-                            • Next billing in{" "}
+                            • Next billing{" "}
                             <span className="text-blue-500 dark:text-blue-400">
-                              {currentSubscription.daysLeft} days
+                              {currentSubscription.daysLeft > 0 ? (
+                                <>in {currentSubscription.daysLeft} days</>
+                              ) : currentSubscription.daysLeft === 0 ? (
+                                <>today</>
+                              ) : (
+                                <>date needs update</>
+                              )}
                             </span>
                           </p>
                           <p className="mt-1 text-sm text-muted-foreground/80 dark:text-gray-500">
-                            Billing date: {currentSubscription.nextBilling}
+                            {currentSubscription.daysLeft > 0 ? (
+                              <>
+                                Billing date:{" "}
+                                {new Date(currentSubscription.nextBilling).toLocaleDateString(
+                                  "en-GB",
+                                  {
+                                    year: "numeric",
+                                    month: "long",
+                                    day: "numeric",
+                                  }
+                                )}
+                              </>
+                            ) : (
+                              <span className="text-yellow-600 dark:text-yellow-400">
+                                Billing date needs to be updated. Please refresh the page.
+                              </span>
+                            )}
                           </p>
                         </div>
                         <div className="flex space-x-3">

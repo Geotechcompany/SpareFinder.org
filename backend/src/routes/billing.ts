@@ -149,7 +149,7 @@ router.get("/", authenticateToken, async (req: AuthRequest, res: Response) => {
     const userId = req.user!.userId;
 
     // Get subscription info
-    const { data: subscription, error: subError } = await supabase
+    let { data: subscription, error: subError } = await supabase
       .from("subscriptions")
       .select("*")
       .eq("user_id", userId)
@@ -160,6 +160,56 @@ router.get("/", authenticateToken, async (req: AuthRequest, res: Response) => {
       return res.status(500).json({
         error: "Failed to fetch subscription information",
       });
+    }
+
+    // If subscription has Stripe subscription ID, sync dates from Stripe to ensure accuracy
+    if (subscription?.stripe_subscription_id && subscription?.status === "active") {
+      try {
+        const stripe = await getStripeInstance();
+        if (stripe) {
+          const stripeSub = await stripe.subscriptions.retrieve(
+            subscription.stripe_subscription_id
+          );
+
+          // Check if dates need updating
+          const dbPeriodEnd = subscription.current_period_end
+            ? new Date(subscription.current_period_end).getTime()
+            : 0;
+          const stripePeriodEnd = stripeSub.current_period_end * 1000;
+
+          // Update if dates differ by more than 1 hour (account for timezone/rounding)
+          if (Math.abs(dbPeriodEnd - stripePeriodEnd) > 60 * 60 * 1000) {
+            const updateData = {
+              current_period_start: new Date(
+                stripeSub.current_period_start * 1000
+              ).toISOString(),
+              current_period_end: new Date(
+                stripeSub.current_period_end * 1000
+              ).toISOString(),
+              cancel_at_period_end: stripeSub.cancel_at_period_end || false,
+              status: stripeSub.status === "active" ? "active" : subscription.status,
+              updated_at: new Date().toISOString(),
+            };
+
+            const { data: updatedSub, error: updateError } = await supabase
+              .from("subscriptions")
+              .update(updateData)
+              .eq("user_id", userId)
+              .select()
+              .single();
+
+            if (!updateError && updatedSub) {
+              subscription = updatedSub;
+              console.log("✅ Synced subscription dates from Stripe");
+            } else {
+              console.warn("⚠️ Failed to sync subscription dates:", updateError);
+            }
+          }
+        }
+      } catch (stripeErr) {
+        console.warn("⚠️ Failed to sync with Stripe (non-critical):", stripeErr);
+        // Continue with database values if Stripe sync fails
+      }
     }
 
     // Get current usage
@@ -439,11 +489,13 @@ router.post(
       if (error) {
         console.error("Error canceling subscription:", error);
         return res.status(500).json({
+          success: false,
           error: "Failed to cancel subscription",
         });
       }
 
       return res.json({
+        success: true,
         message:
           "Subscription will be canceled at the end of the current period",
         subscription,
@@ -451,7 +503,76 @@ router.post(
     } catch (error) {
       console.error("Cancel subscription error:", error);
       return res.status(500).json({
+        success: false,
         error: "Failed to cancel subscription",
+      });
+    }
+  }
+);
+
+// Reactivate subscription
+router.post(
+  "/subscription/reactivate",
+  authenticateToken,
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const userId = req.user!.userId;
+
+      // Load subscription record
+      const { data: sub, error: loadErr } = await supabase
+        .from("subscriptions")
+        .select("stripe_subscription_id")
+        .eq("user_id", userId)
+        .single();
+
+      if (loadErr) {
+        return res.status(404).json({
+          success: false,
+          error: "Subscription not found",
+        });
+      }
+
+      // Reactivate in Stripe if subscription exists
+      try {
+        if (sub?.stripe_subscription_id) {
+          const stripe = await getStripeInstance();
+          if (stripe) {
+            await stripe.subscriptions.update(sub.stripe_subscription_id, {
+              cancel_at_period_end: false,
+            });
+          }
+        }
+      } catch (e) {
+        console.warn("Stripe reactivate update failed:", e);
+      }
+
+      const { data: subscription, error } = await supabase
+        .from("subscriptions")
+        .update({
+          cancel_at_period_end: false,
+        })
+        .eq("user_id", userId)
+        .select()
+        .single();
+
+      if (error) {
+        console.error("Error reactivating subscription:", error);
+        return res.status(500).json({
+          success: false,
+          error: "Failed to reactivate subscription",
+        });
+      }
+
+      return res.json({
+        success: true,
+        message: "Subscription has been reactivated",
+        subscription,
+      });
+    } catch (error) {
+      console.error("Reactivate subscription error:", error);
+      return res.status(500).json({
+        success: false,
+        error: "Failed to reactivate subscription",
       });
     }
   }
@@ -1363,25 +1484,59 @@ async function handleInvoicePaymentSucceeded(invoice: Stripe.Invoice) {
       invoiceId: invoice.id,
       customerId: invoice.customer,
       amount: invoice.amount_paid,
+      subscriptionId: invoice.subscription,
     });
 
-    // Grant monthly credits when subscription renews
-    const invoiceSubscription = (invoice as any).subscription;
-    if (invoiceSubscription && typeof invoiceSubscription === "string") {
+    // Get subscription details from Stripe if available
+    const stripe = await getStripeInstance();
+    let stripeSubscription: Stripe.Subscription | null = null;
+    
+    if (invoice.subscription && typeof invoice.subscription === "string" && stripe) {
       try {
-        // Find user by Stripe customer ID
-        const { data: subscription } = await supabase
-          .from("subscriptions")
-          .select("user_id, tier")
-          .eq("stripe_customer_id", invoice.customer as string)
-          .single();
+        stripeSubscription = await stripe.subscriptions.retrieve(invoice.subscription);
+      } catch (err) {
+        console.warn("Failed to retrieve Stripe subscription:", err);
+      }
+    }
 
-        if (subscription && subscription.user_id) {
-          const tier = subscription.tier;
+    // Find user by Stripe customer ID
+    if (invoice.customer && typeof invoice.customer === "string") {
+      const { data: subscription } = await supabase
+        .from("subscriptions")
+        .select("user_id, tier, stripe_subscription_id")
+        .eq("stripe_customer_id", invoice.customer)
+        .single();
+
+      if (subscription && subscription.user_id) {
+        const tier = subscription.tier;
+
+        // Update subscription period dates from Stripe subscription or invoice
+        if (stripeSubscription) {
+          const updateData: any = {
+            status: "active",
+            current_period_start: new Date(
+              stripeSubscription.current_period_start * 1000
+            ).toISOString(),
+            current_period_end: new Date(
+              stripeSubscription.current_period_end * 1000
+            ).toISOString(),
+            cancel_at_period_end: stripeSubscription.cancel_at_period_end || false,
+            updated_at: new Date().toISOString(),
+          };
+
+          await supabase
+            .from("subscriptions")
+            .update(updateData)
+            .eq("user_id", subscription.user_id);
+          
+          console.log("✅ Subscription period updated for renewal");
+        }
+
+        // Grant monthly credits when subscription renews (don't fail if this errors)
+        try {
           const planLimits =
             SUBSCRIPTION_LIMITS[tier as keyof typeof SUBSCRIPTION_LIMITS];
 
-          // Grant monthly credits based on plan
           if (planLimits && planLimits.searches > 0) {
             const creditAmount = planLimits.searches;
             const result = await creditService.addCredits(
@@ -1402,93 +1557,108 @@ async function handleInvoicePaymentSucceeded(invoice: Stripe.Invoice) {
             );
             console.log("Enterprise renewal credits grant result:", result);
           }
+        } catch (creditErr) {
+          console.warn("Failed to grant renewal credits:", creditErr);
+          // Continue to send email even if credits fail
+        }
 
-          // Send renewal email notification
-          try {
-            const { data: userProfile } = await supabase
-              .from("profiles")
-              .select("email, full_name, first_name, last_name")
-              .eq("id", subscription.user_id)
+        // Send renewal email notification (always send, even if credits failed)
+        try {
+          const { data: userProfile } = await supabase
+            .from("profiles")
+            .select("email, full_name, first_name, last_name")
+            .eq("id", subscription.user_id)
+            .single();
+
+          const userEmail = userProfile?.email;
+          const userName =
+            userProfile?.full_name ||
+            (userProfile?.first_name && userProfile?.last_name
+              ? `${userProfile.first_name} ${userProfile.last_name}`
+              : userProfile?.first_name || "there");
+
+          if (userEmail) {
+            const planDisplayName =
+              tier === "free"
+                ? "Starter / Basic"
+                : tier === "pro"
+                ? "Professional / Business"
+                : "Enterprise";
+
+            // Get updated subscription period end date
+            const { data: subData } = await supabase
+              .from("subscriptions")
+              .select("current_period_end")
+              .eq("user_id", subscription.user_id)
               .single();
 
-            const userEmail = userProfile?.email;
-            const userName =
-              userProfile?.full_name ||
-              (userProfile?.first_name && userProfile?.last_name
-                ? `${userProfile.first_name} ${userProfile.last_name}`
-                : userProfile?.first_name || "there");
+            const subscriptionEndDate = subData?.current_period_end
+              ? new Date(subData.current_period_end).toLocaleDateString(
+                  "en-GB",
+                  {
+                    weekday: "long",
+                    year: "numeric",
+                    month: "long",
+                    day: "numeric",
+                  }
+                )
+              : stripeSubscription
+              ? new Date(
+                  stripeSubscription.current_period_end * 1000
+                ).toLocaleDateString("en-GB", {
+                  weekday: "long",
+                  year: "numeric",
+                  month: "long",
+                  day: "numeric",
+                })
+              : undefined;
 
-            if (userEmail) {
-              const planDisplayName =
-                tier === "free"
-                  ? "Starter / Basic"
-                  : tier === "pro"
-                  ? "Professional / Business"
-                  : "Enterprise";
+            await emailService.sendSubscriptionRenewedEmail({
+              userEmail,
+              userName: userName || "there",
+              planName: planDisplayName,
+              planTier: tier,
+              amount: invoice.amount_paid
+                ? invoice.amount_paid / 100
+                : tier === "free"
+                ? 12.99
+                : tier === "pro"
+                ? 69.99
+                : 460,
+              currency: (invoice.currency || "GBP").toUpperCase(),
+              subscriptionEndDate,
+            });
+            console.log(`📧 Subscription renewal email sent to ${userEmail}`);
 
-              // Get subscription period end date
-              const { data: subData } = await supabase
-                .from("subscriptions")
-                .select("current_period_end")
-                .eq("user_id", subscription.user_id)
-                .single();
-
-              await emailService.sendSubscriptionRenewedEmail({
-                userEmail,
-                userName: userName || "there",
-                planName: planDisplayName,
-                planTier: tier,
-                amount: invoice.amount_paid
-                  ? invoice.amount_paid / 100
-                  : tier === "free"
-                  ? 12.99
-                  : tier === "pro"
-                  ? 69.99
-                  : 460,
-                currency: (invoice.currency || "GBP").toUpperCase(),
-                subscriptionEndDate: subData?.current_period_end
-                  ? new Date(subData.current_period_end).toLocaleDateString(
-                      "en-GB",
-                      {
-                        weekday: "long",
-                        year: "numeric",
-                        month: "long",
-                        day: "numeric",
-                      }
-                    )
-                  : undefined,
-              });
-              console.log(`📧 Subscription renewal email sent to ${userEmail}`);
-
-              // Notify admins about renewal
-              await emailService.sendAdminPurchaseNotification({
-                purchaseType: "renewal",
-                userEmail,
-                userName: userName || "there",
-                planName: planDisplayName,
-                planTier: tier,
-                amount: invoice.amount_paid
-                  ? invoice.amount_paid / 100
-                  : tier === "free"
-                  ? 12.99
-                  : tier === "pro"
-                  ? 69.99
-                  : 460,
-                currency: (invoice.currency || "GBP").toUpperCase(),
-                userId: subscription.user_id,
-              });
-            }
-          } catch (emailErr) {
-            console.error("Failed to send renewal email:", emailErr);
-            // Don't fail the webhook if email fails
+            // Notify admins about renewal
+            await emailService.sendAdminPurchaseNotification({
+              purchaseType: "renewal",
+              userEmail,
+              userName: userName || "there",
+              planName: planDisplayName,
+              planTier: tier,
+              amount: invoice.amount_paid
+                ? invoice.amount_paid / 100
+                : tier === "free"
+                ? 12.99
+                : tier === "pro"
+                ? 69.99
+                : 460,
+              currency: (invoice.currency || "GBP").toUpperCase(),
+              userId: subscription.user_id,
+            });
+            console.log(`📧 Admin renewal notification sent`);
           }
+        } catch (emailErr) {
+          console.error("❌ Failed to send renewal email:", emailErr);
+          // Don't fail the webhook if email fails, but log it
         }
-      } catch (err) {
-        console.warn("Failed to grant renewal credits:", err);
+      } else {
+        console.warn("⚠️ No subscription found for customer:", invoice.customer);
       }
     }
   } catch (error) {
-    console.error("Error handling invoice payment succeeded:", error);
+    console.error("❌ Error handling invoice payment succeeded:", error);
   }
 }
 
@@ -1498,10 +1668,28 @@ async function handleInvoicePaymentFailed(invoice: Stripe.Invoice) {
     console.log("Invoice payment failed:", {
       invoiceId: invoice.id,
       customerId: invoice.customer,
+      subscriptionId: invoice.subscription,
+      attemptCount: invoice.attempt_count,
     });
 
-    // Find user by Stripe customer ID and send payment failed email
+    // Update subscription status to past_due if payment failed
     if (invoice.customer && typeof invoice.customer === "string") {
+      // Update subscription status
+      const { error: updateError } = await supabase
+        .from("subscriptions")
+        .update({
+          status: "past_due",
+          updated_at: new Date().toISOString(),
+        })
+        .eq("stripe_customer_id", invoice.customer);
+
+      if (updateError) {
+        console.warn("Failed to update subscription status to past_due:", updateError);
+      } else {
+        console.log("✅ Subscription status updated to past_due");
+      }
+
+      // Find user and send payment failed email
       try {
         const { data: subscription } = await supabase
           .from("subscriptions")
@@ -1534,6 +1722,7 @@ async function handleInvoicePaymentFailed(invoice: Stripe.Invoice) {
                 ? "Professional / Business"
                 : "Enterprise";
 
+            // Send payment failed email to user
             await emailService.sendPaymentFailedEmail({
               userEmail,
               userName: userName || "there",
@@ -1552,7 +1741,7 @@ async function handleInvoicePaymentFailed(invoice: Stripe.Invoice) {
 
             // Notify admins about payment failure
             await emailService.sendAdminPurchaseNotification({
-              purchaseType: "purchase",
+              purchaseType: "renewal_failed",
               userEmail,
               userName: userName || "there",
               planName: planDisplayName,
@@ -1568,15 +1757,18 @@ async function handleInvoicePaymentFailed(invoice: Stripe.Invoice) {
               userId: subscription.user_id,
               ...({ isPaymentFailure: true } as any), // Mark as payment failure
             });
+            console.log(`📧 Admin payment failure notification sent`);
           }
+        } else {
+          console.warn("⚠️ No subscription found for customer:", invoice.customer);
         }
       } catch (err) {
-        console.error("Failed to send payment failed email:", err);
+        console.error("❌ Failed to send payment failed email:", err);
         // Don't fail the webhook if email fails
       }
     }
   } catch (error) {
-    console.error("Error handling invoice payment failed:", error);
+    console.error("❌ Error handling invoice payment failed:", error);
   }
 }
 

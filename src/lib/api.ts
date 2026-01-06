@@ -922,6 +922,11 @@ export const billingApi = {
     return response.data;
   },
 
+  reactivateSubscription: async (): Promise<ApiResponse> => {
+    const response = await apiClient.post("/billing/subscription/reactivate");
+    return response.data;
+  },
+
   getInvoices: async (options?: {
     page?: number;
     limit?: number;

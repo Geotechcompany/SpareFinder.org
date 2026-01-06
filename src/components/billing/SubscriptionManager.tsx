@@ -139,15 +139,17 @@ export const SubscriptionManager: React.FC = () => {
         const preloaded = (response.data as BillingData)
           .invoices as BillingResponse["invoices"];
         if (Array.isArray(preloaded)) {
-          const normalized = preloaded.map((inv) => ({
-            id: inv.id,
-            amount: Number(inv.amount ?? inv.total ?? 0),
-            currency: String(inv.currency || "GBP").toUpperCase(),
-            status: inv.status || "paid",
-            created_at:
-              inv.created_at || inv.created || new Date().toISOString(),
-            invoice_url: inv.invoice_url || inv.hosted_invoice_url || "",
-          }));
+          const normalized = preloaded
+            .map((inv) => ({
+              id: inv.id,
+              amount: Number(inv.amount ?? inv.total ?? 0),
+              currency: String(inv.currency || "GBP").toUpperCase(),
+              status: inv.status || "paid",
+              created_at:
+                inv.created_at || inv.created || new Date().toISOString(),
+              invoice_url: (inv.invoice_url || inv.hosted_invoice_url || "").trim(),
+            }))
+            .filter((inv) => inv.invoice_url); // Only include invoices with valid URLs
           setInvoices(normalized);
         } else {
           setInvoices([]);
@@ -279,6 +281,7 @@ export const SubscriptionManager: React.FC = () => {
       return;
     }
 
+    setIsUpdating("cancel");
     try {
       const response = await api.billing.cancelSubscription();
 
@@ -288,11 +291,45 @@ export const SubscriptionManager: React.FC = () => {
           "Subscription will be canceled at the end of the current period"
         );
       } else {
-        toast.error("Failed to cancel subscription");
+        toast.error(response.error || "Failed to cancel subscription");
       }
     } catch (error) {
       console.error("Subscription cancellation error:", error);
       toast.error("Failed to cancel subscription");
+    } finally {
+      setIsUpdating(null);
+    }
+  };
+
+  const handleReactivateSubscription = async () => {
+    if (!user) {
+      toast.error("Please log in to reactivate subscription");
+      return;
+    }
+
+    if (
+      !window.confirm(
+        "Are you sure you want to reactivate your subscription? Your subscription will continue after the current billing period."
+      )
+    ) {
+      return;
+    }
+
+    setIsUpdating("reactivate");
+    try {
+      const response = await api.billing.reactivateSubscription();
+
+      if (response.success) {
+        await fetchBillingData(); // Refresh data
+        toast.success("Subscription has been reactivated");
+      } else {
+        toast.error(response.error || "Failed to reactivate subscription");
+      }
+    } catch (error) {
+      console.error("Subscription reactivation error:", error);
+      toast.error("Failed to reactivate subscription");
+    } finally {
+      setIsUpdating(null);
     }
   };
 
@@ -457,12 +494,29 @@ export const SubscriptionManager: React.FC = () => {
               </p>
               <div className="flex items-center gap-1 text-sm text-muted-foreground">
                 <Calendar className="w-4 h-4" />
-                {subscription.status === "active" && (
+                {subscription.status === "active" && subscription.current_period_end && (
                   <span>
-                    Renews{" "}
-                    {new Date(
-                      subscription.current_period_end
-                    ).toLocaleDateString()}
+                    {(() => {
+                      const periodEnd = new Date(subscription.current_period_end);
+                      const now = new Date();
+                      const isPast = periodEnd < now;
+                      
+                      if (isPast) {
+                        return "Billing date needs update";
+                      }
+                      
+                      return subscription.cancel_at_period_end
+                        ? `Expires ${periodEnd.toLocaleDateString("en-GB", {
+                            year: "numeric",
+                            month: "long",
+                            day: "numeric",
+                          })}`
+                        : `Renews ${periodEnd.toLocaleDateString("en-GB", {
+                            year: "numeric",
+                            month: "long",
+                            day: "numeric",
+                          })}`;
+                    })()}
                   </span>
                 )}
               </div>
@@ -601,12 +655,35 @@ export const SubscriptionManager: React.FC = () => {
                     <>Downgrade to Free</>
                   )}
                 </Button>
-                {!subscription.cancel_at_period_end && (
+                {subscription.cancel_at_period_end ? (
+                  <Button
+                    onClick={handleReactivateSubscription}
+                    variant="default"
+                    disabled={isUpdating === "reactivate"}
+                  >
+                    {isUpdating === "reactivate" ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Reactivating...
+                      </>
+                    ) : (
+                      <>Reactivate Subscription</>
+                    )}
+                  </Button>
+                ) : (
                   <Button
                     onClick={handleCancelSubscription}
                     variant="destructive"
+                    disabled={isUpdating === "cancel"}
                   >
-                    Cancel
+                    {isUpdating === "cancel" ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Canceling...
+                      </>
+                    ) : (
+                      <>Cancel Subscription</>
+                    )}
                   </Button>
                 )}
               </>
@@ -642,12 +719,35 @@ export const SubscriptionManager: React.FC = () => {
                     <>Downgrade to Free</>
                   )}
                 </Button>
-                {!subscription.cancel_at_period_end && (
+                {subscription.cancel_at_period_end ? (
+                  <Button
+                    onClick={handleReactivateSubscription}
+                    variant="default"
+                    disabled={isUpdating === "reactivate"}
+                  >
+                    {isUpdating === "reactivate" ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Reactivating...
+                      </>
+                    ) : (
+                      <>Reactivate Subscription</>
+                    )}
+                  </Button>
+                ) : (
                   <Button
                     onClick={handleCancelSubscription}
                     variant="destructive"
+                    disabled={isUpdating === "cancel"}
                   >
-                    Cancel
+                    {isUpdating === "cancel" ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Canceling...
+                      </>
+                    ) : (
+                      <>Cancel Subscription</>
+                    )}
                   </Button>
                 )}
               </>
@@ -790,16 +890,20 @@ export const SubscriptionManager: React.FC = () => {
                     <span className="font-medium">
                       {inv.currency} {inv.amount}
                     </span>
-                    {inv.invoice_url && (
-                      <Button size="sm" variant="outline" asChild>
-                        <a
-                          href={inv.invoice_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                        >
-                          View
-                        </a>
+                    {inv.invoice_url ? (
+                      <Button 
+                        size="sm" 
+                        variant="outline"
+                        onClick={() => {
+                          if (inv.invoice_url) {
+                            window.open(inv.invoice_url, '_blank', 'noopener,noreferrer');
+                          }
+                        }}
+                      >
+                        View invoice
                       </Button>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">No invoice URL</span>
                     )}
                   </div>
                 </div>
