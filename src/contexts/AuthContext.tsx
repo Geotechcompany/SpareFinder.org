@@ -135,9 +135,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       isSignedIn
         ? async () => {
             try {
-              // Force token refresh by using template option
-              // This ensures we get a fresh token even if current one is expired
-              const token = await getToken({ template: "default" });
+              // Get token from Clerk - this will automatically refresh if expired
+              // Don't use template option as it may not be configured
+              const token = await getToken();
               return token || null;
             } catch (error) {
               console.warn("⚠️ Failed to get Clerk token:", error);
