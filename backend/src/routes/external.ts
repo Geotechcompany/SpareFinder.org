@@ -119,7 +119,7 @@ router.post("/v1/search/keywords/schedule", async (req: AuthRequest, res: Respon
         success: false,
         error: "ai_service_rate_limited",
         message:
-          "The AI analysis service is temporarily rate limited by its provider. Please try again shortly.",
+          "Your request is queued for processing. Please check back shortly.",
         elapsed_ms: duration,
       });
     }

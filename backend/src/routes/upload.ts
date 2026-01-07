@@ -1087,7 +1087,7 @@ router.post(
             success: false,
             error: "ai_service_rate_limited",
             message:
-              "The AI analysis service is temporarily rate limited by its provider. Please try again shortly.",
+              "Your analysis is queued for processing. Please check back shortly.",
             elapsed_ms: duration,
           });
         }
@@ -1209,7 +1209,7 @@ router.post(
                   userEmail: userProfile.email,
                   variables: {
                     userName: userProfile.full_name || "User",
-                    errorMessage: "AI service is temporarily rate limited. Your analysis is queued and will be processed automatically when the service is available.",
+                    errorMessage: "Your analysis is queued for processing and will run automatically. Please check back shortly.",
                     dashboardUrl: dashboardUrl,
                     currentDate: currentDate,
                     currentTime: currentTime,

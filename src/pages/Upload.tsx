@@ -1229,8 +1229,7 @@ const Upload = () => {
           toast({
             title: "Keyword analysis queued",
             description:
-              data?.message ||
-              "The AI analysis service is busy. Your keyword search has been queued and will be processed in the background.",
+              "Your keyword search is queued and will run automatically. You can monitor it from your history.",
           });
 
           // Optionally send the user to History to watch for completion
@@ -1284,7 +1283,7 @@ const Upload = () => {
       toast({
         title: "Keyword analysis queued",
         description:
-          "Your keyword search has been queued for background processing. You can monitor it from your history.",
+          "Your keyword search is queued and will run automatically. You can monitor it from your history.",
       });
 
       setTimeout(() => {
@@ -1979,24 +1978,21 @@ const Upload = () => {
 
         setAnalysisProgress({
           status: "error",
-          message: "Service is currently busy",
+          message: "Please try again shortly",
           progress: 0,
-          currentStep: "Rate Limited",
+          currentStep: "Processing Queue",
           currentStepIndex: 0,
           totalSteps: 6,
           details:
-            errorData?.message ||
-            "The AI service is experiencing high demand. Please try again in a few moments.",
+            "We're receiving a high volume of requests. Please try again shortly.",
         });
 
         toast({
-          title: "Service Busy",
+          title: "Please try again shortly",
           description:
-            errorData?.message ||
-            "The AI service is currently experiencing high demand. " +
-              (retrySeconds
-                ? `Please try again in ${retrySeconds} seconds.`
-                : "Please try again in a few moments."),
+            retrySeconds
+              ? `We're receiving a high volume of requests. Please try again in ${retrySeconds} seconds.`
+              : "We're receiving a high volume of requests. Please try again shortly.",
           variant: "destructive",
           duration: retrySeconds ? retrySeconds * 1000 : 5000,
         });
