@@ -11,19 +11,24 @@ import { incrementUsage } from "../services/usage-tracking";
 
 const router = Router();
 
-const AI_ERROR_ALERT_EMAIL =
-  process.env.AI_ERROR_ALERT_EMAIL || "arthurbreck417@gmail.com";
+const AI_ERROR_ALERT_EMAIL = (process.env.AI_ERROR_ALERT_EMAIL || "").trim();
+const AI_ERROR_ALERT_ON_429 =
+  (process.env.AI_ERROR_ALERT_ON_429 || "").trim().toLowerCase() === "true";
 
 const sendAiErrorAlert = (subject: string, details: any) => {
+  // Alerts are opt-in only. Never default to a personal email.
+  if (!AI_ERROR_ALERT_EMAIL) return;
+
+  // Avoid noisy alerts for expected throttling unless explicitly enabled.
+  if (!AI_ERROR_ALERT_ON_429 && /rate limited|too many requests|429/i.test(subject)) return;
+
   emailService
     .sendEmail({
       to: AI_ERROR_ALERT_EMAIL,
       subject,
       html: `<pre>${JSON.stringify(details, null, 2)}</pre>`,
     })
-    .catch((err) =>
-      console.error("Failed to send AI error alert email:", err)
-    );
+    .catch((err) => console.error("Failed to send AI error alert email:", err));
 };
 
 // Configure multer for file uploads
@@ -233,7 +238,6 @@ router.post(
 
       // Get user email for AI service notifications
       let userEmail = null;
-      console.log(`🔍 Getting user email for userId: ${userId}`);
       try {
         const { data: userProfile, error: profileError } = await supabase
           .from("profiles")
@@ -241,17 +245,15 @@ router.post(
           .eq("id", userId)
           .single();
 
-        console.log(`📊 User profile query result:`, {
-          userProfile,
-          profileError,
-        });
+        if (profileError) {
+          console.warn("Keyword search: failed to fetch profile email", {
+            userId,
+            message: profileError.message,
+          });
+        }
 
         if (userProfile?.email) {
           userEmail = userProfile.email;
-          console.log(
-            "📧 User email added to keyword search request:",
-            userEmail
-          );
 
           // Send "Analysis Started" email notification for keyword search (non-blocking)
           try {
@@ -275,28 +277,22 @@ router.post(
               })
               .then((success) => {
                 if (success) {
-                  console.log(
-                    "📧 Keyword search started email sent to:",
-                    userProfile.email
-                  );
+                  // Intentionally do not log recipient emails in server logs.
+                  console.log("Keyword search: started email sent");
                 } else {
                   console.warn(
-                    "⚠️ Keyword search started email NOT sent (email service not configured or disabled) for:",
-                    userProfile.email
+                    "Keyword search: started email NOT sent (email service not configured or disabled)"
                   );
                 }
               })
               .catch((error) => {
                 console.error(
-                  "Failed to send keyword search started email:",
+                  "Keyword search: failed to send started email:",
                   error
                 );
               });
 
-            console.log(
-              "📧 Keyword search started email queued for:",
-              userProfile.email
-            );
+            console.log("Keyword search: started email queued");
           } catch (emailError) {
             console.error(
               "Error queueing keyword search started email:",
@@ -326,11 +322,9 @@ router.post(
         user_email: userEmail,
       };
 
-      console.log(
-        `🚀 Calling AI service endpoint: ${aiServiceUrl}/search/keywords/schedule`
-      );
-      console.log(`📤 Request data:`, requestData);
-      console.log(`🔑 API Key present:`, !!aiServiceApiKey);
+      console.log("Keyword search: scheduling request", {
+        keywords_count: normalized.length,
+      });
 
       let response: AxiosResponse<any> | null = null;
 
@@ -351,9 +345,8 @@ router.post(
 
         response = axiosResponse;
 
-        console.log("🔄 AI keyword schedule response:", {
+        console.log("Keyword search: schedule response", {
           status: axiosResponse.status,
-          data: axiosResponse.data,
         });
       } catch (error: any) {
         // Network or unexpected errors (connection reset, DNS, etc.)
@@ -364,13 +357,6 @@ router.post(
         });
 
         if (axios.isAxiosError(error) && error.response?.status === 429) {
-          // Upstream (e.g. Cloudflare) is rate limiting the AI agent service
-          sendAiErrorAlert("AI keyword scheduling rate limited (axios error)", {
-            message: error.message,
-            status: error.response.status,
-            data: error.response.data,
-          });
-
           return res.status(502).json({
             success: false,
             error: "ai_service_rate_limited",
@@ -404,11 +390,6 @@ router.post(
 
       // Handle rate limit response in a single, non-retrying pass
       if (response.status === 429) {
-        sendAiErrorAlert("AI keyword scheduling rate limited", {
-          status: response.status,
-          data: response.data,
-        });
-
         return res.status(502).json({
           success: false,
           error: "ai_service_rate_limited",

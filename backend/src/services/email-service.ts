@@ -310,8 +310,13 @@ class EmailService {
       for (const candidateUrl of candidateUrls) {
         try {
           await axios.post(candidateUrl, payload, { timeout: 15000 });
+          // Avoid logging recipient emails in production logs (PII).
+          const toSafe =
+            (process.env.LOG_EMAIL_RECIPIENTS || "").trim().toLowerCase() === "true"
+              ? options.to
+              : "[redacted]";
           console.log(
-            `📧 Email sent via external email service to ${options.to}: ${options.subject} (${candidateUrl})`
+            `📧 Email sent via external email service to ${toSafe}: ${options.subject} (${candidateUrl})`
           );
           return true;
         } catch (err: any) {

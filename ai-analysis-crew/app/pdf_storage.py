@@ -13,6 +13,7 @@ logger = logging.getLogger(__name__)
 # Supabase configuration
 SUPABASE_URL = os.getenv("SUPABASE_URL", "")
 SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_KEY") or os.getenv("SUPABASE_ANON_KEY", "")
+SUPABASE_PDF_BUCKET = (os.getenv("SUPABASE_PDF_BUCKET") or "documents").strip()
 
 
 def upload_pdf_to_supabase_storage(
@@ -56,6 +57,9 @@ def upload_pdf_to_supabase_storage(
         if not filename:
             filename = Path(pdf_path).name
         
+        # Allow overriding bucket for PDFs (some buckets only allow image MIME types)
+        effective_bucket = SUPABASE_PDF_BUCKET or bucket_name
+
         # Storage path: reports/{filename}
         storage_path = f"reports/{filename}"
         
@@ -63,23 +67,39 @@ def upload_pdf_to_supabase_storage(
         with open(pdf_path, "rb") as pdf_file:
             pdf_data = pdf_file.read()
         
-        logger.info(f"📤 Uploading PDF to Supabase Storage: {bucket_name}/{storage_path}")
+        logger.info(f"📤 Uploading PDF to Supabase Storage: {effective_bucket}/{storage_path}")
         
         # Upload to Supabase Storage
         try:
-            # Use upsert to overwrite if exists
-            supabase.storage.from_(bucket_name).upload(
-                storage_path,
-                pdf_data,
-                file_options={
-                    "content-type": "application/pdf",
-                    "x-upsert": "true",
-                }
-            )
+            def _upload_with_content_type(content_type: str) -> None:
+                # Use upsert to overwrite if exists
+                supabase.storage.from_(effective_bucket).upload(
+                    storage_path,
+                    pdf_data,
+                    file_options={
+                        "content-type": content_type,
+                        "x-upsert": "true",
+                    },
+                )
+
+            # First try with correct MIME type
+            try:
+                _upload_with_content_type("application/pdf")
+            except Exception as first_err:
+                # Some buckets enforce a whitelist and reject application/pdf.
+                # Retry with octet-stream to satisfy restrictive bucket rules.
+                msg = str(first_err)
+                if "mime type application/pdf is not supported" in msg.lower():
+                    logger.warning(
+                        "⚠️ Bucket rejected application/pdf; retrying upload as application/octet-stream"
+                    )
+                    _upload_with_content_type("application/octet-stream")
+                else:
+                    raise
             
             # Get public URL
             try:
-                public_url_response = supabase.storage.from_(bucket_name).get_public_url(storage_path)
+                public_url_response = supabase.storage.from_(effective_bucket).get_public_url(storage_path)
                 # Handle different response formats
                 if isinstance(public_url_response, dict):
                     public_url = public_url_response.get("publicUrl") or public_url_response.get("url")
@@ -90,7 +110,7 @@ def upload_pdf_to_supabase_storage(
             except Exception as url_error:
                 logger.warning(f"⚠️ Could not get public URL, constructing manually: {url_error}")
                 # Construct public URL manually
-                public_url = f"{SUPABASE_URL}/storage/v1/object/public/{bucket_name}/{storage_path}"
+                public_url = f"{SUPABASE_URL}/storage/v1/object/public/{effective_bucket}/{storage_path}"
             
             logger.info(f"✅ PDF uploaded successfully: {public_url}")
             return public_url

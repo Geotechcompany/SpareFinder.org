@@ -19,10 +19,17 @@ import { getUsageRow, incrementStorage, incrementUsage } from "../services/usage
 
 const router = Router();
 
-const AI_ERROR_ALERT_EMAIL =
-  process.env.AI_ERROR_ALERT_EMAIL || "arthurbreck417@gmail.com";
+const AI_ERROR_ALERT_EMAIL = (process.env.AI_ERROR_ALERT_EMAIL || "").trim();
+const AI_ERROR_ALERT_ON_429 =
+  (process.env.AI_ERROR_ALERT_ON_429 || "").trim().toLowerCase() === "true";
 
 const sendAiErrorAlert = (subject: string, details: any) => {
+  // Alerts are opt-in only. Never default to a personal email.
+  if (!AI_ERROR_ALERT_EMAIL) return;
+
+  // Avoid noisy alerts for expected throttling unless explicitly enabled.
+  if (!AI_ERROR_ALERT_ON_429 && /rate limited|too many requests|429/i.test(subject)) return;
+
   emailService
     .sendEmail({
       to: AI_ERROR_ALERT_EMAIL,

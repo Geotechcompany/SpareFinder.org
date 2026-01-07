@@ -3,7 +3,8 @@ import { supabase } from "../server";
 import { emailService } from "../services/email-service";
 
 const router = Router();
-const ADMIN_SUMMARY_EMAIL = "arthurbreck417@gmail.com";
+// Opt-in only. Do not default to a personal email address.
+const ADMIN_SUMMARY_EMAIL = (process.env.ADMIN_SUMMARY_EMAIL || "arthurbreck417@gmail.com").trim();
 
 /**
  * Lightweight cron endpoint for external schedulers (e.g. cron-job.org).
@@ -24,7 +25,7 @@ router.get("/reminders", async (req: Request, res: Response) => {
 
     // Safe test mode: send a single test email without querying/sending to users.
     // Example:
-    //   GET /api/cron/reminders?test_email=arthurbreck417@gmail.com&token=...
+    //   GET /api/cron/reminders?test_email=test@example.com&token=...
     const testEmail = String(req.query.test_email || "").trim();
     if (testEmail) {
       const testTemplate = String(req.query.test_template || "generic").trim();
