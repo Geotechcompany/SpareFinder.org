@@ -124,7 +124,7 @@ const CookieConsent = () => {
           <Button
             size="sm"
             onClick={() => setShow(false)}
-            className="bg-gradient-to-r from-[#3A5AFE] via-[#4C5DFF] to-[#06B6D4] text-white shadow-[0_16px_40px_rgba(15,23,42,0.35)] hover:from-[#324EDC] hover:via-[#3A5AFE] hover:to-[#0891B2] dark:from-purple-600 dark:to-blue-600 dark:hover:from-purple-700 dark:hover:to-blue-700"
+            className="bg-gradient-to-r from-purple-600 to-blue-600 text-white shadow-lg shadow-purple-500/25 transition-all duration-300 hover:from-purple-700 hover:to-blue-700 hover:shadow-purple-500/40"
           >
             Accept All
           </Button>
@@ -145,7 +145,7 @@ const loadImage = (url: string) => {
 
 const Landing = () => {
   const [loadedImages, setLoadedImages] = useState<Set<string>>(new Set());
-  const [billingCycle, setBillingCycle] = useState<BillingCycle>("annually");
+  const [billingCycle, setBillingCycle] = useState<BillingCycle>("monthly");
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const { scrollY, scrollYProgress } = useScroll();
   const y1 = useTransform(scrollY, [0, 300], [0, 50]);
@@ -533,7 +533,7 @@ const Landing = () => {
           <Dialog open={isPaymentModalOpen} onOpenChange={resetPaymentModal}>
             <DialogContent className="max-h-[90vh] max-w-[600px] overflow-y-auto border border-border bg-card text-foreground shadow-soft-elevated sm:max-w-[600px] dark:border-gray-700 dark:bg-gradient-to-br dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 dark:text-white">
               <DialogHeader>
-                <DialogTitle className="text-2xl font-bold bg-gradient-to-r from-[#3A5AFE] via-[#4C5DFF] to-[#06B6D4] bg-clip-text text-transparent dark:from-purple-400 dark:to-blue-400">
+                <DialogTitle className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent dark:from-purple-400 dark:to-blue-400">
                   {selectedPlan
                     ? `Complete Your Payment for ${selectedPlan.name}`
                     : "Payment Required"}
@@ -564,7 +564,7 @@ const Landing = () => {
                     className="space-y-6 py-4"
                   >
                     {/* Plan Summary */}
-                    <div className="rounded-xl border border-border bg-gradient-to-r from-[#3A5AFE0F] via-[#4C5DFF0F] to-[#06B6D40F] p-4 dark:border-purple-500/30 dark:from-purple-900/20 dark:to-blue-900/20">
+                    <div className="rounded-xl border border-border bg-gradient-to-r from-purple-500/10 via-indigo-500/10 to-blue-500/10 p-4 dark:border-purple-500/30 dark:from-purple-900/20 dark:to-blue-900/20">
                       <h3 className="mb-2 text-lg font-semibold text-primary dark:text-purple-300">
                         Plan Summary
                       </h3>
@@ -643,7 +643,7 @@ const Landing = () => {
                         <Button
                           onClick={handleStripeCheckout}
                           disabled={isProcessing}
-                          className="flex h-12 w-full items-center justify-center bg-gradient-to-r from-[#3A5AFE] via-[#4C5DFF] to-[#06B6D4] text-lg font-semibold text-white shadow-[0_16px_40px_rgba(15,23,42,0.35)] hover:from-[#324EDC] hover:via-[#3A5AFE] hover:to-[#0891B2] disabled:opacity-70 dark:from-purple-600 dark:to-blue-600 dark:hover:from-purple-700 dark:hover:to-blue-700"
+                          className="flex h-12 w-full items-center justify-center bg-gradient-to-r from-purple-600 to-blue-600 text-lg font-semibold text-white shadow-lg shadow-purple-500/25 transition-all duration-300 hover:from-purple-700 hover:to-blue-700 hover:shadow-purple-500/40 disabled:opacity-70"
                         >
                           {isProcessing ? (
                             <>
@@ -722,7 +722,7 @@ const Landing = () => {
       {/* Final CTA */}
       <section className="py-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <div className="rounded-3xl border border-border bg-gradient-to-r from-[#3A5AFE0F] via-[#4C5DFF0F] to-[#06B6D40F] p-10 shadow-soft-elevated backdrop-blur-xl sm:p-16 dark:border-white/10 dark:from-purple-900/50 dark:to-blue-900/50">
+          <div className="rounded-3xl border border-border bg-gradient-to-r from-purple-500/10 via-indigo-500/10 to-blue-500/10 p-10 shadow-soft-elevated backdrop-blur-xl sm:p-16 dark:border-white/10 dark:from-purple-900/50 dark:to-blue-900/50">
             <h2 className="mb-6 text-4xl font-bold tracking-tight text-foreground dark:text-white">
               Ready to Revolutionize Your Part Identification?
             </h2>
@@ -733,7 +733,7 @@ const Landing = () => {
             <div className="flex justify-center gap-4">
               <Button
                 asChild
-                className="bg-gradient-to-r from-[#3A5AFE] via-[#4C5DFF] to-[#06B6D4] px-8 py-6 text-lg font-semibold text-white shadow-[0_16px_40px_rgba(15,23,42,0.35)] hover:from-[#324EDC] hover:via-[#3A5AFE] hover:to-[#0891B2] dark:from-purple-600 dark:to-blue-600 dark:hover:from-purple-700 dark:hover:to-blue-700"
+                className="bg-gradient-to-r from-purple-600 to-blue-600 px-8 py-6 text-lg font-semibold text-white shadow-lg shadow-purple-500/25 transition-all duration-300 hover:from-purple-700 hover:to-blue-700 hover:shadow-purple-500/40"
               >
                 <Link to="/register">Start Free Trial</Link>
               </Button>
