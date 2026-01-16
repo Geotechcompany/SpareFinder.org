@@ -46,6 +46,7 @@ import { PartAnalysisDisplayModal } from "@/components/PartAnalysisDisplay";
 import { ReviewModal } from "@/components/ReviewModal";
 import OnboardingGuide from "@/components/OnboardingGuide";
 import { CrewAnalysisProgress } from "@/components/CrewAnalysisProgress";
+import { getCrewJobDisplayName } from "@/services/aiAnalysisCrew";
 import { AnalysisResultModal } from "@/components/AnalysisResultModal";
 import {
   Dialog,
@@ -1616,6 +1617,8 @@ const History = () => {
                         .map((job: any) => {
                           // Use the stable unique key pre-assigned in useMemo
                           const cardUniqueKey = job._uniqueCardKey;
+                          const displayName =
+                            getCrewJobDisplayName(job) || "Part analysis";
 
                           return (
                             <motion.div
@@ -1675,12 +1678,12 @@ const History = () => {
                                     <div>
                                       <h3 className="font-semibold text-foreground line-clamp-1 transition-colors group-hover:text-[#7C3AED] dark:text-white">
                                         {job.status === "completed"
-                                          ? "✅ SpareFinder AI Research"
+                                          ? `✅ ${displayName}`
                                           : job.status === "failed"
-                                          ? "❌ Analysis Failed"
+                                          ? `❌ ${displayName}`
                                           : job.status === "pending"
-                                          ? "⏳ Analysis Pending"
-                                          : "🤖SpareFinder research Ongoing..."}
+                                          ? `⏳ ${displayName}`
+                                          : `🤖 ${displayName}`}
                                       </h3>
                                       <p className="mt-1 text-xs font-mono text-muted-foreground truncate dark:text-gray-400">
                                         ID: {job.id?.slice(0, 8)}...
@@ -1698,6 +1701,7 @@ const History = () => {
                                           currentStage={job.current_stage}
                                           progress={job.progress || 0}
                                           errorMessage={job.error_message}
+                                          title={displayName}
                                           compact={true}
                                           isExpanded={expandedJobIds.has(
                                             cardUniqueKey

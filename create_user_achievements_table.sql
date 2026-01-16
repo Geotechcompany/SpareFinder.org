@@ -45,3 +45,5 @@ CREATE POLICY "Admins can manage all achievements" ON user_achievements
         )
     );
 
+
+

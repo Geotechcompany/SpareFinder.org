@@ -28,6 +28,7 @@ interface CrewAnalysisProgressProps {
   currentStage?: string;
   progress?: number;
   errorMessage?: string;
+  title?: string;
   compact?: boolean;
   isExpanded?: boolean;
   onToggleExpanded?: () => void;
@@ -38,6 +39,7 @@ export const CrewAnalysisProgress = ({
   currentStage,
   progress = 0,
   errorMessage,
+  title = "AI Research",
   compact = false,
   isExpanded = false,
   onToggleExpanded,
@@ -128,7 +130,7 @@ export const CrewAnalysisProgress = ({
         {isAnalyzing && (
           <>
             <div className="flex items-center justify-between text-xs">
-              <span className="text-muted-foreground">SpareFinder AI Research</span>
+              <span className="text-muted-foreground">{title}</span>
               <span className="text-blue-400">{progress}%</span>
             </div>
             <Progress value={progress} className="h-1" />
@@ -240,7 +242,7 @@ export const CrewAnalysisProgress = ({
       {/* Status Badge */}
       <div className="flex items-center justify-between">
         <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300">
-          SpareFinder AI Research
+          {title}
         </h4>
         <Badge
           variant="outline"

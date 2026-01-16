@@ -53,6 +53,105 @@ export type CrewStage = (typeof CREW_STAGES)[keyof typeof CREW_STAGES];
 export type CrewProgressCallback = (update: CrewProgressUpdate) => void;
 
 // ============================================================================
+// Display helpers
+// ============================================================================
+
+/**
+ * Best-effort display name for a crew analysis job.
+ * Different APIs/DB rows may populate different fields, so we try several.
+ */
+export function getCrewJobDisplayName(job: any): string | null {
+  if (!job) return null;
+
+  const reportText: unknown = job?.result_data?.report_text;
+  if (typeof reportText === "string" && reportText.trim()) {
+    const fromReport = extractPartNameFromReportText(reportText);
+    if (fromReport) return fromReport;
+  }
+
+  const candidates = [
+    job.precise_part_name,
+    job.part_name,
+    job.partName,
+    job.part_title,
+    job.partTitle,
+    job.detected_part_name,
+    job.detectedPartName,
+    job.keywords,
+    job.query,
+    job.search_query,
+    job.searchQuery,
+    job.title,
+    job.name,
+  ];
+  for (const c of candidates) {
+    if (typeof c !== "string") continue;
+    const v = c.trim();
+    if (!v) continue;
+    // Avoid showing raw upload filenames like "download (10).jpeg"
+    if (looksLikeFilename(v)) continue;
+    return v;
+  }
+  return null;
+}
+
+function looksLikeFilename(value: string): boolean {
+  const v = value.trim();
+  if (!v) return false;
+  if (/^download\b/i.test(v)) return true;
+  if (/\.(jpe?g|png|webp|gif|pdf)$/i.test(v)) return true;
+  // Common camera/file patterns: IMG_1234, DSC_1234, etc.
+  if (/^(img|dsc|image|photo)[-_ ]?\d+/i.test(v)) return true;
+  return false;
+}
+
+function extractPartNameFromReportText(reportText: string): string | null {
+  // 1) Try to read the first column ("NAME/TYPE") from the markdown table
+  const lines = reportText.split(/\r?\n/);
+  const headerIdx = lines.findIndex((l) => /name\/type/i.test(l) && l.includes("|"));
+  if (headerIdx !== -1) {
+    for (let i = headerIdx + 1; i < Math.min(lines.length, headerIdx + 8); i++) {
+      const line = lines[i]?.trim() || "";
+      if (!line.includes("|")) continue;
+      // Skip separator rows like | --- | --- |
+      if (/^\|?\s*:?-{2,}/.test(line.replace(/\s/g, ""))) continue;
+      const cells = line
+        .split("|")
+        .map((c) => c.trim())
+        .filter(Boolean);
+      if (cells.length >= 1 && !/name\/type/i.test(cells[0])) {
+        const name = cells[0];
+        if (name && name.length <= 120) return name;
+      }
+    }
+  }
+
+  // 2) Try the main title line: "PROFESSIONAL TECHNICAL REPORT ON <PART>"
+  const titleLine = lines.find((l) => /^#{1,4}\s*/.test(l)) || lines[0] || "";
+  const normalized = titleLine.replace(/^#{1,4}\s*/, "").trim();
+  const m = normalized.match(/\bREPORT\b.*\bON\b\s+(.+)$/i);
+  if (m?.[1]) {
+    const candidate = m[1].trim();
+    // Avoid returning massive strings
+    if (candidate && candidate.length <= 120) return toTitleCase(candidate);
+  }
+
+  return null;
+}
+
+function toTitleCase(value: string): string {
+  // Keeps acronyms reasonably intact while fixing ALL CAPS headings.
+  const v = value.trim();
+  if (!v) return v;
+  if (v === v.toUpperCase()) {
+    return v
+      .toLowerCase()
+      .replace(/\b([a-z])/g, (m) => m.toUpperCase());
+  }
+  return v;
+}
+
+// ============================================================================
 // Configuration
 // ============================================================================
 

@@ -38,6 +38,7 @@ import { dashboardApi, apiClient } from "@/lib/api";
 import { useToast } from "@/components/ui/use-toast";
 import DashboardSkeleton from "@/components/DashboardSkeleton";
 import { PerformanceOverviewChart } from "@/components/PerformanceOverviewChart";
+import { getCrewJobDisplayName } from "@/services/aiAnalysisCrew";
 
 const Dashboard = () => {
   const { inLayout } = useDashboardLayout();
@@ -290,7 +291,7 @@ const Dashboard = () => {
         setRecentUploads(
           recentCompleted.map((job: any) => ({
             id: job.id,
-            name: job.keywords || "SpareFinder AI Research",
+            name: getCrewJobDisplayName(job) || "Part analysis",
             date: format(new Date(job.completed_at || job.created_at), "PPp"),
             status: job.status,
             confidence: job.progress || 100, // Use progress as confidence (completed jobs are 100%)
@@ -302,7 +303,7 @@ const Dashboard = () => {
             JSON.stringify(
               recentCompleted.map((job: any) => ({
                 id: job.id,
-                name: job.keywords || "SpareFinder AI Research",
+                name: getCrewJobDisplayName(job) || "Part analysis",
                 date: format(new Date(job.completed_at || job.created_at), "PPp"),
                 status: job.status,
                 confidence: job.progress || 100,
@@ -364,8 +365,8 @@ const Dashboard = () => {
           return jobs
             .filter((j) => j.status === "completed")
             .map((j) => {
-              const title = `SpareFinder AI Research`;
-              const desc = j.keywords || "Analysis Complete";
+              const title = getCrewJobDisplayName(j) || "Part analysis";
+              const desc = j.keywords || title;
               const timeStr = j.completed_at
                 ? format(new Date(j.completed_at), "PPp")
                 : j.created_at

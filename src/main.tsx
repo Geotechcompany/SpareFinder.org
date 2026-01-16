@@ -2,6 +2,7 @@ import React from "react";
 import { createRoot } from "react-dom/client";
 import { ClerkProvider } from "@clerk/clerk-react";
 import App from "./App";
+import { ClerkErrorBoundary } from "./components/ClerkErrorBoundary";
 import "./index.css";
 import "./styles/skeleton.css"; // Skeleton animations
 import "./services/keepAlive"; // Auto-start keep-alive service
@@ -47,16 +48,18 @@ if (!clerkPublishableKey) {
 } else {
   createRoot(rootElement).render(
     <React.StrictMode>
-      <ClerkProvider
-        publishableKey={clerkPublishableKey}
-        signInUrl="/login"
-        signUpUrl="/register"
-        afterSignInUrl="/dashboard"
-        // New signups should complete post-signup profile onboarding before picking a plan.
-        afterSignUpUrl="/onboarding/profile"
-      >
-        <App />
-      </ClerkProvider>
+      <ClerkErrorBoundary>
+        <ClerkProvider
+          publishableKey={clerkPublishableKey}
+          signInUrl="/login"
+          signUpUrl="/register"
+          afterSignInUrl="/dashboard"
+          // New signups should complete post-signup profile onboarding before picking a plan.
+          afterSignUpUrl="/onboarding/profile"
+        >
+          <App />
+        </ClerkProvider>
+      </ClerkErrorBoundary>
     </React.StrictMode>
   );
 }
