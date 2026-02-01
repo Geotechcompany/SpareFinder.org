@@ -724,6 +724,8 @@ async def run_analysis_background(
         
         # Complete the job - use public URL if available, otherwise filename
         logger.info(f"🏁 Completing job {analysis_id}")
+        # Set status to completed first so UI updates even if full completion payload fails
+        update_crew_job_status(analysis_id, "completed", "completed", 100)
         pdf_url_for_completion = pdf_public_url if pdf_public_url else pdf_filename
         completion_success = complete_crew_job(
             job_id=analysis_id,
@@ -734,7 +736,7 @@ async def run_analysis_background(
         if completion_success:
             logger.info(f"✅ Job {analysis_id} marked as completed in database")
         else:
-            logger.error(f"❌ Failed to mark job {analysis_id} as completed")
+            logger.warning(f"⚠️ Full job completion update failed; status was already set to completed")
         
     except Exception as e:
         # Mark as failed

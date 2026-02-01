@@ -560,8 +560,21 @@ def complete_crew_job(
         response = requests.patch(url, headers=SUPABASE_HEADERS, json=update_data)
         
         if response.status_code not in [200, 204]:
-            logger.error(f"❌ Failed to complete crew job: {response.status_code} - {response.text}")
-            return False
+            # Fallback: minimal update (status + pdf_url) in case result_data is too large or RLS blocks
+            logger.warning(f"Full completion PATCH failed ({response.status_code}), retrying with minimal update")
+            minimal_data = {
+                'status': 'completed',
+                'current_stage': 'completed',
+                'progress': 100,
+                'completed_at': datetime.utcnow().isoformat(),
+                'updated_at': datetime.utcnow().isoformat(),
+            }
+            if pdf_url:
+                minimal_data['pdf_url'] = pdf_url
+            retry_response = requests.patch(url, headers=SUPABASE_HEADERS, json=minimal_data)
+            if retry_response.status_code not in [200, 204]:
+                logger.error(f"❌ Failed to complete crew job: {retry_response.status_code} - {retry_response.text}")
+                return False
         
         logger.info(f"✅ Completed crew job {job_id}")
         # Publish to Redis for real-time push to WebSocket clients
