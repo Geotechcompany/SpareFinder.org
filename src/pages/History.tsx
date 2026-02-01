@@ -438,9 +438,13 @@ const History = () => {
           if (background && prev.length > 0) {
             const byId = new Map(prev.map((j) => [j.id, { ...j, _uniqueCardKey: j.id }]));
             fromApi.forEach((j: any) => byId.set(j.id, j));
-            const merged = Array.from(byId.values()).sort(
+            let merged = Array.from(byId.values()).sort(
               (a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()
             );
+            // Drop optimistic placeholders when we have real jobs so image upload doesn't show duplicate cards
+            if (fromApi.length > 0) {
+              merged = merged.filter((j: any) => !j._optimistic && !String(j.id || "").startsWith("pending-"));
+            }
             return merged;
           }
           return fromApi.length ? fromApi : prev;

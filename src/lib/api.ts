@@ -156,6 +156,12 @@ const processQueue = (error: unknown, token: string | null = null) => {
 // Request interceptor to add token to every request
 apiClient.interceptors.request.use(
   async (config) => {
+    // FormData must be sent without Content-Type so the browser sets multipart/form-data with boundary.
+    // Otherwise the default application/json causes the backend to not see the file (422 missing "image").
+    if (config.data instanceof FormData) {
+      delete config.headers["Content-Type"];
+    }
+
     // Check if this is a public endpoint that doesn't require a token
     const isPublicEndpoint =
       config.url &&
@@ -1244,11 +1250,10 @@ export const uploadApi = {
         formData.append("keywords", keywords);
       }
 
+      // Do not set Content-Type: let the browser set multipart/form-data with boundary
+      // so the backend can parse the request (same flow as keyword analysis → crew_analysis_jobs).
       const response = await apiClient.post("/upload/crew-analysis", formData, {
-        headers: {
-          "Content-Type": "multipart/form-data",
-        },
-        timeout: 90000, // 90s - backend returns 201 after creating job; analysis runs in background. Allow time for upload + DB.
+        timeout: 90000, // 90s - backend returns 201 after creating job; analysis runs in background.
       });
 
       return response.data;

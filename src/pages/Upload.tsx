@@ -4596,7 +4596,21 @@ const Upload = () => {
                           description:
                             "Your analysis is in the queue. Check History for progress.",
                         });
-                        navigate("/dashboard/history", { replace: true });
+                        // Pass optimistic job so History shows a card (same flow as keyword analysis)
+                        const optimisticJob = {
+                          id: `pending-${Date.now()}`,
+                          keywords: savedKeywords.join(" "),
+                          image_name: uploadedFile?.name,
+                          status: "pending",
+                          progress: 0,
+                          created_at: new Date().toISOString(),
+                          _uniqueCardKey: `pending-${Date.now()}`,
+                          _optimistic: true,
+                        };
+                        navigate("/dashboard/history", {
+                          replace: true,
+                          state: { newCrewJob: optimisticJob },
+                        });
                       }, maxWaitMs);
                       maxWaitTimerRef.current = timerId;
 
