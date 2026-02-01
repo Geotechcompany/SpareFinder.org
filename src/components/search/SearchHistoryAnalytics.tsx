@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { dashboardApi, getAuthHeaders } from "@/lib/api";
+import { API_BASE_URL } from "@/lib/config";
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 
@@ -38,10 +39,7 @@ export const SearchHistoryAnalytics: React.FC = () => {
 
   const handleExportHistory = async () => {
     try {
-      const apiBaseUrl =
-        import.meta.env.VITE_API_URL ||
-        import.meta.env.VITE_API_BASE_URL ||
-        "http://localhost:4000";
+      const apiBaseUrl = API_BASE_URL;
 
       const response = await fetch(
         `${apiBaseUrl}/api/history/export?format=csv`,

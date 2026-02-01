@@ -16,7 +16,7 @@ if __name__ == "__main__":
         "app.main:app",
         host="0.0.0.0",
         port=int(os.getenv("PORT", 8000)),
-        reload=False,  # Set to False to avoid Windows reload issues
+        reload=False,  # Disabled to avoid Windows reload issues - manually restart when needed
         log_level="info"
     )
 

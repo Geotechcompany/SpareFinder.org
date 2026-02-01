@@ -55,56 +55,27 @@ const Dashboard = () => {
   const abortControllerRef = useRef<AbortController | null>(null);
   const hasLoadedOnceRef = useRef(false);
 
-  // State for dashboard data (persist last successful stats to avoid flicker-to-zero)
-  const [stats, setStats] = useState(() => {
-    try {
-      const raw = localStorage.getItem("dashboard_overview_stats_v1");
-      if (!raw) {
-        return {
-          totalUploads: 0,
-          successfulUploads: 0,
-          avgConfidence: 0,
-          avgProcessTime: 0,
-        };
-      }
-      const parsed = JSON.parse(raw) as Partial<{
-        totalUploads: number;
-        successfulUploads: number;
-        avgConfidence: number;
-        avgProcessTime: number;
-      }>;
-      return {
-        totalUploads: Number(parsed.totalUploads || 0),
-        successfulUploads: Number(parsed.successfulUploads || 0),
-        avgConfidence: Number(parsed.avgConfidence || 0),
-        avgProcessTime: Number(parsed.avgProcessTime || 0),
-      };
-    } catch {
-      return {
-        totalUploads: 0,
-        successfulUploads: 0,
-        avgConfidence: 0,
-        avgProcessTime: 0,
-      };
-    }
-  });
+  const storageKey = useCallback(
+    (base: string) => {
+      // IMPORTANT: scope dashboard caches to the logged-in app user.
+      // Otherwise a canceled fetch can leave stale stats from a previous user/session.
+      const uid = user?.id;
+      return uid ? `${base}:${uid}` : base;
+    },
+    [user?.id]
+  );
 
-  const [recentUploads, setRecentUploads] = useState<any[]>(() => {
-    try {
-      const raw = localStorage.getItem("dashboard_recent_uploads_v1");
-      return raw ? (JSON.parse(raw) as any[]) : [];
-    } catch {
-      return [];
-    }
-  });
-  const [recentActivities, setRecentActivities] = useState<any[]>(() => {
-    try {
-      const raw = localStorage.getItem("dashboard_recent_activities_v1");
-      return raw ? (JSON.parse(raw) as any[]) : [];
-    } catch {
-      return [];
-    }
-  });
+  // State for dashboard data (persist last successful stats to avoid flicker-to-zero)
+  // Start with zero; hydrate from per-user cache once the user id is available.
+  const [stats, setStats] = useState(() => ({
+    totalUploads: 0,
+    successfulUploads: 0,
+    avgConfidence: 0,
+    avgProcessTime: 0,
+  }));
+
+  const [recentUploads, setRecentUploads] = useState<any[]>(() => []);
+  const [recentActivities, setRecentActivities] = useState<any[]>(() => []);
   const [performanceMetrics, setPerformanceMetrics] = useState([
     {
       label: "AI Model Accuracy",
@@ -128,14 +99,7 @@ const Dashboard = () => {
       color: "from-purple-600 to-violet-600",
     },
   ]);
-  const [analyticsSeries, setAnalyticsSeries] = useState<any[]>(() => {
-    try {
-      const raw = localStorage.getItem("dashboard_analytics_series_v1");
-      return raw ? (JSON.parse(raw) as any[]) : [];
-    } catch {
-      return [];
-    }
-  });
+  const [analyticsSeries, setAnalyticsSeries] = useState<any[]>(() => []);
 
   const { toast } = useToast();
 
@@ -251,7 +215,7 @@ const Dashboard = () => {
         });
         try {
           localStorage.setItem(
-            "dashboard_overview_stats_v1",
+            storageKey("dashboard_overview_stats_v1"),
             JSON.stringify({
               totalUploads,
               successfulUploads,
@@ -299,7 +263,7 @@ const Dashboard = () => {
         );
         try {
           localStorage.setItem(
-            "dashboard_recent_uploads_v1",
+            storageKey("dashboard_recent_uploads_v1"),
             JSON.stringify(
               recentCompleted.map((job: any) => ({
                 id: job.id,
@@ -416,7 +380,7 @@ const Dashboard = () => {
         setRecentActivities(mergedActivities);
         try {
           localStorage.setItem(
-            "dashboard_recent_activities_v1",
+            storageKey("dashboard_recent_activities_v1"),
             JSON.stringify(mergedActivities)
           );
         } catch {}
@@ -424,7 +388,7 @@ const Dashboard = () => {
         // Only set empty if both sources succeeded but there is genuinely no activity.
         setRecentActivities([]);
         try {
-          localStorage.setItem("dashboard_recent_activities_v1", "[]");
+          localStorage.setItem(storageKey("dashboard_recent_activities_v1"), "[]");
         } catch {}
       } else {
         console.warn("❌ Recent activities fetch failed; keeping last successful list.");
@@ -518,7 +482,7 @@ const Dashboard = () => {
         setAnalyticsSeries(nextAnalyticsSeries);
         try {
           localStorage.setItem(
-            "dashboard_analytics_series_v1",
+            storageKey("dashboard_analytics_series_v1"),
             JSON.stringify(nextAnalyticsSeries)
           );
         } catch {}
@@ -584,7 +548,52 @@ const Dashboard = () => {
       isFetchingRef.current = false;
       setIsDataLoading(false);
     }
-  }, [canFetchDashboard, toast, logout]);
+  }, [canFetchDashboard, toast, logout, storageKey]);
+
+  // Hydrate cached dashboard data once we know which user is signed in.
+  // This keeps the UI stable during refresh, without risking cross-user leakage.
+  useEffect(() => {
+    if (authLoading) return;
+    if (!isAuthenticated) return;
+    if (!user?.id) return;
+
+    try {
+      const rawStats = localStorage.getItem(storageKey("dashboard_overview_stats_v1"));
+      if (rawStats && !hasLoadedOnceRef.current) {
+        const parsed = JSON.parse(rawStats) as Partial<{
+          totalUploads: number;
+          successfulUploads: number;
+          avgConfidence: number;
+          avgProcessTime: number;
+        }>;
+        setStats({
+          totalUploads: Number(parsed.totalUploads || 0),
+          successfulUploads: Number(parsed.successfulUploads || 0),
+          avgConfidence: Number(parsed.avgConfidence || 0),
+          avgProcessTime: Number(parsed.avgProcessTime || 0),
+        });
+      }
+
+      const rawUploads = localStorage.getItem(storageKey("dashboard_recent_uploads_v1"));
+      if (rawUploads && !hasLoadedOnceRef.current) {
+        setRecentUploads(JSON.parse(rawUploads) as any[]);
+      }
+
+      const rawActivities = localStorage.getItem(
+        storageKey("dashboard_recent_activities_v1")
+      );
+      if (rawActivities && !hasLoadedOnceRef.current) {
+        setRecentActivities(JSON.parse(rawActivities) as any[]);
+      }
+
+      const rawSeries = localStorage.getItem(storageKey("dashboard_analytics_series_v1"));
+      if (rawSeries && !hasLoadedOnceRef.current) {
+        setAnalyticsSeries(JSON.parse(rawSeries) as any[]);
+      }
+    } catch {
+      // ignore cache parse errors
+    }
+  }, [authLoading, isAuthenticated, user?.id, storageKey]);
 
   // Initialize data fetch - run whenever auth becomes ready and user is present.
   // Avoid one-shot gating; Clerk can take longer than a fixed timeout to hydrate.

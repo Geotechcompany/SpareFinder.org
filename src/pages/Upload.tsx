@@ -48,6 +48,7 @@ import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSubscription } from "@/contexts/SubscriptionContext";
 import { PlanRequiredCard } from "@/components/billing/PlanRequiredCard";
+import { API_BASE_URL } from "@/lib/config";
 import axios from "axios";
 import { useToast } from "@/components/ui/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -940,6 +941,17 @@ const Upload = () => {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const keywordsInputRef = useRef<HTMLInputElement>(null);
+  const redirectGuardRef = useRef(false);
+  const maxWaitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (maxWaitTimerRef.current) {
+        clearTimeout(maxWaitTimerRef.current);
+        maxWaitTimerRef.current = null;
+      }
+    };
+  }, []);
 
   const { toast } = useToast();
   const { uploadFile } = useFileUpload();
@@ -1179,24 +1191,29 @@ const Upload = () => {
       // Schedule the keyword search for background processing
       const response = await dashboardApi.scheduleKeywordSearch(savedKeywords);
 
-      if (!response?.success) {
+      // Extract jobId - backend returns job_id in data object
+      const data = response?.data as
+        | { jobId?: string; job_id?: string; filename?: string }
+        | undefined;
+      const jobId =
+        response?.jobId ||
+        data?.jobId ||
+        data?.job_id || // Backend returns job_id (snake_case)
+        data?.filename ||
+        response?.filename ||
+        null;
+
+      // If we got a jobId or the response exists, treat as success (even if success flag is missing)
+      // Backend returns 202 Accepted which means job was created and queued
+      const isSuccess = response?.success !== false && (jobId || response);
+
+      if (!isSuccess && !jobId) {
         throw new Error(
           response?.message || "Keyword search scheduling failed"
         );
       }
 
-      // Extract jobId with type-safe access to nested data
-      const data = response?.data as
-        | { jobId?: string; filename?: string }
-        | undefined;
-      const jobId =
-        response?.jobId ||
-        response?.filename ||
-        data?.jobId ||
-        data?.filename ||
-        null;
-
-      // Show scheduling confirmation
+      // Show scheduling confirmation (same pattern as image upload)
       toast({
         title: "Keyword analysis scheduled",
         description: `Your keyword search has been queued. Job ID: ${
@@ -1204,12 +1221,32 @@ const Upload = () => {
         }`,
       });
 
-      // Auto-redirect to history page to track the job
-      setTimeout(() => {
-        navigate("/dashboard/history");
-      }, 1500);
+      // Close confirmation dialog and clear loading state
+      setConfirmKeywordSearchOpen(false);
+      setIsKeywordSearching(false);
 
-      return; // Exit early since we're scheduling, not processing immediately
+      // Build minimal job so History can show the card immediately (keyword-only creates crew_analysis_job in background)
+      const keywordsStr = Array.isArray(savedKeywords) ? savedKeywords.join(" ") : String(savedKeywords ?? "");
+      const newCrewJob =
+        jobId
+          ? {
+              id: jobId,
+              keywords: keywordsStr,
+              status: "pending",
+              progress: 0,
+              created_at: new Date().toISOString(),
+              _uniqueCardKey: jobId,
+            }
+          : null;
+
+      // Redirect with job in state so History shows the card while analysis runs
+      setTimeout(() => {
+        navigate("/dashboard/history", {
+          replace: true,
+          state: newCrewJob ? { newCrewJob } : undefined,
+        });
+      }, 100);
+      return;
     } catch (error: any) {
       console.error("Keyword search error:", error);
 
@@ -1232,10 +1269,9 @@ const Upload = () => {
               "Your keyword search is queued and will run automatically. You can monitor it from your history.",
           });
 
-          // Optionally send the user to History to watch for completion
-          setTimeout(() => {
-            navigate("/dashboard/history");
-          }, 1500);
+          setConfirmKeywordSearchOpen(false);
+          setIsKeywordSearching(false);
+          navigate("/dashboard/history", { replace: true });
           return;
         }
       }
@@ -1286,11 +1322,14 @@ const Upload = () => {
           "Your keyword search is queued and will run automatically. You can monitor it from your history.",
       });
 
-      setTimeout(() => {
-        navigate("/dashboard/history");
-      }, 1500);
-    } finally {
+      setConfirmKeywordSearchOpen(false);
       setIsKeywordSearching(false);
+      navigate("/dashboard/history", { replace: true });
+    } finally {
+      // Only clear if redirect hasn't happened yet (shouldn't reach here in success case)
+      if (isKeywordSearching) {
+        setIsKeywordSearching(false);
+      }
     }
   };
 
@@ -1918,10 +1957,8 @@ const Upload = () => {
         description: `Part identified: ${firstPrediction.class_name}`,
       });
 
-      // Auto-redirect to history page to show the results
-      setTimeout(() => {
-        navigate("/dashboard/history");
-      }, 1500); // Small delay to let user see the success message
+      // Immediately redirect to history page to show the results
+      navigate("/dashboard/history", { replace: true });
 
       // If analysis is successful, store the results
       if (result.success && result.data && (result.data as any).length > 0) {
@@ -2102,9 +2139,7 @@ const Upload = () => {
       return;
     }
     try {
-      const API_BASE =
-        (import.meta as any).env?.VITE_AI_SERVICE_URL ||
-        "https://aiagent-sparefinder-org.onrender.com";
+      const API_BASE = API_BASE_URL;
       const form = new FormData();
       form.append("file", uploadedFile);
       if (savedKeywords.length)
@@ -4547,14 +4582,36 @@ const Upload = () => {
                         return;
                       }
 
-                      try {
-                        setIsAnalyzing(true);
+                      redirectGuardRef.current = false;
+                      setIsAnalyzing(true);
 
-                        // Create SpareFinder Research job
-                        const response = await api.upload.createCrewAnalysisJob(
-                          uploadedFile,
-                          savedKeywords.join(" ")
-                        );
+                      // Redirect to History after 8s max so user is never stuck on overlay
+                      const maxWaitMs = 8000;
+                      const timerId = setTimeout(() => {
+                        if (redirectGuardRef.current) return;
+                        redirectGuardRef.current = true;
+                        setIsAnalyzing(false);
+                        toast({
+                          title: "Taking a moment…",
+                          description:
+                            "Your analysis is in the queue. Check History for progress.",
+                        });
+                        navigate("/dashboard/history", { replace: true });
+                      }, maxWaitMs);
+                      maxWaitTimerRef.current = timerId;
+
+                      try {
+                        const response =
+                          await api.upload.createCrewAnalysisJob(
+                            uploadedFile,
+                            savedKeywords.join(" ")
+                          );
+
+                        if (maxWaitTimerRef.current) {
+                          clearTimeout(maxWaitTimerRef.current);
+                          maxWaitTimerRef.current = null;
+                        }
+                        if (redirectGuardRef.current) return;
 
                         if (!response.success) {
                           throw new Error(
@@ -4562,28 +4619,71 @@ const Upload = () => {
                           );
                         }
 
+                        redirectGuardRef.current = true;
+                        setIsAnalyzing(false);
                         toast({
                           title: "Analysis Started! 🚀",
                           description:
                             "Redirecting you to history to watch progress...",
                         });
 
-                        // Redirect to history page
+                        const jobId =
+                          (response as any).jobId ??
+                          (response as any).data?.jobId;
+                        const newJob =
+                          (response as any).data?.job ||
+                          (response as any).job ||
+                          (jobId
+                            ? {
+                                id: jobId,
+                                image_url:
+                                  (response as any).imageUrl ??
+                                  (response as any).data?.imageUrl,
+                                image_name: uploadedFile?.name,
+                                keywords: savedKeywords.join(" "),
+                                status: "pending",
+                                progress: 0,
+                                created_at: new Date().toISOString(),
+                              }
+                            : null);
+
                         setTimeout(() => {
-                          navigate("/dashboard/history");
-                        }, 1500);
+                          navigate("/dashboard/history", {
+                            replace: true,
+                            state: newJob
+                              ? { newCrewJob: newJob }
+                              : undefined,
+                          });
+                        }, 100);
                       } catch (error) {
+                        if (maxWaitTimerRef.current) {
+                          clearTimeout(maxWaitTimerRef.current);
+                          maxWaitTimerRef.current = null;
+                        }
+                        if (redirectGuardRef.current) return;
+
                         console.error("SpareFinder Research error:", error);
+                        redirectGuardRef.current = true;
                         setIsAnalyzing(false);
 
+                        const isTimeout =
+                          error instanceof Error &&
+                          (error.message.includes("timeout") ||
+                            error.message.includes("exceeded"));
                         toast({
-                          title: "Analysis Failed",
-                          description:
-                            error instanceof Error
+                          title: isTimeout
+                            ? "Request timed out"
+                            : "Analysis Failed",
+                          description: isTimeout
+                            ? "The server may still be processing. Check the History page for your job and progress."
+                            : error instanceof Error
                               ? error.message
                               : "Please try again",
                           variant: "destructive",
                         });
+                        if (isTimeout) {
+                          navigate("/dashboard/history", { replace: true });
+                        }
                       }
                     } else {
                       performKeywordSearch();

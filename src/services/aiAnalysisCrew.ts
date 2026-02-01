@@ -155,10 +155,12 @@ function toTitleCase(value: string): string {
 // Configuration
 // ============================================================================
 
+// Import centralized configuration
+import { API_BASE_URL, AI_CREW_WS_URL } from "../lib/config";
+
 const AI_CREW_CONFIG = {
-  baseUrl:
-    import.meta.env.VITE_AI_CREW_API_URL || "https://aiagent-sparefinder-org.onrender.com",
-  wsUrl: import.meta.env.VITE_AI_CREW_WS_URL || "wss://aiagent-sparefinder-org.onrender.com",
+  baseUrl: API_BASE_URL,
+  wsUrl: AI_CREW_WS_URL,
   reconnectAttempts: 3,
   reconnectDelay: 2000,
   heartbeatInterval: 30000,
@@ -517,6 +519,7 @@ export const getStageDisplayName = (stage: string): string => {
     reconnecting: "Reconnecting...",
     initialization: "Initializing...",
     retrying: "Retrying...",
+    starting: "Starting analysis...",
   };
 
   return stageNames[stage] || stage;

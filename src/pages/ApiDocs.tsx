@@ -9,6 +9,7 @@ import { Separator } from "@/components/ui/separator";
 import { Code, KeyRound, ShieldCheck, Zap } from "lucide-react";
 import { FeatureLock } from "@/components/FeatureLock";
 import { useSubscription } from "@/contexts/SubscriptionContext";
+import { API_BASE_URL } from "@/lib/config";
 
 const CodeBlock: React.FC<{ children: string }> = ({ children }) => {
   return (
@@ -20,13 +21,7 @@ const CodeBlock: React.FC<{ children: string }> = ({ children }) => {
 
 const ApiDocs: React.FC = () => {
   const { tier, isPlanActive } = useSubscription();
-  const apiBaseUrl = useMemo(() => {
-    return (
-      import.meta.env.VITE_API_BASE_URL ||
-      import.meta.env.VITE_API_URL ||
-      "https://sparefinder-org-pp8y.onrender.com"
-    );
-  }, []);
+  const apiBaseUrl = API_BASE_URL;
 
   const hasApiAccess = isPlanActive && (tier === "pro" || tier === "enterprise");
 

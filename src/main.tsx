@@ -49,16 +49,16 @@ if (!clerkPublishableKey) {
   createRoot(rootElement).render(
     <React.StrictMode>
       <ClerkErrorBoundary>
-        <ClerkProvider
-          publishableKey={clerkPublishableKey}
-          signInUrl="/login"
-          signUpUrl="/register"
-          afterSignInUrl="/dashboard"
-          // New signups should complete post-signup profile onboarding before picking a plan.
-          afterSignUpUrl="/onboarding/profile"
-        >
-          <App />
-        </ClerkProvider>
+      <ClerkProvider
+        publishableKey={clerkPublishableKey}
+        signInUrl="/login"
+        signUpUrl="/register"
+        afterSignInUrl="/dashboard"
+        // New signups should complete post-signup profile onboarding before picking a plan.
+        afterSignUpUrl="/onboarding/profile"
+      >
+        <App />
+      </ClerkProvider>
       </ClerkErrorBoundary>
     </React.StrictMode>
   );

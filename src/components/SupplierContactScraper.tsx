@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { motion, AnimatePresence } from "framer-motion";
+import { API_BASE_URL } from "@/lib/config";
 
 interface ContactInfo {
   emails: string[];
@@ -102,9 +103,7 @@ export const SupplierContactScraper: React.FC<SupplierContactScraperProps> = ({
     setScrapedData(null);
 
     try {
-      const API_BASE =
-        import.meta.env.VITE_AI_SERVICE_URL || "http://localhost:8000";
-      const response = await fetch(`${API_BASE}/suppliers/scrape`, {
+      const response = await fetch(`${API_BASE_URL}/suppliers/scrape`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

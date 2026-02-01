@@ -29,7 +29,7 @@ const SharedAnalysis = () => {
       try {
         setLoading(true);
         const response = await fetch(
-          `${import.meta.env.VITE_API_URL || 'http://localhost:4000'}/api/reports/shared/${token}`
+          `${API_BASE_URL}/api/reports/shared/${token}`
         );
 
         if (!response.ok) {
@@ -55,10 +55,7 @@ const SharedAnalysis = () => {
 
     try {
       const filename = analysis.pdf_url.split('/').pop() || 'report.pdf';
-      const apiBaseUrl =
-        import.meta.env.VITE_API_URL ||
-        import.meta.env.VITE_API_BASE_URL ||
-        'http://localhost:4000';
+      const apiBaseUrl = API_BASE_URL;
 
       // Fetch PDF as blob to avoid browser security warnings
       const response = await fetch(`${apiBaseUrl}/api/reports/pdf/${filename}`, {

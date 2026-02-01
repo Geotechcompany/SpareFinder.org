@@ -17,6 +17,7 @@ except Exception:
 
 import asyncio
 import base64
+import queue as queue_module
 from typing import Optional
 import warnings
 import logging
@@ -48,7 +49,8 @@ from openai import OpenAI
 app = FastAPI(
     title="AI Spare Part Analyzer API",
     description="AI-powered manufacturer part identification, research, and supplier discovery",
-    version="2.0.0"
+    version="2.0.1",
+    redirect_slashes=True  # Allow both /api/billing and /api/billing/
 )
 
 # CORS middleware
@@ -59,6 +61,53 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Import and register API routers
+from .api.routes_auth import router as auth_router
+from .api.routes_billing import router as billing_router
+from .api.routes_credits import router as credits_router
+from .api.routes_statistics import router as statistics_router
+from .api.routes_dashboard import router as dashboard_router
+from .api.routes_history import router as history_router
+from .api.routes_notifications import router as notifications_router
+from .api.routes_user import router as user_router
+from .api.routes_upload import router as upload_router
+from .api.routes_reviews import router as reviews_router
+from .api.routes_search import router as search_router
+
+app.include_router(auth_router, prefix="/api")
+app.include_router(billing_router, prefix="/api")
+app.include_router(credits_router, prefix="/api")
+app.include_router(statistics_router, prefix="/api")
+app.include_router(dashboard_router, prefix="/api")
+app.include_router(history_router, prefix="/api")
+app.include_router(notifications_router, prefix="/api")
+app.include_router(user_router, prefix="/api")
+app.include_router(upload_router, prefix="/api")
+app.include_router(reviews_router, prefix="/api")
+app.include_router(search_router, prefix="/api")
+
+print("All API routers registered successfully")
+logger.info("All API routers registered successfully")
+
+# Debug endpoint to verify routes
+@app.get("/api/debug/routes")
+async def debug_routes():
+    """Debug endpoint to list all registered routes."""
+    routes = []
+    for route in app.routes:
+        if hasattr(route, "path") and hasattr(route, "methods"):
+            routes.append({
+                "path": route.path,
+                "methods": list(route.methods)
+            })
+    return {"total_routes": len(routes), "api_routes": [r for r in routes if r["path"].startswith("/api")]}
+
+# Test endpoint to verify billing route works
+@app.get("/api/test/billing")
+async def test_billing():
+    """Test endpoint to verify billing route is accessible."""
+    return {"message": "Billing route test - this endpoint works", "status": "ok"}
 
 # WebSocket connections manager
 class ConnectionManager:
@@ -106,10 +155,144 @@ def create_progress_emitter(websocket: WebSocket):
     return emit
 
 
+async def auto_start_pending_jobs():
+    """Background task to automatically start pending analysis jobs."""
+    # Import here to avoid circular imports at module level
+    try:
+        from app.api.supabase_admin import get_supabase_admin
+    except ImportError:
+        # Fallback: try relative import
+        try:
+            from .api.supabase_admin import get_supabase_admin
+        except ImportError:
+            logger.error("Failed to import get_supabase_admin - auto-start disabled")
+            return
+    
+    import httpx
+    
+    while True:
+        try:
+            await asyncio.sleep(10)  # Check every 10 seconds
+            
+            supabase = get_supabase_admin()
+            
+            # Find pending jobs
+            result = (
+                supabase.table("crew_analysis_jobs")
+                .select("id, user_email, keywords, image_url, image_name")
+                .eq("status", "pending")
+                .limit(10)  # Process max 10 at a time
+                .execute()
+            )
+            
+            if not result.data or len(result.data) == 0:
+                continue
+            
+            logger.info(f"Found {len(result.data)} pending jobs to start")
+            
+            for job in result.data:
+                job_id = job.get("id")
+                user_email = job.get("user_email")
+                keywords = job.get("keywords") or ""
+                image_url = job.get("image_url")
+                
+                if not job_id or not user_email:
+                    continue
+                
+                try:
+                    # Update status to processing immediately
+                    update_crew_job_status(job_id, "processing", "starting", 5)
+                    
+                    # Fetch image if URL is provided and not a placeholder
+                    image_data = None
+                    if image_url and not image_url.startswith("placeholder_url"):
+                        try:
+                            async with httpx.AsyncClient(timeout=30.0) as client:
+                                img_response = await client.get(image_url)
+                                if img_response.status_code == 200:
+                                    image_data = img_response.content
+                                    logger.info(f"Fetched image for job {job_id} ({len(image_data)} bytes)")
+                        except Exception as img_error:
+                            logger.warning(f"Failed to fetch image for job {job_id}: {img_error}")
+                            # Continue without image - analysis can still proceed with keywords
+                    
+                    # Start analysis in background
+                    asyncio.create_task(
+                        run_analysis_background(
+                            job_id,
+                            user_email,
+                            image_data,
+                            keywords
+                        )
+                    )
+                    
+                    logger.info(f"Started pending job {job_id} for {user_email}")
+                    
+                except Exception as job_error:
+                    logger.error(f"Failed to start pending job {job_id}: {job_error}")
+                    import traceback
+                    logger.error(traceback.format_exc())
+                    # Mark as failed
+                    try:
+                        update_crew_job_status(
+                            job_id,
+                            "failed",
+                            "error",
+                            0,
+                            str(job_error)
+                        )
+                    except:
+                        pass
+        
+        except Exception as e:
+            logger.error(f"Error in auto-start pending jobs task: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
+            await asyncio.sleep(30)  # Wait longer on error
+
+
+async def redis_broadcast_loop(message_queue: queue_module.Queue):
+    """Read crew job updates from Redis subscriber queue and broadcast to all WebSocket clients."""
+    loop = asyncio.get_event_loop()
+
+    def get_message():
+        return message_queue.get(timeout=2.0)
+
+    while True:
+        try:
+            msg = await loop.run_in_executor(None, get_message)
+            await manager.broadcast(msg)
+        except queue_module.Empty:
+            await asyncio.sleep(0.1)
+        except Exception as e:
+            logger.debug("Redis broadcast loop error: %s", e)
+            await asyncio.sleep(1.0)
+
+
 @app.on_event("startup")
 async def startup_event():
     """Initialize on startup."""
     ensure_temp_dir()
+    # Debug: Print all registered routes
+    api_routes = [r for r in app.routes if hasattr(r, "path") and r.path.startswith("/api")]
+    logger.info(f"Registered {len(api_routes)} API routes on startup")
+    for route in api_routes[:10]:  # Print first 10
+        logger.info(f"  {route.path} {getattr(route, 'methods', [])}")
+    
+    # Start background task to auto-start pending jobs
+    asyncio.create_task(auto_start_pending_jobs())
+    logger.info("Started auto-start pending jobs background task")
+
+    # Redis Pub/Sub: subscribe to crew_job_updates and broadcast to WebSocket clients
+    try:
+        from .redis_client import is_redis_configured, start_job_updates_subscriber
+        if is_redis_configured():
+            redis_queue: queue_module.Queue = queue_module.Queue()
+            start_job_updates_subscriber(redis_queue)
+            asyncio.create_task(redis_broadcast_loop(redis_queue))
+            logger.info("Started Redis Pub/Sub broadcast loop for job updates")
+    except ImportError:
+        pass
 
 
 @app.get("/")
@@ -793,108 +976,11 @@ async def websocket_progress(websocket: WebSocket):
             manager.disconnect(websocket)
 
 
-@app.post("/search/keywords/schedule")
-async def schedule_keyword_search(request: Request):
-    """
-    Schedule a keyword-only search (no image required).
-    Returns immediately with a job ID for tracking.
-    """
-    try:
-        # Parse JSON body
-        body = await request.json()
-        keywords_raw = body.get("keywords", "")
-        user_email = body.get("user_email", "")
-        
-        # Handle keywords as either string or array
-        if isinstance(keywords_raw, list):
-            keywords = " ".join(str(k).strip() for k in keywords_raw if k)
-        else:
-            keywords = str(keywords_raw).strip() if keywords_raw else ""
-        
-        # Validate inputs
-        if not keywords:
-            return JSONResponse(
-                status_code=400,
-                content={"error": "Keywords are required"}
-            )
-        
-        if not user_email or "@" not in user_email:
-            return JSONResponse(
-                status_code=400,
-                content={"error": "Valid email address is required"}
-            )
-        
-        # Generate unique job ID
-        import uuid
-        job_id = str(uuid.uuid4())
-        
-        # Create job entry in database first
-        from .database_storage import create_crew_job
-        job_created = create_crew_job(
-            job_id=job_id,
-            user_email=user_email,
-            keywords=keywords,
-            image_url=None
-        )
-        
-        if not job_created:
-            logger.warning(f"⚠️ Failed to create crew job entry for {job_id}, but continuing with analysis")
-        
-        # Start analysis in background (no image, only keywords)
-        asyncio.create_task(run_analysis_background(
-            job_id,
-            user_email,
-            None,  # No image data
-            keywords
-        ))
-        
-        # Return job ID immediately
-        return JSONResponse(
-            status_code=202,
-            content={
-                "success": True,
-                "job_id": job_id,
-                "message": "Keyword search scheduled successfully",
-                "status": "processing"
-            }
-        )
-    
-    except Exception as e:
-        print(f"❌ Error scheduling keyword search: {e}")
-        return JSONResponse(
-            status_code=500,
-            content={"error": str(e)}
-        )
-
-
-@app.get("/search/keywords/status/{job_id}")
-async def get_keyword_search_status(job_id: str):
-    """
-    Get the status of a keyword search job.
-    """
-    try:
-        # Check job status in database
-        from .database_storage import get_crew_job_status
-        
-        job_status = get_crew_job_status(job_id)
-        
-        if not job_status:
-            return JSONResponse(
-                status_code=404,
-                content={"error": "Job not found"}
-            )
-        
-        return JSONResponse(
-            status_code=200,
-            content=job_status
-        )
-    
-    except Exception as e:
-        print(f"❌ Error getting job status: {e}")
-        return JSONResponse(
-            status_code=500,
-            content={"error": str(e)}
-        )
+# Search routes moved to routes_search.py router
+# These endpoints are now available at:
+# - POST /api/search/keywords
+# - POST /api/search/keywords/schedule (legacy)
+# - GET /api/search/keywords/status/{job_id}
 
 
 if __name__ == "__main__":

@@ -1855,7 +1855,7 @@ const Settings = () => {
                             Example
                           </div>
                           <pre className="overflow-x-auto rounded-xl border border-border bg-background/70 p-3 dark:bg-black/30">
-{`curl -X GET \"${import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL || "https://sparefinder-org-pp8y.onrender.com"}/api/external/v1/me\" \\\n  -H \"x-api-key: <YOUR_API_KEY>\"`}
+{`curl -X GET \"${import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL || "http://localhost:8000"}/api/external/v1/me\" \\\n  -H \"x-api-key: <YOUR_API_KEY>\"`}
                           </pre>
                         </div>
                       </CardContent>

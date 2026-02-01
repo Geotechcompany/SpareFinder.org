@@ -523,7 +523,7 @@ const Landing = () => {
             billingCycle={billingCycle}
             onBillingCycleChange={setBillingCycle}
             onSelectPlan={handlePlanSelect}
-          />
+                      />
         </div>
       </section>
 

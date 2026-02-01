@@ -249,7 +249,7 @@ router.post(
           console.warn("Keyword search: failed to fetch profile email", {
             userId,
             message: profileError.message,
-          });
+        });
         }
 
         if (userProfile?.email) {

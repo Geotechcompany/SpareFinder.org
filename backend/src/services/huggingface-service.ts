@@ -57,7 +57,7 @@ class HuggingFaceService {
             Authorization: `Bearer ${this.apiToken}`,
             "Content-Type": "application/json",
           },
-          timeout: 90000, // 90 seconds timeout for image generation
+          timeout: 80000, // 90 seconds timeout for image generation
           responseType: "arraybuffer",
         }
       );

@@ -64,18 +64,38 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       }
 
       // Wait a bit to ensure token provider is set
-      // This prevents race condition where checkAuth runs before token provider is configured
       await new Promise(resolve => setTimeout(resolve, 100));
 
       setIsProfileLoading(true);
 
-      // Verify / sync app profile via backend (also performs Clerk→profiles linking server-side)
-      const response = await api.auth.getCurrentUser<{ user: User }>();
+      // Short timeout so we don't hang when backend is busy (e.g. Crew AI running)
+      const authTimeoutMs = 10000;
+      let response: ApiResponse<{ user: User }> | null = null;
 
-      if (response.success && response.data?.user) {
+      try {
+        response = await api.auth.getCurrentUser<{ user: User }>({
+          timeout: authTimeoutMs,
+        });
+      } catch (firstError) {
+        // One retry after 2s so transient slowness doesn't block login
+        const isTimeout =
+          firstError instanceof Error &&
+          (firstError.message.includes("timeout") ||
+            (firstError as any)?.code === "ECONNABORTED");
+        if (isTimeout) {
+          await new Promise((r) => setTimeout(r, 2000));
+          response = await api.auth.getCurrentUser<{ user: User }>({
+            timeout: authTimeoutMs,
+          }).catch(() => null);
+        } else {
+          throw firstError;
+        }
+      }
+
+      if (response?.success && response.data?.user) {
         setUser(response.data.user);
       } else {
-        console.warn("❌ Failed to load app profile:", response.error || response.message);
+        console.warn("❌ Failed to load app profile:", response?.error || response?.message);
         setUser(null);
       }
     } catch (error) {

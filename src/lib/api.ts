@@ -46,20 +46,22 @@ export type AdminStatsApiResponse = {
 // Remove the Axios module declaration and the duplicate interface
 // Type assertions will be used in the code instead
 
-const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL ||
-  import.meta.env.VITE_API_URL ||
-  "https://sparefinder-org-pp8y.onrender.com";
+// Import centralized configuration
+import { API_BASE_URL } from "./config";
 
 console.log("🔧 API Client Config:", {
   baseURL: API_BASE_URL,
   environment: import.meta.env.MODE,
-  envVars: {
-    VITE_API_BASE_URL: import.meta.env.VITE_API_BASE_URL,
-    VITE_API_URL: import.meta.env.VITE_API_URL,
-    MODE: import.meta.env.MODE,
-  },
 });
+
+const isCanceledRequest = (err: any) => {
+  // Axios v1 uses AbortController and throws CanceledError with code "ERR_CANCELED"
+  return (
+    err?.code === "ERR_CANCELED" ||
+    err?.name === "CanceledError" ||
+    (typeof axios.isCancel === "function" && axios.isCancel(err))
+  );
+};
 
 // Token storage utilities (legacy Supabase auth)
 const TOKEN_KEY = "auth_token";
@@ -462,8 +464,16 @@ export const authApi = {
     }
   },
 
-  getCurrentUser: async <T = unknown>(): Promise<ApiResponse<T>> => {
-    const response = await apiClient.get("/auth/current-user");
+  getCurrentUser: async <T = unknown>(options?: {
+    timeout?: number;
+    signal?: AbortSignal;
+  }): Promise<ApiResponse<T>> => {
+    // Shorter timeout so auth doesn't hang when backend is busy (e.g. Crew AI running)
+    const timeout = options?.timeout ?? 10000;
+    const response = await apiClient.get("/auth/current-user", {
+      timeout,
+      signal: options?.signal,
+    });
     return response.data as ApiResponse<T>;
   },
 
@@ -505,7 +515,9 @@ export const dashboardApi = {
       console.log("📊 Stats response config:", response.config);
       return response.data as ApiResponse<DashboardStats>;
     } catch (error) {
-      console.error("📊 Failed to fetch dashboard stats:", error);
+      if (!isCanceledRequest(error)) {
+        console.error("📊 Failed to fetch dashboard stats:", error);
+      }
       throw error;
     }
   },
@@ -523,10 +535,7 @@ export const dashboardApi = {
     const payload: { keywords: string[] } = {
       keywords: Array.isArray(keywords) ? keywords : [keywords],
     };
-    const AI_BASE =
-      (import.meta as { env?: { VITE_AI_SERVICE_URL?: string } }).env
-        ?.VITE_AI_SERVICE_URL || "https://aiagent-sparefinder-org.onrender.com";
-    const res = await axios.post(`${AI_BASE}/search/keywords`, payload, {
+    const res = await axios.post(`${API_BASE_URL}/search/keywords`, payload, {
       headers: { "Content-Type": "application/json" },
     });
     return res.data;
@@ -541,21 +550,21 @@ export const dashboardApi = {
     };
     if (userEmail) payload.user_email = userEmail;
 
-    // Call backend instead of AI service directly. Allow longer timeout because
-    // the scheduler proxies to the AI service which can take several seconds.
+    // Backend returns immediately with job_id; analysis runs in background.
     const response = await apiClient.post("/search/keywords", payload, {
-      timeout: 120000,
+      timeout: 15000, // Expect quick response; analysis runs server-side
     });
     const result = response.data as ApiResponse & {
       filename?: string;
       jobId?: string;
-      data?: { filename?: string; jobId?: string };
+      data?: { filename?: string; jobId?: string; job_id?: string };
     };
 
     const jobId =
       result?.jobId ??
       result?.filename ??
       result?.data?.jobId ??
+      result?.data?.job_id ?? // Backend returns job_id (snake_case)
       result?.data?.filename ??
       null;
 
@@ -595,7 +604,9 @@ export const dashboardApi = {
       console.log("🔄 Recent activities response:", response.data);
       return response.data;
     } catch (error) {
-      console.error("🔄 Failed to fetch recent activities:", error);
+      if (!isCanceledRequest(error)) {
+        console.error("🔄 Failed to fetch recent activities:", error);
+      }
       throw error;
     }
   },
@@ -609,7 +620,9 @@ export const dashboardApi = {
       console.log("📈 Performance metrics response:", response.data);
       return response.data;
     } catch (error) {
-      console.error("📈 Failed to fetch performance metrics:", error);
+      if (!isCanceledRequest(error)) {
+        console.error("📈 Failed to fetch performance metrics:", error);
+      }
       throw error;
     }
   },
@@ -619,10 +632,18 @@ export const dashboardApi = {
     signal?: AbortSignal;
   }): Promise<ApiResponse<{ days: number; series: DashboardAnalyticsPoint[] }>> => {
     const days = options?.days ?? 30;
-    const response = await apiClient.get(`/dashboard/analytics?days=${days}`, {
-      signal: options?.signal,
-    });
-    return response.data as ApiResponse<{ days: number; series: DashboardAnalyticsPoint[] }>;
+    try {
+      const response = await apiClient.get(`/dashboard/analytics?days=${days}`, {
+        signal: options?.signal,
+      });
+      return response.data as ApiResponse<{ days: number; series: DashboardAnalyticsPoint[] }>;
+    } catch (error) {
+      // Avoid spamming the console during intentional aborts (HMR/unmount).
+      if (!isCanceledRequest(error)) {
+        console.error("📉 Failed to fetch analytics:", error);
+      }
+      throw error;
+    }
   },
 
   // Add missing methods used by History component
@@ -903,9 +924,13 @@ export const adminApi = {
 export const billingApi = {
   getBillingInfo: async (options?: {
     signal?: AbortSignal;
+    timeout?: number;
   }): Promise<ApiResponse> => {
+    // Shorter timeout so billing doesn't hang when backend is busy (e.g. Crew AI)
+    const timeout = options?.timeout ?? 10000;
     const response = await apiClient.get("/billing", {
       signal: options?.signal,
+      timeout,
     });
     return response.data;
   },
@@ -919,11 +944,6 @@ export const billingApi = {
 
   cancelSubscription: async (): Promise<ApiResponse> => {
     const response = await apiClient.post("/billing/subscription/cancel");
-    return response.data;
-  },
-
-  reactivateSubscription: async (): Promise<ApiResponse> => {
-    const response = await apiClient.post("/billing/subscription/reactivate");
     return response.data;
   },
 
@@ -1228,7 +1248,7 @@ export const uploadApi = {
         headers: {
           "Content-Type": "multipart/form-data",
         },
-        timeout: 30000, // 30 second timeout
+        timeout: 90000, // 90s - backend returns 201 after creating job; analysis runs in background. Allow time for upload + DB.
       });
 
       return response.data;
@@ -1281,16 +1301,6 @@ export const statisticsApi = {
     }
   },
 
-  checkAchievements: async (): Promise<ApiResponse> => {
-    try {
-      const response = await apiClient.post("/statistics/check-achievements");
-      return response.data;
-    } catch (error) {
-      console.error("Achievement check error:", error);
-      throw error;
-    }
-  },
-
   deleteUserData: async (password: string): Promise<ApiResponse> => {
     try {
       const response = await apiClient.delete("/statistics/user-data", {
@@ -1299,6 +1309,18 @@ export const statisticsApi = {
       return response.data;
     } catch (error) {
       console.error("User data deletion error:", error);
+      throw error;
+    }
+  },
+
+  // Optional endpoint: checks/unlocks achievements server-side (and may send emails).
+  // If the backend has no special logic, it can safely return success and do nothing.
+  checkAchievements: async (): Promise<ApiResponse> => {
+    try {
+      const response = await apiClient.post("/statistics/check-achievements");
+      return response.data;
+    } catch (error) {
+      console.error("Achievements check error:", error);
       throw error;
     }
   },

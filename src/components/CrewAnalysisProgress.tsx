@@ -125,15 +125,25 @@ export const CrewAnalysisProgress = ({
 
   if (compact) {
     // Compact view for cards with collapsible stages
+    const isPending = status === "pending";
     return (
       <div className="space-y-2">
-        {isAnalyzing && (
+        {isPending && (
+          <div className="flex items-center gap-2 rounded-lg bg-muted/50 dark:bg-muted/30 px-2.5 py-2 text-xs">
+            <Loader2 className="h-3.5 w-3.5 animate-spin text-amber-500 flex-shrink-0" />
+            <span className="text-muted-foreground">
+              Processing..
+            </span>
+            <span className="ml-auto inline-flex h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" aria-hidden />
+          </div>
+        )}
+        {isAnalyzing && !isPending && (
           <>
             <div className="flex items-center justify-between text-xs">
               <span className="text-muted-foreground">{title}</span>
-              <span className="text-blue-400">{progress}%</span>
+              <span className="text-blue-400 font-medium tabular-nums">{progress}%</span>
             </div>
-            <Progress value={progress} className="h-1" />
+            <Progress value={progress} className="h-1.5" />
 
             {/* Current Stage + Toggle Button */}
             <div className="flex items-center justify-between">

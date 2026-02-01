@@ -1,16 +1,45 @@
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import DashboardSidebar from "@/components/DashboardSidebar";
 import MobileSidebar from "@/components/MobileSidebar";
 import { DashboardLayoutProvider } from "@/contexts/DashboardLayoutContext";
 import { Menu } from "lucide-react";
-import { Outlet } from "react-router-dom";
+import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import DashboardHeader from "@/components/DashboardHeader";
 import DashboardMobileTabs from "@/components/DashboardMobileTabs";
 
 const DashboardLayout: React.FC = () => {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const location = useLocation();
+  const navigate = useNavigate();
+  const didRestoreRef = useRef(false);
+
+  // Persist the last visited dashboard sub-route so a hard refresh can restore it
+  // even if the server rewrites /dashboard/* → /dashboard.
+  useEffect(() => {
+    if (!location.pathname.startsWith("/dashboard")) return;
+    const fullPath = `${location.pathname}${location.search}${location.hash}`;
+    localStorage.setItem("sparefinder:lastDashboardPath", fullPath);
+  }, [location.pathname, location.search, location.hash]);
+
+  useEffect(() => {
+    if (didRestoreRef.current) return;
+    if (location.pathname !== "/dashboard") return;
+
+    const navEntry = (performance.getEntriesByType?.("navigation")?.[0] as
+      | PerformanceNavigationTiming
+      | undefined);
+    const navType = navEntry?.type;
+    const isReload = navType === "reload";
+    if (!isReload) return;
+
+    const last = localStorage.getItem("sparefinder:lastDashboardPath");
+    if (!last || !last.startsWith("/dashboard/")) return;
+
+    didRestoreRef.current = true;
+    navigate(last, { replace: true });
+  }, [location.pathname, navigate]);
 
   const handleToggleSidebar = () => setIsCollapsed(!isCollapsed);
   const handleToggleMobileMenu = () => setIsMobileMenuOpen(!isMobileMenuOpen);

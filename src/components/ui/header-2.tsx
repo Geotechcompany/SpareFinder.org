@@ -73,7 +73,10 @@ export function Header() {
             />
           </a>
         </div>
-        <div className="hidden items-center gap-4 md:flex">
+        {/* Desktop nav:
+            - Shows at lg+ for normal desktops
+            - Hidden on coarse pointers (phones/tablets) even if viewport width is misreported */}
+        <div className="hidden items-center gap-4 lg:flex [@media(pointer:coarse)]:hidden">
           <NavigationMenu>
             <NavigationMenuList>
               <NavigationMenuItem>
@@ -159,7 +162,8 @@ export function Header() {
           size="icon"
           variant="outline"
           onClick={() => setOpen(!open)}
-          className="md:hidden"
+          className="lg:hidden [@media(pointer:coarse)]:inline-flex"
+          aria-label={open ? "Close menu" : "Open menu"}
         >
           <MenuToggleIcon open={open} className="size-5" duration={300} />
         </Button>
@@ -167,8 +171,8 @@ export function Header() {
 
       <div
         className={cn(
-          "bg-background/90 fixed top-14 right-0 bottom-0 left-0 z-50 flex flex-col overflow-hidden border-y md:hidden",
-          open ? "block" : "hidden"
+          "fixed top-14 right-0 bottom-0 left-0 z-50 overflow-hidden border-y bg-background/95 text-foreground lg:hidden [@media(pointer:coarse)]:block",
+          open ? "flex flex-col" : "hidden"
         )}
       >
         <div
@@ -179,7 +183,7 @@ export function Header() {
           )}
         >
           <div className="grid gap-y-2">
-            <span className="px-2 text-xs uppercase text-white/50">
+            <span className="px-2 text-xs uppercase text-muted-foreground">
               Platform
             </span>
             {platform.map((link) => (
@@ -194,7 +198,7 @@ export function Header() {
                 {link.label}
               </a>
             ))}
-            <span className="mt-2 px-2 text-xs uppercase text-white/50">
+            <span className="mt-2 px-2 text-xs uppercase text-muted-foreground">
               Solutions
             </span>
             {solutions.map((link) => (
@@ -209,7 +213,7 @@ export function Header() {
                 {link.label}
               </a>
             ))}
-            <span className="mt-2 px-2 text-xs uppercase text-white/50">
+            <span className="mt-2 px-2 text-xs uppercase text-muted-foreground">
               Resources
             </span>
             {resources.map((link) => (

@@ -19,6 +19,10 @@ python-dotenv==1.0.0
 tiktoken>=0.7.0
 requests>=2.31.0
 
+# Auth (Clerk JWT verification)
+PyJWT==2.10.1
+python-jose[cryptography]==3.3.0
+
 # Storage and database integration
 # NOTE: Older supabase versions pin httpx<0.25 which conflicts with modern AI libs (anthropic/stagehand).
 supabase==2.25.1
@@ -26,6 +30,12 @@ postgrest==2.25.1
 
 # Shared HTTP client version to keep resolver deterministic (must satisfy supabase/openai/anthropic/stagehand)
 httpx==0.28.1
+
+# Payments (Stripe)
+stripe==10.12.0
+
+# Redis (caching / queue) - use Redis Labs or any Redis
+redis>=5.0.0
 
 # CrewAI transitive deps (pin to keep Render builds deterministic / fast)
 litellm==1.74.15

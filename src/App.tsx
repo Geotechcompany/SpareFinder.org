@@ -16,6 +16,7 @@ import Dashboard from "./pages/Dashboard";
 import Upload from "./pages/Upload";
 import History from "./pages/History";
 import Billing from "./pages/Billing";
+import TestPayment from "./pages/TestPayment";
 import AdminDashboard from "./pages/AdminDashboard";
 import Settings from "./pages/Settings";
 import Notifications from "./pages/Notifications";
@@ -130,6 +131,14 @@ const App = () => (
                 <Route path="notifications" element={<Notifications />} />
                 <Route path="profile" element={<Profile />} />
               </Route>
+              <Route
+                path="/test-payment"
+                element={
+                  <ProtectedRoute requireAuth={false}>
+                    <TestPayment />
+                  </ProtectedRoute>
+                }
+              />
               <Route
                 path="/onboarding/trial"
                 element={

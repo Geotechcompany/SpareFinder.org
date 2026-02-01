@@ -502,6 +502,20 @@ def update_crew_job_status(
             return False
         
         logger.info(f"✅ Updated crew job {job_id} status to {status}")
+        # Publish to Redis for real-time push to WebSocket clients
+        try:
+            from .redis_client import is_redis_configured, publish_job_update
+            if is_redis_configured():
+                publish_job_update({
+                    "type": "crew_job_update",
+                    "job_id": job_id,
+                    "status": status,
+                    "current_stage": current_stage,
+                    "progress": progress,
+                    "error_message": error_message,
+                })
+        except Exception as pub_err:
+            logger.debug("Redis publish_job_update (status): %s", pub_err)
         return True
         
     except Exception as e:
@@ -550,6 +564,20 @@ def complete_crew_job(
             return False
         
         logger.info(f"✅ Completed crew job {job_id}")
+        # Publish to Redis for real-time push to WebSocket clients
+        try:
+            from .redis_client import is_redis_configured, publish_job_update
+            if is_redis_configured():
+                publish_job_update({
+                    "type": "crew_job_update",
+                    "job_id": job_id,
+                    "status": "completed",
+                    "current_stage": "completed",
+                    "progress": 100,
+                    "pdf_url": pdf_url,
+                })
+        except Exception as pub_err:
+            logger.debug("Redis publish_job_update (complete): %s", pub_err)
         return True
         
     except Exception as e:

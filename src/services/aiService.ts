@@ -113,9 +113,11 @@ interface BackendResponse {
   external_search_results?: BackendPrediction['external_parts'];
 }
 
+import { API_BASE_URL } from "../lib/config";
+
 // Configuration
 const AI_SERVICE_CONFIG = {
-  baseUrl: import.meta.env.VITE_AI_SERVICE_URL || 'https://aiagent-sparefinder-org.onrender.com',
+  baseUrl: API_BASE_URL,
   apiKey: import.meta.env.VITE_AI_SERVICE_API_KEY || 'geotech-dev-key-2024',
   maxFileSize: 10 * 1024 * 1024, // 10MB
   supportedFormats: ['image/jpeg', 'image/png', 'image/webp'],

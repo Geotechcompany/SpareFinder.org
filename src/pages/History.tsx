@@ -42,11 +42,12 @@ import MobileSidebar from "@/components/MobileSidebar";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/components/ui/use-toast";
 import { dashboardApi, getAuthHeaders, uploadApi, api } from "@/lib/api";
+import { API_BASE_URL } from "@/lib/config";
 import { PartAnalysisDisplayModal } from "@/components/PartAnalysisDisplay";
 import { ReviewModal } from "@/components/ReviewModal";
 import OnboardingGuide from "@/components/OnboardingGuide";
 import { CrewAnalysisProgress } from "@/components/CrewAnalysisProgress";
-import { getCrewJobDisplayName } from "@/services/aiAnalysisCrew";
+import { getCrewJobDisplayName, getStageDisplayName } from "@/services/aiAnalysisCrew";
 import { AnalysisResultModal } from "@/components/AnalysisResultModal";
 import {
   Dialog,
@@ -69,8 +70,12 @@ import {
   PaginationNext,
   PaginationLink,
 } from "@/components/ui/pagination";
+import { useLocation } from "react-router-dom";
+
+const HISTORY_PATH = "/dashboard/history";
 
 const History = () => {
+  const location = useLocation();
   const { inLayout } = useDashboardLayout();
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -87,6 +92,17 @@ const History = () => {
   const [pastAnalysis, setpastAnalysis] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Pagination state
+  const [pagination, setPagination] = useState({
+    page: 1,
+    limit: 9, // 3 rows × 3 columns = 9 items per page
+    total: 0,
+    hasMore: false,
+  });
+
+  // Search state
+  const [searchQuery, setSearchQuery] = useState("");
 
   // Analysis modal state
   const [isAnalysisOpen, setIsAnalysisOpen] = useState(false);
@@ -155,6 +171,28 @@ const History = () => {
       _uniqueCardKey: job.id, // Use job ID directly since they're now unique
     }));
   }, [crewJobs]);
+
+  // Filter jobs based on search query
+  const filteredCrewJobs = useMemo(() => {
+    if (!searchQuery.trim()) {
+      return uniqueCrewJobs;
+    }
+
+    const query = searchQuery.toLowerCase();
+    return uniqueCrewJobs.filter((job: any) => {
+      const keywords = (job.keywords || "").toLowerCase();
+      const imageName = (job.image_name || "").toLowerCase();
+      const status = (job.status || "").toLowerCase();
+      const id = (job.id || "").toLowerCase();
+      
+      return (
+        keywords.includes(query) ||
+        imageName.includes(query) ||
+        status.includes(query) ||
+        id.includes(query)
+      );
+    });
+  }, [uniqueCrewJobs, searchQuery]);
 
   // Pagination state
   const [imagePage, setImagePage] = useState(1);
@@ -230,7 +268,11 @@ const History = () => {
   }, [isAuthenticated, user?.id]);
 
   // Single comprehensive data fetch function
-  const fetchAllData = useCallback(async () => {
+  // When options.background is true (e.g. after redirect with new job), don't show full-page loading so the page doesn't freeze
+  const FETCH_TIMEOUT_MS = 12000;
+  const fetchAllData = useCallback(async (options?: { background?: boolean }) => {
+    const background = options?.background === true;
+
     // Prevent multiple simultaneous requests
     if (isFetchingRef.current || !hasValidToken()) {
       return;
@@ -245,16 +287,29 @@ const History = () => {
     abortControllerRef.current = new AbortController();
     const signal = abortControllerRef.current.signal;
 
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
     try {
       isFetchingRef.current = true;
-      setIsLoading(true);
+      if (!background) {
+        setIsLoading(true);
+      }
       setError(null);
 
-      console.log("🔄 Starting comprehensive data fetch for user:", user?.id);
+      // Prevent indefinite freeze: stop loading after timeout (backend may be busy with analysis)
+      if (!background) {
+        timeoutId = setTimeout(() => {
+          abortControllerRef.current?.abort();
+          setIsLoading(false);
+        }, FETCH_TIMEOUT_MS);
+      } else {
+        // Background fetch: still abort after 20s so we don't hang; stats/history will retry via delayed full fetch
+        timeoutId = setTimeout(() => abortControllerRef.current?.abort(), 20000);
+      }
+
+      console.log("🔄 Starting comprehensive data fetch for user:", user?.id, background ? "(background)" : "");
 
       // Fetch stats and user's history in parallel (but controlled)
-      const BACKEND_BASE =
-        import.meta.env.VITE_API_URL || "http://localhost:4000";
+      const BACKEND_BASE = API_BASE_URL;
       const [statsResponse, historyResponse, crewJobsResponse] =
         await Promise.allSettled([
           dashboardApi.getStats().catch((err) => {
@@ -264,7 +319,10 @@ const History = () => {
           // Fetch history using the updated API wrapper (aligned with backend routes)
           (async () => {
             try {
-              const resp = await uploadApi.getHistory({ limit: 100 as any });
+              const resp = await uploadApi.getHistory({ 
+                page: pagination.page,
+                limit: pagination.limit 
+              });
               return resp;
             } catch (e) {
               throw e;
@@ -317,11 +375,30 @@ const History = () => {
       if (historyResponse.status === "fulfilled" && historyResponse.value) {
         // History response is expected to contain an `uploads` array from backend
         const historyData = historyResponse.value as any;
-        const userJobs: any[] = Array.isArray(historyData.uploads)
-          ? historyData.uploads
+        // Access data from the response (API wraps in { success: true, data: {...} })
+        const responseData = historyData.data || historyData;
+        const userJobs: any[] = Array.isArray(responseData.uploads)
+          ? responseData.uploads
           : [];
 
+        // Update pagination info from response
+        if (responseData.pagination) {
+          console.log("📄 Pagination data from API:", responseData.pagination);
+          setPagination(prev => ({
+            ...prev,
+            total: responseData.pagination.total || 0,
+            hasMore: responseData.pagination.hasMore || false,
+          }));
+        } else {
+          console.warn("⚠️ No pagination data in API response");
+        }
+
         console.log("🔄 User's history jobs:", userJobs.length, "jobs");
+        console.log("📄 Current pagination state after update:", {
+          page: pagination.page,
+          limit: pagination.limit,
+          total: responseData.pagination?.total || 0,
+        });
         console.log(
           "📊 Job details:",
           userJobs.map((j: any) => ({
@@ -337,7 +414,7 @@ const History = () => {
         setpastAnalysis([]);
       }
 
-      // Handle crew jobs response
+      // Handle crew jobs response: merge with current state when in background so we don't wipe optimistic job
       if (crewJobsResponse.status === "fulfilled" && crewJobsResponse.value) {
         const crewData = crewJobsResponse.value as any;
         const crewAnalysisJobs: any[] = Array.isArray(crewData.data)
@@ -353,33 +430,81 @@ const History = () => {
               crewAnalysisJobs.length - uniqueIds.size
             } duplicate job(s) in crew jobs data`
           );
-          console.log(
-            "Duplicate IDs:",
-            crewAnalysisJobs.map((j: any) => j.id)
-          );
         }
 
-        setCrewJobs(crewAnalysisJobs);
+        setCrewJobs((prev) => {
+          // When background fetch: merge API with current so we never drop optimistic job
+          const fromApi = crewAnalysisJobs.map((j: any) => ({ ...j, _uniqueCardKey: j.id }));
+          if (background && prev.length > 0) {
+            const byId = new Map(prev.map((j) => [j.id, { ...j, _uniqueCardKey: j.id }]));
+            fromApi.forEach((j: any) => byId.set(j.id, j));
+            const merged = Array.from(byId.values()).sort(
+              (a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()
+            );
+            return merged;
+          }
+          return fromApi.length ? fromApi : prev;
+        });
+
+        setPagination(prev => ({
+          ...prev,
+          total: Math.max(crewAnalysisJobs.length, prev.total ?? 0),
+        }));
+
+        // Derive stats from crew jobs so they match the cards (even if API stats failed or returned 0)
+        if (crewAnalysisJobs.length > 0) {
+          const completed = crewAnalysisJobs.filter((j: any) => j.status === "completed");
+          const total = crewAnalysisJobs.length;
+          let avgConf = 0;
+          let avgSec = 0;
+          if (completed.length > 0) {
+            const confSum = completed.reduce(
+              (s: number, j: any) => s + (typeof j.progress === "number" ? j.progress : 0),
+              0
+            );
+            avgConf = confSum / completed.length;
+            const timeSum = completed.reduce((s: number, j: any) => {
+              if (j.created_at && j.completed_at) {
+                const ms = new Date(j.completed_at).getTime() - new Date(j.created_at).getTime();
+                return s + ms / 1000;
+              }
+              return s;
+            }, 0);
+            avgSec = timeSum / completed.length;
+          }
+          setStats({
+            totalUploads: total,
+            completed: completed.length,
+            avgConfidence: avgConf.toFixed(1),
+            avgProcessingTime: `${Math.round(avgSec)}s`,
+          });
+        }
       } else {
         console.warn("❌ Failed to fetch crew jobs:", crewJobsResponse);
-        setCrewJobs([]);
+        if (!background) {
+          setCrewJobs([]);
+          setPagination(prev => ({ ...prev, total: 0 }));
+        }
       }
-
-      // Compute accurate stats from user's jobs (image analyses only)
-      // Stats are now fetched from the backend API above (includes crew jobs)
-      // No longer recalculating locally from pastAnalysis
-      console.log("📊 Using stats from API");
 
       // Hydrate missing thumbnails by querying job status
       const hydrateImages = async () => {
         try {
-          const API_BASE =
-            (import.meta as any).env?.VITE_AI_SERVICE_URL ||
-            "https://aiagent-sparefinder-org.onrender.com";
+          const API_BASE = API_BASE_URL;
           // Only fetch from AI service if image_url is missing
           // Images are already stored in Supabase Storage
+          // Filter out crew jobs - they use Supabase real-time updates, not /analyze-part/status/
           const toFetch = (pastAnalysis || []).filter(
-            (j: any) => !j.image_url && (j.image_name || j.id)
+            (j: any) => {
+              const id = j.id || "";
+              const imageName = j.image_name || "";
+              // Skip crew jobs (they have IDs like "crew_analysis_xxx" or image_name like "crew_analysis_xxx.jpg")
+              const isCrewJob = id.startsWith("crew_analysis_") || 
+                                imageName.startsWith("crew_analysis_") ||
+                                id.includes("crew_analysis") ||
+                                imageName.includes("crew_analysis");
+              return !j.image_url && (imageName || id) && !isCrewJob;
+            }
           );
 
           const alreadyHaveImages = (pastAnalysis || []).filter(
@@ -604,10 +729,11 @@ const History = () => {
         variant: "destructive",
       });
     } finally {
+      if (timeoutId) clearTimeout(timeoutId);
       isFetchingRef.current = false;
-      setIsLoading(false);
+      if (!background) setIsLoading(false);
     }
-  }, [hasValidToken, user?.id, toast, logout]);
+  }, [hasValidToken, user?.id, toast, logout, pagination.page, pagination.limit]);
 
   // Real-time polling for job statuses and data updates
   const pollJobStatuses = useCallback(async () => {
@@ -622,12 +748,18 @@ const History = () => {
 
       setIsPolling(true);
       // Use backend endpoint instead of AI service to ensure user filtering
-      const historyData = await uploadApi.getHistory({ limit: 100 });
+      // Respect current pagination settings
+      const historyData = await uploadApi.getHistory({ 
+        page: pagination.page,
+        limit: pagination.limit 
+      });
       // Normalize response shape for robust polling
       if (historyData?.success) {
         // Support both possible shapes from backend: { searches: [...] } and { uploads: [...] }
+        // Access data from the response (API wraps in { success: true, data: {...} })
+        const responseData = (historyData as any).data || historyData;
         const potentialSearches =
-          (historyData as any).searches ?? (historyData as any).uploads ?? [];
+          responseData.searches ?? responseData.uploads ?? [];
         let searches: any[] = [];
         if (Array.isArray(potentialSearches)) {
           searches = potentialSearches;
@@ -754,15 +886,23 @@ const History = () => {
     }
   }, [lastPollTime]);
 
+  // When a SpareFinder Research analysis is running, stop polling history/uploads to avoid API spam.
+  // Crew jobs are polled separately every 1.5s; resume history polling when no crew jobs are active.
+  const hasActiveCrewJobs = crewJobs.some(
+    (job: any) => job.status === "processing" || job.status === "pending"
+  );
   useEffect(() => {
     if (authLoading || !isAuthenticated || !user?.id) return;
+    if (hasActiveCrewJobs) return; // Don't poll history while analysis is running
     const id = setInterval(pollJobStatuses, 5000); // Poll every 5 seconds for real-time updates
     return () => clearInterval(id);
-  }, [authLoading, isAuthenticated, user?.id, pollJobStatuses]);
+  }, [authLoading, isAuthenticated, user?.id, pollJobStatuses, hasActiveCrewJobs]);
 
-  // Intelligent polling with exponential backoff for processing jobs
+  // Intelligent polling with exponential backoff for processing jobs (image history only)
+  // Skip when SpareFinder Research is running to avoid extra history API calls
   useEffect(() => {
     if (authLoading || !isAuthenticated || !user?.id) return;
+    if (hasActiveCrewJobs) return;
 
     const hasProcessingJobs = pastAnalysis.some(
       (job: any) => job.status === "processing" || job.status === "pending"
@@ -812,7 +952,56 @@ const History = () => {
       // Start intelligent polling
       intelligentPoll();
     }
-  }, [authLoading, isAuthenticated, user?.id, pollJobStatuses, pastAnalysis]);
+  }, [authLoading, isAuthenticated, user?.id, pollJobStatuses, pastAnalysis, hasActiveCrewJobs]);
+
+  // Auto-refresh stats (and history) in background so numbers stay up to date
+  const STATS_REFRESH_INTERVAL_MS = 30000; // 30 seconds
+  useEffect(() => {
+    if (authLoading || !isAuthenticated || !user?.id) return;
+
+    const refreshStats = () => {
+      if (typeof document !== "undefined" && document.visibilityState === "hidden") return;
+      fetchAllData({ background: true });
+    };
+
+    // First refresh sooner so stats don't stay at 0
+    const firstId = setTimeout(refreshStats, 5000);
+    const id = setInterval(refreshStats, STATS_REFRESH_INTERVAL_MS);
+    return () => {
+      clearTimeout(firstId);
+      clearInterval(id);
+    };
+  }, [authLoading, isAuthenticated, user?.id, fetchAllData]);
+
+  // Keep stats in sync with crew jobs (realtime + polling updates)
+  useEffect(() => {
+    if (crewJobs.length === 0) return;
+    const completed = crewJobs.filter((j: any) => j.status === "completed");
+    const total = crewJobs.length;
+    let avgConf = 0;
+    let avgSec = 0;
+    if (completed.length > 0) {
+      const confSum = completed.reduce(
+        (s: number, j: any) => s + (typeof j.progress === "number" ? j.progress : 0),
+        0
+      );
+      avgConf = confSum / completed.length;
+      const timeSum = completed.reduce((s: number, j: any) => {
+        if (j.created_at && j.completed_at) {
+          const ms = new Date(j.completed_at).getTime() - new Date(j.created_at).getTime();
+          return s + ms / 1000;
+        }
+        return s;
+      }, 0);
+      avgSec = timeSum / completed.length;
+    }
+    setStats({
+      totalUploads: total,
+      completed: completed.length,
+      avgConfidence: avgConf.toFixed(1),
+      avgProcessingTime: `${Math.round(avgSec)}s`,
+    });
+  }, [crewJobs]);
 
   // Export history function (downloads CSV file)
   const handleExportHistory = async () => {
@@ -902,12 +1091,28 @@ const History = () => {
 
   // Helper: fetch job details then save as PDF
   const handleDownloadAnalysisPdf = async (job: any) => {
+    const jobId = job.id || "";
+    const imageName = job.image_name || job.filename || "";
+    
+    // Skip crew jobs - they use different handlers
+    const isCrewJob = jobId.startsWith("crew_analysis_") || 
+                      imageName.startsWith("crew_analysis_") ||
+                      jobId.includes("crew_analysis") ||
+                      imageName.includes("crew_analysis");
+    
+    if (isCrewJob) {
+      console.warn("handleDownloadAnalysisPdf called for crew job, use crew-specific handler instead");
+      toast({
+        title: "Download not available",
+        description: "PDF download for crew analysis jobs is handled separately.",
+        variant: "default",
+      });
+      return;
+    }
+    
     try {
-      const API_BASE =
-        (import.meta as any).env?.VITE_AI_SERVICE_URL ||
-        "https://aiagent-sparefinder-org.onrender.com";
       const id = encodeURIComponent(job.filename || job.id);
-      const res = await fetch(`${API_BASE}/analyze-part/status/${id}`);
+      const res = await fetch(`${API_BASE_URL}/analyze-part/status/${id}`);
       const data = await res.json();
       downloadPdfFromData(
         data,
@@ -965,6 +1170,20 @@ const History = () => {
   // View job -> open analysis modal
   const handleViewJob = async (job: any) => {
     const jobId = job.id;
+    const id = jobId || "";
+    const imageName = job.image_name || job.filename || "";
+    
+    // Skip crew jobs - they use different handlers (handleViewCrewAnalysis)
+    const isCrewJob = id.startsWith("crew_analysis_") || 
+                      imageName.startsWith("crew_analysis_") ||
+                      id.includes("crew_analysis") ||
+                      imageName.includes("crew_analysis");
+    
+    if (isCrewJob) {
+      console.warn("handleViewJob called for crew job, use handleViewCrewAnalysis instead");
+      return;
+    }
+    
     try {
       setCurrentViewedJob(job); // Store the current job being viewed
 
@@ -985,11 +1204,8 @@ const History = () => {
       setIsAnalysisLoading(true);
       setSelectedAnalysis(null);
 
-      const API_BASE =
-        (import.meta as any).env?.VITE_AI_SERVICE_URL ||
-        "https://aiagent-sparefinder-org.onrender.com";
       const res = await fetch(
-        `${API_BASE}/analyze-part/status/${encodeURIComponent(
+        `${API_BASE_URL}/analyze-part/status/${encodeURIComponent(
           job.filename || job.id
         )}`,
         {
@@ -1022,20 +1238,66 @@ const History = () => {
     }
   };
 
-  // Initialize data fetch - only run once when component mounts and user is authenticated
+  // Auto-start pending jobs when detected
+  useEffect(() => {
+    if (!isAuthenticated || !user?.id || authLoading) return;
+
+    const pendingJobs = pastAnalysis.filter(
+      (job: any) => job.status === "pending" && job.id
+    );
+
+    if (pendingJobs.length > 0) {
+      console.log(`🔄 Found ${pendingJobs.length} pending jobs, backend will auto-start them`);
+      // Backend auto-start service handles this, but we log for visibility
+      // Frontend can also trigger start if needed as fallback
+    }
+  }, [pastAnalysis, isAuthenticated, user?.id, authLoading]);
+
+  // Refetch whenever user lands on History (including after redirect from Upload)
   useEffect(() => {
     if (
       !authLoading &&
       isAuthenticated &&
       user?.id &&
-      !isInitializedRef.current
+      location.pathname === HISTORY_PATH
     ) {
-      console.log("📊 Initializing History data fetch for user:", user.id);
+      // Optimistic: show new crew job immediately if we were redirected from Upload with state
+      const state = location.state as { newCrewJob?: any } | null | undefined;
+      const newCrewJob = state?.newCrewJob;
+      const isAfterRedirectWithJob = !!newCrewJob?.id;
+      if (newCrewJob?.id) {
+        setCrewJobs((prev) => {
+          if (prev.some((j) => j.id === newCrewJob.id)) return prev;
+          return [{ ...newCrewJob, _uniqueCardKey: newCrewJob.id }, ...prev];
+        });
+        window.history.replaceState(null, "", location.pathname);
+        // Show content immediately (optimistic job card); don't leave page stuck on skeleton
+        setIsLoading(false);
+      }
+
+      // When we have an optimistic job, fetch in background so the page doesn't freeze on slow/hanging APIs
+      console.log("📊 Refetching History data (landed on page) for user:", user.id);
       isInitializedRef.current = true;
-      fetchAllData();
+      fetchAllData(isAfterRedirectWithJob ? { background: true } : undefined);
+
+      // Multiple delayed refetches so in-progress analysis shows up even if DB/API is briefly behind
+      const bg = isAfterRedirectWithJob ? { background: true } as const : undefined;
+      const t1 = setTimeout(() => fetchAllData(bg), 500);
+      const t2 = setTimeout(() => fetchAllData(bg), 1500);
+      const t3 = setTimeout(() => fetchAllData(bg), 3000);
+      // When analysis just started: retry stats/history in background after backend may have caught up
+      const tRetry = isAfterRedirectWithJob
+        ? setTimeout(() => fetchAllData({ background: true }), 8000)
+        : undefined;
+      return () => {
+        clearTimeout(t1);
+        clearTimeout(t2);
+        clearTimeout(t3);
+        if (tRetry) clearTimeout(tRetry);
+      };
     }
 
-    // Reset initialization flag when user changes
+    // Reset when user logs out
     if (!isAuthenticated || !user?.id) {
       isInitializedRef.current = false;
       setStats({
@@ -1047,7 +1309,15 @@ const History = () => {
       setError(null);
       setIsLoading(false);
     }
-  }, [isAuthenticated, user?.id, authLoading, fetchAllData]);
+  }, [location.pathname, location.state, isAuthenticated, user?.id, authLoading, fetchAllData]);
+
+  // Refetch data when pagination changes (but only after initial load)
+  useEffect(() => {
+    if (isInitializedRef.current && isAuthenticated && user?.id) {
+      console.log("📄 Pagination changed, refetching data:", pagination.page);
+      fetchAllData();
+    }
+  }, [pagination.page, pagination.limit]);
 
   // Real-time Supabase subscription for SpareFinder Research jobs
   useEffect(() => {
@@ -1116,20 +1386,50 @@ const History = () => {
 
     if (!hasActiveJobs) return;
 
-    // Poll every 3 seconds for active jobs
+    // Poll every 1s so we catch "completed" status soon after backend finishes
     const pollInterval = setInterval(async () => {
       try {
         const resp = await api.upload.getCrewAnalysisJobs();
         if (resp && (resp as any).data) {
-          setCrewJobs((resp as any).data);
+          const fromApi = (resp as any).data as any[];
+          setCrewJobs((prev) => {
+            const byId = new Map(prev.map((j) => [j.id, { ...j, _uniqueCardKey: j.id }]));
+            fromApi.forEach((j: any) => byId.set(j.id, { ...j, _uniqueCardKey: j.id }));
+            return Array.from(byId.values()).sort(
+              (a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()
+            );
+          });
         }
       } catch (error) {
         console.error("Failed to poll crew jobs:", error);
       }
-    }, 3000);
+    }, 1000);
 
     return () => clearInterval(pollInterval);
   }, [user?.id, crewJobs]);
+
+  // Refetch crew jobs when tab becomes visible so we pick up completed status
+  useEffect(() => {
+    if (!user?.id) return;
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        api.upload.getCrewAnalysisJobs().then((resp) => {
+          if (resp && (resp as any).data) {
+            const fromApi = (resp as any).data as any[];
+            setCrewJobs((prev) => {
+              const byId = new Map(prev.map((j) => [j.id, { ...j, _uniqueCardKey: j.id }]));
+              fromApi.forEach((j: any) => byId.set(j.id, { ...j, _uniqueCardKey: j.id }));
+              return Array.from(byId.values()).sort(
+                (a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()
+              );
+            });
+          }
+        }).catch(() => {});
+      }
+    };
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => document.removeEventListener("visibilitychange", onVisibilityChange);
+  }, [user?.id]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -1360,7 +1660,7 @@ const History = () => {
                   <p className="mb-3 text-sm text-muted-foreground md:text-base md:mb-4 dark:text-gray-400">
                     {error}
                   </p>
-                  <Button onClick={fetchAllData} variant="outline" size="sm">
+                  <Button onClick={() => fetchAllData()} variant="outline" size="sm">
                     Try Again
                   </Button>
                 </div>
@@ -1561,7 +1861,7 @@ const History = () => {
             <div className="absolute inset-0 bg-gradient-to-r from-emerald-600/10 to-cyan-600/10 rounded-2xl md:rounded-3xl blur-xl opacity-60" />
             <Card className="relative border border-border bg-card text-foreground shadow-soft-elevated backdrop-blur-xl dark:bg-black/20 dark:border-white/10">
               <CardHeader className="p-4 md:p-6">
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between mb-4">
                   <CardTitle className="flex items-center space-x-2 text-base md:text-lg text-foreground dark:text-white">
                     <Database className="w-4 h-4 md:w-5 md:h-5 text-emerald-500" />
                     <span>History</span>
@@ -1576,7 +1876,8 @@ const History = () => {
                     variant="outline"
                     size="sm"
                     onClick={() => {
-                      // Force refresh jobs data
+                      // Refetch all data including crew jobs so in-progress analysis shows up
+                      fetchAllData();
                       pollJobStatuses();
                     }}
                     className="text-xs border-border bg-transparent text-muted-foreground hover:bg-muted dark:border-white/20 dark:text-gray-200 dark:hover:bg-white/10"
@@ -1585,12 +1886,47 @@ const History = () => {
                     Refresh
                   </Button>
                 </div>
+                
+                {/* Modern Search Bar */}
+                <div className="relative mb-3">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <input
+                    type="text"
+                    placeholder="Search by keywords, filename, status, or ID..."
+                    value={searchQuery}
+                    onChange={(e) => {
+                      setSearchQuery(e.target.value);
+                      setPagination(prev => ({ ...prev, page: 1 }));
+                    }}
+                    className="w-full pl-10 pr-10 py-2 text-sm bg-background/50 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition-all placeholder:text-muted-foreground dark:bg-black/30 dark:border-white/10"
+                  />
+                  {searchQuery && (
+                    <button
+                      onClick={() => {
+                        setSearchQuery("");
+                        setPagination(prev => ({ ...prev, page: 1 }));
+                      }}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  )}
+                </div>
+
                 <CardDescription className="text-xs text-muted-foreground md:text-sm dark:text-gray-400">
-                  Completed and queued analyses from the AI service
+                  {searchQuery ? (
+                    <span>
+                      Found {filteredCrewJobs.length} result{filteredCrewJobs.length !== 1 ? 's' : ''} for "{searchQuery}"
+                    </span>
+                  ) : (
+                    <span>Completed and queued analyses from the AI service</span>
+                  )}
                 </CardDescription>
               </CardHeader>
               <CardContent className="p-4 md:p-6 pt-0">
-                {uniqueCrewJobs.length === 0 ? (
+                {filteredCrewJobs.length === 0 ? (
                   <div className="text-center py-6 md:py-8">
                     <Sparkles className="mx-auto mb-3 h-8 w-8 text-purple-400/70 md:mb-4 md:h-12 md:w-12" />
                     <p className="text-sm text-muted-foreground md:text-base dark:text-gray-400">
@@ -1608,12 +1944,13 @@ const History = () => {
                       id="tour-past-jobs-table"
                       className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"
                     >
-                      {uniqueCrewJobs
+                      {filteredCrewJobs
                         .sort(
                           (a: any, b: any) =>
                             new Date(b.created_at).getTime() -
                             new Date(a.created_at).getTime()
                         )
+                        .slice((pagination.page - 1) * pagination.limit, pagination.page * pagination.limit)
                         .map((job: any) => {
                           // Use the stable unique key pre-assigned in useMemo
                           const cardUniqueKey = job._uniqueCardKey;
@@ -1685,21 +2022,30 @@ const History = () => {
                                           ? `⏳ ${displayName}`
                                           : `🤖 ${displayName}`}
                                       </h3>
+                                      {/* Live stage line: updates in real time as backend progresses */}
+                                      {job.status !== "completed" &&
+                                        job.status !== "failed" && (
+                                          <p className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground dark:text-gray-400">
+                                            <span className="inline-flex h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" aria-hidden />
+                                            {job.status === "pending"
+                                              ? "Processing.."
+                                              : `${getStageDisplayName(job.current_stage || "initialization")} • ${job.progress ?? 0}%`}
+                                          </p>
+                                        )}
                                       <p className="mt-1 text-xs font-mono text-muted-foreground truncate dark:text-gray-400">
                                         ID: {job.id?.slice(0, 8)}...
                                       </p>
                                     </div>
 
-                                    {/* Progress Display */}
+                                    {/* Progress Display: show for both pending and processing so stages update in real time */}
                                     {job.status !== "completed" &&
                                       job.status !== "failed" &&
-                                      job.status !== "pending" &&
                                       job.id && (
                                         <CrewAnalysisProgress
                                           key={`progress-${cardUniqueKey}`}
                                           status={job.status}
                                           currentStage={job.current_stage}
-                                          progress={job.progress || 0}
+                                          progress={job.progress ?? 0}
                                           errorMessage={job.error_message}
                                           title={displayName}
                                           compact={true}
@@ -1751,7 +2097,7 @@ const History = () => {
                                         </>
                                       )}
                                       {job.status === "pending" && (
-                                        <div className="flex-1 text-xs text-yellow-400 p-2 bg-yellow-900/20 rounded">
+                                        <div className="flex-1 text-xs text-yellow-900 dark:text-yellow-300 font-medium p-2 bg-yellow-400/80 dark:bg-yellow-900/20 rounded">
                                           Analysis is queued and will be processed automatically. You'll receive an email when complete.
                                         </div>
                                       )}
@@ -1776,6 +2122,73 @@ const History = () => {
                           );
                         })}
                     </div>
+
+                    {/* Pagination */}
+                    {filteredCrewJobs.length > pagination.limit && (
+                      <div className="mt-8 flex justify-center">
+                        <Pagination>
+                          <PaginationContent>
+                            <PaginationItem>
+                              <PaginationPrevious
+                                onClick={() => {
+                                  if (pagination.page > 1) {
+                                    setPagination(prev => ({ ...prev, page: prev.page - 1 }));
+                                  }
+                                }}
+                                className={pagination.page === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                              />
+                            </PaginationItem>
+
+                            {[...Array(Math.ceil(filteredCrewJobs.length / pagination.limit))].map((_, idx) => {
+                              const pageNum = idx + 1;
+                              const totalPages = Math.ceil(filteredCrewJobs.length / pagination.limit);
+                              
+                              // Show first page, last page, current page, and pages around current
+                              const showPage = 
+                                pageNum === 1 || 
+                                pageNum === totalPages || 
+                                (pageNum >= pagination.page - 1 && pageNum <= pagination.page + 1);
+
+                              if (!showPage) {
+                                // Show ellipsis
+                                if (pageNum === pagination.page - 2 || pageNum === pagination.page + 2) {
+                                  return (
+                                    <PaginationItem key={pageNum}>
+                                      <span className="px-4 py-2">...</span>
+                                    </PaginationItem>
+                                  );
+                                }
+                                return null;
+                              }
+
+                              return (
+                                <PaginationItem key={pageNum}>
+                                  <PaginationLink
+                                    onClick={() => setPagination(prev => ({ ...prev, page: pageNum }))}
+                                    isActive={pagination.page === pageNum}
+                                    className="cursor-pointer"
+                                  >
+                                    {pageNum}
+                                  </PaginationLink>
+                                </PaginationItem>
+                              );
+                            })}
+
+                            <PaginationItem>
+                              <PaginationNext
+                                onClick={() => {
+                                  const totalPages = Math.ceil(filteredCrewJobs.length / pagination.limit);
+                                  if (pagination.page < totalPages) {
+                                    setPagination(prev => ({ ...prev, page: prev.page + 1 }));
+                                  }
+                                }}
+                                className={pagination.page >= Math.ceil(filteredCrewJobs.length / pagination.limit) ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                              />
+                            </PaginationItem>
+                          </PaginationContent>
+                        </Pagination>
+                      </div>
+                    )}
                   </div>
                 )}
               </CardContent>
