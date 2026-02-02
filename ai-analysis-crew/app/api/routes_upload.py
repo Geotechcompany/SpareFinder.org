@@ -86,6 +86,8 @@ async def get_crew_analysis_job(
 async def create_crew_analysis_job(
     image: UploadFile = File(...),
     keywords: Optional[str] = Form(None),
+    user_country: Optional[str] = Form(None),
+    user_region: Optional[str] = Form(None),
     user: CurrentUser = Depends(get_current_user)
 ):
     """
@@ -196,7 +198,9 @@ async def create_crew_analysis_job(
                 job_id,
                 user_email,
                 image_data,
-                keywords or ""
+                keywords or "",
+                user_country=user_country or None,
+                user_region=user_region or None,
             )
         )
 

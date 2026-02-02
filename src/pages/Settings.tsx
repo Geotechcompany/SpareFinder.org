@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Card,
@@ -41,6 +41,8 @@ import {
   Menu,
   AlertCircle,
   Trash2,
+  Wifi,
+  DollarSign,
 } from "lucide-react";
 import DashboardSidebar from "@/components/DashboardSidebar";
 import MobileSidebar from "@/components/MobileSidebar";
@@ -101,6 +103,9 @@ const Settings = () => {
     darkMode: true,
     analytics: true,
     marketing: false,
+    useRegionalSuppliers: false,
+    userCountry: "",
+    userRegion: "",
   });
 
   // New state for password change
@@ -249,17 +254,24 @@ const Settings = () => {
         }
       }
 
-      // Fetch settings
+      // Fetch settings (region preference is stored in DB columns + preferences JSON)
       try {
         const profileResponse = await api.user.getProfile();
+        const profile =
+          profileResponse?.data?.profile ?? (profileResponse as any)?.profile;
 
-        if (
-          profileResponse &&
-          profileResponse.data &&
-          profileResponse.data.profile &&
-          profileResponse.data.profile.preferences
-        ) {
-          const prefs = profileResponse.data.profile.preferences;
+        if (profile) {
+          const prefs = profile.preferences ?? {};
+          // Prefer dedicated DB columns for region (backend may return use_regional_suppliers, user_country, user_region)
+          const useRegionalSuppliers =
+            prefs.useRegionalSuppliers ??
+            (profile as any).use_regional_suppliers ??
+            false;
+          const userCountry =
+            (prefs.userCountry ?? (profile as any).user_country ?? "").trim();
+          const userRegion =
+            (prefs.userRegion ?? (profile as any).user_region ?? "").trim();
+
           setPreferences({
             emailNotifications: prefs.emailNotifications ?? true,
             smsNotifications: prefs.smsNotifications ?? false,
@@ -267,6 +279,9 @@ const Settings = () => {
             darkMode: prefs.darkMode ?? true,
             analytics: prefs.analytics ?? true,
             marketing: prefs.marketing ?? false,
+            useRegionalSuppliers: !!useRegionalSuppliers,
+            userCountry: userCountry ?? "",
+            userRegion: userRegion ?? "",
           });
 
           // Sync UI theme with stored preference when available
@@ -296,12 +311,117 @@ const Settings = () => {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
-  const handlePreferenceChange = (field: string, value: boolean) => {
+  const handlePreferenceChange = (field: string, value: boolean | string) => {
     setPreferences((prev) => ({ ...prev, [field]: value }));
 
     // Immediately reflect dark-mode preference in the UI theme
-    if (field === "darkMode") {
+    if (field === "darkMode" && typeof value === "boolean") {
       setTheme(value ? "dark" : "light");
+    }
+  };
+
+  // Auto-save region preference so it stays enabled until user turns it off (persists without main Save)
+  const saveRegionPreferenceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const preferencesRef = useRef(preferences);
+  preferencesRef.current = preferences;
+
+  const saveRegionPreference = useCallback(async () => {
+    const prefs = preferencesRef.current;
+    try {
+      await api.user.updateProfile({
+        preferences: {
+          useRegionalSuppliers: prefs.useRegionalSuppliers,
+          userCountry: prefs.userCountry,
+          userRegion: prefs.userRegion,
+        },
+      });
+      toast({
+        title: "Region preference saved",
+        description: "Your supplier region setting will stay on until you turn it off.",
+      });
+    } catch {
+      toast({
+        variant: "destructive",
+        title: "Could not save region preference",
+        description: "Use Save below to retry.",
+      });
+    }
+  }, []);
+
+  const scheduleSaveRegionPreference = useCallback(() => {
+    if (saveRegionPreferenceRef.current) clearTimeout(saveRegionPreferenceRef.current);
+    saveRegionPreferenceRef.current = setTimeout(() => {
+      saveRegionPreferenceRef.current = null;
+      saveRegionPreference();
+    }, 600);
+  }, [saveRegionPreference]);
+
+  const [isDetectingRegion, setIsDetectingRegion] = useState(false);
+  const [detectedIp, setDetectedIp] = useState("");
+  const [detectedCurrency, setDetectedCurrency] = useState("");
+
+  const handleDetectLocation = async () => {
+    setIsDetectingRegion(true);
+    setDetectedIp("");
+    setDetectedCurrency("");
+    try {
+      let country = "";
+      let region = "";
+      let ip = "";
+      let currency = "";
+      try {
+        const res = await api.user.detectRegion();
+        const r = res as any;
+        country = (r?.country ?? r?.data?.country ?? "").trim();
+        region = (r?.region ?? r?.data?.region ?? "").trim();
+        ip = (r?.ip ?? r?.data?.ip ?? "").trim();
+        currency = (r?.currency ?? r?.data?.currency ?? "").trim();
+        // Backend returns empty for localhost; fall back to client-side geolocation
+        if (!country && !region) {
+          const ipRes = await fetch("https://ipapi.co/json/");
+          const data = await ipRes.json();
+          country = (data.country_name ?? "").trim();
+          region = (data.region ?? "").trim();
+          ip = (data.ip ?? "").trim();
+          currency = (data.currency_code ?? data.currency ?? "").trim();
+        }
+      } catch {
+        const res = await fetch("https://ipapi.co/json/");
+        const data = await res.json();
+        country = (data.country_name ?? "").trim();
+        region = (data.region ?? "").trim();
+        ip = (data.ip ?? "").trim();
+        currency = (data.currency_code ?? data.currency ?? "").trim();
+      }
+      setDetectedIp(ip);
+      setDetectedCurrency(currency);
+      setPreferences((prev) => ({
+        ...prev,
+        userCountry: country,
+        userRegion: region,
+      }));
+      // Persist detected location after state update (next tick)
+      setTimeout(() => scheduleSaveRegionPreference(), 100);
+      if (country || region) {
+        toast({
+          title: "Location detected",
+          description: [country, region].filter(Boolean).join(", ") || "Could not detect location.",
+        });
+      } else {
+        toast({
+          title: "Detection failed",
+          description: "Could not detect location. Enter country/region manually.",
+          variant: "destructive",
+        });
+      }
+    } catch {
+      toast({
+        title: "Detection failed",
+        description: "Could not detect location. Enter country/region manually.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsDetectingRegion(false);
     }
   };
 
@@ -323,16 +443,18 @@ const Settings = () => {
         darkMode: preferences.darkMode,
         analytics: preferences.analytics,
         marketing: preferences.marketing,
+        useRegionalSuppliers: preferences.useRegionalSuppliers,
+        userCountry: preferences.userCountry,
+        userRegion: preferences.userRegion,
       };
 
       const preferencesResponse = await api.user.updateProfile({
         preferences: updatedPreferences,
       });
 
-      if (
-        (profileResponse as any).success &&
-        (preferencesResponse as any).success
-      ) {
+      const profileOk = (profileResponse as any)?.data?.success ?? (profileResponse as any)?.success;
+      const prefsOk = (preferencesResponse as any)?.data?.success ?? (preferencesResponse as any)?.success;
+      if (profileOk && prefsOk) {
         toast({
           title: "Success",
           description: "Your settings have been saved successfully.",
@@ -646,7 +768,7 @@ const Settings = () => {
   // Modify the existing tabs to include the password change section
   const tabs = [
     { id: "profile", label: "Profile", icon: User },
-    { id: "notifications", label: "Notifications", icon: Bell },
+    { id: "notifications", label: "Preferences", icon: Bell },
     { id: "security", label: "Security", icon: Shield },
     { id: "appearance", label: "Appearance", icon: Palette },
     ...(isApiKeysEnabled
@@ -1357,6 +1479,116 @@ const Settings = () => {
                             </div>
                           </div>
                         ))}
+                      </CardContent>
+                    </Card>
+
+                    <Card className="relative mt-6 rounded-3xl border border-border bg-card text-foreground shadow-soft-elevated backdrop-blur-xl dark:bg-black/20 dark:border-white/10">
+                      <CardHeader>
+                        <CardTitle className="flex items-center space-x-2 text-foreground dark:text-white">
+                          <MapPin className="w-5 h-5 text-[#8B5CF6]" />
+                          <span>Supplier region</span>
+                        </CardTitle>
+                        <CardDescription className="text-muted-foreground dark:text-gray-400">
+                          When enabled, we use your country/region to prioritize suppliers near you. We do not store precise location.
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent className="space-y-6">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 p-4 rounded-xl border border-border bg-muted/30 dark:bg-white/5 dark:border-white/10">
+                          <div>
+                            <h4 className="font-medium text-foreground dark:text-white">
+                              Use my location for supplier results
+                            </h4>
+                            <p className="text-sm text-muted-foreground dark:text-gray-400">
+                              Prioritize suppliers in your country or region when running SpareFinder Research.
+                            </p>
+                          </div>
+                          <Switch
+                            checked={preferences.useRegionalSuppliers}
+                            onCheckedChange={(checked) => {
+                              handlePreferenceChange("useRegionalSuppliers", checked);
+                              if (checked) handleDetectLocation();
+                              scheduleSaveRegionPreference();
+                            }}
+                            className="data-[state=checked]:bg-purple-600"
+                          />
+                        </div>
+                        {preferences.useRegionalSuppliers && (
+                          <div className="space-y-4 p-4 rounded-xl border border-border bg-muted/20 dark:bg-white/5 dark:border-white/10">
+                            <div className="flex flex-wrap items-center gap-3">
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={handleDetectLocation}
+                                disabled={isDetectingRegion}
+                              >
+                                {isDetectingRegion ? "Detecting…" : "Detect my location"}
+                              </Button>
+                              <span className="text-sm text-muted-foreground">
+                                or enter country/region manually below
+                              </span>
+                            </div>
+                            {(preferences.userCountry || preferences.userRegion || detectedIp || detectedCurrency) && (
+                              <div className="rounded-2xl border border-border/80 bg-gradient-to-br from-muted/50 to-muted/30 dark:from-white/5 dark:to-white/[0.02] dark:border-white/10 p-4 shadow-sm">
+                                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3 dark:text-gray-400">
+                                  Detected location
+                                </p>
+                                <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+                                  {(preferences.userCountry || preferences.userRegion) && (
+                                    <div className="inline-flex items-center gap-1.5 rounded-lg bg-background/80 dark:bg-white/10 px-3 py-1.5 border border-border/60 dark:border-white/10">
+                                      <MapPin className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                                      <span className="text-sm font-medium text-foreground dark:text-white">
+                                        {[preferences.userCountry, preferences.userRegion].filter(Boolean).join(", ") || "—"}
+                                      </span>
+                                    </div>
+                                  )}
+                                  {detectedIp && (
+                                    <div className="inline-flex items-center gap-1.5 rounded-lg bg-background/80 dark:bg-white/10 px-3 py-1.5 border border-border/60 dark:border-white/10">
+                                      <Wifi className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                                      <span className="text-sm font-mono text-foreground/90 dark:text-gray-200 truncate max-w-[140px] sm:max-w-none" title={detectedIp}>
+                                        {detectedIp}
+                                      </span>
+                                    </div>
+                                  )}
+                                  {detectedCurrency && (
+                                    <div className="inline-flex items-center gap-1.5 rounded-lg bg-background/80 dark:bg-white/10 px-3 py-1.5 border border-border/60 dark:border-white/10">
+                                      <DollarSign className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                                      <span className="text-sm font-medium text-foreground dark:text-white">
+                                        {detectedCurrency}
+                                      </span>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            )}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                              <div className="space-y-2">
+                                <Label htmlFor="userCountry">Country</Label>
+                                <Input
+                                  id="userCountry"
+                                  placeholder="e.g. United Kingdom"
+                                  value={preferences.userCountry}
+                                  onChange={(e) =>
+                                    handlePreferenceChange("userCountry", e.target.value)
+                                  }
+                                  onBlur={scheduleSaveRegionPreference}
+                                />
+                              </div>
+                              <div className="space-y-2">
+                                <Label htmlFor="userRegion">Region</Label>
+                                <Input
+                                  id="userRegion"
+                                  placeholder="e.g. Europe"
+                                  value={preferences.userRegion}
+                                  onChange={(e) =>
+                                    handlePreferenceChange("userRegion", e.target.value)
+                                  }
+                                  onBlur={scheduleSaveRegionPreference}
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        )}
                       </CardContent>
                     </Card>
                   </div>

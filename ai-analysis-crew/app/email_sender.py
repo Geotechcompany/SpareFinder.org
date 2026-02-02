@@ -185,6 +185,51 @@ def send_email_via_email_service(
         return False
 
 
+def send_no_regional_suppliers_email(
+    *,
+    to_email: str,
+    region_label: str,
+    settings_url: str = "https://sparefinder.org/dashboard/settings",
+) -> bool:
+    """
+    Send an email when no suppliers were found in the user's region.
+    Suggests retrying with another region or disabling the region preference (global search).
+    """
+    subject = "SpareFinder: No suppliers found in your region – retry or switch to global"
+    text = f"""Hi,
+
+Your SpareFinder Research completed, but no suppliers were found in your selected region ({region_label}).
+
+You can:
+1. Retry with global search – run the same search again with region preference turned off to see worldwide suppliers.
+2. Change your region – update your country/region in Settings (Preferences) and run a new search.
+
+Settings: {settings_url}
+
+Your report is still attached / available in your History.
+"""
+    html = f"""<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><title>No suppliers in region</title></head>
+<body style="font-family: sans-serif; max-width: 560px;">
+  <p>Hi,</p>
+  <p>Your SpareFinder Research completed, but <strong>no suppliers were found</strong> in your selected region (<strong>{region_label}</strong>).</p>
+  <p>You can:</p>
+  <ol>
+    <li><strong>Retry with global search</strong> – run the same search again with region preference turned off to see worldwide suppliers.</li>
+    <li><strong>Change your region</strong> – update your country/region in Settings → Preferences and run a new search.</li>
+  </ol>
+  <p><a href="{settings_url}">Open Settings (Preferences)</a></p>
+  <p>Your report is still available in your History.</p>
+  <p>— SpareFinder</p>
+</body>
+</html>"""
+    ok = send_basic_email_smtp(to_email=to_email, subject=subject, html=html, text=text)
+    if not ok:
+        ok = send_email_via_email_service(to_email=to_email, subject=subject, html=html, text=text)
+    return ok
+
+
 def send_email_with_attachment(
     to_email: str,
     subject: str,

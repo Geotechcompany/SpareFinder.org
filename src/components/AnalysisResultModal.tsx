@@ -36,6 +36,8 @@ import {
   X,
   Search,
   Share2,
+  RefreshCw,
+  MapPinOff,
 } from "lucide-react";
 
 interface AnalysisResultModalProps {
@@ -44,6 +46,8 @@ interface AnalysisResultModalProps {
   analysis: any;
   onDownloadPDF?: () => void;
   onShare?: () => void;
+  /** When no suppliers were found in user region: retry same search without region (global). */
+  onRetryGlobal?: (analysis: { id: string; keywords?: string }) => void;
 }
 
 export const AnalysisResultModal: React.FC<AnalysisResultModalProps> = ({
@@ -52,11 +56,13 @@ export const AnalysisResultModal: React.FC<AnalysisResultModalProps> = ({
   analysis,
   onDownloadPDF,
   onShare,
+  onRetryGlobal,
 }) => {
   if (!analysis) return null;
 
   const resultData = analysis.result_data;
   const reportText = resultData?.report_text || "";
+  const noRegionalSuppliers = !!resultData?.no_regional_suppliers;
 
   // Parse sections from report text
   const parseSection = (sectionName: string): string => {
@@ -101,6 +107,34 @@ export const AnalysisResultModal: React.FC<AnalysisResultModalProps> = ({
           style={{ maxHeight: "calc(90vh - 180px)" }}
         >
           <div className="space-y-6">
+            {/* No regional suppliers: retry with global or change region */}
+            {noRegionalSuppliers && (
+              <div className="rounded-lg border border-amber-300 dark:border-amber-600 bg-amber-50 dark:bg-amber-950/50 p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div className="flex items-start gap-3">
+                  <MapPinOff className="h-5 w-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="font-medium text-amber-900 dark:text-amber-100">
+                      No suppliers found in your region
+                    </p>
+                    <p className="text-sm text-amber-800 dark:text-amber-200 mt-1">
+                      You can retry with global search (ignore region) or change your region in Settings → Preferences.
+                    </p>
+                  </div>
+                </div>
+                {onRetryGlobal && (analysis.keywords || analysis.id) && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="shrink-0 border-amber-400 dark:border-amber-500 text-amber-800 dark:text-amber-200 hover:bg-amber-100 dark:hover:bg-amber-900/50"
+                    onClick={() => onRetryGlobal({ id: analysis.id, keywords: analysis.keywords })}
+                  >
+                    <RefreshCw className="h-4 w-4 mr-2" />
+                    Retry without region
+                  </Button>
+                )}
+              </div>
+            )}
+
             {/* Keywords Badge for keyword-only searches */}
             {!analysis.image_url && analysis.keywords && (
               <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950 dark:to-indigo-950 border border-blue-200 dark:border-blue-800 rounded-lg p-4">

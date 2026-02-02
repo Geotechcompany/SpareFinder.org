@@ -16,6 +16,7 @@ import {
   Search,
 } from 'lucide-react';
 import { SpinningLogoLoader } from "@/components/brand/spinning-logo-loader";
+import { API_BASE_URL } from '@/lib/config';
 
 const SharedAnalysis = () => {
   const { token } = useParams<{ token: string }>();
@@ -30,7 +31,7 @@ const SharedAnalysis = () => {
         setLoading(true);
         const response = await fetch(
           `${API_BASE_URL}/api/reports/shared/${token}`
-        );
+        );          
 
         if (!response.ok) {
           throw new Error('Analysis not found or no longer available');
@@ -113,10 +114,21 @@ const SharedAnalysis = () => {
   }
 
   const reportText = analysis.result_data?.report_text || '';
+  const noRegionalSuppliers = !!analysis.result_data?.no_regional_suppliers;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 py-8 px-4">
       <div className="max-w-5xl mx-auto">
+        {/* No regional suppliers notice */}
+        {noRegionalSuppliers && (
+          <div className="rounded-lg border border-amber-500/50 bg-amber-500/10 p-4 mb-6 flex items-center gap-3">
+            <span className="text-amber-400 shrink-0">⚠️</span>
+            <p className="text-sm text-amber-200">
+              No suppliers were found in the requester’s region for this analysis. Results may show worldwide or “Outside your region” options only.
+            </p>
+          </div>
+        )}
+
         {/* Header */}
         <div className="bg-slate-800/50 backdrop-blur-xl border border-white/10 rounded-xl p-6 mb-6">
           <div className="flex items-start justify-between mb-4">

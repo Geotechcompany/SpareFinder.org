@@ -204,15 +204,23 @@ AI Spare Part Analyzer Team
         return "Failed to send email"
 
 
-def setup_crew(image_data: Optional[bytes], keywords: Optional[str], user_email: str) -> Tuple[Crew, Task]:
+def setup_crew(
+    image_data: Optional[bytes],
+    keywords: Optional[str],
+    user_email: str,
+    user_country: Optional[str] = None,
+    user_region: Optional[str] = None,
+) -> Tuple[Crew, Task]:
     """
     Set up and configure the CrewAI crew for spare part analysis.
-    
+
     Args:
         image_data: Optional image bytes
         keywords: Optional part keywords
         user_email: User's email address
-        
+        user_country: Optional user country for regional supplier prioritization
+        user_region: Optional user region for regional supplier prioritization
+
     Returns:
         Configured Crew instance
     """
@@ -347,9 +355,29 @@ def setup_crew(image_data: Optional[bytes], keywords: Optional[str], user_email:
         context=[identify_task]
     )
     
+    region_block = ""
+    region_expected = ""
+    if user_country or user_region:
+        parts = []
+        if user_country:
+            parts.append(user_country)
+        if user_region:
+            parts.append(user_region)
+        region_label = ", ".join(parts)
+        region_block = f"""
+        **MANDATORY REGION: User location is {region_label}.**
+        - List ONLY suppliers that are physically located in or primarily serve {region_label}. Their address or primary market must be in this country/region.
+        - Do NOT list suppliers that are merely "international" or "ship worldwide" (e.g. generic US/UK retailers) unless they have a physical presence or primary operations in {region_label}.
+        - If you cannot find at least 2 suppliers that clearly meet this criterion, then list those you find and add at most 1–2 worldwide options, clearly labeled as "Outside your region" with a note that they ship internationally.
+        - Prefer suppliers with complete contact details (address, phone, email, website) in the user's region.
+        - If you found NO supplier physically located in or primarily serving the user's region (i.e. you only listed "Outside your region" options), you MUST include exactly this line at the end of your output: [NO_REGIONAL_SUPPLIERS]
+        """
+        region_expected = " All listed suppliers must be in or primarily serve the user's region unless labeled 'Outside your region'."
     supplier_task = Task(
-        description="""
-        Find 2-3 TOP reliable suppliers for this part. For EACH supplier, provide:
+        description=f"""
+        Find 2-3 TOP reliable suppliers for this part.{region_block}
+        
+        For EACH supplier, provide:
         
         **REQUIRED FOR EACH SUPPLIER:**
         1. Company Name (Official name)
@@ -366,7 +394,7 @@ def setup_crew(image_data: Optional[bytes], keywords: Optional[str], user_email:
         Prioritize suppliers with complete contact information and competitive pricing.
         """,
         agent=supplier_finder,
-        expected_output="Detailed list of 2-3 suppliers with complete information including business analysis, pricing, and full contact details",
+        expected_output="Detailed list of 2-3 suppliers with complete information including business analysis, pricing, and full contact details." + region_expected,
         context=[identify_task, research_task]
     )
     

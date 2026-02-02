@@ -549,12 +549,20 @@ export const dashboardApi = {
 
   scheduleKeywordSearch: async (
     keywords: string[] | string,
-    userEmail?: string
+    userEmail?: string,
+    options?: { userCountry?: string; userRegion?: string }
   ): Promise<ApiResponse> => {
-    const payload: { keywords: string[]; user_email?: string } = {
+    const payload: {
+      keywords: string[];
+      user_email?: string;
+      user_country?: string;
+      user_region?: string;
+    } = {
       keywords: Array.isArray(keywords) ? keywords : [keywords],
     };
     if (userEmail) payload.user_email = userEmail;
+    if (options?.userCountry) payload.user_country = options.userCountry;
+    if (options?.userRegion) payload.user_region = options.userRegion;
 
     // Backend returns immediately with job_id; analysis runs in background.
     const response = await apiClient.post("/search/keywords", payload, {
@@ -1241,13 +1249,20 @@ export const uploadApi = {
 
   createCrewAnalysisJob: async (
     file: File,
-    keywords: string = ""
+    keywords: string = "",
+    options?: { userCountry?: string; userRegion?: string }
   ): Promise<ApiResponse<{ jobId: string; imageUrl: string }>> => {
     try {
       const formData = new FormData();
       formData.append("image", file);
       if (keywords) {
         formData.append("keywords", keywords);
+      }
+      if (options?.userCountry) {
+        formData.append("user_country", options.userCountry);
+      }
+      if (options?.userRegion) {
+        formData.append("user_region", options.userRegion);
       }
 
       // Do not set Content-Type: let the browser set multipart/form-data with boundary
@@ -1642,6 +1657,17 @@ export const api = {
   profile: profileApi,
   user: {
     getProfile: () => apiClient.get("/user/profile"),
+    /** Lightweight: returns only region preference (useRegionalSuppliers, userCountry, userRegion) from DB. */
+    getRegionPreference: async (): Promise<
+      ApiResponse<{ useRegionalSuppliers?: boolean; userCountry?: string; userRegion?: string }>
+    > => {
+      const response = await apiClient.get("/user/region-preference");
+      return response.data;
+    },
+    detectRegion: async (): Promise<ApiResponse<{ country?: string; region?: string }>> => {
+      const response = await apiClient.get("/user/detect-region");
+      return response.data;
+    },
     submitOnboardingSurvey: (payload: {
       company?: string;
       role?: string;
@@ -1658,13 +1684,16 @@ export const api = {
       bio?: string;
       location?: string;
       website?: string;
-      preferences?: {
+        preferences?: {
         emailNotifications?: boolean;
         smsNotifications?: boolean;
         autoSave?: boolean;
         darkMode?: boolean;
         analytics?: boolean;
         marketing?: boolean;
+        useRegionalSuppliers?: boolean;
+        userCountry?: string;
+        userRegion?: string;
         onboarding?: {
           companySize?: string;
           role?: string;

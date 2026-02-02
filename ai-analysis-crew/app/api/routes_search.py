@@ -19,6 +19,8 @@ router = APIRouter(prefix="/search", tags=["search"])
 class KeywordSearchRequest(BaseModel):
     keywords: list[str] | str
     user_email: Optional[str] = None
+    user_country: Optional[str] = None
+    user_region: Optional[str] = None
 
 
 @router.post("/keywords")
@@ -52,6 +54,8 @@ async def search_keywords(
         if not user_email or "@" not in user_email:
             return api_error("Valid email address is required", status_code=400)
 
+        user_country = payload.user_country or None
+        user_region = payload.user_region or None
         job_id = str(uuid.uuid4())
 
         async def _create_job_and_start_analysis() -> None:
@@ -71,7 +75,11 @@ async def search_keywords(
                     "Failed to create crew job entry for %s, but continuing with analysis",
                     job_id,
                 )
-            await run_analysis_background(job_id, user_email, None, keywords)
+            await run_analysis_background(
+                job_id, user_email, None, keywords,
+                user_country=user_country,
+                user_region=user_region,
+            )
 
         # Fire-and-forget: do not await so we return the response immediately
         asyncio.create_task(_create_job_and_start_analysis())
@@ -108,6 +116,8 @@ async def schedule_keyword_search(
         body = await request.json()
         keywords_raw = body.get("keywords", "")
         user_email = body.get("user_email", "")
+        user_country = body.get("user_country") or None
+        user_region = body.get("user_region") or None
 
         # Handle keywords as either string or array
         if isinstance(keywords_raw, list):
@@ -165,6 +175,8 @@ async def schedule_keyword_search(
                 user_email,
                 None,  # No image data
                 keywords,
+                user_country=user_country,
+                user_region=user_region,
             )
         )
 

@@ -1188,8 +1188,28 @@ const Upload = () => {
       setSelectedPrediction(null);
       setOriginalAiResponse(null);
 
+      let regionOptions: { userCountry?: string; userRegion?: string } | undefined;
+      try {
+        const regionRes = await api.user.getRegionPreference();
+        const data = (regionRes as any)?.data ?? regionRes;
+        const useRegional = data?.useRegionalSuppliers;
+        const userCountry = data?.userCountry ?? "";
+        const userRegion = data?.userRegion ?? "";
+        if (useRegional && (userCountry || userRegion)) {
+          regionOptions = {};
+          if (userCountry) regionOptions.userCountry = userCountry;
+          if (userRegion) regionOptions.userRegion = userRegion;
+        }
+      } catch (_) {
+        // Ignore region-preference fetch failure; proceed without region
+      }
+
       // Schedule the keyword search for background processing
-      const response = await dashboardApi.scheduleKeywordSearch(savedKeywords);
+      const response = await dashboardApi.scheduleKeywordSearch(
+        savedKeywords,
+        undefined,
+        regionOptions
+      );
 
       // Extract jobId - backend returns job_id in data object
       const data = response?.data as
@@ -4615,10 +4635,26 @@ const Upload = () => {
                       maxWaitTimerRef.current = timerId;
 
                       try {
+                        let regionOptions: { userCountry?: string; userRegion?: string } | undefined;
+                        try {
+                          const regionRes = await api.user.getRegionPreference();
+                          const data = (regionRes as any)?.data ?? regionRes;
+                          const useRegional = data?.useRegionalSuppliers;
+                          const userCountry = data?.userCountry ?? "";
+                          const userRegion = data?.userRegion ?? "";
+                          if (useRegional && (userCountry || userRegion)) {
+                            regionOptions = {};
+                            if (userCountry) regionOptions.userCountry = userCountry;
+                            if (userRegion) regionOptions.userRegion = userRegion;
+                          }
+                        } catch (_) {
+                          // Ignore region-preference fetch failure; proceed without region
+                        }
                         const response =
                           await api.upload.createCrewAnalysisJob(
                             uploadedFile,
-                            savedKeywords.join(" ")
+                            savedKeywords.join(" "),
+                            regionOptions
                           );
 
                         if (maxWaitTimerRef.current) {

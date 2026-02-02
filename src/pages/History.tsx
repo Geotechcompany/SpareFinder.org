@@ -1598,6 +1598,62 @@ const History = () => {
     }
   };
 
+  // Retry same search without region (global) when no suppliers were found in user region
+  const handleRetryGlobal = async (analysis: { id: string; keywords?: string }) => {
+    const keywords = analysis.keywords ?? "";
+    if (!keywords) {
+      toast({
+        title: "Cannot retry",
+        description: "This job has no keywords to retry.",
+        variant: "destructive",
+      });
+      return;
+    }
+    try {
+      const response = await dashboardApi.scheduleKeywordSearch(
+        keywords,
+        undefined,
+        undefined
+      );
+      const jobId =
+        (response as any)?.jobId ??
+        (response as any)?.data?.job_id ??
+        (response as any)?.filename;
+      if (jobId) {
+        const keywordsStr = typeof keywords === "string" ? keywords : (Array.isArray(keywords) ? (keywords as string[]).join(" ") : String(keywords));
+        setCrewJobs((prev) => {
+          if (prev.some((j) => j.id === jobId)) return prev;
+          return [
+            {
+              id: jobId,
+              keywords: keywordsStr,
+              status: "pending",
+              progress: 0,
+              created_at: new Date().toISOString(),
+              _uniqueCardKey: jobId,
+            },
+            ...prev,
+          ];
+        });
+        setIsAnalysisResultOpen(false);
+        setSelectedAnalysisResult(null);
+        toast({
+          title: "Retry scheduled",
+          description: "Searching globally (region preference off). New job added to History.",
+        });
+      } else {
+        throw new Error("No job ID returned");
+      }
+    } catch (err) {
+      console.error("Retry global error:", err);
+      toast({
+        title: "Retry failed",
+        description: "Could not start global search. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
   // Toggle expanded state for a specific card using unique card identifier
   const toggleJobExpanded = (cardKey: string) => {
     if (!cardKey) {
@@ -2305,6 +2361,7 @@ const History = () => {
                 handleCreateShareLink(selectedAnalysisResult.id);
               }
             }}
+            onRetryGlobal={handleRetryGlobal}
           />
 
           {/* Delete Crew Job Confirmation Dialog */}

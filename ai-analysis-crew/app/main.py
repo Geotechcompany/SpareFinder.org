@@ -40,7 +40,7 @@ from datetime import datetime
 import json
 import uvicorn
 from .crew_setup import setup_crew, set_progress_emitter, emit_progress, generate_report_tool_func, send_email_tool_func
-from .email_sender import send_email_via_email_service, send_basic_email_smtp
+from .email_sender import send_email_via_email_service, send_basic_email_smtp, send_no_regional_suppliers_email
 from .utils import ensure_temp_dir
 from .vision_analyzer import get_image_description
 from .database_storage import store_crew_analysis_to_database, update_crew_job_status, complete_crew_job
@@ -602,7 +602,9 @@ async def run_analysis_background(
     analysis_id: str,
     user_email: str,
     image_data: Optional[bytes],
-    keywords: Optional[str]
+    keywords: Optional[str],
+    user_country: Optional[str] = None,
+    user_region: Optional[str] = None,
 ):
     """Run the SpareFinder Research in the background and update database."""
     try:
@@ -613,10 +615,16 @@ async def run_analysis_background(
         if image_data:
             detailed_description = get_image_description(image_data, keywords)
             update_crew_job_status(analysis_id, "processing", "part_identifier", 20)
-            crew, report_task = setup_crew(None, detailed_description, user_email)
+            crew, report_task = setup_crew(
+                None, detailed_description, user_email,
+                user_country=user_country, user_region=user_region,
+            )
         else:
             update_crew_job_status(analysis_id, "processing", "part_identifier", 15)
-            crew, report_task = setup_crew(None, keywords, user_email)
+            crew, report_task = setup_crew(
+                None, keywords, user_email,
+                user_country=user_country, user_region=user_region,
+            )
         
         # Run crew execution - Research stage
         update_crew_job_status(analysis_id, "processing", "research_agent", 30)
@@ -668,6 +676,16 @@ async def run_analysis_background(
             import traceback
             logger.error(traceback.format_exc())
             result_text = str(result)
+        
+        # Detect no-regional-suppliers so we can flag job and email user
+        no_regional_suppliers = (
+            "[NO_REGIONAL_SUPPLIERS]" in result_text
+            and (user_country or user_region)
+        )
+        region_label = ", ".join(x for x in (user_country, user_region) if x) if (user_country or user_region) else ""
+        if no_regional_suppliers:
+            result_text = result_text.replace("[NO_REGIONAL_SUPPLIERS]", "").strip()
+            logger.info(f"📌 No regional suppliers for {region_label}; will flag job and send follow-up email")
         
         # Generate PDF report
         pdf_path = generate_report_tool_func(comprehensive_report_text=result_text)
@@ -727,9 +745,12 @@ async def run_analysis_background(
         # Set status to completed first so UI updates even if full completion payload fails
         update_crew_job_status(analysis_id, "completed", "completed", 100)
         pdf_url_for_completion = pdf_public_url if pdf_public_url else pdf_filename
+        result_data = {'report_text': result_text}
+        if no_regional_suppliers:
+            result_data['no_regional_suppliers'] = True
         completion_success = complete_crew_job(
             job_id=analysis_id,
-            result_data={'report_text': result_text},
+            result_data=result_data,
             pdf_url=pdf_url_for_completion
         )
         
@@ -737,6 +758,20 @@ async def run_analysis_background(
             logger.info(f"✅ Job {analysis_id} marked as completed in database")
         else:
             logger.warning(f"⚠️ Full job completion update failed; status was already set to completed")
+        
+        # If no suppliers were found in user region, send follow-up email (retry / disable preference)
+        if no_regional_suppliers and region_label:
+            try:
+                send_ok = send_no_regional_suppliers_email(
+                    to_email=user_email,
+                    region_label=region_label,
+                )
+                if send_ok:
+                    logger.info(f"✅ No-regional-suppliers email sent to {user_email}")
+                else:
+                    logger.warning("⚠️ No-regional-suppliers email could not be sent")
+            except Exception as email_err:
+                logger.warning(f"⚠️ No-regional-suppliers email failed: {email_err}")
         
     except Exception as e:
         # Mark as failed
