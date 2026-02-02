@@ -1961,7 +1961,7 @@ class EmailService {
                   <li>Plan: <strong>${data.planName}</strong></li>
                   <li>Trial Period: ${data.trialDays || 30} days</li>
                   <li>Trial Ends: ${trialEndDate}</li>
-                  <li>After Trial: £${data.amount || 12.99}/${
+                  <li>After Trial: £${data.amount || 7.15}/${
         data.currency?.toLowerCase() === "gbp" ? "month" : "month"
       }</li>
                 </ul>
@@ -1977,7 +1977,7 @@ class EmailService {
               </div>
               <p style="margin:24px 0 0 0;color:#94a3b8;font-size:14px;line-height:1.6;">
                 You can cancel anytime during your trial period with no charges. After the trial ends, your subscription will automatically continue at £${
-                  data.amount || 12.99
+                  data.amount || 7.15
                 }/${data.currency?.toLowerCase() === "gbp" ? "month" : "month"}.
               </p>
             </td>
@@ -2063,7 +2063,7 @@ class EmailService {
                 <p style="margin:0 0 8px 0;color:#e2e8f0;font-weight:600;">Subscription Details:</p>
                 <ul style="margin:0;padding-left:20px;color:#cbd5e1;line-height:1.8;">
                   <li>Plan: <strong>${data.planName}</strong></li>
-                  <li>Amount: £${data.amount || 12.99}/${
+                  <li>Amount: £${data.amount || 7.15}/${
         data.currency?.toLowerCase() === "gbp" ? "month" : "month"
       }</li>
                   ${
@@ -2166,7 +2166,7 @@ class EmailService {
                 <p style="margin:0 0 8px 0;color:#e2e8f0;font-weight:600;">Renewal Details:</p>
                 <ul style="margin:0;padding-left:20px;color:#cbd5e1;line-height:1.8;">
                   <li>Plan: <strong>${data.planName}</strong></li>
-                  <li>Amount Charged: £${data.amount || 12.99}</li>
+                  <li>Amount Charged: £${data.amount || 7.15}</li>
                   ${
                     data.subscriptionEndDate
                       ? `<li>Next Billing Date: ${data.subscriptionEndDate}</li>`
@@ -2257,7 +2257,7 @@ class EmailService {
                 <p style="margin:0 0 8px 0;color:#e2e8f0;font-weight:600;">Payment Details:</p>
                 <ul style="margin:0;padding-left:20px;color:#cbd5e1;line-height:1.8;">
                   <li>Plan: <strong>${data.planName}</strong></li>
-                  <li>Amount: £${data.amount || 12.99}</li>
+                  <li>Amount: £${data.amount || 7.15}</li>
                 </ul>
               </div>
               <p style="margin:16px 0;color:#cbd5e1;line-height:1.6;">

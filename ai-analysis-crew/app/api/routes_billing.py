@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+import os
+from datetime import datetime, timedelta
 from typing import Any
 
-from fastapi import APIRouter, Depends
+import stripe
+from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel
 
 from .auth_dependencies import CurrentUser, get_current_user
@@ -41,7 +43,7 @@ SUBSCRIPTION_LIMITS = {
 
 # Plan pricing
 PLAN_PRICING = {
-    "free": {"amount": 12.99, "currency": "gbp"},
+    "free": {"amount": 7.15, "currency": "gbp"},
     "pro": {"amount": 69.99, "currency": "gbp"},
     "enterprise": {"amount": 460, "currency": "gbp"},
 }
@@ -158,14 +160,96 @@ async def get_billing_config():
     Get Stripe configuration (publishable key).
     Public endpoint - no authentication required.
     """
-    import os
-
     publishable_key = os.getenv("STRIPE_PUBLISHABLE_KEY") or os.getenv("STRIPE_PUBLIC_KEY")
 
     if not publishable_key:
         return api_ok(data={"configured": False, "publishableKey": None})
 
     return api_ok(data={"configured": True, "publishableKey": publishable_key})
+
+
+@router.get("/invoices")
+async def get_invoices(
+    user: CurrentUser = Depends(get_current_user),
+    page: int = 1,
+    limit: int = 10,
+):
+    """
+    Get invoices for the current user.
+    Tries DB first, then Stripe if configured.
+    """
+    try:
+        supabase = get_supabase_admin()
+        user_id = user.id
+        offset = (page - 1) * limit
+
+        # Try stored invoices from DB first
+        try:
+            inv_result = (
+                supabase.table("invoices")
+                .select("*")
+                .eq("user_id", user_id)
+                .order("created_at", desc=True)
+                .range(offset, offset + limit - 1)
+                .execute()
+            )
+            if inv_result.data and len(inv_result.data) > 0:
+                return api_ok(
+                    data={
+                        "invoices": inv_result.data,
+                        "pagination": {"page": page, "limit": limit, "total": len(inv_result.data)},
+                    }
+                )
+        except Exception:
+            pass
+
+        # Fallback: fetch from Stripe if we have a subscription with stripe_customer_id
+        stripe_secret = os.getenv("STRIPE_SECRET_KEY") or os.getenv("STRIPE_API_KEY")
+        if stripe_secret:
+            stripe.api_key = stripe_secret
+            sub_result = (
+                supabase.table("subscriptions")
+                .select("stripe_customer_id")
+                .eq("user_id", user_id)
+                .limit(1)
+                .execute()
+            )
+            customer_id = None
+            if sub_result.data and len(sub_result.data) > 0:
+                customer_id = (sub_result.data[0] or {}).get("stripe_customer_id")
+            if customer_id:
+                try:
+                    invs = stripe.Invoice.list(customer=customer_id, limit=limit)
+                    if invs and invs.data:
+                        mapped = [
+                            {
+                                "id": inv.id,
+                                "amount": (inv.amount_paid or inv.amount_due or 0) / 100,
+                                "currency": (inv.currency or "gbp").upper(),
+                                "status": inv.status or "open",
+                                "created_at": datetime.utcfromtimestamp(inv.created).isoformat() + "Z" if inv.created else None,
+                                "invoice_url": inv.hosted_invoice_url or inv.invoice_pdf,
+                            }
+                            for inv in invs.data
+                        ]
+                        return api_ok(
+                            data={
+                                "invoices": mapped,
+                                "pagination": {"page": page, "limit": limit, "total": len(mapped)},
+                            }
+                        )
+                except stripe.error.StripeError:
+                    pass
+
+        return api_ok(
+            data={
+                "invoices": [],
+                "pagination": {"page": page, "limit": limit, "total": 0},
+            }
+        )
+    except Exception as e:
+        print(f"❌ Error fetching invoices: {e}")
+        return api_error("Failed to fetch invoices", status_code=500)
 
 
 class CheckoutSessionRequest(BaseModel):
@@ -186,9 +270,6 @@ async def create_checkout_session(
     Create a Stripe checkout session for subscription payment.
     Requires authentication.
     """
-    import os
-    import stripe
-
     try:
         stripe_secret_key = os.getenv("STRIPE_SECRET_KEY") or os.getenv("STRIPE_API_KEY")
         
@@ -293,3 +374,77 @@ async def create_checkout_session(
             "Failed to create checkout session",
             status_code=500
         )
+
+
+def _plan_to_tier(plan: str) -> str:
+    """Map Stripe metadata plan name to subscription tier."""
+    if not plan:
+        return "free"
+    normalized = plan.lower()
+    if "pro" in normalized or "professional" in normalized or "business" in normalized:
+        return "pro"
+    if "enterprise" in normalized:
+        return "enterprise"
+    if "starter" in normalized or "basic" in normalized:
+        return "free"
+    return "pro" if "pro" in normalized else "free"
+
+
+@router.post("/webhook")
+async def stripe_webhook(request: Request):
+    """
+    Stripe webhook: on checkout.session.completed, update subscriptions with plan from metadata.
+    Configure this URL in Stripe Dashboard (e.g. https://your-api/api/billing/webhook).
+    """
+    stripe_secret = os.getenv("STRIPE_SECRET_KEY") or os.getenv("STRIPE_API_KEY")
+    webhook_secret = os.getenv("STRIPE_WEBHOOK_SECRET") or os.getenv("STRIPE_WEBHOOK_SIGNING_SECRET")
+    if not stripe_secret:
+        return api_error("Stripe not configured", status_code=500)
+    if not webhook_secret:
+        print("⚠️ STRIPE_WEBHOOK_SECRET not set; webhook signature verification skipped")
+    body = await request.body()
+    sig = request.headers.get("stripe-signature", "")
+    try:
+        if webhook_secret:
+            event = stripe.Webhook.construct_event(body, sig, webhook_secret)
+        else:
+            import json
+            event = stripe.Event.construct_from(json.loads(body.decode("utf-8")), stripe.api_key)
+    except ValueError as e:
+        print(f"❌ Webhook body decode error: {e}")
+        return api_error("Invalid payload", status_code=400)
+    except stripe.error.SignatureVerificationError as e:
+        print(f"❌ Webhook signature error: {e}")
+        return api_error("Invalid signature", status_code=400)
+    if event.type != "checkout.session.completed":
+        return api_ok(data={"received": True})
+    session = event["data"]["object"]
+    user_id = (session.get("metadata") or {}).get("user_id")
+    plan = (session.get("metadata") or {}).get("plan")
+    if not user_id:
+        print("⚠️ checkout.session.completed: missing metadata.user_id")
+        return api_ok(data={"received": True})
+    if not plan:
+        print("⚠️ successfully paid with Stripe but no plan was given in session metadata")
+    tier = _plan_to_tier(plan or "")
+    supabase = get_supabase_admin()
+    now = datetime.utcnow()
+    period_end = datetime(now.year, now.month, now.day) + timedelta(days=30)
+    try:
+        supabase.table("subscriptions").upsert(
+            {
+                "user_id": user_id,
+                "tier": tier,
+                "status": "active",
+                "stripe_customer_id": session.get("customer") or "",
+                "stripe_subscription_id": session.get("subscription") or "",
+                "current_period_start": now.isoformat(),
+                "current_period_end": period_end.isoformat(),
+                "cancel_at_period_end": False,
+            },
+            on_conflict="user_id",
+        ).execute()
+        print(f"✅ Subscription updated for user {user_id}, tier={tier} (plan={plan})")
+    except Exception as e:
+        print(f"❌ Failed to update subscription: {e}")
+    return api_ok(data={"received": True})

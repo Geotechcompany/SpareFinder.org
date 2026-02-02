@@ -369,7 +369,7 @@ const Billing = () => {
 
   const handlePlanChange = async (planId: string) => {
     try {
-      // Starter (free) -> begin 30-day trial at £12.99/month via Stripe
+      // Starter (free) -> begin 30-day trial at £7.15/month via Stripe
       if (planId === "free") {
         const starter = plans.find((p) => p.id === "free");
         const starterPlan = PLAN_CONFIG.free;

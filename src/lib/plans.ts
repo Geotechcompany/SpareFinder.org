@@ -72,7 +72,7 @@ export const PLAN_CONFIG: Record<PlanTier, PlanFeature> = {
   free: {
     id: "starter",
     name: "Starter / Basic",
-    price: 12.99,
+    price: 7.15,
     currency: "GBP",
     period: "month",
     description: "For small users testing the service",

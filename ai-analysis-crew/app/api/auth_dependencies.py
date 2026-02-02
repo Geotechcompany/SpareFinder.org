@@ -232,9 +232,8 @@ async def get_current_user(
                         status_code=status.HTTP_401_UNAUTHORIZED,
                         detail="User profile not found and email claim missing from Clerk token. Set CLERK_SECRET_KEY on the backend so it can fetch your email from Clerk and link/create your profile.",
                     )
-                inserted = (
-                    supabase.table("profiles")
-                    .insert(
+                try:
+                    supabase.table("profiles").insert(
                         [
                             {
                                 "id": new_id,
@@ -244,12 +243,19 @@ async def get_current_user(
                                 "clerk_user_id": clerk_user_id,
                             }
                         ]
-                    )
-                    .select("*")
-                    .single()
-                    .execute()
-                    .data
-                )
+                    ).execute()
+                except Exception as insert_err:  # noqa: BLE001
+                    err_msg = str(insert_err).lower() if insert_err else ""
+                    if "23503" in err_msg or "foreign key" in err_msg or "profiles_id_fkey" in err_msg:
+                        raise HTTPException(
+                            status_code=status.HTTP_401_UNAUTHORIZED,
+                            detail="Profile creation failed: profiles.id references auth.users. Run migration 023_profiles_allow_clerk_ids.sql in Supabase (SQL Editor or MCP) to allow Clerk users.",
+                        ) from insert_err
+                    raise
+                inserted_res = supabase.table("profiles").select("*").eq("id", new_id).single().execute()
+                inserted = inserted_res.data if inserted_res and inserted_res.data else None
+                if not inserted:
+                    raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Profile created but could not be read back")
                 u = CurrentUser(
                     id=inserted["id"],
                     email=inserted["email"],
@@ -323,14 +329,20 @@ async def get_current_user(
                 # Create a profile if missing (mirror old backend behavior)
                 if user_email and isinstance(user_email, str) and user_email.strip():
                     new_id = str(user_id)
-                    inserted = (
-                        supabase.table("profiles")
-                        .insert([{"id": new_id, "email": user_email.strip().lower(), "role": "user"}])
-                        .select("*")
-                        .single()
-                        .execute()
-                        .data
-                    )
+                    try:
+                        supabase.table("profiles").insert([{"id": new_id, "email": user_email.strip().lower(), "role": "user"}]).execute()
+                    except Exception as insert_err:  # noqa: BLE001
+                        err_msg = str(insert_err).lower() if insert_err else ""
+                        if "23503" in err_msg or "foreign key" in err_msg or "profiles_id_fkey" in err_msg:
+                            raise HTTPException(
+                                status_code=status.HTTP_401_UNAUTHORIZED,
+                                detail="Profile creation failed: profiles.id references auth.users. Run migration 023_profiles_allow_clerk_ids.sql in Supabase (SQL Editor or MCP) to allow Clerk users.",
+                            ) from insert_err
+                        raise
+                    inserted_res = supabase.table("profiles").select("*").eq("id", new_id).single().execute()
+                    inserted = inserted_res.data if inserted_res and inserted_res.data else None
+                    if not inserted:
+                        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Profile created but could not be read back")
                     u = CurrentUser(
                         id=inserted["id"],
                         email=inserted["email"],

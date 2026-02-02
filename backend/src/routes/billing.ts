@@ -103,7 +103,7 @@ async function getStripeInstance(): Promise<Stripe | null> {
 // Helper function to determine price based on plan
 // Uses centralized plan configuration to ensure consistency
 const PLAN_PRICING = {
-  free: { amount: 12.99, currency: "gbp" },
+  free: { amount: 7.15, currency: "gbp" },
   pro: { amount: 69.99, currency: "gbp" },
   enterprise: { amount: 460, currency: "gbp" },
 };
@@ -1363,7 +1363,7 @@ async function handleCheckoutSessionCompleted(
             planTier: tier,
             amount:
               Number(session.metadata?.amount) ||
-              (tier === "free" ? 12.99 : tier === "pro" ? 69.99 : 460),
+              (tier === "free" ? 7.15 : tier === "pro" ? 69.99 : 460),
             currency: (session.metadata?.currency || "GBP").toUpperCase(),
             trialDays:
               stripeSubscription && stripeSubscription.trial_end
@@ -1402,7 +1402,7 @@ async function handleCheckoutSessionCompleted(
             planTier: tier,
             amount:
               Number(session.metadata?.amount) ||
-              (tier === "free" ? 12.99 : tier === "pro" ? 69.99 : 460),
+              (tier === "free" ? 7.15 : tier === "pro" ? 69.99 : 460),
             currency: (session.metadata?.currency || "GBP").toUpperCase(),
             trialDays:
               stripeSubscription && stripeSubscription.trial_end
@@ -1422,7 +1422,7 @@ async function handleCheckoutSessionCompleted(
             planTier: tier,
             amount:
               Number(session.metadata?.amount) ||
-              (tier === "free" ? 12.99 : tier === "pro" ? 69.99 : 460),
+              (tier === "free" ? 7.15 : tier === "pro" ? 69.99 : 460),
             currency: (session.metadata?.currency || "GBP").toUpperCase(),
             subscriptionStartDate: periodStart.toLocaleDateString("en-GB", {
               weekday: "long",
@@ -1448,7 +1448,7 @@ async function handleCheckoutSessionCompleted(
             planTier: tier,
             amount:
               Number(session.metadata?.amount) ||
-              (tier === "free" ? 12.99 : tier === "pro" ? 69.99 : 460),
+              (tier === "free" ? 7.15 : tier === "pro" ? 69.99 : 460),
             currency: (session.metadata?.currency || "GBP").toUpperCase(),
             userId,
           });
@@ -1648,7 +1648,7 @@ async function handleInvoicePaymentSucceeded(invoice: Stripe.Invoice) {
               amount: invoice.amount_paid
                 ? invoice.amount_paid / 100
                 : tier === "free"
-                ? 12.99
+                ? 7.15
                 : tier === "pro"
                 ? 69.99
                 : 460,
@@ -1667,7 +1667,7 @@ async function handleInvoicePaymentSucceeded(invoice: Stripe.Invoice) {
               amount: invoice.amount_paid
                 ? invoice.amount_paid / 100
                 : tier === "free"
-                ? 12.99
+                ? 7.15
                 : tier === "pro"
                 ? 69.99
                 : 460,
@@ -1762,7 +1762,7 @@ async function handleInvoicePaymentFailed(invoice: Stripe.Invoice) {
               amount: invoice.amount_due
                 ? invoice.amount_due / 100
                 : tier === "free"
-                ? 12.99
+                ? 7.15
                 : tier === "pro"
                 ? 69.99
                 : 460,
@@ -1780,7 +1780,7 @@ async function handleInvoicePaymentFailed(invoice: Stripe.Invoice) {
               amount: invoice.amount_due
                 ? invoice.amount_due / 100
                 : tier === "free"
-                ? 12.99
+                ? 7.15
                 : tier === "pro"
                 ? 69.99
                 : 460,
