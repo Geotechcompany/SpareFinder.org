@@ -39,6 +39,7 @@ import { useToast } from "@/components/ui/use-toast";
 import DashboardSkeleton from "@/components/DashboardSkeleton";
 import { PerformanceOverviewChart } from "@/components/PerformanceOverviewChart";
 import { getCrewJobDisplayName } from "@/services/aiAnalysisCrew";
+import { formatProcessingDisplay } from "@/lib/utils";
 
 const Dashboard = () => {
   const { inLayout } = useDashboardLayout();
@@ -810,7 +811,7 @@ const Dashboard = () => {
               },
               {
                 title: "Avg Processing",
-                value: `${stats.avgProcessTime || 0}s`,
+                value: formatProcessingDisplay(Number(stats.avgProcessTime) || 0),
                 icon: Clock,
                 color: "from-orange-600 to-red-600",
               },

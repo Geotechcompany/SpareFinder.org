@@ -68,6 +68,8 @@ async def get_dashboard_stats(user: CurrentUser = Depends(get_current_user)):
         # Calculate averages:
         # - Confidence: reuse `progress` (0..100) as the UI confidence proxy.
         # - Processing time: seconds between created_at and completed_at for completed jobs.
+        #   Exclude outliers (> 2 hours) so one bad/corrupt row doesn't skew overview stats.
+        MAX_PROCESSING_SECONDS = 7200  # 2 hours
         confidence_scores = []
         processing_seconds = []
         for j in jobs:
@@ -79,7 +81,7 @@ async def get_dashboard_stats(user: CurrentUser = Depends(get_current_user)):
                     created = datetime.fromisoformat(str(j["created_at"]).replace("Z", "+00:00"))
                     completed = datetime.fromisoformat(str(j["completed_at"]).replace("Z", "+00:00"))
                     delta = (completed - created).total_seconds()
-                    if delta >= 0:
+                    if 0 <= delta <= MAX_PROCESSING_SECONDS:
                         processing_seconds.append(delta)
                 except Exception:
                     pass
@@ -321,14 +323,17 @@ async def get_performance_metrics(user: CurrentUser = Depends(get_current_user))
                 }
             )
 
-        # Calculate metrics
+        # Calculate metrics (exclude processing times > 2h so outliers don't skew overview)
+        MAX_PROCESSING_SECONDS = 7200
         processing_times = []
         for s in searches:
             if (s.get("status") or "").lower() == "completed" and s.get("created_at") and s.get("completed_at"):
                 try:
                     created = datetime.fromisoformat(str(s["created_at"]).replace("Z", "+00:00"))
                     completed = datetime.fromisoformat(str(s["completed_at"]).replace("Z", "+00:00"))
-                    processing_times.append((completed - created).total_seconds())
+                    delta = (completed - created).total_seconds()
+                    if 0 <= delta <= MAX_PROCESSING_SECONDS:
+                        processing_times.append(delta)
                 except Exception:
                     pass
         avg_processing_time = sum(processing_times) / len(processing_times) if processing_times else 0
