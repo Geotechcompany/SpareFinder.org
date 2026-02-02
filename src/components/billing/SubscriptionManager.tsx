@@ -179,7 +179,7 @@ export const SubscriptionManager: React.FC = () => {
 
     setIsUpdating(tier);
     try {
-      // Starter (free tier label) -> Stripe checkout with 30-day trial @ £7.15
+      // Starter (free tier label) -> Stripe checkout with 30-day trial @ £12.99
       if (tier === "free") {
         const plan = PLAN_FEATURES["free"];
         const starterPlan = PLAN_CONFIG.free;

@@ -43,7 +43,7 @@ SUBSCRIPTION_LIMITS = {
 
 # Plan pricing
 PLAN_PRICING = {
-    "free": {"amount": 7.15, "currency": "gbp"},
+    "free": {"amount": 12.99, "currency": "gbp"},
     "pro": {"amount": 69.99, "currency": "gbp"},
     "enterprise": {"amount": 460, "currency": "gbp"},
 }
