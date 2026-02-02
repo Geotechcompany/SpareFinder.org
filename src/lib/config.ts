@@ -3,14 +3,14 @@
  * Single source of truth for all backend API URLs
  * 
  * We have ONE backend: ai-analysis-crew (Python FastAPI)
- * All API calls go to http://localhost:8000 (dev) or production URL
+ * All API calls go to https://aiagent-sparefinder-org.onrender.com (dev) or production URL
  */
 
 // Backend API Base URL - ai-analysis-crew (Python FastAPI)
 export const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL ||
   import.meta.env.VITE_API_URL ||
-  "http://localhost:8000";
+  "https://aiagent-sparefinder-org.onrender.com";
 
 // WebSocket URL for AI Crew
 export const AI_CREW_WS_URL =

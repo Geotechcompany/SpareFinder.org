@@ -119,7 +119,7 @@ PORT=3001
 SUPABASE_URL=https://your-project.supabase.co
 SUPABASE_ANON_KEY=your-supabase-anon-key
 SUPABASE_SERVICE_KEY=your-supabase-service-key
-AI_SERVICE_URL=http://localhost:8000
+AI_SERVICE_URL=https://aiagent-sparefinder-org.onrender.com
 AI_SERVICE_API_KEY=your-secure-api-key-here
 ```
 
@@ -186,8 +186,8 @@ cd ai-service
 uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 
 # Test the service
-curl -X GET http://localhost:8000/health
-curl -X GET http://localhost:8000/health/ready
+curl -X GET https://aiagent-sparefinder-org.onrender.com/health
+curl -X GET https://aiagent-sparefinder-org.onrender.com/health/ready
 ```
 
 ## 🔧 **Phase 2: TypeScript Integration**

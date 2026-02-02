@@ -39,12 +39,12 @@ docker-compose up
 
 **Health check:**
 ```bash
-curl http://localhost:8000/health
+curl https://aiagent-sparefinder-org.onrender.com/health
 ```
 
 **Root endpoint:**
 ```bash
-curl http://localhost:8000/
+curl https://aiagent-sparefinder-org.onrender.com/
 ```
 
 **WebSocket (using wscat):**
@@ -198,7 +198,7 @@ docker run -p 8000:8000 -e OPENAI_API_KEY=your_key ai-spare-part-analyzer
 
 **Test manually:**
 ```bash
-docker exec -it spare-part-api curl http://localhost:8000/health
+docker exec -it spare-part-api curl https://aiagent-sparefinder-org.onrender.com/health
 ```
 
 ### Module Not Found Errors
@@ -230,7 +230,7 @@ docker run -p 8000:8000 \
 ```
 
 **Test with frontend:**
-1. Update frontend `.env.local`: `NEXT_PUBLIC_API_URL=http://localhost:8000`
+1. Update frontend `.env.local`: `NEXT_PUBLIC_API_URL=https://aiagent-sparefinder-org.onrender.com`
 2. Start frontend: `npm run dev`
 3. Test full workflow
 

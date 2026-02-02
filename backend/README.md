@@ -51,7 +51,7 @@ SUPABASE_ANON_KEY=your-supabase-anon-key
 SUPABASE_SERVICE_KEY=your-supabase-service-role-key
 
 # AI Service Integration
-AI_SERVICE_URL=http://localhost:8000
+AI_SERVICE_URL=https://aiagent-sparefinder-org.onrender.com
 AI_SERVICE_API_KEY=your-ai-service-api-key
 
 # Frontend URL (for password reset redirects)

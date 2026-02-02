@@ -430,20 +430,29 @@ async def stripe_webhook(request: Request):
     supabase = get_supabase_admin()
     now = datetime.utcnow()
     period_end = datetime(now.year, now.month, now.day) + timedelta(days=30)
+    payload = {
+        "user_id": user_id,
+        "tier": tier,
+        "status": "active",
+        "stripe_customer_id": session.get("customer") or "",
+        "stripe_subscription_id": session.get("subscription") or "",
+        "current_period_start": now.isoformat(),
+        "current_period_end": period_end.isoformat(),
+        "cancel_at_period_end": False,
+    }
     try:
-        supabase.table("subscriptions").upsert(
-            {
-                "user_id": user_id,
-                "tier": tier,
-                "status": "active",
-                "stripe_customer_id": session.get("customer") or "",
-                "stripe_subscription_id": session.get("subscription") or "",
-                "current_period_start": now.isoformat(),
-                "current_period_end": period_end.isoformat(),
-                "cancel_at_period_end": False,
-            },
-            on_conflict="user_id",
-        ).execute()
+        existing = (
+            supabase.table("subscriptions")
+            .select("id")
+            .eq("user_id", user_id)
+            .limit(1)
+            .execute()
+        )
+        if existing.data and len(existing.data) > 0:
+            row_id = existing.data[0]["id"]
+            supabase.table("subscriptions").update(payload).eq("id", row_id).execute()
+        else:
+            supabase.table("subscriptions").insert(payload).execute()
         print(f"✅ Subscription updated for user {user_id}, tier={tier} (plan={plan})")
     except Exception as e:
         print(f"❌ Failed to update subscription: {e}")

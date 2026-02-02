@@ -29,7 +29,7 @@ const frontendEnvContent = `# GeoTech SpareFinder - Frontend Environment
 # =============================================
 
 # AI Service Configuration (REQUIRED)
-VITE_AI_SERVICE_URL=http://localhost:8000
+VITE_AI_SERVICE_URL=https://aiagent-sparefinder-org.onrender.com
 VITE_AI_SERVICE_API_KEY=geotech-dev-key-2024
 
 # Application Configuration
@@ -64,7 +64,7 @@ VITE_CORS_ENABLED=true
 # 1. The AI service should be running on localhost:8000
 # 2. Update VITE_SUPABASE_* values when you set up Supabase
 # 3. Use 'npm run dev' to start the frontend development server
-# 4. Check AI service health: curl http://localhost:8000/health
+# 4. Check AI service health: curl https://aiagent-sparefinder-org.onrender.com/health
 `;
 
 // AI Service .env content
@@ -85,7 +85,7 @@ DEBUG=true
 ENVIRONMENT=development
 
 # CORS Configuration for frontend
-ALLOWED_ORIGINS=http://localhost:5173,http://localhost:3000,http://localhost:8000
+ALLOWED_ORIGINS=http://localhost:5173,http://localhost:3000,https://aiagent-sparefinder-org.onrender.com
 ALLOWED_HOSTS=localhost,127.0.0.1
 
 # =============================================

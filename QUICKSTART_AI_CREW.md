@@ -15,7 +15,7 @@ Get your AI Analysis Crew up and running in 5 minutes!
 
 ```bash
 # Add environment variables
-echo "VITE_AI_CREW_API_URL=http://localhost:8000" >> .env
+echo "VITE_AI_CREW_API_URL=https://aiagent-sparefinder-org.onrender.com" >> .env
 echo "VITE_AI_CREW_WS_URL=ws://localhost:8000" >> .env
 
 # Install dependencies (if not already done)
@@ -71,7 +71,7 @@ GMAIL_PASS=your_app_password_here
 python run.py
 ```
 
-Backend will be at: `http://localhost:8000`
+Backend will be at: `https://aiagent-sparefinder-org.onrender.com`
 
 ### 3️⃣ Test It! (30 seconds)
 
@@ -101,7 +101,7 @@ pip install -r requirements.txt --force-reinstall
 ```
 
 **Frontend can't connect?**
-- Check backend is running: `curl http://localhost:8000/health`
+- Check backend is running: `curl https://aiagent-sparefinder-org.onrender.com/health`
 - Verify `.env` has correct URLs
 
 **Email not sending?**

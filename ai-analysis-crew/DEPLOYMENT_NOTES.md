@@ -42,7 +42,7 @@ OTEL_SDK_DISABLED=true
 
 ### Frontend `.env.local`:
 ```bash
-NEXT_PUBLIC_API_URL=http://localhost:8000
+NEXT_PUBLIC_API_URL=https://aiagent-sparefinder-org.onrender.com
 ```
 
 ---

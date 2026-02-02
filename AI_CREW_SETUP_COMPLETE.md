@@ -119,7 +119,7 @@ npm run dev
 ### Frontend (`.env`):
 
 ```bash
-VITE_AI_CREW_API_URL=http://localhost:8000
+VITE_AI_CREW_API_URL=https://aiagent-sparefinder-org.onrender.com
 VITE_AI_CREW_WS_URL=ws://localhost:8000
 ```
 
@@ -169,7 +169,7 @@ WHERE id = 'crew_abc123';
 ### 1. Test Backend:
 
 ```bash
-curl http://localhost:8000/health
+curl https://aiagent-sparefinder-org.onrender.com/health
 # Should return: {"status":"healthy","service":"AI Spare Part Analyzer API"}
 ```
 

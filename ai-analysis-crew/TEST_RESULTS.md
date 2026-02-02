@@ -1,7 +1,7 @@
 # 🧪 API Test Results
 
 **Test Date:** November 1, 2025  
-**Backend URL:** http://localhost:8000  
+**Backend URL:** https://aiagent-sparefinder-org.onrender.com  
 **Status:** ✅ ALL TESTS PASSED
 
 ---
@@ -23,7 +23,7 @@
 ### ✅ Test 1: Root Endpoint
 **Request:**
 ```bash
-curl http://localhost:8000/
+curl https://aiagent-sparefinder-org.onrender.com/
 ```
 **Response:**
 ```json
@@ -36,7 +36,7 @@ curl http://localhost:8000/
 ### ✅ Test 2: Health Check
 **Request:**
 ```bash
-curl http://localhost:8000/health
+curl https://aiagent-sparefinder-org.onrender.com/health
 ```
 **Response:**
 ```json
@@ -49,7 +49,7 @@ curl http://localhost:8000/health
 ### ✅ Test 3: Analyze Part with Keywords
 **Request:**
 ```bash
-curl -X POST http://localhost:8000/analyze-part \
+curl -X POST https://aiagent-sparefinder-org.onrender.com/analyze-part \
   -F "user_email=test@example.com" \
   -F "keywords=Toyota Camry 2015 front brake pad ceramic"
 ```
@@ -69,7 +69,7 @@ curl -X POST http://localhost:8000/analyze-part \
 ### ✅ Test 4: Invalid Email Validation
 **Request:**
 ```bash
-curl -X POST http://localhost:8000/analyze-part \
+curl -X POST https://aiagent-sparefinder-org.onrender.com/analyze-part \
   -F "user_email=invalid-email" \
   -F "keywords=brake pad"
 ```
@@ -85,7 +85,7 @@ curl -X POST http://localhost:8000/analyze-part \
 ### ✅ Test 5: Missing Required Field
 **Request:**
 ```bash
-curl -X POST http://localhost:8000/analyze-part \
+curl -X POST https://aiagent-sparefinder-org.onrender.com/analyze-part \
   -F "keywords=brake pad"
 ```
 **Response:**
