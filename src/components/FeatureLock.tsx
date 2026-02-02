@@ -5,7 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useNavigate } from "react-router-dom";
-import { PlanTier } from "@/lib/plans";
+import { PlanTier, canAccessFeature } from "@/lib/plans";
+import { useSubscription } from "@/contexts/SubscriptionContext";
 
 interface FeatureLockProps {
   requiredTier: PlanTier;
@@ -37,6 +38,10 @@ export const FeatureLock: React.FC<FeatureLockProps> = ({
   className = "",
 }) => {
   const navigate = useNavigate();
+  const { tier, isLoading } = useSubscription();
+
+  // Strict: only show content if user's plan includes this feature
+  const hasAccess = canAccessFeature(tier, requiredTier);
 
   const handleUpgrade = () => {
     navigate("/dashboard/billing");
@@ -48,6 +53,11 @@ export const FeatureLock: React.FC<FeatureLockProps> = ({
       }
     }, 100);
   };
+
+  // User has required tier or higher: render children only (no lock)
+  if (!isLoading && hasAccess) {
+    return <div className={className}>{children}</div>;
+  }
 
   return (
     <div className={`relative ${className}`}>

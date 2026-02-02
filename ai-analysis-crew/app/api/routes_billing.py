@@ -23,26 +23,33 @@ from ..email_sender import (
 
 router = APIRouter(prefix="/billing", tags=["billing"])
 
-# Subscription limits configuration
+# Subscription limits configuration (strict: features per plan only)
 SUBSCRIPTION_LIMITS = {
     "free": {
-        "searches": 5,
-        "api_calls": 50,
-        "storage": 100,  # MB
+        "searches": 20,
+        "api_calls": 0,
+        "storage": 1024,  # MB
+        "priority_support": False,
+        "custom_branding": False,
+    },
+    "starter": {
+        "searches": 20,
+        "api_calls": 0,
+        "storage": 1024,
         "priority_support": False,
         "custom_branding": False,
     },
     "pro": {
-        "searches": 100,
-        "api_calls": 1000,
-        "storage": 1000,  # MB
+        "searches": 500,
+        "api_calls": 5000,
+        "storage": 25 * 1024,  # MB
         "priority_support": True,
         "custom_branding": False,
     },
     "enterprise": {
         "searches": -1,  # Unlimited
-        "api_calls": -1,  # Unlimited
-        "storage": -1,  # Unlimited
+        "api_calls": -1,
+        "storage": -1,
         "priority_support": True,
         "custom_branding": True,
     },

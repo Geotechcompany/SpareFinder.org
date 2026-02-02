@@ -200,15 +200,15 @@ async def auto_start_pending_jobs():
         except ImportError:
             logger.error("Failed to import get_supabase_admin - auto-start disabled")
             return
-    
+
     import httpx
-    
+
     while True:
         try:
             await asyncio.sleep(10)  # Check every 10 seconds
-            
+
             supabase = get_supabase_admin()
-            
+
             # Find pending jobs
             result = (
                 supabase.table("crew_analysis_jobs")
@@ -274,13 +274,21 @@ async def auto_start_pending_jobs():
                             0,
                             str(job_error)
                         )
-                    except:
+                    except Exception:
                         pass
-        
+
         except Exception as e:
-            logger.error(f"Error in auto-start pending jobs task: {e}")
-            import traceback
-            logger.error(traceback.format_exc())
+            err_msg = str(e)
+            # Supabase/Cloudflare returned non-JSON (e.g. 5xx HTML error page)
+            if "JSON could not be generated" in err_msg or ("502" in err_msg and "html" in err_msg.lower()):
+                logger.warning(
+                    "Auto-start pending jobs: Supabase/Cloudflare returned non-JSON (5xx). "
+                    "Will retry in 30s. If this persists, check Supabase/Cloudflare status."
+                )
+            else:
+                logger.error("Error in auto-start pending jobs task: %s", e)
+                import traceback
+                logger.error(traceback.format_exc())
             await asyncio.sleep(30)  # Wait longer on error
 
 

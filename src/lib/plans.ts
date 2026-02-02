@@ -176,6 +176,21 @@ export const TIER_DISPLAY_MAP: Record<PlanTier, string> = {
   enterprise: "Enterprise",
 };
 
+/** Tier order for strict feature gating (higher index = more access) */
+const TIER_ORDER: PlanTier[] = ["free", "pro", "enterprise"];
+
+/** Returns true only if the user's tier includes access to the required tier. Strict: no access to higher-plan features. */
+export function canAccessFeature(
+  currentTier: PlanTier | "none" | string | null,
+  requiredTier: PlanTier
+): boolean {
+  if (!currentTier || currentTier === "none") return false;
+  const current = TIER_ORDER.indexOf(currentTier as PlanTier);
+  const required = TIER_ORDER.indexOf(requiredTier);
+  if (current === -1) return false; // unknown tier = no access
+  return current >= required;
+}
+
 // Subscription limits for backend compatibility
 export const SUBSCRIPTION_LIMITS = Object.fromEntries(
   Object.entries(PLAN_CONFIG).map(([tier, plan]) => [

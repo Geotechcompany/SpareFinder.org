@@ -8,6 +8,7 @@ import logging
 from fastapi import APIRouter, Depends, File, Form, UploadFile, HTTPException
 
 from .auth_dependencies import CurrentUser, get_current_user
+from .plan_enforcement import check_upload_limit
 from .responses import api_ok, api_error
 from .supabase_admin import get_supabase_admin
 
@@ -93,11 +94,20 @@ async def create_crew_analysis_job(
     """
     Create a new crew analysis job and start analysis immediately.
     Uploads the image, creates a job entry in the database, and starts processing.
+    Plan-gated: upload count must not exceed tier limit for the current period.
     """
     import asyncio
     import uuid
     
     try:
+        # Enforce plan upload limit (strict: user cannot exceed their tier limit)
+        allowed, current, limit = await check_upload_limit(user.id, user.role)
+        if not allowed:
+            return api_error(
+                f"Upload limit reached for your plan ({current}/{limit} this period). Upgrade to get more analyses.",
+                status_code=403,
+            )
+
         supabase = get_supabase_admin()
         user_id = user.id
         user_email = user.email

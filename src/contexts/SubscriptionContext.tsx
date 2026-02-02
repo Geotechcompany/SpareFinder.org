@@ -44,6 +44,8 @@ const SubscriptionContext = createContext<SubscriptionContextValue | undefined>(
 
 const normalizeTier = (tier: unknown): SubscriptionTier => {
   if (tier === "free" || tier === "pro" || tier === "enterprise") return tier;
+  // Backend may return "starter" for Starter plan; map to "free" for feature checks
+  if (tier === "starter" || tier === "basic") return "free";
   return "none";
 };
 

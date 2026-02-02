@@ -17,6 +17,7 @@ export const CreditsDisplay: React.FC<CreditsDisplayProps> = ({
   onCreditChange,
 }) => {
   const [credits, setCredits] = useState<number | "unlimited" | null>(null);
+  const [planActive, setPlanActive] = useState<boolean | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const hasFetchedOnceRef = React.useRef(false);
@@ -25,6 +26,7 @@ export const CreditsDisplay: React.FC<CreditsDisplayProps> = ({
     try {
       const response = await api.credits.getBalance();
       if (response.success) {
+        setPlanActive((response as any).plan_active ?? null);
         const unlimited =
           (response as any).unlimited === true ||
           (response as any).credits === Infinity;
@@ -150,7 +152,7 @@ export const CreditsDisplay: React.FC<CreditsDisplayProps> = ({
         </Button>
       )}
 
-      {!loading && (credits === null || credits === 0) && (
+      {!loading && (credits === null || credits === 0) && !planActive && (
         <Button
           variant="outline"
           size="sm"
