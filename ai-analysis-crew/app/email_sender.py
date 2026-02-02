@@ -325,6 +325,116 @@ Manage subscriptions and view past invoices: {billing_url}
     return _send_billing_email(to_email=to_email, subject=subject, html=html, text=text)
 
 
+def send_payment_failed_email(
+    *,
+    to_email: str,
+    amount_due: Optional[str] = None,
+    billing_url: str = "https://sparefinder.org/dashboard/billing",
+) -> bool:
+    """
+    Send when a payment fails (invoice.payment_failed). Asks user to update payment method.
+    """
+    subject = "SpareFinder: Payment failed – please update your card"
+    amount_line = f"\nAmount due: {amount_due}" if amount_due else ""
+    text = f"""Hi,
+
+We couldn't process your payment for your SpareFinder subscription.
+{amount_line}
+
+Please update your payment method to avoid any interruption to your plan:
+{billing_url}
+
+If you have questions, contact us at support@sparefinder.org.
+
+— SpareFinder
+"""
+    html = f"""<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><title>Payment failed</title></head>
+<body style="font-family: system-ui, sans-serif; max-width: 560px; line-height: 1.5;">
+  <p>Hi,</p>
+  <p>We couldn't process your payment for your SpareFinder subscription.</p>
+  {"<p><strong>Amount due: " + amount_due + "</strong></p>" if amount_due else ""}
+  <p>Please <a href="{billing_url}">update your payment method</a> to avoid any interruption to your plan.</p>
+  <p>If you have questions, contact us at <a href="mailto:support@sparefinder.org">support@sparefinder.org</a>.</p>
+  <p>— SpareFinder</p>
+</body>
+</html>"""
+    return _send_billing_email(to_email=to_email, subject=subject, html=html, text=text)
+
+
+def send_subscription_canceled_email(
+    *,
+    to_email: str,
+    plan_name: str = "subscription",
+    end_date: Optional[str] = None,
+    billing_url: str = "https://sparefinder.org/dashboard/billing",
+) -> bool:
+    """
+    Send when a subscription is canceled (customer.subscription.deleted).
+    """
+    subject = "Your SpareFinder subscription has ended"
+    end_line = f"\nYour access ended on: {end_date}" if end_date else ""
+    text = f"""Hi,
+
+Your SpareFinder {plan_name} plan has been canceled.
+{end_line}
+
+You can resubscribe anytime from your dashboard:
+{billing_url}
+
+We're sorry to see you go. If you change your mind, we're here to help – contact support@sparefinder.org.
+
+— SpareFinder
+"""
+    html = f"""<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><title>Subscription ended</title></head>
+<body style="font-family: system-ui, sans-serif; max-width: 560px; line-height: 1.5;">
+  <p>Hi,</p>
+  <p>Your SpareFinder <strong>{plan_name}</strong> plan has been canceled.</p>
+  {"<p>Your access ended on: <strong>" + end_date + "</strong></p>" if end_date else ""}
+  <p>You can <a href="{billing_url}">resubscribe anytime</a> from your dashboard.</p>
+  <p>We're sorry to see you go. If you change your mind, contact <a href="mailto:support@sparefinder.org">support@sparefinder.org</a>.</p>
+  <p>— SpareFinder</p>
+</body>
+</html>"""
+    return _send_billing_email(to_email=to_email, subject=subject, html=html, text=text)
+
+
+def send_subscription_renewing_soon_email(
+    *,
+    to_email: str,
+    plan_name: str,
+    renew_date: str,
+    billing_url: str = "https://sparefinder.org/dashboard/billing",
+) -> bool:
+    """
+    Send before renewal (e.g. from a cron job). Reminds user when their plan renews.
+    """
+    subject = f"Your SpareFinder plan renews on {renew_date}"
+    text = f"""Hi,
+
+This is a reminder that your SpareFinder {plan_name} plan will renew on {renew_date}.
+
+You can manage or cancel your subscription here:
+{billing_url}
+
+— SpareFinder
+"""
+    html = f"""<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><title>Plan renewal reminder</title></head>
+<body style="font-family: system-ui, sans-serif; max-width: 560px; line-height: 1.5;">
+  <p>Hi,</p>
+  <p>This is a reminder that your SpareFinder <strong>{plan_name}</strong> plan will renew on <strong>{renew_date}</strong>.</p>
+  <p><a href="{billing_url}">Manage or cancel your subscription</a></p>
+  <p>— SpareFinder</p>
+</body>
+</html>"""
+    return _send_billing_email(to_email=to_email, subject=subject, html=html, text=text)
+
+
 def send_email_with_attachment(
     to_email: str,
     subject: str,

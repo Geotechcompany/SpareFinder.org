@@ -13,7 +13,12 @@ from pydantic import BaseModel
 from .auth_dependencies import CurrentUser, get_current_user
 from .responses import api_error, api_ok
 from .supabase_admin import get_supabase_admin
-from ..email_sender import send_purchase_confirmation_email, send_receipt_email
+from ..email_sender import (
+    send_payment_failed_email,
+    send_purchase_confirmation_email,
+    send_receipt_email,
+    send_subscription_canceled_email,
+)
 
 router = APIRouter(prefix="/billing", tags=["billing"])
 
@@ -557,6 +562,64 @@ async def stripe_webhook(request: Request):
                     print(f"⚠️ Receipt email failed: {mail_err}")
         except Exception as e:
             print(f"❌ invoice.payment_succeeded handler error: {e}")
+        return api_ok(data={"received": True})
+
+    if event.type == "invoice.payment_failed":
+        invoice = event["data"]["object"]
+        customer_id = invoice.get("customer")
+        customer_email = (invoice.get("customer_email") or "").strip()
+        if not customer_email and customer_id:
+            try:
+                cust = stripe.Customer.retrieve(customer_id)
+                customer_email = (getattr(cust, "email", None) or (cust.get("email") if isinstance(cust, dict) else None) or "").strip()
+            except Exception:
+                pass
+        if customer_email:
+            amount_cents = invoice.get("amount_due") or invoice.get("amount_paid") or 0
+            amount_due_str = f"£{amount_cents / 100:.2f}" if amount_cents else None
+            try:
+                send_payment_failed_email(to_email=customer_email, amount_due=amount_due_str)
+            except Exception as mail_err:
+                print(f"⚠️ Payment failed email error: {mail_err}")
+        return api_ok(data={"received": True})
+
+    if event.type == "customer.subscription.deleted":
+        subscription = event["data"]["object"]
+        customer_id = subscription.get("customer")
+        plan_name = "subscription"
+        try:
+            sub_plan = (subscription.get("metadata") or {}).get("plan") or ""
+            if sub_plan:
+                plan_name = sub_plan
+            elif subscription.get("items") and subscription["items"].get("data"):
+                first = subscription["items"]["data"][0]
+                price = (first.get("price") or {})
+                plan_name = price.get("nickname") or plan_name
+        except Exception:
+            pass
+        end_ts = subscription.get("canceled_at") or subscription.get("ended_at")
+        end_date = None
+        if end_ts:
+            end_date = datetime.utcfromtimestamp(end_ts).strftime("%Y-%m-%d")
+        customer_email = ""
+        if customer_id:
+            try:
+                cust = stripe.Customer.retrieve(customer_id)
+                customer_email = (getattr(cust, "email", None) or (cust.get("email") if isinstance(cust, dict) else None) or "").strip()
+            except Exception:
+                pass
+        if customer_email:
+            try:
+                send_subscription_canceled_email(to_email=customer_email, plan_name=plan_name, end_date=end_date)
+            except Exception as mail_err:
+                print(f"⚠️ Subscription canceled email error: {mail_err}")
+        # Update our DB: set status canceled / inactive
+        try:
+            r = supabase.table("subscriptions").select("id").eq("stripe_subscription_id", subscription.get("id")).limit(1).execute()
+            if r.data and len(r.data) > 0:
+                supabase.table("subscriptions").update({"status": "canceled"}).eq("id", r.data[0]["id"]).execute()
+        except Exception as e:
+            print(f"⚠️ Failed to update subscription status on delete: {e}")
         return api_ok(data={"received": True})
 
     return api_ok(data={"received": True})
