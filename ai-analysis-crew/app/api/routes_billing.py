@@ -18,6 +18,7 @@ from ..email_sender import (
     send_purchase_confirmation_email,
     send_receipt_email,
     send_subscription_canceled_email,
+    send_subscription_renewing_soon_email,
 )
 
 router = APIRouter(prefix="/billing", tags=["billing"])
@@ -623,3 +624,78 @@ async def stripe_webhook(request: Request):
         return api_ok(data={"received": True})
 
     return api_ok(data={"received": True})
+
+
+@router.get("/cron/renewal-reminders")
+async def cron_renewal_reminders():
+    """
+    Public cron endpoint: send renewal reminder emails for subscriptions
+    whose current_period_end is 3–7 days from now. Call daily (e.g. cron-job.org).
+    """
+    now = datetime.utcnow()
+    start = now + timedelta(days=3)
+    end = now + timedelta(days=7)
+    start_iso = start.strftime("%Y-%m-%d")
+    end_iso = end.strftime("%Y-%m-%dT23:59:59.999Z")
+    supabase = get_supabase_admin()
+    sent = 0
+    errors = 0
+    try:
+        rows = (
+            supabase.table("subscriptions")
+            .select("id, user_id, tier, current_period_end, stripe_customer_id")
+            .eq("status", "active")
+            .gte("current_period_end", start_iso)
+            .lte("current_period_end", end_iso)
+            .execute()
+        )
+        subs = rows.data or []
+    except Exception as e:
+        print(f"❌ Cron renewal-reminders query error: {e}")
+        return api_error("Failed to fetch subscriptions", status_code=500)
+    for sub in subs:
+        user_id = sub.get("user_id")
+        period_end = sub.get("current_period_end")
+        tier = sub.get("tier") or sub.get("plan_type") or "subscription"
+        try:
+            renew_date = datetime.fromisoformat(period_end.replace("Z", "+00:00")).strftime("%Y-%m-%d") if period_end else ""
+        except Exception:
+            renew_date = period_end or ""
+        email = None
+        if user_id:
+            try:
+                pr = supabase.table("profiles").select("email").eq("id", user_id).limit(1).execute()
+                if pr.data and len(pr.data) > 0 and (pr.data[0].get("email") or "").strip():
+                    email = (pr.data[0]["email"] or "").strip()
+            except Exception:
+                pass
+        if not email and sub.get("stripe_customer_id"):
+            try:
+                cust = stripe.Customer.retrieve(sub["stripe_customer_id"])
+                email = (getattr(cust, "email", None) or (cust.get("email") if isinstance(cust, dict) else None) or "").strip()
+            except Exception:
+                pass
+        if not email:
+            errors += 1
+            continue
+        try:
+            ok = send_subscription_renewing_soon_email(
+                to_email=email,
+                plan_name=tier,
+                renew_date=renew_date,
+            )
+            if ok:
+                sent += 1
+            else:
+                errors += 1
+        except Exception as e:
+            print(f"⚠️ Renewal reminder email failed for {email}: {e}")
+            errors += 1
+    return api_ok(
+        data={
+            "sent": sent,
+            "errors": errors,
+            "total_eligible": len(subs),
+            "message": f"Renewal reminders: {sent} sent, {errors} errors.",
+        }
+    )
