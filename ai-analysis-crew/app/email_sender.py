@@ -230,6 +230,101 @@ Your report is still attached / available in your History.
     return ok
 
 
+def _send_billing_email(*, to_email: str, subject: str, html: str, text: str) -> bool:
+    """Send a billing-related email (SMTP first, then email-service fallback)."""
+    ok = send_basic_email_smtp(to_email=to_email, subject=subject, html=html, text=text)
+    if not ok:
+        ok = send_email_via_email_service(to_email=to_email, subject=subject, html=html, text=text)
+    return ok
+
+
+def send_purchase_confirmation_email(
+    *,
+    to_email: str,
+    plan_name: str,
+    amount_paid: Optional[str] = None,
+    billing_url: str = "https://sparefinder.org/dashboard/billing",
+    is_subscription: bool = True,
+) -> bool:
+    """
+    Send a purchase confirmation email after a successful plan purchase (checkout.session.completed).
+    Modern SaaS-style: clear confirmation, what they get, and link to manage subscription.
+    """
+    subject = f"Your SpareFinder {plan_name} plan is active"
+    amount_line = f"\nAmount paid: {amount_paid}" if amount_paid else ""
+    text = f"""Hi,
+
+Thank you for subscribing to SpareFinder. Your {plan_name} plan is now active.
+
+What's next:
+• Use your full access in the dashboard
+• Manage your subscription, invoices, and payment methods at: {billing_url}
+• Contact us at support@sparefinder.org if you have any questions
+{amount_line}
+
+— SpareFinder
+"""
+    html = f"""<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><title>Plan activated</title></head>
+<body style="font-family: system-ui, sans-serif; max-width: 560px; line-height: 1.5;">
+  <p>Hi,</p>
+  <p>Thank you for subscribing to SpareFinder. Your <strong>{plan_name}</strong> plan is now active.</p>
+  <p><strong>What's next:</strong></p>
+  <ul>
+    <li>Use your full access in the <a href="https://sparefinder.org/dashboard">dashboard</a></li>
+    <li><a href="{billing_url}">Manage your subscription, invoices, and payment methods</a></li>
+    <li>Contact us at <a href="mailto:support@sparefinder.org">support@sparefinder.org</a> if you have any questions</li>
+  </ul>
+  {"<p>Amount paid: " + amount_paid + "</p>" if amount_paid else ""}
+  <p>— SpareFinder</p>
+</body>
+</html>"""
+    return _send_billing_email(to_email=to_email, subject=subject, html=html, text=text)
+
+
+def send_receipt_email(
+    *,
+    to_email: str,
+    plan_name: str,
+    amount_paid: str,
+    currency: str = "GBP",
+    receipt_url: Optional[str] = None,
+    billing_url: str = "https://sparefinder.org/dashboard/billing",
+) -> bool:
+    """
+    Send a receipt email (e.g. after invoice.payment_succeeded) with optional link to Stripe receipt.
+    """
+    subject = f"Your SpareFinder receipt – {amount_paid} {currency}"
+    receipt_line = f"\nDownload or view your receipt: {receipt_url}" if receipt_url else ""
+    text = f"""Hi,
+
+Your payment has been received.
+
+Plan: {plan_name}
+Amount: {amount_paid} {currency}
+{receipt_line}
+
+Manage subscriptions and view past invoices: {billing_url}
+
+— SpareFinder
+"""
+    receipt_html = f'<p><a href="{receipt_url}">Download or view your receipt</a></p>' if receipt_url else ""
+    html = f"""<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><title>Payment receipt</title></head>
+<body style="font-family: system-ui, sans-serif; max-width: 560px; line-height: 1.5;">
+  <p>Hi,</p>
+  <p>Your payment has been received.</p>
+  <p><strong>Plan:</strong> {plan_name}<br><strong>Amount:</strong> {amount_paid} {currency}</p>
+  {receipt_html}
+  <p><a href="{billing_url}">Manage subscriptions and view past invoices</a></p>
+  <p>— SpareFinder</p>
+</body>
+</html>"""
+    return _send_billing_email(to_email=to_email, subject=subject, html=html, text=text)
+
+
 def send_email_with_attachment(
     to_email: str,
     subject: str,

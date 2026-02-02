@@ -13,6 +13,7 @@ from pydantic import BaseModel
 from .auth_dependencies import CurrentUser, get_current_user
 from .responses import api_error, api_ok
 from .supabase_admin import get_supabase_admin
+from ..email_sender import send_purchase_confirmation_email, send_receipt_email
 
 router = APIRouter(prefix="/billing", tags=["billing"])
 
@@ -455,6 +456,26 @@ async def stripe_webhook(request: Request):
             else:
                 supabase.table("subscriptions").insert(payload).execute()
             print(f"✅ Subscription updated for user {user_id}, tier={tier} (plan={plan})")
+            # Send purchase confirmation email (modern SaaS)
+            customer_email = (
+                session.get("customer_email")
+                or (session.get("customer_details") or {}).get("email")
+                or ""
+            ).strip()
+            if customer_email:
+                amount_total = session.get("amount_total")
+                amount_paid_str = None
+                if amount_total is not None and isinstance(amount_total, (int, float)):
+                    amount_paid_str = f"£{amount_total / 100:.2f}"
+                try:
+                    send_purchase_confirmation_email(
+                        to_email=customer_email,
+                        plan_name=plan or tier,
+                        amount_paid=amount_paid_str,
+                        is_subscription=bool(session.get("subscription")),
+                    )
+                except Exception as mail_err:
+                    print(f"⚠️ Purchase confirmation email failed: {mail_err}")
         except Exception as e:
             print(f"❌ Failed to update subscription: {e}")
         return api_ok(data={"received": True})
@@ -511,6 +532,29 @@ async def stripe_webhook(request: Request):
             }
             supabase.table("subscriptions").update(payload).eq("id", row_id).execute()
             print(f"✅ Subscription updated from invoice.payment_succeeded for user {user_id}, tier={tier} (plan={plan})")
+            # Send receipt email (modern SaaS)
+            customer_email = (invoice.get("customer_email") or "").strip()
+            if not customer_email and customer_id:
+                try:
+                    cust = stripe.Customer.retrieve(customer_id)
+                    customer_email = (getattr(cust, "email", None) or (cust.get("email") if isinstance(cust, dict) else None) or "").strip()
+                except Exception:
+                    pass
+            if customer_email:
+                amount_cents = invoice.get("amount_paid") or invoice.get("amount_due") or 0
+                amount_paid_str = f"{amount_cents / 100:.2f}"
+                currency = (invoice.get("currency") or "gbp").upper()
+                receipt_url = invoice.get("hosted_invoice_url") or invoice.get("invoice_pdf") or None
+                try:
+                    send_receipt_email(
+                        to_email=customer_email,
+                        plan_name=plan or tier,
+                        amount_paid=amount_paid_str,
+                        currency=currency,
+                        receipt_url=receipt_url,
+                    )
+                except Exception as mail_err:
+                    print(f"⚠️ Receipt email failed: {mail_err}")
         except Exception as e:
             print(f"❌ invoice.payment_succeeded handler error: {e}")
         return api_ok(data={"received": True})
