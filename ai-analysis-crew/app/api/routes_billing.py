@@ -416,44 +416,103 @@ async def stripe_webhook(request: Request):
     except stripe.error.SignatureVerificationError as e:
         print(f"❌ Webhook signature error: {e}")
         return api_error("Invalid signature", status_code=400)
-    if event.type != "checkout.session.completed":
-        return api_ok(data={"received": True})
-    session = event["data"]["object"]
-    user_id = (session.get("metadata") or {}).get("user_id")
-    plan = (session.get("metadata") or {}).get("plan")
-    if not user_id:
-        print("⚠️ checkout.session.completed: missing metadata.user_id")
-        return api_ok(data={"received": True})
-    if not plan:
-        print("⚠️ successfully paid with Stripe but no plan was given in session metadata")
-    tier = _plan_to_tier(plan or "")
+
     supabase = get_supabase_admin()
-    now = datetime.utcnow()
-    period_end = datetime(now.year, now.month, now.day) + timedelta(days=30)
-    payload = {
-        "user_id": user_id,
-        "tier": tier,
-        "status": "active",
-        "stripe_customer_id": session.get("customer") or "",
-        "stripe_subscription_id": session.get("subscription") or "",
-        "current_period_start": now.isoformat(),
-        "current_period_end": period_end.isoformat(),
-        "cancel_at_period_end": False,
-    }
-    try:
-        existing = (
-            supabase.table("subscriptions")
-            .select("id")
-            .eq("user_id", user_id)
-            .limit(1)
-            .execute()
-        )
-        if existing.data and len(existing.data) > 0:
-            row_id = existing.data[0]["id"]
+
+    if event.type == "checkout.session.completed":
+        session = event["data"]["object"]
+        user_id = (session.get("metadata") or {}).get("user_id")
+        plan = (session.get("metadata") or {}).get("plan")
+        if not user_id:
+            print("⚠️ checkout.session.completed: missing metadata.user_id")
+            return api_ok(data={"received": True})
+        if not plan:
+            print("⚠️ successfully paid with Stripe but no plan was given in session metadata")
+        tier = _plan_to_tier(plan or "")
+        now = datetime.utcnow()
+        period_end = datetime(now.year, now.month, now.day) + timedelta(days=30)
+        payload = {
+            "user_id": user_id,
+            "tier": tier,
+            "status": "active",
+            "stripe_customer_id": session.get("customer") or "",
+            "stripe_subscription_id": session.get("subscription") or "",
+            "current_period_start": now.isoformat(),
+            "current_period_end": period_end.isoformat(),
+            "cancel_at_period_end": False,
+        }
+        try:
+            existing = (
+                supabase.table("subscriptions")
+                .select("id")
+                .eq("user_id", user_id)
+                .limit(1)
+                .execute()
+            )
+            if existing.data and len(existing.data) > 0:
+                row_id = existing.data[0]["id"]
+                supabase.table("subscriptions").update(payload).eq("id", row_id).execute()
+            else:
+                supabase.table("subscriptions").insert(payload).execute()
+            print(f"✅ Subscription updated for user {user_id}, tier={tier} (plan={plan})")
+        except Exception as e:
+            print(f"❌ Failed to update subscription: {e}")
+        return api_ok(data={"received": True})
+
+    if event.type == "invoice.payment_succeeded":
+        invoice = event["data"]["object"]
+        customer_id = invoice.get("customer")
+        subscription_id = invoice.get("subscription")
+        if not customer_id and not subscription_id:
+            return api_ok(data={"received": True})
+        try:
+            plan = None
+            period_start = datetime.utcnow()
+            period_end = period_start + timedelta(days=30)
+            if subscription_id:
+                sub = stripe.Subscription.retrieve(subscription_id)
+                plan = (sub.metadata or {}).get("plan") or (sub.get("metadata") or {}).get("plan")
+                if sub.current_period_start:
+                    period_start = datetime.utcfromtimestamp(sub.current_period_start)
+                if sub.current_period_end:
+                    period_end = datetime.utcfromtimestamp(sub.current_period_end)
+                if not plan and sub.get("items") and sub["items"].get("data"):
+                    first_item = sub["items"]["data"][0]
+                    price = first_item.get("price") or {}
+                    plan = price.get("nickname") or ""
+                    if not plan and isinstance(price.get("product"), str):
+                        try:
+                            plan = getattr(stripe.Product.retrieve(price["product"]), "name", "") or ""
+                        except Exception:
+                            pass
+            existing = None
+            if customer_id:
+                r = supabase.table("subscriptions").select("id", "user_id").eq("stripe_customer_id", customer_id).limit(1).execute()
+                if r.data and len(r.data) > 0:
+                    existing = r.data[0]
+            if not existing and subscription_id:
+                r = supabase.table("subscriptions").select("id", "user_id").eq("stripe_subscription_id", subscription_id).limit(1).execute()
+                if r.data and len(r.data) > 0:
+                    existing = r.data[0]
+            if not existing:
+                print("⚠️ invoice.payment_succeeded: no subscription row for customer/subscription, cannot set plan")
+                return api_ok(data={"received": True})
+            row_id = existing["id"]
+            user_id = existing["user_id"]
+            tier = _plan_to_tier(plan or "")
+            payload = {
+                "status": "active",
+                "stripe_customer_id": customer_id or existing.get("stripe_customer_id") or "",
+                "stripe_subscription_id": subscription_id or "",
+                "current_period_start": period_start.isoformat(),
+                "current_period_end": period_end.isoformat(),
+                "cancel_at_period_end": False,
+                "tier": tier,
+            }
             supabase.table("subscriptions").update(payload).eq("id", row_id).execute()
-        else:
-            supabase.table("subscriptions").insert(payload).execute()
-        print(f"✅ Subscription updated for user {user_id}, tier={tier} (plan={plan})")
-    except Exception as e:
-        print(f"❌ Failed to update subscription: {e}")
+            print(f"✅ Subscription updated from invoice.payment_succeeded for user {user_id}, tier={tier} (plan={plan})")
+        except Exception as e:
+            print(f"❌ invoice.payment_succeeded handler error: {e}")
+        return api_ok(data={"received": True})
+
     return api_ok(data={"received": True})
