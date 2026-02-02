@@ -109,6 +109,39 @@ async def test_billing():
     """Test endpoint to verify billing route is accessible."""
     return {"message": "Billing route test - this endpoint works", "status": "ok"}
 
+
+@app.get("/api/cron/reminders")
+async def cron_reminders(
+    type: str = "reengagement",
+    inactive_days: int = 14,
+    days_after_signup: int = 1,
+    limit: int = 50,
+):
+    """
+    Public cron endpoint: run onboarding or reengagement reminder emails.
+    Reengagement: sends AI-generated emails (new content each time) to users inactive for N days.
+    Call daily from cron-job.org or similar.
+    Query: ?type=reengagement&inactive_days=14&limit=50  or  ?type=onboarding&days_after_signup=1&limit=50
+    """
+    if type not in ("onboarding", "reengagement"):
+        return {"ok": False, "error": "type must be 'onboarding' or 'reengagement'"}
+    limit = max(1, min(limit, 200))
+    inactive_days = max(1, min(inactive_days, 365))
+    days_after_signup = max(0, min(days_after_signup, 30))
+    try:
+        from .cron_reminders import run_cron_reminders_background
+        summary = await run_cron_reminders_background(
+            reminder_type=type,
+            days_after_signup=days_after_signup,
+            inactive_days=inactive_days,
+            limit=limit,
+        )
+        return {"ok": True, **summary}
+    except Exception as e:
+        logger.error(f"❌ Cron reminders failed: {e}")
+        return {"ok": False, "error": str(e)}
+
+
 # WebSocket connections manager
 class ConnectionManager:
     def __init__(self):
