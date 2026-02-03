@@ -776,6 +776,36 @@ export const adminApi = {
     return { success: true, data: response.data };
   },
 
+  listPlans: async (): Promise<ApiResponse<{ plans: any[] }>> => {
+    const response = await apiClient.get("/admin/plans");
+    return response.data;
+  },
+
+  updatePlan: async (
+    planId: string,
+    payload: {
+      tier?: string;
+      name?: string;
+      price?: number;
+      currency?: string;
+      period?: string;
+      description?: string;
+      features?: string[];
+      popular?: boolean;
+      color?: string;
+      limits_searches?: number;
+      limits_api_calls?: number;
+      limits_storage_mb?: number;
+      trial_days?: number | null;
+      trial_price?: number | null;
+      display_order?: number;
+      active?: boolean;
+    }
+  ): Promise<ApiResponse<{ plan: any }>> => {
+    const response = await apiClient.put(`/admin/plans/${planId}`, payload);
+    return response.data;
+  },
+
   getEmailTemplates: async (): Promise<ApiResponse> => {
     const response = await apiClient.get("/admin/email-templates");
     return response.data;
@@ -1732,6 +1762,12 @@ export const api = {
   billing: billingApi,
   statistics: statisticsApi,
   credits: creditsApi,
+  plans: {
+    getPlans: async (): Promise<ApiResponse<{ plans: any[] }>> => {
+      const response = await apiClient.get("/plans");
+      return response.data;
+    },
+  },
   apiKeys: {
     list: async (): Promise<ApiResponse<{ keys: any[] }>> => {
       const response = await apiClient.get("/api-keys");

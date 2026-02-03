@@ -13,12 +13,13 @@ import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/components/ui/use-toast";
 import { api } from "@/lib/api";
 import {
+  fetchPlansFromApi,
   getAllPlans,
   getPlan,
   formatPrice,
   PlanTier,
   isUnlimited,
-  PLAN_CONFIG,
+  type PlanFeature,
 } from "@/lib/plans";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import {
@@ -155,6 +156,7 @@ const Billing = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [billingData, setBillingData] = useState<BillingData | null>(null);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [plansFromApi, setPlansFromApi] = useState<PlanFeature[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchParams] = useSearchParams();
@@ -228,6 +230,9 @@ const Billing = () => {
       try {
         setIsLoading(true);
         setError(null);
+
+        // Fetch plans from DB (for display and checkout)
+        fetchPlansFromApi().then((p) => isMounted && setPlansFromApi(p));
 
         // Fetch billing info
         const billingResponse = await api.billing.getBillingInfo({
@@ -367,12 +372,33 @@ const Billing = () => {
     );
   }
 
+  const allPlans = plansFromApi.length > 0 ? plansFromApi : getAllPlans();
+  const plans = allPlans.map((plan) => ({
+    id:
+      plan.id === "starter"
+        ? "free"
+        : plan.id === "professional"
+        ? "pro"
+        : ("enterprise" as PlanTier),
+    name: plan.name,
+    price: plan.price,
+    period: plan.period,
+    description: plan.description,
+    features: plan.features,
+    popular: plan.popular || false,
+    icon: plan.icon,
+    color: plan.color,
+    limit:
+      plan.limits.searches === -1
+        ? "Unlimited"
+        : `${plan.limits.searches} recognitions/month`,
+  }));
+
   const handlePlanChange = async (planId: string) => {
     try {
       // Starter (free) -> begin 30-day trial at £12.99/month via Stripe
       if (planId === "free") {
-        const starter = plans.find((p) => p.id === "free");
-        const starterPlan = PLAN_CONFIG.free;
+        const starterPlan = allPlans.find((p) => p.id === "free" || p.id === "starter") || getPlan("free");
         const checkoutResponse = (await api.billing.createCheckoutSession({
           plan: starterPlan.name,
           amount: starterPlan.price,
@@ -465,27 +491,6 @@ const Billing = () => {
       });
     }
   };
-
-  const plans = getAllPlans().map((plan) => ({
-    id:
-      plan.id === "starter"
-        ? "free"
-        : plan.id === "professional"
-        ? "pro"
-        : ("enterprise" as PlanTier),
-    name: plan.name,
-    price: plan.price,
-    period: plan.period,
-    description: plan.description,
-    features: plan.features,
-    popular: plan.popular || false,
-    icon: plan.icon,
-    color: plan.color,
-    limit:
-      plan.limits.searches === -1
-        ? "Enterprise scale"
-        : `${plan.limits.searches} recognitions/month`,
-  }));
 
   const hasActiveSubscription =
     billingData?.subscription?.status === "active" ||

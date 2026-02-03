@@ -64,6 +64,7 @@ import {
 import { useToast } from "@/components/ui/use-toast";
 import { api } from "@/lib/api";
 import {
+  fetchPlansFromApi,
   getAllPlans,
   formatPriceWithPeriod,
   type PlanFeature,
@@ -304,7 +305,11 @@ const Landing = () => {
   const aiInterfaceImage =
     "https://images.unsplash.com/photo-1639322537228-f710d8465a4d?auto=format&fit=crop&w=1920";
 
-  const pricingPlans = getAllPlans();
+  const [pricingPlans, setPricingPlans] = useState<PlanFeature[]>(() => getAllPlans());
+
+  useEffect(() => {
+    fetchPlansFromApi().then(setPricingPlans);
+  }, []);
 
   useEffect(() => {
     const allImages = [aiInterfaceImage, ...features.map((f) => f.image)];

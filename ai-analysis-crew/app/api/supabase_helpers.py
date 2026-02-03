@@ -52,6 +52,32 @@ def supabase_count(*, table: str, filters: list[tuple[str, str, Any]]) -> int:
     return len(data or [])
 
 
+def get_plans_limits_from_db() -> dict[str, int]:
+    """
+    Fetch limits_searches per tier from public.plans (active only).
+    Returns e.g. {"free": 20, "pro": 500, "enterprise": 999999}.
+    On error or missing table returns empty dict; callers should fall back to hardcoded limits.
+    """
+    try:
+        supabase = get_supabase_admin()
+        result = supabase.table("plans").select("tier, limits_searches").eq("active", True).execute()
+        if not result.data:
+            return {}
+        out: dict[str, int] = {}
+        for row in result.data:
+            t = (row.get("tier") or "").strip().lower()
+            if not t:
+                continue
+            v = row.get("limits_searches")
+            if v is None:
+                continue
+            try:
+                out[t] = int(v)
+            except (TypeError, ValueError):
+                continue
+        return out
+    except Exception:
+        return {}
 
 
 

@@ -228,9 +228,16 @@ async def get_current_user(
                 # No existing profile: create one (profiles.id has NO default; must supply a UUID).
                 new_id = str(uuid.uuid4())
                 if not email:
+                    has_secret = bool((os.getenv("CLERK_SECRET_KEY") or "").strip())
                     raise HTTPException(
                         status_code=status.HTTP_401_UNAUTHORIZED,
-                        detail="User profile not found and email claim missing from Clerk token. Set CLERK_SECRET_KEY on the backend so it can fetch your email from Clerk and link/create your profile.",
+                        detail=(
+                            "User profile not found and email is not in the Clerk token. "
+                            "Add CLERK_SECRET_KEY to your backend .env (Clerk Dashboard → API Keys → Secret key, e.g. sk_test_... or sk_live_...). "
+                            "Then restart the server so it can fetch your email from Clerk and create/link your profile."
+                            if not has_secret
+                            else "User profile not found; Clerk API could not return email for this user. Check Clerk Dashboard and that CLERK_SECRET_KEY has access to read users."
+                        ),
                     )
                 try:
                     supabase.table("profiles").insert(

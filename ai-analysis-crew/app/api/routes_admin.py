@@ -184,6 +184,90 @@ async def admin_delete_user(
 
 
 # -----------------------
+# Pricing plans (admin CRUD)
+# -----------------------
+
+
+@router.get("/plans")
+async def admin_list_plans(_admin: CurrentUser = Depends(require_roles("admin", "super_admin"))):
+    """List all plans (active and inactive) for admin editing."""
+    supabase = get_supabase_admin()
+    try:
+        result = supabase.table("plans").select("*").order("display_order").execute()
+        return api_ok(data={"plans": result.data or []})
+    except Exception as e:
+        return api_error(status_code=500, error="db_error", message=str(e))
+
+
+class PlanUpdateBody(BaseModel):
+    tier: Optional[str] = None
+    name: Optional[str] = None
+    price: Optional[float] = None
+    currency: Optional[str] = None
+    period: Optional[str] = None
+    description: Optional[str] = None
+    features: Optional[list[str]] = None
+    popular: Optional[bool] = None
+    color: Optional[str] = None
+    limits_searches: Optional[int] = None
+    limits_api_calls: Optional[int] = None
+    limits_storage_mb: Optional[int] = None
+    trial_days: Optional[int] = None
+    trial_price: Optional[float] = None
+    display_order: Optional[int] = None
+    active: Optional[bool] = None
+
+
+@router.put("/plans/{plan_id}")
+async def admin_update_plan(
+    plan_id: str = Path(...),
+    payload: PlanUpdateBody = Body(...),
+    _admin: CurrentUser = Depends(require_roles("admin", "super_admin")),
+):
+    """Update a plan by id (uuid) or tier."""
+    supabase = get_supabase_admin()
+    # Build update dict from non-None fields
+    raw = payload.model_dump(exclude_unset=True)
+    updates = {}
+    for k, v in raw.items():
+        if v is None:
+            continue
+        if k == "tier":
+            v = str(v).strip() if v else ""
+            if not v:
+                continue  # skip empty tier
+        updates[k] = v
+    if not updates:
+        return api_error("No fields to update", code="no_fields", status_code=400)
+    updates["updated_at"] = datetime.utcnow().isoformat()
+    try:
+        import uuid as uuid_mod
+        is_uuid = False
+        try:
+            uuid_mod.UUID(plan_id)
+            is_uuid = True
+        except (ValueError, TypeError):
+            pass
+        # Always identify by id (UUID) so we can safely change tier
+        if is_uuid:
+            supabase.table("plans").update(updates).eq("id", plan_id).execute()
+            result = supabase.table("plans").select("*").eq("id", plan_id).limit(1).execute()
+        else:
+            # Look up id by tier first, then update by id so tier can be changed
+            row = supabase.table("plans").select("id").eq("tier", plan_id).limit(1).execute()
+            if not row.data or len(row.data) == 0:
+                return api_error("Plan not found", code="not_found", status_code=404)
+            row_id = row.data[0].get("id")
+            supabase.table("plans").update(updates).eq("id", row_id).execute()
+            result = supabase.table("plans").select("*").eq("id", row_id).limit(1).execute()
+        if not result.data or len(result.data) == 0:
+            return api_error("Plan not found", code="not_found", status_code=404)
+        return api_ok(data={"plan": result.data[0]}, message="Plan updated")
+    except Exception as e:
+        return api_error(str(e), code="db_error", status_code=500)
+
+
+# -----------------------
 # Admin dashboard statistics
 # -----------------------
 

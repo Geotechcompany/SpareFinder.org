@@ -34,6 +34,7 @@ import SubscribersManagement from "@/components/admin/SubscribersManagement";
 import AdminLogin from "@/pages/admin/AdminLogin";
 import AdminProtectedRoute from "@/components/AdminProtectedRoute";
 import OnboardingSurveys from "@/pages/admin/OnboardingSurveys";
+import PlansManagement from "@/pages/admin/PlansManagement";
 
 import Landing from "@/pages/Landing";
 import PrivacyPolicy from "@/pages/PrivacyPolicy";
@@ -217,6 +218,14 @@ const App = () => (
                 element={
                   <AdminProtectedRoute>
                     <PaymentManagement />
+                  </AdminProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/plans"
+                element={
+                  <AdminProtectedRoute>
+                    <PlansManagement />
                   </AdminProtectedRoute>
                 }
               />

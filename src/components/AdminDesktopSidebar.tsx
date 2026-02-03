@@ -39,6 +39,7 @@ import {
   CheckCircle,
   Clock,
   Eye,
+  Tag,
 } from "lucide-react";
 
 interface AdminSidebarProps {
@@ -188,6 +189,14 @@ const AdminDesktopSidebar: React.FC<AdminSidebarProps> = ({
       label: "Payment Management",
       icon: CreditCard,
       description: "Payment settings",
+      badge: null,
+      section: "Billing",
+    },
+    {
+      href: "/admin/plans",
+      label: "Pricing plans",
+      icon: Tag,
+      description: "Edit plans & features",
       badge: null,
       section: "Billing",
     },

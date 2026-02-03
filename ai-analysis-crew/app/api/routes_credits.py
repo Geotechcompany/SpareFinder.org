@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends
 from .auth_dependencies import CurrentUser, get_current_user
 from .responses import api_ok
 from .supabase_admin import get_supabase_admin
+from .supabase_helpers import get_plans_limits_from_db
 
 router = APIRouter(prefix="/credits", tags=["credits"])
 
@@ -59,6 +60,15 @@ async def get_balance(user: CurrentUser = Depends(get_current_user)):
                     credits = int(prof.data[0]["credits"])
             except Exception:
                 pass
+
+        # Plan limits: cap displayed balance from DB plans or fallback
+        db_caps = get_plans_limits_from_db()
+        PLAN_CAP = {"starter": 20, "basic": 20, "free": 20, "pro": 500, "enterprise": 999999}
+        cap = db_caps.get(tier) if db_caps else None
+        if cap is None:
+            cap = PLAN_CAP.get(tier)
+        if cap is not None and credits > cap:
+            credits = cap
 
         # Paid plan but no credits yet: return tier-based default so UI doesn't show "Upgrade plan"
         if credits <= 0:

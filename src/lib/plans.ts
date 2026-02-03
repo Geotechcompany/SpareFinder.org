@@ -1,4 +1,5 @@
 import { Shield, Zap, Crown, LucideIcon } from "lucide-react";
+import { api } from "@/lib/api";
 
 // Centralized plan configuration to ensure consistency across the entire app
 export type PlanTier = "free" | "pro" | "enterprise";
@@ -137,6 +138,64 @@ export const getPlan = (tier: PlanTier): PlanFeature => {
 export const getAllPlans = (): PlanFeature[] => {
   return Object.values(PLAN_CONFIG);
 };
+
+/** API plan shape from backend GET /api/plans */
+export interface ApiPlan {
+  id?: string;
+  tier: string;
+  name: string;
+  price: number;
+  currency: string;
+  period: string;
+  description: string;
+  features: string[];
+  popular?: boolean;
+  color?: string;
+  limits: { searches: number; api_calls: number; storage: number };
+  trial?: { days: number; trialPrice?: number } | null;
+}
+
+const TIER_ICON: Record<string, LucideIcon> = {
+  free: Shield,
+  starter: Shield,
+  pro: Zap,
+  professional: Zap,
+  enterprise: Crown,
+};
+
+/** Fetch plans from DB (used by landing/billing). Returns static config on error or empty. */
+export async function fetchPlansFromApi(): Promise<PlanFeature[]> {
+  try {
+    const res = await api.plans.getPlans();
+    if (!res?.success || !Array.isArray((res as any)?.data?.plans) || (res as any).data.plans.length === 0) {
+      return getAllPlans();
+    }
+    const apiPlans = (res as any).data.plans as ApiPlan[];
+    return apiPlans.map((p) => {
+      const tier = (p.tier || "free").toLowerCase();
+      return {
+        id: p.tier === "free" ? "starter" : p.tier === "pro" ? "professional" : p.tier,
+        name: p.name,
+        price: Number(p.price) || 0,
+        currency: (p.currency as "GBP") || "GBP",
+        period: (p.period as "month") || "month",
+        description: p.description || "",
+        features: Array.isArray(p.features) ? p.features : [],
+        popular: Boolean(p.popular),
+        color: p.color || "from-gray-600 to-gray-700",
+        icon: TIER_ICON[tier] || Shield,
+        limits: {
+          searches: p.limits?.searches ?? 20,
+          api_calls: p.limits?.api_calls ?? 0,
+          storage: p.limits?.storage ?? 1024 * 1024 * 1024,
+        },
+        trial: p.trial?.days != null ? { days: p.trial.days, trialPrice: p.trial.trialPrice ?? undefined } : undefined,
+      } satisfies PlanFeature;
+    });
+  } catch {
+    return getAllPlans();
+  }
+}
 
 export const getPlanByPrice = (price: number): PlanFeature | null => {
   return getAllPlans().find((plan) => plan.price === price) || null;
