@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 import { MenuToggleIcon } from "@/components/ui/menu-toggle-icon";
 import { useScroll } from "@/components/ui/use-scroll";
 import ThemeToggle from "@/components/ThemeToggle";
+import { X } from "lucide-react";
 import {
   NavigationMenu,
   NavigationMenuList,
@@ -162,26 +163,40 @@ export function Header() {
           size="icon"
           variant="outline"
           onClick={() => setOpen(!open)}
-          className="lg:hidden [@media(pointer:coarse)]:inline-flex"
+          className="flex shrink-0 lg:hidden [@media(pointer:coarse)]:flex"
           aria-label={open ? "Close menu" : "Open menu"}
         >
           <MenuToggleIcon open={open} className="size-5" duration={300} />
         </Button>
       </nav>
 
+      {/* Mobile menu overlay: full-screen below header; below lg or on touch devices */}
       <div
         className={cn(
-          "fixed top-14 right-0 bottom-0 left-0 z-50 overflow-hidden border-y bg-background/95 text-foreground lg:hidden [@media(pointer:coarse)]:block",
+          "fixed inset-0 top-14 z-[100] overflow-y-auto border-y border-border bg-background text-foreground backdrop-blur-xl lg:!hidden [@media(pointer:coarse)]:!block",
           open ? "flex flex-col" : "hidden"
         )}
+        aria-hidden={!open}
       >
         <div
           data-slot={open ? "open" : "closed"}
           className={cn(
             "data-[slot=open]:animate-in data-[slot=open]:zoom-in-95 data-[slot=closed]:animate-out data-[slot=closed]:zoom-out-95 ease-out",
-            "flex h-full w-full flex-col justify-between gap-y-2 p-4"
+            "flex min-h-full w-full flex-col justify-between gap-y-2 p-4"
           )}
         >
+          <div className="flex items-center justify-between border-b border-border/70 pb-3">
+            <span className="text-sm font-medium text-foreground">Menu</span>
+            <Button
+              size="icon"
+              variant="ghost"
+              onClick={() => setOpen(false)}
+              aria-label="Close menu"
+              className="shrink-0"
+            >
+              <X className="size-5" />
+            </Button>
+          </div>
           <div className="grid gap-y-2">
             <span className="px-2 text-xs uppercase text-muted-foreground">
               Platform
@@ -194,6 +209,7 @@ export function Header() {
                   className: "justify-start",
                 })}
                 href={link.href}
+                onClick={() => setOpen(false)}
               >
                 {link.label}
               </a>
@@ -209,6 +225,7 @@ export function Header() {
                   className: "justify-start",
                 })}
                 href={link.href}
+                onClick={() => setOpen(false)}
               >
                 {link.label}
               </a>
@@ -224,6 +241,7 @@ export function Header() {
                   className: "justify-start",
                 })}
                 href={link.href}
+                onClick={() => setOpen(false)}
               >
                 {link.label}
               </a>
@@ -234,6 +252,7 @@ export function Header() {
                 variant: "ghost",
                 className: "justify-start mt-2",
               })}
+              onClick={() => setOpen(false)}
             >
               Reviews
             </a>
@@ -245,6 +264,7 @@ export function Header() {
                 buttonVariants({ variant: "outline" }),
                 "w-full text-center"
               )}
+              onClick={() => setOpen(false)}
             >
               Sign In
             </a>
@@ -254,6 +274,7 @@ export function Header() {
                 buttonVariants({}),
                 "w-full text-center bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white shadow-lg shadow-purple-500/25 hover:shadow-purple-500/40 transition-all duration-300"
               )}
+              onClick={() => setOpen(false)}
             >
               Get Started
             </a>
