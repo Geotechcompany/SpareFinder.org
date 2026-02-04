@@ -218,14 +218,15 @@ async def admin_update_user_plan(
             "current_period_end": period_end.isoformat() + "Z",
             "updated_at": now.isoformat() + "Z",
         }).eq("user_id", userId).execute()
-        updated = (
+        updated_list = (
             supabase.table("subscriptions")
             .select("*")
             .eq("user_id", userId)
-            .single()
+            .limit(1)
             .execute()
             .data
         )
+        updated = updated_list[0] if updated_list else None
         return api_ok(message="User plan updated successfully", data={"subscription": updated})
     supabase.table("subscriptions").insert({
         "user_id": userId,
@@ -234,14 +235,15 @@ async def admin_update_user_plan(
         "current_period_start": now.isoformat() + "Z",
         "current_period_end": period_end.isoformat() + "Z",
     }).execute()
-    inserted = (
+    inserted_list = (
         supabase.table("subscriptions")
         .select("*")
         .eq("user_id", userId)
-        .single()
+        .limit(1)
         .execute()
         .data
     )
+    inserted = inserted_list[0] if inserted_list else None
     return api_ok(message="User plan set successfully", data={"subscription": inserted})
 
 
