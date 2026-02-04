@@ -163,6 +163,8 @@ const Billing = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [hoveredFeature, setHoveredFeature] = useState<string | null>(null);
+  const [showPaymentSuccessBanner, setShowPaymentSuccessBanner] = useState(false);
+  const [paymentSuccessTier, setPaymentSuccessTier] = useState<string | null>(null);
 
   const handleToggleSidebar = () => {
     setIsCollapsed(!isCollapsed);
@@ -172,22 +174,17 @@ const Billing = () => {
     setIsMobileMenuOpen(!isMobileMenuOpen);
   };
 
-  // Handle post-payment redirect
+  // Handle post-payment redirect (show banner instead of toast; don't clear URL until dismiss)
   useEffect(() => {
     const paymentSuccess = searchParams.get("payment_success");
     const paymentCancelled = searchParams.get("payment_cancelled");
     const sessionId = searchParams.get("session_id");
     const trialDeclined = searchParams.get("trial_declined");
+    const tierFromUrl = searchParams.get("tier");
 
-    if (paymentSuccess === "true") {
-      toast({
-        title: "Payment Successful!",
-        description: "Your subscription has been activated successfully.",
-        variant: "default",
-      });
-
-      // Clear the URL parameters
-      navigate("/dashboard/billing", { replace: true });
+    if (paymentSuccess === "true" || sessionId) {
+      setShowPaymentSuccessBanner(true);
+      setPaymentSuccessTier(tierFromUrl || (sessionId ? "pro" : "starter"));
     } else if (paymentCancelled === "true") {
       toast({
         title: "Payment Cancelled",
@@ -205,18 +202,6 @@ const Billing = () => {
           "You can start your 30-day free trial anytime from Billing.",
       });
       navigate("/dashboard/billing", { replace: true });
-    } else if (sessionId) {
-      // Handle Stripe checkout session success
-      toast({
-        title: "Processing Payment",
-        description: "Please wait while we confirm your payment...",
-        variant: "default",
-      });
-
-      // You could verify the session here
-      setTimeout(() => {
-        navigate("/dashboard/billing", { replace: true });
-      }, 3000);
     }
   }, [searchParams, navigate, toast]);
 
@@ -430,7 +415,7 @@ const Billing = () => {
           amount: selectedPlan.price,
           currency: "GBP",
           billing_cycle: "monthly",
-          success_url: `${window.location.origin}/dashboard/billing?payment_success=true&session_id={CHECKOUT_SESSION_ID}`,
+          success_url: `${window.location.origin}/dashboard/billing?payment_success=true&tier=${planId === "free" ? "starter" : planId}&session_id={CHECKOUT_SESSION_ID}`,
           cancel_url: `${window.location.origin}/dashboard/billing?payment_cancelled=true`,
         })) as CheckoutResponse;
 
@@ -670,47 +655,99 @@ const Billing = () => {
             transition={{ duration: 0.5 }}
             className="space-y-4 sm:space-y-6 lg:space-y-8 max-w-6xl mx-auto"
           >
-            {/* Payment Success Banner */}
+            {/* Payment Success – Congratulation banner with plan features */}
             <AnimatePresence>
-              {(searchParams.get("payment_success") === "true" ||
-                searchParams.get("session_id")) && (
-                <motion.div
-                  initial={{ opacity: 0, y: -20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -20 }}
-                  className="relative"
-                >
-                  <div className="absolute inset-0 rounded-3xl bg-gradient-to-r from-emerald-500/10 to-green-500/10 blur-xl opacity-80 dark:from-green-600/20 dark:to-emerald-600/20" />
-                  <div className="relative mb-6 rounded-3xl border border-emerald-500/40 bg-gradient-to-r from-emerald-500/10 to-green-500/10 p-6 backdrop-blur-xl">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-4">
-                        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-r from-green-500 to-emerald-500 shadow-sm shadow-emerald-500/40">
-                          <CheckCircle className="w-6 h-6 text-white" />
+              {showPaymentSuccessBanner && (() => {
+                const tierToPlanId: Record<string, string> = {
+                  starter: "free",
+                  pro: "pro",
+                  enterprise: "enterprise",
+                };
+                const planId = paymentSuccessTier
+                  ? tierToPlanId[paymentSuccessTier] ?? "pro"
+                  : "pro";
+                const plan = plans.find((p) => p.id === planId);
+                const features = plan?.features ?? [];
+                const planName = plan?.name ?? "Your plan";
+
+                const handleDismiss = () => {
+                  setShowPaymentSuccessBanner(false);
+                  setPaymentSuccessTier(null);
+                  navigate("/dashboard/billing", { replace: true });
+                };
+
+                return (
+                  <motion.div
+                    key="payment-success-banner"
+                    initial={{ opacity: 0, y: -24, scale: 0.98 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: -16, scale: 0.98 }}
+                    transition={{ type: "spring", damping: 24, stiffness: 300 }}
+                    className="relative mb-6"
+                  >
+                    <div className="absolute -inset-[1px] rounded-3xl bg-gradient-to-r from-emerald-500 via-green-500 to-teal-500 opacity-60 blur-sm" />
+                    <div className="relative rounded-3xl border border-emerald-500/50 bg-gradient-to-br from-emerald-500/15 via-green-500/10 to-teal-500/15 p-6 shadow-xl backdrop-blur-xl dark:from-emerald-600/20 dark:via-green-600/15 dark:to-teal-600/20">
+                      <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
+                        <div className="flex gap-4">
+                          <motion.div
+                            initial={{ scale: 0 }}
+                            animate={{ scale: 1 }}
+                            transition={{ delay: 0.15, type: "spring", stiffness: 300 }}
+                            className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-green-500 to-emerald-600 shadow-lg shadow-emerald-500/40 ring-4 ring-emerald-500/20"
+                          >
+                            <CheckCircle className="h-7 w-7 text-white" />
+                          </motion.div>
+                          <div>
+                            <h3 className="text-xl font-bold tracking-tight text-foreground dark:text-white sm:text-2xl">
+                              Congratulations!
+                            </h3>
+                            <p className="mt-1 text-sm text-muted-foreground dark:text-gray-300">
+                              Payment successful. Your subscription to{" "}
+                              <span className="font-semibold text-emerald-700 dark:text-emerald-300">
+                                {planName}
+                              </span>{" "}
+                              is now active.
+                            </p>
+                            {features.length > 0 && (
+                              <div className="mt-4">
+                                <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-emerald-700/90 dark:text-emerald-400/90">
+                                  What’s included
+                                </p>
+                                <ul className="grid gap-1.5 sm:grid-cols-2">
+                                  {features.map((feature, i) => (
+                                    <motion.li
+                                      key={i}
+                                      initial={{ opacity: 0, x: -8 }}
+                                      animate={{ opacity: 1, x: 0 }}
+                                      transition={{
+                                        delay: 0.2 + i * 0.05,
+                                        duration: 0.25,
+                                      }}
+                                      className="flex items-center gap-2 text-sm text-foreground/90 dark:text-gray-200"
+                                    >
+                                      <Check className="h-4 w-4 shrink-0 text-emerald-500 dark:text-emerald-400" />
+                                      <span>{feature}</span>
+                                    </motion.li>
+                                  ))}
+                                </ul>
+                              </div>
+                            )}
+                          </div>
                         </div>
-                        <div>
-                          <h3 className="text-xl font-bold text-foreground dark:text-white">
-                            Payment Successful!
-                          </h3>
-                          <p className="text-sm text-emerald-800 dark:text-green-200">
-                            Your subscription has been activated and is now
-                            processing.
-                          </p>
-                        </div>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={handleDismiss}
+                          className="shrink-0 rounded-full text-muted-foreground hover:bg-emerald-500/20 hover:text-emerald-700 dark:hover:text-emerald-300"
+                          aria-label="Dismiss"
+                        >
+                          <X className="h-5 w-5" />
+                        </Button>
                       </div>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() =>
-                          navigate("/dashboard/billing", { replace: true })
-                        }
-                        className="text-sm text-emerald-800 underline-offset-2 hover:underline dark:text-green-200 dark:hover:text-white"
-                      >
-                        <X className="w-4 h-4" />
-                      </Button>
                     </div>
-                  </div>
-                </motion.div>
-              )}
+                  </motion.div>
+                );
+              })()}
             </AnimatePresence>
 
             {/* Header */}
