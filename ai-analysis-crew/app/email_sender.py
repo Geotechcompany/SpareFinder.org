@@ -238,6 +238,63 @@ def _send_billing_email(*, to_email: str, subject: str, html: str, text: str) ->
     return ok
 
 
+def _email_header() -> str:
+    """Modern branded header for subscription emails (solid colors for email client compatibility)."""
+    return """
+<table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="max-width: 600px; margin: 0 auto; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;">
+  <tr>
+    <td style="background: #6366f1; padding: 24px 32px; border-radius: 12px 12px 0 0; text-align: center;">
+      <h1 style="margin: 0; font-size: 24px; font-weight: 700; color: #ffffff; letter-spacing: -0.5px;">SpareFinder</h1>
+      <p style="margin: 6px 0 0 0; font-size: 13px; color: #e0e7ff;">AI-powered spare parts identification</p>
+    </td>
+  </tr>
+</table>
+"""
+
+
+def _email_footer(billing_url: str = "https://sparefinder.org/dashboard/billing") -> str:
+    """Shared footer with support and links."""
+    return f"""
+<table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="max-width: 600px; margin: 0 auto; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+  <tr>
+    <td style="padding: 24px 32px; background: #f8fafc; border-radius: 0 0 12px 12px; border: 1px solid #e2e8f0; border-top: none;">
+      <p style="margin: 0; font-size: 12px; color: #64748b; text-align: center;">
+        Need help? <a href="mailto:support@sparefinder.org" style="color: #6366f1; text-decoration: none;">support@sparefinder.org</a>
+        &nbsp;·&nbsp;
+        <a href="{billing_url}" style="color: #6366f1; text-decoration: none;">Billing</a>
+        &nbsp;·&nbsp;
+        <a href="https://sparefinder.org" style="color: #6366f1; text-decoration: none;">SpareFinder.org</a>
+      </p>
+      <p style="margin: 8px 0 0 0; font-size: 11px; color: #94a3b8; text-align: center;">You received this email because you have a SpareFinder account.</p>
+    </td>
+  </tr>
+</table>
+"""
+
+
+def _wrap_subscription_email(body_content: str, billing_url: str = "https://sparefinder.org/dashboard/billing") -> str:
+    """Wrap body in full email layout with header and footer."""
+    return f"""<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SpareFinder</title>
+</head>
+<body style="margin: 0; padding: 24px 16px; background: #f1f5f9;">
+{_email_header()}
+<table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="max-width: 600px; margin: 0 auto; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+  <tr>
+    <td style="padding: 32px; background: #ffffff; border: 1px solid #e2e8f0; border-top: none;">
+{body_content}
+    </td>
+  </tr>
+</table>
+{_email_footer(billing_url)}
+</body>
+</html>"""
+
+
 def send_purchase_confirmation_email(
     *,
     to_email: str,
@@ -250,7 +307,7 @@ def send_purchase_confirmation_email(
     Send a purchase confirmation email after a successful plan purchase (checkout.session.completed).
     Modern SaaS-style: clear confirmation, what they get, and link to manage subscription.
     """
-    subject = f"Your SpareFinder {plan_name} plan is active"
+    subject = f"🎉 Your SpareFinder {plan_name} plan is active"
     amount_line = f"\nAmount paid: {amount_paid}" if amount_paid else ""
     text = f"""Hi,
 
@@ -264,22 +321,37 @@ What's next:
 
 — SpareFinder
 """
-    html = f"""<!DOCTYPE html>
-<html>
-<head><meta charset="utf-8"><title>Plan activated</title></head>
-<body style="font-family: system-ui, sans-serif; max-width: 560px; line-height: 1.5;">
-  <p>Hi,</p>
-  <p>Thank you for subscribing to SpareFinder. Your <strong>{plan_name}</strong> plan is now active.</p>
-  <p><strong>What's next:</strong></p>
-  <ul>
-    <li>Use your full access in the <a href="https://sparefinder.org/dashboard">dashboard</a></li>
-    <li><a href="{billing_url}">Manage your subscription, invoices, and payment methods</a></li>
-    <li>Contact us at <a href="mailto:support@sparefinder.org">support@sparefinder.org</a> if you have any questions</li>
-  </ul>
-  {"<p>Amount paid: " + amount_paid + "</p>" if amount_paid else ""}
-  <p>— SpareFinder</p>
-</body>
-</html>"""
+    amount_block = f"""
+      <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin-top: 20px; background: #f0fdf4; border: 1px solid #86efac; border-radius: 8px;">
+        <tr><td style="padding: 12px 16px; font-size: 14px; color: #166534;"><strong>Amount paid:</strong> {amount_paid}</td></tr>
+      </table>""" if amount_paid else ""
+    body = f"""
+      <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
+        <tr>
+          <td style="text-align: center; padding-bottom: 20px;">
+            <span style="display: inline-block; width: 56px; height: 56px; line-height: 56px; font-size: 28px; background: #10b981; border-radius: 50%; color: #fff;">✓</span>
+          </td>
+        </tr>
+        <tr>
+          <td>
+            <h2 style="margin: 0 0 8px 0; font-size: 22px; font-weight: 700; color: #0f172a;">Congratulations!</h2>
+            <p style="margin: 0; font-size: 16px; color: #475569; line-height: 1.6;">Your <strong style="color: #059669;">{plan_name}</strong> plan is now active. You have full access to all features included in your subscription.</p>
+          </td>
+        </tr>
+        <tr><td height="20"></td></tr>
+        <tr>
+          <td style="background: #f8fafc; border-radius: 8px; padding: 16px; border-left: 4px solid #6366f1;">
+            <p style="margin: 0 0 8px 0; font-size: 13px; font-weight: 600; color: #334155;">What you can do now</p>
+            <ul style="margin: 0; padding-left: 20px; font-size: 14px; color: #475569; line-height: 1.8;">
+              <li>Upload parts and run AI-powered identification in the <a href="https://sparefinder.org/dashboard" style="color: #6366f1; text-decoration: none;">dashboard</a></li>
+              <li>View usage, invoices, and payment methods in <a href="{billing_url}" style="color: #6366f1; text-decoration: none;">Billing</a></li>
+              <li>Get help anytime at <a href="mailto:support@sparefinder.org" style="color: #6366f1; text-decoration: none;">support@sparefinder.org</a></li>
+            </ul>
+          </td>
+        </tr>
+        {amount_block}
+      </table>"""
+    html = _wrap_subscription_email(body, billing_url)
     return _send_billing_email(to_email=to_email, subject=subject, html=html, text=text)
 
 
@@ -295,7 +367,7 @@ def send_receipt_email(
     """
     Send a receipt email (e.g. after invoice.payment_succeeded) with optional link to Stripe receipt.
     """
-    subject = f"Your SpareFinder receipt – {amount_paid} {currency}"
+    subject = f"Receipt for your SpareFinder payment – {amount_paid} {currency}"
     receipt_line = f"\nDownload or view your receipt: {receipt_url}" if receipt_url else ""
     text = f"""Hi,
 
@@ -309,19 +381,39 @@ Manage subscriptions and view past invoices: {billing_url}
 
 — SpareFinder
 """
-    receipt_html = f'<p><a href="{receipt_url}">Download or view your receipt</a></p>' if receipt_url else ""
-    html = f"""<!DOCTYPE html>
-<html>
-<head><meta charset="utf-8"><title>Payment receipt</title></head>
-<body style="font-family: system-ui, sans-serif; max-width: 560px; line-height: 1.5;">
-  <p>Hi,</p>
-  <p>Your payment has been received.</p>
-  <p><strong>Plan:</strong> {plan_name}<br><strong>Amount:</strong> {amount_paid} {currency}</p>
-  {receipt_html}
-  <p><a href="{billing_url}">Manage subscriptions and view past invoices</a></p>
-  <p>— SpareFinder</p>
-</body>
-</html>"""
+    receipt_block = f"""
+        <tr>
+          <td style="padding-top: 16px;">
+            <a href="{receipt_url}" style="display: inline-block; padding: 12px 20px; background: #6366f1; color: #fff; text-decoration: none; font-weight: 600; font-size: 14px; border-radius: 8px;">View or download receipt</a>
+          </td>
+        </tr>""" if receipt_url else ""
+    body = f"""
+      <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
+        <tr>
+          <td style="text-align: center; padding-bottom: 16px;">
+            <span style="display: inline-block; width: 52px; height: 52px; line-height: 52px; font-size: 24px; background: #6366f1; border-radius: 50%; color: #fff;">📄</span>
+          </td>
+        </tr>
+        <tr>
+          <td>
+            <h2 style="margin: 0 0 8px 0; font-size: 20px; font-weight: 700; color: #0f172a;">Payment received</h2>
+            <p style="margin: 0; font-size: 15px; color: #475569; line-height: 1.6;">We've received your payment for your SpareFinder subscription.</p>
+          </td>
+        </tr>
+        <tr><td height="16"></td></tr>
+        <tr>
+          <td>
+            <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="background: #f8fafc; border-radius: 8px; border: 1px solid #e2e8f0;">
+              <tr><td style="padding: 16px 20px; font-size: 14px; color: #334155;"><strong>Plan</strong></td><td style="padding: 16px 20px; font-size: 14px; color: #475569; text-align: right;">{plan_name}</td></tr>
+              <tr><td colspan="2" style="border-top: 1px solid #e2e8f0;"></td></tr>
+              <tr><td style="padding: 16px 20px; font-size: 14px; color: #334155;"><strong>Amount</strong></td><td style="padding: 16px 20px; font-size: 18px; font-weight: 700; color: #059669; text-align: right;">{amount_paid} {currency}</td></tr>
+            </table>
+          </td>
+        </tr>
+        {receipt_block}
+        <tr><td style="padding-top: 20px; font-size: 13px; color: #64748b;"><a href="{billing_url}" style="color: #6366f1; text-decoration: none;">Manage subscriptions and view past invoices →</a></td></tr>
+      </table>"""
+    html = _wrap_subscription_email(body, billing_url)
     return _send_billing_email(to_email=to_email, subject=subject, html=html, text=text)
 
 
@@ -334,7 +426,7 @@ def send_payment_failed_email(
     """
     Send when a payment fails (invoice.payment_failed). Asks user to update payment method.
     """
-    subject = "SpareFinder: Payment failed – please update your card"
+    subject = "Action required: SpareFinder payment could not be processed"
     amount_line = f"\nAmount due: {amount_due}" if amount_due else ""
     text = f"""Hi,
 
@@ -348,18 +440,35 @@ If you have questions, contact us at support@sparefinder.org.
 
 — SpareFinder
 """
-    html = f"""<!DOCTYPE html>
-<html>
-<head><meta charset="utf-8"><title>Payment failed</title></head>
-<body style="font-family: system-ui, sans-serif; max-width: 560px; line-height: 1.5;">
-  <p>Hi,</p>
-  <p>We couldn't process your payment for your SpareFinder subscription.</p>
-  {"<p><strong>Amount due: " + amount_due + "</strong></p>" if amount_due else ""}
-  <p>Please <a href="{billing_url}">update your payment method</a> to avoid any interruption to your plan.</p>
-  <p>If you have questions, contact us at <a href="mailto:support@sparefinder.org">support@sparefinder.org</a>.</p>
-  <p>— SpareFinder</p>
-</body>
-</html>"""
+    amount_block = f"""
+        <tr>
+          <td style="padding: 12px 16px; margin-top: 12px; background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; font-size: 15px; color: #b91c1c;"><strong>Amount due:</strong> {amount_due}</td>
+        </tr>""" if amount_due else ""
+    body = f"""
+      <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
+        <tr>
+          <td style="text-align: center; padding-bottom: 16px;">
+            <span style="display: inline-block; width: 52px; height: 52px; line-height: 52px; font-size: 24px; background: #dc2626; border-radius: 50%; color: #fff;">!</span>
+          </td>
+        </tr>
+        <tr>
+          <td>
+            <h2 style="margin: 0 0 8px 0; font-size: 20px; font-weight: 700; color: #0f172a;">Payment could not be processed</h2>
+            <p style="margin: 0; font-size: 15px; color: #475569; line-height: 1.6;">We were unable to charge your payment method for your SpareFinder subscription. This can happen if your card has expired, funds are insufficient, or the bank declined the transaction.</p>
+          </td>
+        </tr>
+        {amount_block}
+        <tr><td height="20"></td></tr>
+        <tr>
+          <td style="background: #fffbeb; border-radius: 8px; padding: 16px; border-left: 4px solid #f59e0b;">
+            <p style="margin: 0 0 12px 0; font-size: 14px; font-weight: 600; color: #92400e;">What to do next</p>
+            <p style="margin: 0 0 12px 0; font-size: 14px; color: #78350f; line-height: 1.5;">Update your payment method to avoid any interruption. Your subscription will remain active while we retry.</p>
+            <a href="{billing_url}" style="display: inline-block; padding: 12px 20px; background: #d97706; color: #fff; text-decoration: none; font-weight: 600; font-size: 14px; border-radius: 8px;">Update payment method</a>
+          </td>
+        </tr>
+        <tr><td style="padding-top: 16px; font-size: 13px; color: #64748b;">Questions? Reply to this email or contact <a href="mailto:support@sparefinder.org" style="color: #6366f1; text-decoration: none;">support@sparefinder.org</a>.</td></tr>
+      </table>"""
+    html = _wrap_subscription_email(body, billing_url)
     return _send_billing_email(to_email=to_email, subject=subject, html=html, text=text)
 
 
@@ -387,18 +496,35 @@ We're sorry to see you go. If you change your mind, we're here to help – conta
 
 — SpareFinder
 """
-    html = f"""<!DOCTYPE html>
-<html>
-<head><meta charset="utf-8"><title>Subscription ended</title></head>
-<body style="font-family: system-ui, sans-serif; max-width: 560px; line-height: 1.5;">
-  <p>Hi,</p>
-  <p>Your SpareFinder <strong>{plan_name}</strong> plan has been canceled.</p>
-  {"<p>Your access ended on: <strong>" + end_date + "</strong></p>" if end_date else ""}
-  <p>You can <a href="{billing_url}">resubscribe anytime</a> from your dashboard.</p>
-  <p>We're sorry to see you go. If you change your mind, contact <a href="mailto:support@sparefinder.org">support@sparefinder.org</a>.</p>
-  <p>— SpareFinder</p>
-</body>
-</html>"""
+    end_block = f"""
+        <tr>
+          <td style="padding: 12px 16px; margin-top: 8px; background: #f1f5f9; border-radius: 8px; font-size: 14px; color: #475569;">Access ended on: <strong>{end_date}</strong></td>
+        </tr>""" if end_date else ""
+    body = f"""
+      <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
+        <tr>
+          <td style="text-align: center; padding-bottom: 16px;">
+            <span style="display: inline-block; width: 52px; height: 52px; line-height: 52px; font-size: 24px; background: #64748b; border-radius: 50%; color: #fff;">·</span>
+          </td>
+        </tr>
+        <tr>
+          <td>
+            <h2 style="margin: 0 0 8px 0; font-size: 20px; font-weight: 700; color: #0f172a;">Subscription ended</h2>
+            <p style="margin: 0; font-size: 15px; color: #475569; line-height: 1.6;">Your <strong>{plan_name}</strong> plan has been canceled. You no longer have access to paid features.</p>
+          </td>
+        </tr>
+        {end_block}
+        <tr><td height="20"></td></tr>
+        <tr>
+          <td style="background: #f8fafc; border-radius: 8px; padding: 16px; border: 1px solid #e2e8f0;">
+            <p style="margin: 0 0 8px 0; font-size: 14px; font-weight: 600; color: #334155;">Want to come back?</p>
+            <p style="margin: 0 0 12px 0; font-size: 14px; color: #475569; line-height: 1.5;">You can resubscribe anytime and get back full access to AI identification, catalog storage, and more.</p>
+            <a href="{billing_url}" style="display: inline-block; padding: 10px 18px; background: #6366f1; color: #fff; text-decoration: none; font-weight: 600; font-size: 14px; border-radius: 8px;">View plans & resubscribe</a>
+          </td>
+        </tr>
+        <tr><td style="padding-top: 16px; font-size: 13px; color: #64748b;">We're sorry to see you go. Questions? <a href="mailto:support@sparefinder.org" style="color: #6366f1; text-decoration: none;">support@sparefinder.org</a></td></tr>
+      </table>"""
+    html = _wrap_subscription_email(body, billing_url)
     return _send_billing_email(to_email=to_email, subject=subject, html=html, text=text)
 
 
@@ -412,7 +538,7 @@ def send_subscription_renewing_soon_email(
     """
     Send before renewal (e.g. from a cron job). Reminds user when their plan renews.
     """
-    subject = f"Your SpareFinder plan renews on {renew_date}"
+    subject = f"Reminder: Your SpareFinder plan renews on {renew_date}"
     text = f"""Hi,
 
 This is a reminder that your SpareFinder {plan_name} plan will renew on {renew_date}.
@@ -422,16 +548,29 @@ You can manage or cancel your subscription here:
 
 — SpareFinder
 """
-    html = f"""<!DOCTYPE html>
-<html>
-<head><meta charset="utf-8"><title>Plan renewal reminder</title></head>
-<body style="font-family: system-ui, sans-serif; max-width: 560px; line-height: 1.5;">
-  <p>Hi,</p>
-  <p>This is a reminder that your SpareFinder <strong>{plan_name}</strong> plan will renew on <strong>{renew_date}</strong>.</p>
-  <p><a href="{billing_url}">Manage or cancel your subscription</a></p>
-  <p>— SpareFinder</p>
-</body>
-</html>"""
+    body = f"""
+      <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
+        <tr>
+          <td style="text-align: center; padding-bottom: 16px;">
+            <span style="display: inline-block; width: 52px; height: 52px; line-height: 52px; font-size: 24px; background: #06b6d4; border-radius: 50%; color: #fff;">📅</span>
+          </td>
+        </tr>
+        <tr>
+          <td>
+            <h2 style="margin: 0 0 8px 0; font-size: 20px; font-weight: 700; color: #0f172a;">Renewal reminder</h2>
+            <p style="margin: 0; font-size: 15px; color: #475569; line-height: 1.6;">Your <strong>{plan_name}</strong> plan will automatically renew on <strong style="color: #059669;">{renew_date}</strong>. No action is needed if you want to continue.</p>
+          </td>
+        </tr>
+        <tr><td height="16"></td></tr>
+        <tr>
+          <td style="background: #ecfdf5; border-radius: 8px; padding: 16px; border-left: 4px solid #10b981;">
+            <p style="margin: 0 0 8px 0; font-size: 13px; font-weight: 600; color: #065f46;">Need to make changes?</p>
+            <p style="margin: 0 0 12px 0; font-size: 14px; color: #047857; line-height: 1.5;">Update payment method, switch plans, or cancel before the renewal date from your billing page.</p>
+            <a href="{billing_url}" style="display: inline-block; padding: 10px 18px; background: #10b981; color: #fff; text-decoration: none; font-weight: 600; font-size: 14px; border-radius: 8px;">Manage subscription</a>
+          </td>
+        </tr>
+      </table>"""
+    html = _wrap_subscription_email(body, billing_url)
     return _send_billing_email(to_email=to_email, subject=subject, html=html, text=text)
 
 
