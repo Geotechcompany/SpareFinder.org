@@ -3509,51 +3509,82 @@ const Upload = () => {
             </div>
           </div>
 
-          {/* Wizard Progress Bar */}
-          {wizardStep !== "landing" && wizardStep !== "selection" && (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: "auto" }}
-              exit={{ opacity: 0, height: 0 }}
-              className="relative"
-            >
-              <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-[#3A5AFE0A] via-[#8B5CF60A] to-transparent blur-xl opacity-80 dark:from-purple-600/10 dark:to-blue-600/10" />
-              <div className="relative rounded-2xl border border-border bg-card shadow-soft-elevated backdrop-blur-xl dark:bg-black/30 dark:border-white/10">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm text-muted-foreground font-medium">
-                    Progress
-                  </span>
-                  <span className="text-sm text-purple-400 font-semibold">
-                    {wizardProgress}%
-                  </span>
+          {/* Wizard Progress Bar - Snake-style stepped */}
+          {wizardStep !== "landing" && wizardStep !== "selection" && (() => {
+            const steps = selectedMode === "both"
+              ? [
+                  { key: "image", label: "Upload" },
+                  { key: "keywords", label: "Keywords" },
+                  { key: "review", label: "Review" },
+                ]
+              : [
+                  { key: "image", label: "Upload" },
+                  { key: "review", label: "Review" },
+                ];
+            const currentIndex = steps.findIndex((s) => s.key === wizardStep);
+            const n = steps.length;
+            return (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                exit={{ opacity: 0, height: 0 }}
+                className="relative"
+              >
+                <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-[#3A5AFE0A] via-[#8B5CF60A] to-transparent blur-xl opacity-80 dark:from-purple-600/10 dark:to-blue-600/10" />
+                <div className="relative rounded-2xl border border-border bg-card/95 px-4 py-4 shadow-soft-elevated backdrop-blur-xl dark:bg-black/30 dark:border-white/10 sm:px-5">
+                  <div className="mb-3 flex items-center justify-between">
+                    <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground sm:text-sm">
+                      Progress
+                    </span>
+                    <span className="text-sm font-semibold tabular-nums text-primary sm:text-base">
+                      {wizardProgress}%
+                    </span>
+                  </div>
+                  {/* Snake track: one bar with segment notches and smooth fill */}
+                  <div className="relative h-3 w-full overflow-hidden rounded-full bg-muted sm:h-3.5">
+                    <motion.div
+                      className="absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-primary via-primary to-primary/90"
+                      initial={false}
+                      animate={{ width: `${wizardProgress}%` }}
+                      transition={{ type: "tween", duration: 0.35, ease: [0.32, 0.72, 0, 1] }}
+                    />
+                    {/* Segment notches (snake segments) */}
+                    {n > 1 && Array.from({ length: n - 1 }).map((_, i) => (
+                      <div
+                        key={i}
+                        className="absolute top-0 bottom-0 w-1 flex-shrink-0 bg-card/95 dark:bg-background/80"
+                        style={{
+                          left: `${((i + 1) / n) * 100}%`,
+                          transform: "translateX(-50%)",
+                          borderRadius: 1,
+                        }}
+                      />
+                    ))}
+                  </div>
+                  {/* Labels under bar - one per segment, evenly spaced */}
+                  <div className="mt-2.5 flex w-full sm:mt-3">
+                    {steps.map((step, i) => {
+                      const isActive = currentIndex === i;
+                      const isComplete = currentIndex > i;
+                      return (
+                        <span
+                          key={step.key}
+                          className={cn(
+                            "flex-1 text-center text-xs font-medium transition-colors duration-200 sm:text-sm",
+                            isActive && "text-primary",
+                            isComplete && !isActive && "text-primary/80",
+                            !isActive && !isComplete && "text-muted-foreground"
+                          )}
+                        >
+                          {step.label}
+                        </span>
+                      );
+                    })}
+                  </div>
                 </div>
-                <Progress value={wizardProgress} className="h-2 bg-muted" />
-                <div className="flex justify-between mt-2 text-xs text-muted-foreground">
-                  <span
-                    className={wizardStep === "image" ? "text-purple-400" : ""}
-                  >
-                    {selectedMode === "both" && wizardStep !== "keywords"
-                      ? "Step 1: Image"
-                      : selectedMode === "keywords"
-                      ? "Keywords"
-                      : "Upload"}
-                  </span>
-                  <span
-                    className={
-                      wizardStep === "keywords" ? "text-purple-400" : ""
-                    }
-                  >
-                    {selectedMode === "both" ? "Step 2: Keywords" : ""}
-                  </span>
-                  <span
-                    className={wizardStep === "review" ? "text-purple-400" : ""}
-                  >
-                    Review
-                  </span>
-                </div>
-              </div>
-            </motion.div>
-          )}
+              </motion.div>
+            );
+          })()}
 
           {/* Wizard Content */}
           <AnimatePresence mode="wait">
@@ -4816,7 +4847,7 @@ const Upload = () => {
                   className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 shadow-lg shadow-purple-500/25 px-8 h-12"
                 >
                   <Brain className="w-5 h-5 mr-2" />
-                  🤖 SpareFinder AI Research
+                  🤖 Analyze
                 </Button>
               </div>
             </motion.div>
