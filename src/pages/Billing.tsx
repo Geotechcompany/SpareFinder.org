@@ -174,7 +174,9 @@ const Billing = () => {
     setIsMobileMenuOpen(!isMobileMenuOpen);
   };
 
-  // Handle post-payment redirect (show banner instead of toast; don't clear URL until dismiss)
+  const PAYMENT_SUCCESS_STORAGE_KEY = "sparefinder_payment_success";
+
+  // Handle post-payment redirect (show banner; support sessionStorage when redirect loses URL params)
   useEffect(() => {
     const paymentSuccess = searchParams.get("payment_success");
     const paymentCancelled = searchParams.get("payment_cancelled");
@@ -183,9 +185,37 @@ const Billing = () => {
     const tierFromUrl = searchParams.get("tier");
 
     if (paymentSuccess === "true" || sessionId) {
+      const tier = tierFromUrl || (sessionId ? "pro" : "starter");
       setShowPaymentSuccessBanner(true);
-      setPaymentSuccessTier(tierFromUrl || (sessionId ? "pro" : "starter"));
-    } else if (paymentCancelled === "true") {
+      setPaymentSuccessTier(tier);
+      try {
+        sessionStorage.removeItem(PAYMENT_SUCCESS_STORAGE_KEY);
+      } catch {
+        /* ignore */
+      }
+    } else {
+      // No URL params: show banner once from sessionStorage if we just completed payment (e.g. after login redirect)
+      try {
+        const raw = sessionStorage.getItem(PAYMENT_SUCCESS_STORAGE_KEY);
+        if (raw) {
+          const { tier, at } = JSON.parse(raw);
+          if (at && Date.now() - at < 10 * 60 * 1000) {
+            setShowPaymentSuccessBanner(true);
+            setPaymentSuccessTier(tier || "pro");
+          }
+          sessionStorage.removeItem(PAYMENT_SUCCESS_STORAGE_KEY);
+        }
+      } catch {
+        /* ignore */
+      }
+    }
+
+    if (paymentCancelled === "true") {
+      try {
+        sessionStorage.removeItem(PAYMENT_SUCCESS_STORAGE_KEY);
+      } catch {
+        /* ignore */
+      }
       toast({
         title: "Payment Cancelled",
         description:
@@ -410,16 +440,25 @@ const Billing = () => {
         }
 
         // Create Stripe checkout session
+        const tierParam = planId === "free" ? "starter" : planId;
         const checkoutResponse = (await api.billing.createCheckoutSession({
           plan: selectedPlan.name,
           amount: selectedPlan.price,
           currency: "GBP",
           billing_cycle: "monthly",
-          success_url: `${window.location.origin}/dashboard/billing?payment_success=true&tier=${planId === "free" ? "starter" : planId}&session_id={CHECKOUT_SESSION_ID}`,
+          success_url: `${window.location.origin}/dashboard/billing?payment_success=true&tier=${tierParam}&session_id={CHECKOUT_SESSION_ID}`,
           cancel_url: `${window.location.origin}/dashboard/billing?payment_cancelled=true`,
         })) as CheckoutResponse;
 
         if (checkoutResponse.data?.checkout_url) {
+          try {
+            sessionStorage.setItem(
+              PAYMENT_SUCCESS_STORAGE_KEY,
+              JSON.stringify({ tier: tierParam, at: Date.now() })
+            );
+          } catch {
+            /* ignore */
+          }
           // Redirect to Stripe checkout
           window.location.href = checkoutResponse.data.checkout_url;
         } else {

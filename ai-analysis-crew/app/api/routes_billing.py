@@ -331,14 +331,15 @@ async def create_checkout_session(
                 },
             )
         else:
-            # Recurring subscription
+            # Recurring subscription – attach tier to subscription via subscription_data so webhooks get correct tier
             interval_map = {
                 "monthly": "month",
                 "annually": "year",
                 "yearly": "year",
             }
             interval = interval_map.get(billing_cycle_lower, "month")
-            
+            tier = _plan_to_tier(payload.plan)
+
             checkout_session = stripe.checkout.Session.create(
                 payment_method_types=["card"],
                 line_items=[
@@ -364,8 +365,16 @@ async def create_checkout_session(
                 metadata={
                     "user_id": user.id,
                     "plan": payload.plan,
+                    "tier": tier,
                     "billing_cycle": payload.billing_cycle,
                     "payment_type": "subscription",
+                },
+                subscription_data={
+                    "metadata": {
+                        "user_id": user.id,
+                        "plan": payload.plan,
+                        "tier": tier,
+                    },
                 },
             )
 
@@ -501,11 +510,16 @@ async def stripe_webhook(request: Request):
             return api_ok(data={"received": True})
         try:
             plan = None
+            tier_from_sub = None
             period_start = datetime.utcnow()
             period_end = period_start + timedelta(days=30)
             if subscription_id:
                 sub = stripe.Subscription.retrieve(subscription_id)
-                plan = (sub.metadata or {}).get("plan") or (sub.get("metadata") or {}).get("plan")
+                meta = (sub.metadata or {}) if hasattr(sub, "metadata") else (sub.get("metadata") or {})
+                plan = meta.get("plan")
+                tier_from_sub = meta.get("tier")
+                if not plan:
+                    plan = (sub.get("metadata") or {}).get("plan")
                 if sub.current_period_start:
                     period_start = datetime.utcfromtimestamp(sub.current_period_start)
                 if sub.current_period_end:
@@ -533,7 +547,7 @@ async def stripe_webhook(request: Request):
                 return api_ok(data={"received": True})
             row_id = existing["id"]
             user_id = existing["user_id"]
-            tier = _plan_to_tier(plan or "")
+            tier = (tier_from_sub and tier_from_sub.strip().lower() in ("free", "pro", "enterprise")) and tier_from_sub.strip().lower() or _plan_to_tier(plan or "")
             payload = {
                 "status": "active",
                 "stripe_customer_id": customer_id or existing.get("stripe_customer_id") or "",
