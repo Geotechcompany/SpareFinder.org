@@ -130,6 +130,32 @@ async def admin_get_users(
     users = res.data or []
     total = _count_from_response(res, len(users))
 
+    # Attach subscription tier/status per user
+    user_ids = [u["id"] for u in users if u.get("id")]
+    subscription_by_user: dict[str, dict[str, str]] = {}
+    if user_ids:
+        try:
+            subs_res = (
+                supabase.table("subscriptions")
+                .select("user_id, tier, status")
+                .in_("user_id", user_ids)
+                .execute()
+            )
+            for row in (subs_res.data or []):
+                uid = row.get("user_id")
+                if uid:
+                    subscription_by_user[str(uid)] = {
+                        "tier": row.get("tier") or "free",
+                        "status": row.get("status") or "inactive",
+                    }
+        except Exception:
+            pass
+    for u in users:
+        uid = u.get("id")
+        sub = subscription_by_user.get(str(uid)) if uid else None
+        u["subscription_tier"] = sub["tier"] if sub else "free"
+        u["subscription_status"] = sub["status"] if sub else "inactive"
+
     return api_ok(
         data={
             "users": users,
@@ -159,6 +185,64 @@ async def admin_update_user_role(
         .data
     )
     return api_ok(message="User role updated successfully", data={"user": updated})
+
+
+class UpdatePlanBody(BaseModel):
+    tier: str = Field(pattern=r"^(free|pro|enterprise)$")
+
+
+@router.patch("/users/{userId}/plan")
+async def admin_update_user_plan(
+    userId: str = Path(...),
+    payload: UpdatePlanBody = Body(...),
+    _admin: CurrentUser = Depends(require_roles("admin", "super_admin")),
+):
+    """Update a user's subscription plan (tier). Creates or updates the subscriptions row."""
+    supabase = get_supabase_admin()
+    tier = payload.tier
+    now = datetime.utcnow()
+    period_end = now + timedelta(days=30)
+
+    existing = (
+        supabase.table("subscriptions")
+        .select("id, user_id, tier, status")
+        .eq("user_id", userId)
+        .execute()
+        .data
+    )
+    if existing and len(existing) > 0:
+        supabase.table("subscriptions").update({
+            "tier": tier,
+            "status": "active",
+            "current_period_start": now.isoformat() + "Z",
+            "current_period_end": period_end.isoformat() + "Z",
+            "updated_at": now.isoformat() + "Z",
+        }).eq("user_id", userId).execute()
+        updated = (
+            supabase.table("subscriptions")
+            .select("*")
+            .eq("user_id", userId)
+            .single()
+            .execute()
+            .data
+        )
+        return api_ok(message="User plan updated successfully", data={"subscription": updated})
+    supabase.table("subscriptions").insert({
+        "user_id": userId,
+        "tier": tier,
+        "status": "active",
+        "current_period_start": now.isoformat() + "Z",
+        "current_period_end": period_end.isoformat() + "Z",
+    }).execute()
+    inserted = (
+        supabase.table("subscriptions")
+        .select("*")
+        .eq("user_id", userId)
+        .single()
+        .execute()
+        .data
+    )
+    return api_ok(message="User plan set successfully", data={"subscription": inserted})
 
 
 @router.delete("/users/{userId}")

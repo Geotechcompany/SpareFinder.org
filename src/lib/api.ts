@@ -841,6 +841,16 @@ export const adminApi = {
     return response.data;
   },
 
+  updateUserPlan: async (
+    userId: string,
+    tier: "free" | "pro" | "enterprise"
+  ): Promise<ApiResponse> => {
+    const response = await apiClient.patch(`/admin/users/${userId}/plan`, {
+      tier,
+    });
+    return response.data;
+  },
+
   deleteUser: async (userId: string): Promise<ApiResponse> => {
     const response = await apiClient.delete(`/admin/users/${userId}`);
     return response.data;

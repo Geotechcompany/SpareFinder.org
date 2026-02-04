@@ -73,6 +73,8 @@ interface UserData {
   last_search_at?: string;
   upload_count?: number;
   last_upload_at?: string;
+  subscription_tier?: string;
+  subscription_status?: string;
 }
 
 interface Pagination {
@@ -209,6 +211,38 @@ const UserManagement = () => {
         variant: "destructive",
         title: "Error",
         description: "Failed to update user role. Please try again.",
+      });
+    }
+  };
+
+  const handlePlanUpdate = async (
+    userId: string,
+    newTier: "free" | "pro" | "enterprise"
+  ) => {
+    try {
+      const response = await api.admin.updateUserPlan(userId, newTier);
+
+      if (response.success) {
+        toast({
+          title: "Plan Updated",
+          description: "User plan has been updated successfully.",
+        });
+        setUsers((prev) =>
+          prev.map((u) =>
+            u.id === userId
+              ? { ...u, subscription_tier: newTier, subscription_status: "active" }
+              : u
+          )
+        );
+      } else {
+        throw new Error((response as any).error || "Failed to update plan");
+      }
+    } catch (error) {
+      console.error("Error updating user plan:", error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to update user plan. Please try again.",
       });
     }
   };
@@ -416,6 +450,9 @@ const UserManagement = () => {
                             Role
                           </TableHead>
                           <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                            Plan
+                          </TableHead>
+                          <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                             Activity
                           </TableHead>
                           <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
@@ -429,7 +466,7 @@ const UserManagement = () => {
                       <TableBody>
                         {users.length === 0 ? (
                           <TableRow>
-                              <TableCell colSpan={6} className="py-8 text-center">
+                              <TableCell colSpan={7} className="py-8 text-center">
                               <div className="text-muted-foreground">
                                 {searchTerm || roleFilter !== "all" ? (
                                   <div>
@@ -479,6 +516,32 @@ const UserManagement = () => {
                                     <RoleIcon className="w-3 h-3 mr-1" />
                                     {user.role.replace("_", " ").toUpperCase()}
                                   </Badge>
+                                </TableCell>
+                                <TableCell>
+                                  <Select
+                                    value={user.subscription_tier || "free"}
+                                    onValueChange={(value) =>
+                                      handlePlanUpdate(
+                                        user.id,
+                                        value as "free" | "pro" | "enterprise"
+                                      )
+                                    }
+                                  >
+                                    <SelectTrigger className="w-32 h-8 text-xs bg-background/80 border-border text-foreground dark:bg-white/5 dark:border-white/10 dark:text-white">
+                                      <SelectValue placeholder="Plan" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="free">
+                                        Starter
+                                      </SelectItem>
+                                      <SelectItem value="pro">
+                                        Professional
+                                      </SelectItem>
+                                      <SelectItem value="enterprise">
+                                        Enterprise
+                                      </SelectItem>
+                                    </SelectContent>
+                                  </Select>
                                 </TableCell>
                                 <TableCell className="text-sm text-muted-foreground dark:text-gray-300">
                                   <div className="text-sm">
