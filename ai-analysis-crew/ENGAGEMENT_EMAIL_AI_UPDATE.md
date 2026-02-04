@@ -125,7 +125,7 @@ SUPABASE_BUCKET_NAME=sparefinder
 Test the new system:
 ```bash
 # Test email generation and storage
-curl -X POST https://aiagent-sparefinder-org.onrender.com/test/reengagement-email \
+curl -X POST http://localhost:8000/test/reengagement-email \
   -H "Content-Type: application/json" \
   -d '{"email": "test@example.com", "user_name": "Test User"}'
 ```

@@ -95,7 +95,7 @@ Use these online tools to test the WebSocket:
 
 **Test HTTP health endpoint first:**
 ```bash
-curl https://aiagent-sparefinder-org.onrender.com/health
+curl http://localhost:8000/health
 ```
 
 **Expected response:**
@@ -107,7 +107,7 @@ curl https://aiagent-sparefinder-org.onrender.com/health
 
 1. Set environment variables in `.env`:
    ```bash
-   VITE_AI_CREW_API_URL=https://aiagent-sparefinder-org.onrender.com
+   VITE_AI_CREW_API_URL=http://localhost:8000
    VITE_AI_CREW_WS_URL=wss://aiagent-sparefinder-org.onrender.com
    ```
 
@@ -171,7 +171,7 @@ curl https://aiagent-sparefinder-org.onrender.com/health
 1. Verify the URL is correct: `wss://aiagent-sparefinder-org.onrender.com/ws/progress`
 2. Check if the server is running
 3. Verify firewall/network settings
-4. Test HTTP endpoint first: `curl https://aiagent-sparefinder-org.onrender.com/health`
+4. Test HTTP endpoint first: `curl http://localhost:8000/health`
 
 ### ❌ SSL Certificate Error
 
@@ -209,7 +209,7 @@ curl https://aiagent-sparefinder-org.onrender.com/health
 
 ## Verification Checklist
 
-- [ ] HTTP health endpoint responds: `curl https://aiagent-sparefinder-org.onrender.com/health`
+- [ ] HTTP health endpoint responds: `curl http://localhost:8000/health`
 - [ ] WebSocket connects successfully
 - [ ] Can send messages without errors
 - [ ] Receives progress updates

@@ -929,6 +929,7 @@ const Upload = () => {
   const [wizardStep, setWizardStep] = useState<
     "landing" | "selection" | "image" | "keywords" | "review"
   >("landing");
+  const [landingActiveStep, setLandingActiveStep] = useState<1 | 2 | 3>(1);
   const [selectedMode, setSelectedMode] = useState<
     "image" | "keywords" | "both" | null
   >(null);
@@ -952,6 +953,18 @@ const Upload = () => {
       }
     };
   }, []);
+
+  // Landing carousel: auto-advance steps every 3.5s, then reset to step 1
+  useEffect(() => {
+    if (wizardStep !== "landing") return;
+    const t = setInterval(() => {
+      setLandingActiveStep((prev) => {
+        if (prev >= 3) return 1;
+        return (prev + 1) as 2 | 3;
+      });
+    }, 3500);
+    return () => clearInterval(t);
+  }, [wizardStep]);
 
   const { toast } = useToast();
   const { uploadFile } = useFileUpload();
@@ -1072,7 +1085,7 @@ const Upload = () => {
 
   const extractCategory = (text: string): string => {
     const categoryMatches = text.match(/Category:\s*([^.\n]+)/i);
-    return categoryMatches ? categoryMatches[1].trim() : "Engineering spares Component";
+    return categoryMatches ? categoryMatches[1].trim() : "Manufacturing spares Component";
   };
 
   const extractManufacturer = (text: string): string => {
@@ -1422,7 +1435,7 @@ const Upload = () => {
               class_name:
                 flatData.class_name ||
                 flatData.precise_part_name ||
-                "Engineering spares Component",
+                "Manufacturing spares Component",
               confidence: (flatData.confidence_score || 0) / 100, // Convert percentage to decimal
               description: flatData.description || flatData.full_analysis || "",
               category: flatData.category || "Unspecified",
@@ -1495,7 +1508,7 @@ const Upload = () => {
           class_name:
             flatData.class_name ||
             flatData.precise_part_name ||
-            "Engineering spares Component",
+            "Manufacturing spares Component",
           confidence: (flatData.confidence_score || 0) / 100, // Convert percentage to decimal
           description: flatData.description || flatData.full_analysis || "",
           category: flatData.category || "Unspecified",
@@ -1837,7 +1850,7 @@ const Upload = () => {
         "ai_analysis",
         "Initializing AI-powered part analysis...",
         40,
-        "Searching advanced Engineering spares databases"
+        "Searching advanced Manufacturing spares databases"
       );
 
       const result = await api.upload.image(uploadedFile, savedKeywords, {
@@ -1852,7 +1865,7 @@ const Upload = () => {
         "part_matching",
         "Matching part details across multiple databases...",
         70,
-        "Cross-referencing Engineering spares part catalogs"
+        "Cross-referencing Manufacturing spares part catalogs"
       );
       await new Promise((resolve) => setTimeout(resolve, 1000)); // Simulate matching process
 
@@ -1898,7 +1911,7 @@ const Upload = () => {
       // Prepare predictions, using the service's predictions or fallback parsing
       const predictions = (result.data as any)?.predictions?.length
         ? (result.data as any).predictions.map((prediction: any) => ({
-            class_name: prediction.class_name || "Engineering spares Component",
+            class_name: prediction.class_name || "Manufacturing spares Component",
             confidence: prediction.confidence || 0.75,
             description: prediction.analysis || prediction.description || "", // Use analysis field first
             category: prediction.category || "Unspecified",
@@ -1911,7 +1924,7 @@ const Upload = () => {
         : // Fallback parsing if no predictions
           [
             {
-              class_name: "Engineering spares Component",
+              class_name: "Manufacturing spares Component",
               confidence: 0.75,
               description:
                 (result.data as any)?.analysis ||
@@ -1987,7 +2000,7 @@ const Upload = () => {
           const analysisResults: AnalysisResponse = {
             success: result.success,
             predictions: (result.data as any[]).map((prediction: any) => ({
-              class_name: prediction.class_name || "Engineering spares Component",
+              class_name: prediction.class_name || "Manufacturing spares Component",
               confidence: prediction.confidence || 0.75,
               description: prediction.description || "",
               category: prediction.category || "Unspecified",
@@ -2687,7 +2700,7 @@ const Upload = () => {
 
       // Save PDF with descriptive filename
       const partName =
-        analysisResults.predictions[0]?.class_name || "Engineering spares-part";
+        analysisResults.predictions[0]?.class_name || "Manufacturing spares-part";
       const timestamp = new Date()
         .toISOString()
         .replace(/:/g, "-")
@@ -3481,13 +3494,13 @@ const Upload = () => {
                   transition={{ delay: 0.4 }}
                 >
                   {wizardStep === "landing"
-                    ? "Welcome to SpareFinder AI - Let's identify your Engineering spares part!"
+                    ? "Welcome to SpareFinder AI - Let's identify your Manufacturing spares part!"
                     : wizardStep === "selection"
-                    ? "Choose how you'd like to identify your Engineering spares part"
+                    ? "Choose how you'd like to identify your Manufacturing spares part"
                     : wizardStep === "image"
                     ? selectedMode === "both"
                       ? "Upload an image - step 1 of 2"
-                      : "Upload an image of your Engineering spares part for AI analysis"
+                      : "Upload an image of your Manufacturing spares part for AI analysis"
                     : wizardStep === "keywords"
                     ? "Add keywords to refine your search - step 2 of 2"
                     : "Review and submit your request"}
@@ -3563,67 +3576,100 @@ const Upload = () => {
                   >
                     <Card className="flex h-full flex-col rounded-3xl border border-border bg-card/95 shadow-soft-elevated backdrop-blur-xl dark:bg-black/30 dark:border-white/10">
                       <CardHeader className="space-y-3 pb-4 sm:pb-6">
-                        <div className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-muted/60 px-3 py-1 text-xs font-medium text-muted-foreground dark:bg-white/5 dark:border-white/10">
-                          <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
-                          Guided, AI‑assisted workflow
-                        </div>
-                        <CardTitle className="mb-4 text-2xl font-semibold text-foreground sm:text-3xl dark:text-white">
-                          Get Started with SpareFinder AI
+                        <CardTitle className="mb-2 text-xl font-semibold leading-tight text-foreground xs:text-2xl sm:text-3xl dark:text-white">
+                          Manufacturing Spares, Identified in Seconds.
                         </CardTitle>
-                        <CardDescription className="text-lg text-muted-foreground dark:text-gray-400">
-                          Identify your Engineering spares parts in just a few simple
-                          steps
+                        <CardDescription className="text-base text-muted-foreground sm:text-lg dark:text-gray-400">
+                          Stop wasting hours searching manuals. Our AI analyzes your parts to find exact matches, pricing, and suppliers instantly.
                         </CardDescription>
                       </CardHeader>
                       <CardContent className="flex flex-1 flex-col justify-between space-y-6">
                         <div className="space-y-4" id="tour-step-choose-method">
-                          <div className="flex items-start gap-3 rounded-2xl bg-muted/60 p-3 sm:p-4 dark:bg-white/5" id="tour-step-upload-analyze">
-                            <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-primary/10 ring-1 ring-primary/20">
-                              <span className="text-sm font-bold text-primary">
+                          <div
+                            className={cn(
+                              "flex items-start gap-3 rounded-2xl p-3 sm:p-4 transition-all duration-300",
+                              landingActiveStep === 1
+                                ? "bg-purple-500/15 dark:bg-purple-500/20 ring-2 ring-purple-500/40 shadow-[0_0_20px_rgba(139,92,246,0.25)]"
+                                : "bg-muted/60 dark:bg-white/5"
+                            )}
+                            id="tour-step-upload-analyze"
+                          >
+                            <div className={cn(
+                              "flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full ring-1",
+                              landingActiveStep === 1 ? "bg-purple-500/30 ring-purple-400/50" : "bg-primary/10 ring-primary/20"
+                            )}>
+                              <span className={cn(
+                                "text-sm font-bold",
+                                landingActiveStep === 1 ? "text-purple-400" : "text-primary"
+                              )}>
                                 1
                               </span>
                             </div>
                             <div>
-                              <h3 className="mb-1 text-lg font-semibold text-foreground dark:text-white">
-                                Choose Your Method
+                              <h3 className="mb-1 text-base font-semibold text-foreground sm:text-lg dark:text-white">
+                                Select Your Input
                               </h3>
                               <p className="text-sm text-muted-foreground dark:text-gray-400">
-                                Select image upload, keyword search, or both for
-                                maximum accuracy
+                                Choose between a quick photo upload or a targeted keyword search.
                               </p>
                             </div>
                           </div>
 
-                          <div className="flex items-start gap-3 rounded-2xl bg-muted/40 p-3 sm:p-4 dark:bg-white/5" id="tour-step-get-results">
-                            <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-[#3A5AFE1A] ring-1 ring-[#3A5AFE26]">
-                              <span className="text-sm font-bold text-[#3A5AFE]">
+                          <div
+                            className={cn(
+                              "flex items-start gap-3 rounded-2xl p-3 sm:p-4 transition-all duration-300",
+                              landingActiveStep === 2
+                                ? "bg-purple-500/15 dark:bg-purple-500/20 ring-2 ring-purple-500/40 shadow-[0_0_20px_rgba(139,92,246,0.25)]"
+                                : "bg-muted/40 dark:bg-white/5"
+                            )}
+                            id="tour-step-get-results"
+                          >
+                            <div className={cn(
+                              "flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full ring-1",
+                              landingActiveStep === 2 ? "bg-purple-500/30 ring-purple-400/50" : "bg-[#3A5AFE1A] ring-[#3A5AFE26]"
+                            )}>
+                              <span className={cn(
+                                "text-sm font-bold",
+                                landingActiveStep === 2 ? "text-purple-400" : "text-[#3A5AFE]"
+                              )}>
                                 2
                               </span>
                             </div>
                             <div>
-                              <h3 className="mb-1 text-lg font-semibold text-foreground dark:text-white">
-                                Upload & Analyze
+                              <h3 className="mb-1 text-base font-semibold text-foreground sm:text-lg dark:text-white">
+                                AI-Powered Analysis
                               </h3>
                               <p className="text-sm text-muted-foreground dark:text-gray-400">
-                                Our AI will process your part image and provide
-                                detailed identification
+                                Our neural network identifies technical specifications and part numbers in real-time.
                               </p>
                             </div>
                           </div>
 
-                          <div className="flex items-start gap-3 rounded-2xl bg-muted/20 p-3 sm:p-4 dark:bg-white/5">
-                            <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-emerald-500/10 ring-1 ring-emerald-400/30">
-                              <span className="text-sm font-bold text-emerald-500">
+                          <div
+                            className={cn(
+                              "flex items-start gap-3 rounded-2xl p-3 sm:p-4 transition-all duration-300",
+                              landingActiveStep === 3
+                                ? "bg-purple-500/15 dark:bg-purple-500/20 ring-2 ring-purple-500/40 shadow-[0_0_20px_rgba(139,92,246,0.25)]"
+                                : "bg-muted/20 dark:bg-white/5"
+                            )}
+                          >
+                            <div className={cn(
+                              "flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full ring-1",
+                              landingActiveStep === 3 ? "bg-purple-500/30 ring-purple-400/50" : "bg-emerald-500/10 ring-emerald-400/30"
+                            )}>
+                              <span className={cn(
+                                "text-sm font-bold",
+                                landingActiveStep === 3 ? "text-purple-400" : "text-emerald-500"
+                              )}>
                                 3
                               </span>
                             </div>
                             <div>
-                              <h3 className="mb-1 text-lg font-semibold text-foreground dark:text-white">
-                                Get Results
+                              <h3 className="mb-1 text-base font-semibold text-foreground sm:text-lg dark:text-white">
+                                Procurement Ready
                               </h3>
                               <p className="text-sm text-muted-foreground dark:text-gray-400">
-                                Receive comprehensive part information, pricing,
-                                and supplier details
+                                Get a full breakdown of pricing and trusted suppliers to complete your order.
                               </p>
                             </div>
                           </div>
@@ -3638,7 +3684,7 @@ const Upload = () => {
                               id="tour-start-analyzing-button"
                               onClick={() => setWizardStep("selection")}
                               size="lg"
-                              className="group relative flex h-14 w-full items-center justify-center gap-2 overflow-hidden rounded-2xl bg-gradient-to-r from-[#3A5AFE] via-[#4C5DFF] to-[#06B6D4] text-base font-semibold text-white shadow-[0_18px_45px_rgba(15,23,42,0.35)] transition-all duration-200 hover:scale-[1.01] hover:shadow-[0_22px_55px_rgba(15,23,42,0.45)] focus-visible:ring-2 focus-visible:ring-[#3A5AFE] focus-visible:ring-offset-2 focus-visible:ring-offset-background dark:from-purple-600 dark:via-blue-600 dark:to-cyan-500"
+                              className="group relative flex h-14 w-full items-center justify-center gap-2 overflow-hidden rounded-2xl bg-[#7540EA] text-base font-semibold text-white shadow-[0_18px_45px_rgba(117,64,234,0.4)] transition-all duration-200 hover:bg-[#6530d4] hover:scale-[1.01] hover:shadow-[0_22px_55px_rgba(117,64,234,0.5)] focus-visible:ring-2 focus-visible:ring-[#7540EA] focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                             >
                               <Zap className="mr-2 h-5 w-5" />
                               Start Analyzing Parts
@@ -3649,23 +3695,50 @@ const Upload = () => {
                     </Card>
                   </motion.div>
 
-                  {/* Right Column - Animation */}
+                  {/* Right Column - Illustration stage (stacked slides, vertical slide animation) */}
                   <motion.div
                     initial={{ opacity: 0, scale: 0.9 }}
                     animate={{ opacity: 1, scale: 1 }}
                     transition={{ delay: 0.3 }}
-                    className="flex items-center justify-center h-full"
+                    className="flex min-h-[260px] items-center justify-center h-full sm:min-h-[320px]"
                   >
-                <div className="relative w-full h-full flex items-center justify-center rounded-lg border border-border bg-card shadow-soft-elevated backdrop-blur-xl dark:bg-black/30 dark:border-white/10 overflow-hidden">
-                      <video
-                        src="/Animations/scanpart.mp4"
-                        autoPlay
-                        loop
-                        muted
-                        playsInline
-                        className="w-full h-full object-cover scale-[1.35]"
-                        style={{ objectPosition: "center 45%" }}
-                      />
+                    <div className="relative w-full h-full min-h-[260px] sm:min-h-[320px] flex items-center justify-center rounded-lg border border-border bg-card shadow-soft-elevated backdrop-blur-xl dark:bg-black/30 dark:border-white/10 overflow-hidden">
+                      <div className="absolute inset-0 overflow-hidden h-full">
+                        <motion.div
+                          className="flex flex-col w-full"
+                          animate={{
+                            y: `${-(landingActiveStep - 1) * (100 / 3)}%`,
+                          }}
+                          transition={{
+                            type: "tween",
+                            duration: 0.5,
+                            ease: [0.32, 0.72, 0, 1],
+                          }}
+                          style={{ height: "300%" }}
+                        >
+                          <div className="flex-shrink-0 flex items-center justify-center p-4 w-full" style={{ height: "33.333%" }}>
+                            <img
+                              src="/Illustrations/choose.svg"
+                              alt="Step 1: Select your input"
+                              className="w-full max-h-full object-contain"
+                            />
+                          </div>
+                          <div className="flex-shrink-0 flex items-center justify-center p-4 w-full" style={{ height: "33.333%" }}>
+                            <img
+                              src="/Illustrations/ai-powered.svg"
+                              alt="Step 2: AI-powered analysis"
+                              className="w-full max-h-full object-contain"
+                            />
+                          </div>
+                          <div className="flex-shrink-0 flex items-center justify-center p-4 w-full" style={{ height: "33.333%" }}>
+                            <img
+                              src="/Illustrations/getresults.svg"
+                              alt="Step 3: Procurement ready"
+                              className="w-full max-h-full object-contain"
+                            />
+                          </div>
+                        </motion.div>
+                      </div>
                     </div>
                   </motion.div>
                 </div>
@@ -3858,7 +3931,7 @@ const Upload = () => {
                           {selectedMode === "both"
                             ? "Your image will be analyzed using AI, refined with your keywords for maximum accuracy."
                             : selectedMode === "image"
-                            ? "Your image will be processed using advanced AI to identify the Engineering spares part."
+                            ? "Your image will be processed using advanced AI to identify the Manufacturing spares part."
                             : "Our system will search for parts matching your keywords in our extensive catalog."}
                         </p>
                       </div>
@@ -4069,7 +4142,7 @@ const Upload = () => {
                                       </div>
                                       <div className="text-muted-foreground text-base mt-1">
                                         {analysisProgress.details ||
-                                          "Processing your Engineering spares part analysis..."}
+                                          "Processing your Manufacturing spares part analysis..."}
                                       </div>
                                       {analysisProgress.currentStepIndex &&
                                         analysisProgress.totalSteps && (
@@ -4273,7 +4346,7 @@ const Upload = () => {
                                         "part_matching" && (
                                         <div className="flex justify-between text-purple-300">
                                           <span>
-                                            🔗 Matching against Engineering spares
+                                            🔗 Matching against Manufacturing spares
                                             database...
                                           </span>
                                           <span className="text-gray-500">
@@ -4378,7 +4451,7 @@ const Upload = () => {
                           Add Keywords
                         </CardTitle>
                         <CardDescription className="text-muted-foreground dark:text-gray-400">
-                          Describe your Engineering spares part using keywords
+                          Describe your Manufacturing spares part using keywords
                         </CardDescription>
                       </CardHeader>
                       <CardContent>
@@ -4777,7 +4850,7 @@ const Upload = () => {
               </h3>
               <p className="text-gray-400 text-lg">
                 {isAnalyzing
-                  ? "Our AI is examining your Engineering spares part..."
+                  ? "Our AI is examining your Manufacturing spares part..."
                   : "Finding matching parts for your keywords..."}
               </p>
             </div>

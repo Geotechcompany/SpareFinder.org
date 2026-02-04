@@ -14,7 +14,7 @@ services:
       - ./temp:/app/temp
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "python", "-c", "import requests; requests.get('https://aiagent-sparefinder-org.onrender.com/health')"]
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8000/health')"]
       interval: 30s
       timeout: 10s
       retries: 3

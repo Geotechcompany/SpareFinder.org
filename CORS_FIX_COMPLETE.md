@@ -50,7 +50,7 @@ VITE_AI_SERVICE_URL=https://part-finder-ai-vision-1.onrender.com
 ### **Current Frontend API Configuration**
 ```typescript
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
-const AI_SERVICE_URL = import.meta.env.VITE_AI_SERVICE_URL || 'https://aiagent-sparefinder-org.onrender.com';
+const AI_SERVICE_URL = import.meta.env.VITE_AI_SERVICE_URL || 'http://localhost:8000';
 ```
 
 ## 🚀 Expected Results

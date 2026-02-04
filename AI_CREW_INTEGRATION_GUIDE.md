@@ -76,7 +76,7 @@ Add to your `.env` file:
 
 ```bash
 # AI Analysis Crew Configuration
-VITE_AI_CREW_API_URL=https://aiagent-sparefinder-org.onrender.com
+VITE_AI_CREW_API_URL=http://localhost:8000
 VITE_AI_CREW_WS_URL=ws://localhost:8000
 ```
 
@@ -113,7 +113,7 @@ cp .env.example .env
 python run.py
 ```
 
-The API will be available at `https://aiagent-sparefinder-org.onrender.com`
+The API will be available at `http://localhost:8000`
 
 #### Backend Environment Variables
 
@@ -215,7 +215,7 @@ const MyComponent = () => {
 
 **HTTP Endpoint:**
 ```bash
-POST https://aiagent-sparefinder-org.onrender.com/analyze-part
+POST http://localhost:8000/analyze-part
 Content-Type: multipart/form-data
 
 user_email: user@example.com
@@ -329,10 +329,10 @@ python run.py  # Watch console output
 **Test API Directly:**
 ```bash
 # Test health
-curl https://aiagent-sparefinder-org.onrender.com/health
+curl http://localhost:8000/health
 
 # Test with image
-curl -X POST https://aiagent-sparefinder-org.onrender.com/analyze-part \
+curl -X POST http://localhost:8000/analyze-part \
   -F "user_email=test@example.com" \
   -F "keywords=brake pad" \
   -F "file=@/path/to/image.jpg"
