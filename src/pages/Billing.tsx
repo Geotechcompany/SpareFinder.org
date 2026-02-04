@@ -57,6 +57,12 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 interface BillingData {
   subscription?: {
@@ -694,100 +700,74 @@ const Billing = () => {
             transition={{ duration: 0.5 }}
             className="space-y-4 sm:space-y-6 lg:space-y-8 max-w-6xl mx-auto"
           >
-            {/* Payment Success – Congratulation banner with plan features */}
-            <AnimatePresence>
-              {showPaymentSuccessBanner && (() => {
-                const tierToPlanId: Record<string, string> = {
-                  starter: "free",
-                  pro: "pro",
-                  enterprise: "enterprise",
-                };
-                const planId = paymentSuccessTier
-                  ? tierToPlanId[paymentSuccessTier] ?? "pro"
-                  : "pro";
-                const plan = plans.find((p) => p.id === planId);
-                const features = plan?.features ?? [];
-                const planName = plan?.name ?? "Your plan";
+            {/* Payment Success – Congratulation modal popup */}
+            {(() => {
+              const tierToPlanId: Record<string, string> = {
+                starter: "free",
+                pro: "pro",
+                enterprise: "enterprise",
+              };
+              const planId = paymentSuccessTier
+                ? tierToPlanId[paymentSuccessTier] ?? "pro"
+                : "pro";
+              const plan = plans.find((p) => p.id === planId);
+              const features = plan?.features ?? [];
+              const planName = plan?.name ?? "Your plan";
 
-                const handleDismiss = () => {
-                  setShowPaymentSuccessBanner(false);
-                  setPaymentSuccessTier(null);
-                  navigate("/dashboard/billing", { replace: true });
-                };
+              const handleDismiss = () => {
+                setShowPaymentSuccessBanner(false);
+                setPaymentSuccessTier(null);
+                navigate("/dashboard/billing", { replace: true });
+              };
 
-                return (
-                  <motion.div
-                    key="payment-success-banner"
-                    initial={{ opacity: 0, y: -24, scale: 0.98 }}
-                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                    exit={{ opacity: 0, y: -16, scale: 0.98 }}
-                    transition={{ type: "spring", damping: 24, stiffness: 300 }}
-                    className="relative mb-6"
-                  >
-                    <div className="absolute -inset-[1px] rounded-3xl bg-gradient-to-r from-emerald-500 via-green-500 to-teal-500 opacity-60 blur-sm" />
-                    <div className="relative rounded-3xl border border-emerald-500/50 bg-gradient-to-br from-emerald-500/15 via-green-500/10 to-teal-500/15 p-6 shadow-xl backdrop-blur-xl dark:from-emerald-600/20 dark:via-green-600/15 dark:to-teal-600/20">
-                      <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
-                        <div className="flex gap-4">
-                          <motion.div
-                            initial={{ scale: 0 }}
-                            animate={{ scale: 1 }}
-                            transition={{ delay: 0.15, type: "spring", stiffness: 300 }}
-                            className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-green-500 to-emerald-600 shadow-lg shadow-emerald-500/40 ring-4 ring-emerald-500/20"
-                          >
-                            <CheckCircle className="h-7 w-7 text-white" />
-                          </motion.div>
-                          <div>
-                            <h3 className="text-xl font-bold tracking-tight text-foreground dark:text-white sm:text-2xl">
-                              Congratulations!
-                            </h3>
-                            <p className="mt-1 text-sm text-muted-foreground dark:text-gray-300">
-                              Payment successful. Your subscription to{" "}
-                              <span className="font-semibold text-emerald-700 dark:text-emerald-300">
-                                {planName}
-                              </span>{" "}
-                              is now active.
-                            </p>
-                            {features.length > 0 && (
-                              <div className="mt-4">
-                                <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-emerald-700/90 dark:text-emerald-400/90">
-                                  What’s included
-                                </p>
-                                <ul className="grid gap-1.5 sm:grid-cols-2">
-                                  {features.map((feature, i) => (
-                                    <motion.li
-                                      key={i}
-                                      initial={{ opacity: 0, x: -8 }}
-                                      animate={{ opacity: 1, x: 0 }}
-                                      transition={{
-                                        delay: 0.2 + i * 0.05,
-                                        duration: 0.25,
-                                      }}
-                                      className="flex items-center gap-2 text-sm text-foreground/90 dark:text-gray-200"
-                                    >
-                                      <Check className="h-4 w-4 shrink-0 text-emerald-500 dark:text-emerald-400" />
-                                      <span>{feature}</span>
-                                    </motion.li>
-                                  ))}
-                                </ul>
-                              </div>
-                            )}
-                          </div>
+              return (
+                <Dialog open={showPaymentSuccessBanner} onOpenChange={(open) => !open && handleDismiss()}>
+                  <DialogContent className="max-w-md border-emerald-500/30 bg-gradient-to-br from-emerald-500/10 via-green-500/5 to-teal-500/10 dark:from-emerald-600/20 dark:via-green-600/10 dark:to-teal-600/20 sm:max-w-lg sm:rounded-2xl">
+                    <DialogHeader className="space-y-4 text-left">
+                      <div className="flex items-center gap-4">
+                        <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-green-500 to-emerald-600 shadow-lg shadow-emerald-500/40 ring-4 ring-emerald-500/20">
+                          <CheckCircle className="h-7 w-7 text-white" />
                         </div>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={handleDismiss}
-                          className="shrink-0 rounded-full text-muted-foreground hover:bg-emerald-500/20 hover:text-emerald-700 dark:hover:text-emerald-300"
-                          aria-label="Dismiss"
-                        >
-                          <X className="h-5 w-5" />
-                        </Button>
+                        <DialogTitle className="text-xl font-bold tracking-tight text-foreground dark:text-white sm:text-2xl">
+                          Congratulations!
+                        </DialogTitle>
                       </div>
-                    </div>
-                  </motion.div>
-                );
-              })()}
-            </AnimatePresence>
+                      <p className="text-sm text-muted-foreground dark:text-gray-300">
+                        Payment successful. Your subscription to{" "}
+                        <span className="font-semibold text-emerald-700 dark:text-emerald-300">
+                          {planName}
+                        </span>{" "}
+                        is now active.
+                      </p>
+                      {features.length > 0 && (
+                        <div className="mt-2">
+                          <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-emerald-700/90 dark:text-emerald-400/90">
+                            What’s included
+                          </p>
+                          <ul className="grid gap-1.5 sm:grid-cols-2">
+                            {features.map((feature, i) => (
+                              <li
+                                key={i}
+                                className="flex items-center gap-2 text-sm text-foreground/90 dark:text-gray-200"
+                              >
+                                <Check className="h-4 w-4 shrink-0 text-emerald-500 dark:text-emerald-400" />
+                                <span>{feature}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </DialogHeader>
+                    <Button
+                      onClick={handleDismiss}
+                      className="mt-2 w-full bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700"
+                    >
+                      Got it
+                    </Button>
+                  </DialogContent>
+                </Dialog>
+              );
+            })()}
 
             {/* Header */}
             <div className="relative">
