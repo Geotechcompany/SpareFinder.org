@@ -90,15 +90,6 @@ export function FeatureSteps({
               </motion.div>
             ))}
 
-            {/* progress bar */}
-            <div className="pt-2">
-              <div className="h-1 w-full overflow-hidden rounded-full bg-muted">
-                <div
-                  className="h-full bg-primary transition-[width] duration-100"
-                  style={{ width: `${progress}%` }}
-                />
-              </div>
-            </div>
           </div>
 
           <div
