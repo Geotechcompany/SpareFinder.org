@@ -1,164 +1,173 @@
-# 🔧 SparePart AI – Identify Auto Parts Using AI + Web Intelligence
+# SpareFinder
 
-![SparePart AI Banner](https://your-cdn.com/banner.png)
-
-> Upload a picture of any auto spare part and get accurate details powered by AI and real-time web scraping.
-
-SparePart AI is a modern SaaS platform that allows users to identify and learn about Engineering spares spare parts using image uploads. It combines OpenAI’s GPT-4 vision capabilities with live web scraping and a user-friendly dashboard. Subscriptions are handled via Stripe, with a modern, minimalist UX design.
+**AI-powered industrial spare parts identification.** Upload a photo or use keyword search to identify manufacturing spares, retrieve specifications, pricing, and trusted suppliers in seconds.
 
 ---
 
-## 🚀 Features
+## Overview
 
-- 🔍 **Image Upload** – Upload photos of auto parts for instant analysis
-- 🤖 **AI-Powered Recognition** – OpenAI GPT-4o for intelligent part description, manufacturer, and use cases
-- 🌐 **Web Scraping Fallback** – Augment AI results with real-time scraping from part suppliers
-- 💳 **Stripe Integration** – Subscription-based access (Free, Pro, Enterprise tiers)
-- 👤 **User Dashboard** – Track uploads, view AI results, manage your plan
-- 🛠 **Admin Panel** – Manage users, monitor usage, and audit AI output
-- 📱 **Mobile-Responsive UI** – Minimalist and premium design optimized for all devices
+SpareFinder is an enterprise-ready SaaS platform that reduces engineering and procurement time by combining computer vision (GPT-4o), a dedicated analysis backend (CrewAI), and integrated billing and user management. The frontend is a single-page application built with React and Vite; the analysis pipeline runs as a separate Python service.
 
----
-
-## 🧠 Tech Stack
-
-| Layer      | Tech                                       |
-|------------|--------------------------------------------|
-| Frontend   | Next.js 14 (App Router), TailwindCSS, shadcn/ui |
-| Backend    | Prisma + PostgreSQL, NextAuth.js, Stripe Webhooks |
-| AI         | OpenAI GPT-4o Vision API                    |
-| Uploads    | UploadThing or Vercel Blob                 |
-| Scraping   | Cheerio + Axios / ScraperAPI               |
-| UI/UX      | Framer Motion, React Hot Toast, SEO        |
-| Hosting    | Vercel (Frontend + Serverless Functions)   |
-| Database   | Neon.tech or Railway                       |
+| Layer        | Technology |
+|-------------|------------|
+| Frontend    | React 18, TypeScript, Vite 5, Tailwind CSS, Radix UI / shadcn/ui, Framer Motion |
+| Auth        | Clerk (SSO, email/password, OAuth) |
+| Backend DB | Supabase (PostgreSQL, Auth, Storage, Realtime) |
+| Billing     | Stripe (subscriptions, webhooks) |
+| AI / ML     | OpenAI GPT-4o Vision, CrewAI (Python service) |
+| Deployment  | Static frontend (Netlify/Vercel/Render), Render (API), Supabase Cloud |
 
 ---
 
-## 📂 Project Structure
+## Features
 
-🧱 Project Directory Structure
-bash
-CopyEdit
-spare-part-ai/
-├── app/
-│   ├── layout.tsx                  # Global layout
-│   ├── page.tsx                    # Landing page
-│   ├── auth/
-│   │   ├── login/page.tsx
-│   │   └── register/page.tsx
-│   ├── dashboard/
-│   │   ├── layout.tsx             # User dashboard layout
-│   │   ├── page.tsx               # Dashboard home
-│   │   ├── upload/page.tsx
-│   │   ├── history/page.tsx
-│   │   └── billing/page.tsx
-│   ├── admin/
-│   │   ├── layout.tsx
-│   │   └── page.tsx               # Admin dashboard
-│   └── api/
-│       ├── auth/[...nextauth]/route.ts
-│       ├── stripe/webhook/route.ts
-│       ├── upload/route.ts
-│       └── identify/route.ts     # OpenAI + scraping logic
-│
-├── components/
-│   ├── ui/                        # shadcn/ui components
-│   ├── UploadForm.tsx
-│   ├── Sidebar.tsx
-│   ├── Topbar.tsx
-│   └── AuthForm.tsx
-│
-├── lib/
-│   ├── auth.ts                    # NextAuth config
-│   ├── prisma.ts
-│   ├── stripe.ts
-│   ├── openai.ts
-│   └── scraper.ts
-│
-├── prisma/
-│   └── schema.prisma              # DB models
-│
-├── public/
-│   └── logo.png
-│
-├── styles/
-│   └── globals.css
-│
-├── .env.local                     # API keys, Stripe secrets
-├── middleware.ts                 # Role-based routing
-├── tailwind.config.ts
-├── postcss.config.js
-├── tsconfig.json
-├── next.config.js
-├── package.json
-└── README.md
-2. Install dependencies
-bash
-Copy
-Edit
-pnpm install
-# or
+- **Dual input** — Image upload and/or keyword search for part identification.
+- **AI analysis** — GPT-4o Vision and CrewAI for part recognition, specs, and alternatives.
+- **Procurement** — Pricing and supplier information with optional sharing and reporting.
+- **Subscriptions** — Free, Pro, and Enterprise tiers via Stripe; usage and credits.
+- **Dashboard** — History, profile, settings, notifications, and (optional) onboarding.
+- **Admin** — User and plan management, system analytics, audit logs, AI model config, payments, email/SMTP.
+- **PWA** — Installable app and offline-ready shell (Workbox).
+- **Responsive** — Mobile-first UI with dark mode and accessibility considerations.
+
+---
+
+## Prerequisites
+
+- **Node.js** 18+ (LTS recommended; see `.nvmrc` if using nvm)
+- **npm** or **pnpm**
+- **Supabase** project (database, auth, storage)
+- **Clerk** application (auth)
+- **Stripe** account (products and webhooks)
+- **Python 3.10+** (for `ai-analysis-crew` service)
+- **OpenAI** API key (for GPT-4o Vision)
+
+---
+
+## Quick Start
+
+### 1. Clone and install
+
+```bash
+git clone <repository-url>
+cd SpareFinder.org
 npm install
-3. Set up environment variables
-Create a .env.local file and configure:
+```
 
-env
-Copy
-Edit
-DATABASE_URL=postgresql://...
-NEXTAUTH_SECRET=your_secret
-NEXTAUTH_URL=http://localhost:3000
-OPENAI_API_KEY=your_openai_key
-STRIPE_SECRET_KEY=your_stripe_key
-STRIPE_WEBHOOK_SECRET=your_webhook_secret
-UPLOADTHING_SECRET=your_uploadthing_key
-4. Setup Prisma & DB
-bash
-Copy
-Edit
-npx prisma migrate dev --name init
-npx prisma generate
-5. Run locally
-bash
-Copy
-Edit
-pnpm dev
-# or
+### 2. Environment
+
+Copy the example env and set required variables:
+
+```bash
+cp .env.example .env
+```
+
+Edit `.env` and configure at least:
+
+- `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`
+- `VITE_CLERK_PUBLISHABLE_KEY`
+- `VITE_AI_CREW_API_URL` (e.g. `http://localhost:8000` for local crew service)
+- `VITE_API_URL` if using a separate backend API
+
+See `.env.example` and `env.template` for all supported keys (Stripe, OAuth, etc.).
+
+### 3. Run frontend
+
+```bash
 npm run dev
-🧪 Testing Stripe Webhooks (optional)
-Use Stripe CLI to test locally:
+```
 
-bash
-Copy
-Edit
-stripe listen --forward-to localhost:3000/api/webhooks/stripe
-🌐 Live Demo
-Coming soon! Deployed on Vercel
+Open the URL shown (e.g. `http://localhost:5173`).
 
-🛡 License
-MIT License. Feel free to use and customize for personal/commercial projects.
+### 4. Run AI analysis service (optional, for full flow)
 
-💡 Future Features
-PDF report generation from results
+See `ai-analysis-crew/` for Python env setup and running the CrewAI + GPT-4o Vision service (e.g. on port 8000). Point `VITE_AI_CREW_API_URL` to that URL.
 
-Parts inventory management
+---
 
-Team/Org accounts
+## Scripts
 
-AI confidence scoring + explainability
+| Command              | Description                |
+|----------------------|----------------------------|
+| `npm run dev`        | Start Vite dev server      |
+| `npm run build`      | Production build           |
+| `npm run build:dev`  | Build in development mode  |
+| `npm run preview`    | Preview production build   |
+| `npm run lint`       | Run ESLint                 |
+| `npm run test`       | Run Jest tests             |
+| `npm run test:watch` | Jest in watch mode         |
+| `npm run test:coverage` | Jest with coverage    |
 
-Marketplace integration (Amazon/eBay)
+---
 
-🧠 Powered By
-Next.js
+## Project Structure
 
-OpenAI GPT-4o
+```
+├── src/
+│   ├── App.tsx              # Root app, routing, providers
+│   ├── main.tsx
+│   ├── components/          # Shared UI (Header, Footer, layouts, admin, billing, etc.)
+│   ├── contexts/            # Auth, theme, subscription, dashboard layout
+│   ├── hooks/               # useFileUpload, useAuthGuard, useProfileData, etc.
+│   ├── lib/                 # API client, Supabase, config, utils
+│   ├── pages/               # Route-level pages (Landing, Dashboard, Upload, History, Billing, Admin, …)
+│   ├── services/            # AI crew client, analysis jobs, keepAlive
+│   ├── styles/              # Global CSS, variables, overrides
+│   └── types/
+├── public/                  # Static assets, favicon, manifest, illustrations
+├── ai-analysis-crew/        # Python CrewAI + FastAPI service (part analysis, WebSocket)
+├── docs/                    # Setup guides, deployment, Supabase
+├── supabase/                # Supabase config
+├── netlify/                 # Netlify redirects/functions if used
+├── index.html
+├── vite.config.ts
+├── tailwind.config.ts
+├── tsconfig.json
+├── .env.example
+├── env.template
+└── README.md
+```
 
-Stripe
+- **Frontend** lives in `src/`; entry is `index.html` + `src/main.tsx`.
+- **AI pipeline** and API are in `ai-analysis-crew/` (separate repo/service in production).
+- **Database migrations and one-off SQL** are in repo root and `docs/`; for production, prefer a migration strategy (e.g. Supabase migrations or versioned SQL in a single place).
 
-Prisma
+---
 
-UploadThing
+## Deployment
 
-ScraperAPI
+- **Frontend:** Build with `npm run build`; deploy the `dist/` output to Netlify, Vercel, or Render static. Set env vars in the host’s dashboard.
+- **AI service:** Deploy `ai-analysis-crew/` (e.g. Render, Docker) and set `VITE_AI_CREW_API_URL` (and WS URL) in the frontend env.
+- **Stripe:** Configure webhook endpoint for your production API; use Stripe CLI for local testing.
+- **Clerk:** Set production redirect URLs and keys in Clerk and in `.env`.
+- See `docs/`, `DEPLOYMENT_GUIDE.md`, and `RENDER_DEPLOYMENT_GUIDE.md` for host-specific steps.
+
+---
+
+## Security and Compliance
+
+- **Secrets:** Never commit `.env`; use `.env.example` / `env.template` as references. Rotate API keys and webhook secrets per environment.
+- **Auth:** Clerk handles sign-in and sessions; protect admin routes with `AdminProtectedRoute` and role checks.
+- **API:** Run AI and any BFF behind HTTPS; restrict CORS and rate limits in production.
+- **Data:** Supabase RLS and policies govern access to user and admin data; review and audit regularly.
+
+---
+
+## Documentation
+
+- **Setup:** `docs/supabase-setup-guide.md`, `docs/supabase-setup.md`, `README-BACKEND-SETUP.md`
+- **Deployment:** `DEPLOYMENT_GUIDE.md`, `RENDER_DEPLOYMENT_GUIDE.md`, `deploy.md`
+- **AI / Crew:** `AI_CREW_INTEGRATION_GUIDE.md`, `CREW_ANALYSIS_QUICKSTART.md`, `QUICKSTART_AI_CREW.md`
+- **Admin:** `ADMIN_ACCESS_GUIDE.md`, `ADMIN_DASHBOARD_IMPLEMENTATION.md`, `ADMIN_LOGIN_SYSTEM.md`
+
+---
+
+## License
+
+MIT. Use and adapt for internal or commercial projects; comply with third-party licenses (Clerk, Stripe, OpenAI, etc.).
+
+---
+
+## Support
+
+For bugs, feature requests, or deployment help, open an issue in the repository or contact the maintainers.
