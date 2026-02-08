@@ -243,7 +243,7 @@ const Footer = () => {
             className="flex flex-col items-center space-y-4 text-center sm:flex-row sm:space-x-8 sm:space-y-0 sm:text-left"
           >
             <span className="font-medium text-muted-foreground dark:text-gray-400">
-              © 2025 SpareFinder. All rights reserved.
+              © {new Date().getFullYear()} SpareFinder. All rights reserved.
             </span>
             <div className="flex space-x-6">
               <Link
