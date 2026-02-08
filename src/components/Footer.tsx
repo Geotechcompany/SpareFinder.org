@@ -197,14 +197,19 @@ const Footer = () => {
               {/* Social Links */}
               <div className="flex space-x-4 pt-4">
                 {[
-                  { name: 'GitHub', icon: '🔗', color: 'from-gray-600 to-gray-700' },
-                  { name: 'LinkedIn', icon: '💼', color: 'from-blue-600 to-blue-700' },
-                  { name: 'Twitter', icon: '🐦', color: 'from-cyan-500 to-blue-500' },
-                  { name: 'Discord', icon: '💬', color: 'from-indigo-600 to-purple-600' }
+                  { name: 'Facebook', href: 'https://www.facebook.com/profile.php?id=61587451379309', icon: '📘', color: 'from-blue-600 to-blue-700' },
+                  { name: 'YouTube', href: 'https://www.youtube.com/channel/UCc2v9MyXcFttk-EH3SYer7g', icon: '▶️', color: 'from-red-600 to-red-700' },
+                  { name: 'LinkedIn', href: 'https://www.linkedin.com/company/sparefinder', icon: '💼', color: 'from-blue-700 to-blue-800' },
+                  { name: 'Twitter', href: 'https://twitter.com/SpareFinder', icon: '🐦', color: 'from-cyan-500 to-blue-500' },
+                  { name: 'GitHub', href: '#', icon: '🔗', color: 'from-gray-600 to-gray-700' },
+                  { name: 'Discord', href: '#', icon: '💬', color: 'from-indigo-600 to-purple-600' }
                 ].map((social) => (
                   <motion.a
                     key={social.name}
-                    href="#"
+                    href={social.href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label={social.name}
                     className={`flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-r ${social.color} text-white font-semibold shadow-lg transition-transform duration-300 hover:scale-110`}
                     whileHover={{ y: -2 }}
                     whileTap={{ scale: 0.95 }}
