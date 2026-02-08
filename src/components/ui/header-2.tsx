@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 import { MenuToggleIcon } from "@/components/ui/menu-toggle-icon";
 import { useScroll } from "@/components/ui/use-scroll";
 import ThemeToggle from "@/components/ThemeToggle";
-import { X } from "lucide-react";
+import { MobileMenuSidebar } from "@/components/MobileMenuSidebar";
 import {
   NavigationMenu,
   NavigationMenuList,
@@ -35,21 +35,10 @@ export function Header() {
     { label: "Contact", href: "/contact" },
   ];
 
-  React.useEffect(() => {
-    if (open) {
-      document.body.style.overflow = "hidden";
-    } else {
-      document.body.style.overflow = "";
-    }
-    return () => {
-      document.body.style.overflow = "";
-    };
-  }, [open]);
-
   return (
     <header
       className={cn(
-        "sticky top-0 z-50 mx-auto w-full max-w-5xl rounded-none border-b border-border/70 bg-background/90 text-foreground backdrop-blur-xl md:rounded-[15px] md:border md:transition-all md:ease-out",
+        "sticky top-0 z-[100] mx-auto w-full max-w-5xl rounded-none border-b border-border/70 bg-background/90 text-foreground backdrop-blur-xl md:rounded-[15px] md:border md:transition-all md:ease-out",
         scrolled && !open && "md:top-4 md:max-w-4xl md:shadow-soft-elevated",
         open && "shadow-soft-elevated",
         scrolled &&
@@ -163,124 +152,20 @@ export function Header() {
           size="icon"
           variant="outline"
           onClick={() => setOpen(!open)}
-          className="flex shrink-0 lg:hidden [@media(pointer:coarse)]:flex"
+          className="inline-flex h-10 w-10 shrink-0 touch-manipulation lg:hidden [@media(pointer:coarse)]:inline-flex"
           aria-label={open ? "Close menu" : "Open menu"}
         >
           <MenuToggleIcon open={open} className="size-5" duration={300} />
         </Button>
       </nav>
 
-      {/* Mobile menu overlay: full-screen below header; below lg or on touch devices */}
-      <div
-        className={cn(
-          "fixed inset-0 top-14 z-[100] overflow-y-auto border-y border-border bg-background text-foreground backdrop-blur-xl lg:!hidden [@media(pointer:coarse)]:!block",
-          open ? "flex flex-col" : "hidden"
-        )}
-        aria-hidden={!open}
-      >
-        <div
-          data-slot={open ? "open" : "closed"}
-          className={cn(
-            "data-[slot=open]:animate-in data-[slot=open]:zoom-in-95 data-[slot=closed]:animate-out data-[slot=closed]:zoom-out-95 ease-out",
-            "flex min-h-full w-full flex-col justify-between gap-y-2 p-4"
-          )}
-        >
-          <div className="flex items-center justify-between border-b border-border/70 pb-3">
-            <span className="text-sm font-medium text-foreground">Menu</span>
-            <Button
-              size="icon"
-              variant="ghost"
-              onClick={() => setOpen(false)}
-              aria-label="Close menu"
-              className="shrink-0"
-            >
-              <X className="size-5" />
-            </Button>
-          </div>
-          <div className="grid gap-y-2">
-            <span className="px-2 text-xs uppercase text-muted-foreground">
-              Platform
-            </span>
-            {platform.map((link) => (
-              <a
-                key={link.label}
-                className={buttonVariants({
-                  variant: "ghost",
-                  className: "justify-start",
-                })}
-                href={link.href}
-                onClick={() => setOpen(false)}
-              >
-                {link.label}
-              </a>
-            ))}
-            <span className="mt-2 px-2 text-xs uppercase text-muted-foreground">
-              Solutions
-            </span>
-            {solutions.map((link) => (
-              <a
-                key={link.label}
-                className={buttonVariants({
-                  variant: "ghost",
-                  className: "justify-start",
-                })}
-                href={link.href}
-                onClick={() => setOpen(false)}
-              >
-                {link.label}
-              </a>
-            ))}
-            <span className="mt-2 px-2 text-xs uppercase text-muted-foreground">
-              Resources
-            </span>
-            {resources.map((link) => (
-              <a
-                key={link.label}
-                className={buttonVariants({
-                  variant: "ghost",
-                  className: "justify-start",
-                })}
-                href={link.href}
-                onClick={() => setOpen(false)}
-              >
-                {link.label}
-              </a>
-            ))}
-            <a
-              href="/reviews"
-              className={buttonVariants({
-                variant: "ghost",
-                className: "justify-start mt-2",
-              })}
-              onClick={() => setOpen(false)}
-            >
-              Reviews
-            </a>
-          </div>
-          <div className="flex flex-col gap-2">
-            <a
-              href="/login"
-              className={cn(
-                buttonVariants({ variant: "outline" }),
-                "w-full text-center"
-              )}
-              onClick={() => setOpen(false)}
-            >
-              Sign In
-            </a>
-            <a
-              href="/register"
-              className={cn(
-                buttonVariants({}),
-                "w-full text-center bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white shadow-lg shadow-purple-500/25 hover:shadow-purple-500/40 transition-all duration-300"
-              )}
-              onClick={() => setOpen(false)}
-            >
-              Get Started
-            </a>
-          </div>
-        </div>
-      </div>
+      <MobileMenuSidebar
+        open={open}
+        onClose={() => setOpen(false)}
+        platform={platform}
+        solutions={solutions}
+        resources={resources}
+      />
     </header>
   );
 }

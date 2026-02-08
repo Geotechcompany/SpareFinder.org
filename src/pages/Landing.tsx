@@ -677,14 +677,14 @@ const Landing = () => {
                       <p className="text-xs text-muted-foreground/80 text-center">
                         By proceeding, you agree to our{" "}
                         <Link
-                          to="/terms"
+                          to="/terms-of-service"
                           className="underline hover:text-primary dark:hover:text-purple-400"
                         >
-                          Terms of Service
+                          Terms of Use
                         </Link>{" "}
                         and acknowledge our{" "}
                         <Link
-                          to="/privacy"
+                          to="/privacy-policy"
                           className="underline hover:text-primary dark:hover:text-purple-400"
                         >
                           Privacy Policy

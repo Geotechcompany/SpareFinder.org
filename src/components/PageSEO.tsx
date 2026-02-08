@@ -95,13 +95,13 @@ const pageConfigs: PageSEOConfig = {
     type: "website",
   },
   "/privacy-policy": {
-    title: "Privacy Policy - SpareFinder",
-    description: "Read SpareFinder's privacy policy to understand how we collect, use, and protect your personal information.",
+    title: "Data Protection & Privacy Policy - SpareFinder",
+    description: "Sparefinder.org Data Protection & Privacy Policy. How we collect, use, store, and protect your personal data under UK GDPR and the Data Protection Act 2018.",
     type: "article",
   },
   "/terms-of-service": {
-    title: "Terms of Service - SpareFinder",
-    description: "Read SpareFinder's terms of service to understand the terms and conditions for using our AI-powered spare parts identification platform.",
+    title: "Terms of Use - SpareFinder",
+    description: "Sparefinder.org Terms of Use. Terms governing your access to and use of the Service. Owned and operated by TPS E&P International Ltd.",
     type: "article",
   },
   "/api-docs": {

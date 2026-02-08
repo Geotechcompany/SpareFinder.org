@@ -117,7 +117,7 @@ export const InstallPrompt = () => {
   // iOS-specific instructions banner
   if (isIOS && !deferredPrompt) {
     return (
-      <div className="fixed top-0 left-0 right-0 z-[100] w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+      <div className="fixed top-0 left-0 right-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container mx-auto flex items-center justify-between gap-4 px-4 py-3">
           <div className="flex items-center gap-3 flex-1 min-w-0">
             <img
@@ -148,7 +148,7 @@ export const InstallPrompt = () => {
   // Standard install banner for Android/Desktop
   if (deferredPrompt) {
     return (
-      <div className="fixed top-0 left-0 right-0 z-[100] w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 shadow-sm">
+      <div className="fixed top-0 left-0 right-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 shadow-sm">
         <div className="container mx-auto flex items-center justify-between gap-4 px-4 py-3">
           <div className="flex items-center gap-3 flex-1 min-w-0">
             <img
