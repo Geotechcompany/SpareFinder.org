@@ -620,6 +620,53 @@ If you have any questions, contact us at support@sparefinder.org.
     return _send_billing_email(to_email=to_email, subject=subject, html=html, text=text)
 
 
+def send_unpaid_plan_canceled_email(
+    *,
+    to_email: str,
+    plan_name: str = "your plan",
+    billing_url: str = "https://sparefinder.org/dashboard/billing",
+) -> bool:
+    """
+    Send when a user's plan is canceled because no payment was on file
+    (e.g. they joined before Stripe webhooks or had a manually set plan).
+    """
+    subject = "Your SpareFinder plan was canceled – add payment to continue"
+    text = f"""Hi,
+
+Your SpareFinder {plan_name} has been canceled because we don't have a valid payment on file. To continue using paid features, please subscribe again with a payment method.
+
+Subscribe here: {billing_url}
+
+If you have any questions, contact us at support@sparefinder.org.
+
+— SpareFinder
+"""
+    body = f"""
+      <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
+        <tr>
+          <td style="text-align: center; padding-bottom: 16px;">
+            <span style="display: inline-block; width: 52px; height: 52px; line-height: 52px; font-size: 24px; background: #64748b; border-radius: 50%; color: #fff;">📋</span>
+          </td>
+        </tr>
+        <tr>
+          <td>
+            <h2 style="margin: 0 0 8px 0; font-size: 20px; font-weight: 700; color: #0f172a;">Plan canceled</h2>
+            <p style="margin: 0; font-size: 15px; color: #475569; line-height: 1.6;">Your <strong>{plan_name}</strong> was canceled because we don't have a valid payment on file. Subscribe again with a payment method to restore access.</p>
+          </td>
+        </tr>
+        <tr><td height="16"></td></tr>
+        <tr>
+          <td style="background: #f1f5f9; border-radius: 8px; padding: 16px; border-left: 4px solid #64748b;">
+            <p style="margin: 0 0 8px 0; font-size: 13px; font-weight: 600; color: #334155;">Subscribe to continue</p>
+            <p style="margin: 0 0 12px 0; font-size: 14px; color: #475569; line-height: 1.5;">Add a payment method to get back full access to part identification, supplier info, and more.</p>
+            <a href="{billing_url}" style="display: inline-block; padding: 10px 18px; background: #6366f1; color: #fff; text-decoration: none; font-weight: 600; font-size: 14px; border-radius: 8px;">Go to billing</a>
+          </td>
+        </tr>
+      </table>"""
+    html = _wrap_subscription_email(body, billing_url)
+    return _send_billing_email(to_email=to_email, subject=subject, html=html, text=text)
+
+
 def send_email_with_attachment(
     to_email: str,
     subject: str,
