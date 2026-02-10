@@ -222,17 +222,19 @@ async def get_my_ticket(
     """Get one ticket by id (must belong to current user)."""
     try:
         supabase = get_supabase_admin()
+        # Use .limit(1) instead of .single() so PostgREST client returns a list; .single() with a row
+        # that has a "message" column makes the client treat the response as an API error.
         res = (
             supabase.table("support_tickets")
             .select("id, subject, message, status, priority, admin_notes, created_at, updated_at")
             .eq("id", ticket_id)
             .eq("user_id", user.id)
-            .single()
+            .limit(1)
             .execute()
         )
-        if not res.data:
+        if not res.data or len(res.data) == 0:
             raise HTTPException(status_code=404, detail="Ticket not found")
-        return api_ok(data=res.data)
+        return api_ok(data=res.data[0])
     except HTTPException:
         raise
     except Exception as e:

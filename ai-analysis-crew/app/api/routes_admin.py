@@ -1044,17 +1044,19 @@ async def admin_get_ticket(
     ticket_id: str,
     _admin: CurrentUser = Depends(require_roles("admin", "super_admin")),
 ):
+    # Use .limit(1) instead of .single() so PostgREST client returns a list; .single() with a row
+    # that has a "message" column makes the client treat the response as an API error.
     supabase = get_supabase_admin()
     res = (
         supabase.table("support_tickets")
         .select("id, user_id, subject, message, status, priority, admin_notes, created_at, updated_at")
         .eq("id", ticket_id)
-        .single()
+        .limit(1)
         .execute()
     )
-    if not res.data:
+    if not res.data or len(res.data) == 0:
         return api_error("Ticket not found", status_code=404)
-    ticket = res.data
+    ticket = res.data[0]
     uid = ticket.get("user_id")
     if uid:
         try:
