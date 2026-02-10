@@ -35,6 +35,7 @@ import AdminLogin from "@/pages/admin/AdminLogin";
 import AdminProtectedRoute from "@/components/AdminProtectedRoute";
 import OnboardingSurveys from "@/pages/admin/OnboardingSurveys";
 import PlansManagement from "@/pages/admin/PlansManagement";
+import TicketManagement from "@/pages/admin/TicketManagement";
 
 import Landing from "@/pages/Landing";
 import PrivacyPolicy from "@/pages/PrivacyPolicy";
@@ -47,6 +48,7 @@ import Unauthorized from "@/pages/Unauthorized";
 import ForgotPassword from "@/pages/ForgotPassword";
 import Contact from "@/pages/Contact";
 import Reviews from "@/pages/Reviews";
+import Support from "@/pages/Support";
 import PublicReviews from "@/pages/PublicReviews";
 import DashboardLayout from "@/components/DashboardLayout";
 import SharedAnalysis from "@/pages/SharedAnalysis";
@@ -130,6 +132,7 @@ const App = () => (
                 <Route path="billing" element={<Billing />} />
                 <Route path="settings" element={<Settings />} />
                 <Route path="notifications" element={<Notifications />} />
+                <Route path="support" element={<Support />} />
                 <Route path="profile" element={<Profile />} />
               </Route>
               <Route
@@ -250,6 +253,14 @@ const App = () => (
                 element={
                   <AdminProtectedRoute>
                     <OnboardingSurveys />
+                  </AdminProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/tickets"
+                element={
+                  <AdminProtectedRoute>
+                    <TicketManagement />
                   </AdminProtectedRoute>
                 }
               />

@@ -19,7 +19,8 @@ import {
   Bell,
   UserCircle,
   Shield,
-  Star
+  Star,
+  Ticket
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
@@ -112,6 +113,7 @@ const DashboardSidebar: React.FC<SidebarProps> = ({ isCollapsed = false, onToggl
       items: [
         { href: "/dashboard/profile", icon: User, label: "Profile", description: "Your account" },
         { href: "/dashboard/billing", icon: CreditCard, label: "Billing", description: "Subscription" },
+        { href: "/dashboard/support", icon: Ticket, label: "Support", description: "Help & tickets" },
         { href: "/dashboard/settings", icon: Settings, label: "Settings", description: "Preferences" },
       ],
     },

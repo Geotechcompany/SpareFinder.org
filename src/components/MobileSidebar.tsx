@@ -15,7 +15,8 @@ import {
   User,
   Bell,
   CreditCard,
-  Star
+  Star,
+  Ticket
 } from 'lucide-react';
 
 interface MobileSidebarProps {
@@ -68,6 +69,7 @@ const MobileSidebar: React.FC<MobileSidebarProps> = ({ isOpen, onClose }) => {
       items: [
         { href: "/dashboard/profile", icon: User, label: "Profile", description: "Your account" },
         { href: "/dashboard/billing", icon: CreditCard, label: "Billing", description: "Subscription" },
+        { href: "/dashboard/support", icon: Ticket, label: "Support", description: "Help & tickets" },
         { href: "/dashboard/settings", icon: Settings, label: "Settings", description: "Preferences" },
       ],
     },

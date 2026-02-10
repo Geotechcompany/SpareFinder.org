@@ -40,6 +40,7 @@ import {
   Clock,
   Eye,
   Tag,
+  Ticket,
 } from "lucide-react";
 
 interface AdminSidebarProps {
@@ -165,6 +166,14 @@ const AdminDesktopSidebar: React.FC<AdminSidebarProps> = ({
       description: "Manage system users",
       badge:
         adminStats.totalUsers > 0 ? adminStats.totalUsers.toString() : null,
+      section: "Core",
+    },
+    {
+      href: "/admin/tickets",
+      label: "Support tickets",
+      icon: Ticket,
+      description: "User support tickets",
+      badge: null,
       section: "Core",
     },
     {

@@ -972,6 +972,66 @@ export const adminApi = {
     );
     return response.data;
   },
+
+  getTickets: async (
+    page: number = 1,
+    limit: number = 50,
+    status?: string
+  ): Promise<ApiResponse<{ tickets: any[]; pagination: { total: number; page: number; limit: number; pages: number } }>> => {
+    const params = new URLSearchParams();
+    params.append("page", String(page));
+    params.append("limit", String(limit));
+    if (status && status.trim()) params.append("status", status.trim());
+    const response = await apiClient.get(`/admin/tickets?${params.toString()}`);
+    return response.data;
+  },
+
+  getTicket: async (ticketId: string): Promise<ApiResponse> => {
+    const response = await apiClient.get(`/admin/tickets/${ticketId}`);
+    return response.data;
+  },
+
+  updateTicket: async (
+    ticketId: string,
+    payload: { status?: string; admin_notes?: string }
+  ): Promise<ApiResponse> => {
+    const response = await apiClient.patch(`/admin/tickets/${ticketId}`, payload);
+    return response.data;
+  },
+};
+
+// Tickets API (user support)
+export const ticketsApi = {
+  create: async (payload: {
+    subject: string;
+    message: string;
+    priority?: "low" | "medium" | "high";
+  }): Promise<ApiResponse> => {
+    const response = await apiClient.post("/tickets", {
+      subject: payload.subject,
+      message: payload.message,
+      priority: payload.priority || "medium",
+    });
+    return response.data;
+  },
+
+  list: async (
+    page: number = 1,
+    limit: number = 20,
+    status?: string
+  ): Promise<ApiResponse<{ tickets: any[]; total: number; page: number; limit: number }>> => {
+    const params = new URLSearchParams();
+    params.append("page", String(page));
+    params.append("limit", String(limit));
+    if (status && status.trim()) params.append("status", status.trim());
+    const response = await apiClient.get(`/tickets?${params.toString()}`);
+    return response.data;
+  },
+
+  get: async (ticketId: string): Promise<ApiResponse> => {
+    const response = await apiClient.get(`/tickets/${ticketId}`);
+    return response.data;
+  },
 };
 
 // Billing API
@@ -1799,6 +1859,7 @@ export const api = {
   contact: contactApi,
   reviews: reviewsApi,
   analysisReviews: analysisReviewsApi,
+  tickets: ticketsApi,
 };
 
 // Export individual APIs for backward compatibility

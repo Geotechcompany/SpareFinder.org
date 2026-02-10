@@ -584,10 +584,139 @@ const UserManagement = () => {
                 <TableSkeleton variant="detailed" rows={5} />
               ) : (
                 <>
+                  {/* Bulk actions bar */}
+                  {selectedIds.size > 0 && (
+                    <div className="flex flex-wrap items-center gap-3 py-3 px-4 mb-4 rounded-lg border border-border bg-muted/50 dark:bg-white/5 dark:border-white/10">
+                      <span className="text-sm font-medium text-foreground dark:text-white">
+                        {selectedIds.size} selected
+                      </span>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="border-border bg-background/80 text-foreground dark:bg-white/5 dark:border-white/10 dark:text-white"
+                            >
+                              Set role <ChevronDown className="w-4 h-4 ml-1" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="start" className="w-48">
+                            <DropdownMenuItem onClick={() => handleBulkSetRole("user")}>
+                              <User className="w-4 h-4 mr-2" />
+                              User
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleBulkSetRole("admin")}>
+                              <Shield className="w-4 h-4 mr-2" />
+                              Admin
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleBulkSetRole("super_admin")}>
+                              <Crown className="w-4 h-4 mr-2" />
+                              Super Admin
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="border-border bg-background/80 text-foreground dark:bg-white/5 dark:border-white/10 dark:text-white"
+                            >
+                              Set plan <ChevronDown className="w-4 h-4 ml-1" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="start" className="w-48">
+                            <DropdownMenuItem onClick={() => handleBulkSetPlan("no_plan")}>
+                              No plan
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleBulkSetPlan("free")}>
+                              Starter
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleBulkSetPlan("pro")}>
+                              Professional
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleBulkSetPlan("enterprise")}>
+                              Enterprise
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="border-red-500/50 text-red-600 hover:bg-red-500/10 hover:text-red-700 dark:text-red-400 dark:hover:bg-red-500/20"
+                          onClick={() => setBulkDeleteDialogOpen(true)}
+                        >
+                          <Trash2 className="w-4 h-4 mr-1" />
+                          Delete
+                        </Button>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="ml-auto text-muted-foreground hover:text-foreground"
+                        onClick={() => setSelectedIds(new Set())}
+                      >
+                        Clear selection
+                      </Button>
+                      {bulkActionLoading && (
+                        <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+                      )}
+                    </div>
+                  )}
+
+                  {/* Bulk delete confirmation dialog */}
+                  <AlertDialog open={bulkDeleteDialogOpen} onOpenChange={setBulkDeleteDialogOpen}>
+                    <AlertDialogContent className="border border-border bg-background/95 text-foreground dark:bg-gray-900 dark:border-white/10 dark:text-white">
+                      <AlertDialogHeader>
+                        <AlertDialogTitle className="text-foreground dark:text-white">
+                          Delete {selectedForBulkDelete.length} user{selectedForBulkDelete.length !== 1 ? "s" : ""}?
+                        </AlertDialogTitle>
+                        <AlertDialogDescription className="text-muted-foreground dark:text-gray-400">
+                          This action cannot be undone. Users and their data will be permanently removed.
+                          {currentUser?.id && selectedIds.has(currentUser.id) && (
+                            <span className="block mt-2 text-amber-600 dark:text-amber-400">
+                              Your own account is in the selection and will be excluded from deletion.
+                            </span>
+                          )}
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel className="border border-border bg-background/80 text-foreground hover:bg-accent dark:bg-white/5 dark:border-white/10 dark:text-white dark:hover:bg-white/10">
+                          Cancel
+                        </AlertDialogCancel>
+                        <AlertDialogAction
+                          onClick={handleBulkDelete}
+                          className="bg-red-600 hover:bg-red-700"
+                        >
+                          {bulkActionLoading ? (
+                            <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                          ) : null}
+                          Delete
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+
                   <div className="overflow-x-auto">
                     <Table>
                       <TableHeader>
                         <TableRow className="border-border/60 dark:border-white/10">
+                          <TableHead className="w-10 px-2">
+                            <Checkbox
+                              checked={
+                                users.length > 0
+                                  ? selectedIds.size === users.length
+                                    ? true
+                                    : selectedIds.size > 0
+                                    ? "indeterminate"
+                                    : false
+                                  : false
+                              }
+                              onCheckedChange={toggleSelectAll}
+                              aria-label="Select all on page"
+                            />
+                          </TableHead>
                           <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                             User
                           </TableHead>
@@ -614,7 +743,7 @@ const UserManagement = () => {
                       <TableBody>
                         {users.length === 0 ? (
                           <TableRow>
-                              <TableCell colSpan={7} className="py-8 text-center">
+                              <TableCell colSpan={8} className="py-8 text-center">
                               <div className="text-muted-foreground">
                                 {searchTerm || roleFilter !== "all" ? (
                                   <div>
@@ -643,6 +772,13 @@ const UserManagement = () => {
                                 key={user.id}
                                 className="hover:bg-muted/60 border-border/40 dark:border-white/10 dark:hover:bg-white/5"
                               >
+                                <TableCell className="w-10 px-2">
+                                  <Checkbox
+                                    checked={selectedIds.has(user.id)}
+                                    onCheckedChange={() => toggleUser(user.id)}
+                                    aria-label={`Select ${user.full_name || user.email}`}
+                                  />
+                                </TableCell>
                                 <TableCell>
                                   <div>
                                     <div className="font-medium text-foreground dark:text-white">

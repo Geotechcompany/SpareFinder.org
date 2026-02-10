@@ -990,6 +990,115 @@ async def admin_audit_logs(
     return {"success": True, "logs": transformed, "pagination": {"page": page, "limit": limit, "total": total, "pages": max(1, (total + limit - 1) // limit)}}
 
 
+# -----------------------
+# Support tickets (admin)
+# -----------------------
+
+
+@router.get("/tickets")
+async def admin_list_tickets(
+    page: int = Query(default=1, ge=1),
+    limit: int = Query(default=50, ge=1, le=200),
+    status: str | None = Query(default=None),
+    _admin: CurrentUser = Depends(require_roles("admin", "super_admin")),
+):
+    supabase = get_supabase_admin()
+    offset = (page - 1) * limit
+    q = (
+        supabase.table("support_tickets")
+        .select("id, user_id, subject, status, priority, created_at, updated_at", count="exact")
+        .order("created_at", desc=True)
+        .range(offset, offset + limit - 1)
+    )
+    if status and status.strip() and status.strip().lower() in ("open", "in_progress", "answered", "closed"):
+        q = q.eq("status", status.strip().lower())
+    res = q.execute()
+    tickets = res.data or []
+    total = _count_from_response(res, len(tickets))
+
+    # Enrich with profile (email, full_name)
+    user_ids = list({t.get("user_id") for t in tickets if t.get("user_id")})
+    profiles_by_id: dict[str, dict[str, Any]] = {}
+    if user_ids:
+        try:
+            pr = supabase.table("profiles").select("id, email, full_name").in_("id", user_ids).execute()
+            for p in (pr.data or []):
+                uid = p.get("id")
+                if uid:
+                    profiles_by_id[str(uid)] = p
+        except Exception:
+            pass
+    for t in tickets:
+        t["profile"] = profiles_by_id.get(str(t.get("user_id") or ""))
+
+    return api_ok(
+        data={
+            "tickets": tickets,
+            "pagination": {"page": page, "limit": limit, "total": total, "pages": max(1, (total + limit - 1) // limit)},
+        }
+    )
+
+
+@router.get("/tickets/{ticket_id}")
+async def admin_get_ticket(
+    ticket_id: str,
+    _admin: CurrentUser = Depends(require_roles("admin", "super_admin")),
+):
+    supabase = get_supabase_admin()
+    res = (
+        supabase.table("support_tickets")
+        .select("id, user_id, subject, message, status, priority, admin_notes, created_at, updated_at")
+        .eq("id", ticket_id)
+        .single()
+        .execute()
+    )
+    if not res.data:
+        return api_error("Ticket not found", status_code=404)
+    ticket = res.data
+    uid = ticket.get("user_id")
+    if uid:
+        try:
+            pr = supabase.table("profiles").select("id, email, full_name, company").eq("id", uid).maybe_single().execute().data
+            ticket["profile"] = pr
+        except Exception:
+            ticket["profile"] = None
+    else:
+        ticket["profile"] = None
+    return api_ok(data=ticket)
+
+
+class AdminUpdateTicketBody(BaseModel):
+    status: Optional[str] = Field(default=None, pattern=r"^(open|in_progress|answered|closed)$")
+    admin_notes: Optional[str] = Field(default=None, max_length=10000)
+
+
+@router.patch("/tickets/{ticket_id}")
+async def admin_update_ticket(
+    ticket_id: str,
+    payload: AdminUpdateTicketBody,
+    _admin: CurrentUser = Depends(require_roles("admin", "super_admin")),
+):
+    supabase = get_supabase_admin()
+    updates: dict[str, Any] = {"updated_at": datetime.utcnow().isoformat()}
+    if payload.status is not None:
+        updates["status"] = payload.status
+    if payload.admin_notes is not None:
+        updates["admin_notes"] = payload.admin_notes
+    if len(updates) <= 1:
+        return api_error("No updates provided", status_code=400)
+    try:
+        res = (
+            supabase.table("support_tickets")
+            .update(updates)
+            .eq("id", ticket_id)
+            .select("id, subject, status, admin_notes, updated_at")
+            .execute()
+        )
+        if not res.data or len(res.data) == 0:
+            return api_error("Ticket not found", status_code=404)
+        return api_ok(data=res.data[0], message="Ticket updated")
+    except Exception as e:
+        return api_error(f"Failed to update ticket: {e}", status_code=500)
 
 
 
