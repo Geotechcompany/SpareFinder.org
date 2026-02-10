@@ -24,7 +24,8 @@ COPY requirements.txt .
 # Install Python dependencies (setuptools first and last so pkg_resources is available for CrewAI)
 RUN pip install --no-cache-dir --upgrade pip setuptools wheel
 RUN pip install --no-cache-dir --prefer-binary --retries 10 --timeout 120 -r requirements.txt
-RUN pip install --no-cache-dir "setuptools>=65.5.0"
+# Force setuptools so pkg_resources is available (app also stubs it if missing)
+RUN pip install --no-cache-dir --force-reinstall "setuptools>=65.5.0"
 
 # Copy application code
 COPY . .

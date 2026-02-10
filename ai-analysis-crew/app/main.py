@@ -29,6 +29,16 @@ warnings.filterwarnings('ignore', category=DeprecationWarning)
 # Disable CrewAI telemetry
 os.environ['OTEL_SDK_DISABLED'] = 'true'
 
+# Stub pkg_resources if missing (Render Docker image can lack setuptools; CrewAI telemetry imports it)
+try:
+    import pkg_resources  # noqa: F401
+except ImportError:
+    import sys
+    from types import SimpleNamespace
+    _dist = SimpleNamespace(version="0.80.0")
+    _stub = SimpleNamespace(get_distribution=lambda name: _dist)
+    sys.modules["pkg_resources"] = _stub
+
 # Setup logger
 logger = logging.getLogger(__name__)
 
