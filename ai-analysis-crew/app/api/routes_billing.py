@@ -19,6 +19,7 @@ from ..email_sender import (
     send_receipt_email,
     send_subscription_canceled_email,
     send_subscription_renewing_soon_email,
+    send_trial_ended_renew_email,
 )
 
 router = APIRouter(prefix="/billing", tags=["billing"])
@@ -718,5 +719,113 @@ async def cron_renewal_reminders():
             "errors": errors,
             "total_eligible": len(subs),
             "message": f"Renewal reminders: {sent} sent, {errors} errors.",
+        }
+    )
+
+
+@router.get("/cron/trial-ended")
+async def cron_trial_ended():
+    """
+    Cron: find users whose free trial has ended (status=trialing, current_period_end < now),
+    exclude admin/super_admin, set subscription to canceled, and send renewal email.
+    Call daily (e.g. cron-job.org). Does not touch admin accounts.
+    """
+    now = datetime.utcnow()
+    now_iso = now.strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
+    supabase = get_supabase_admin()
+    deactivated = 0
+    emails_sent = 0
+    errors = 0
+    skipped_admin = 0
+    try:
+        rows = (
+            supabase.table("subscriptions")
+            .select("id, user_id, tier, current_period_end, stripe_customer_id")
+            .eq("status", "trialing")
+            .lt("current_period_end", now_iso)
+            .execute()
+        )
+        subs = rows.data or []
+    except Exception as e:
+        return api_error(f"Failed to fetch trial-ended subscriptions: {e}", status_code=500)
+    if not subs:
+        return api_ok(
+            data={
+                "deactivated": 0,
+                "emails_sent": 0,
+                "errors": 0,
+                "skipped_admin": 0,
+                "message": "No trial-ended subscriptions found.",
+            }
+        )
+    user_ids = [s["user_id"] for s in subs if s.get("user_id")]
+    profiles_by_id = {}
+    admin_user_ids = set()
+    if user_ids:
+        try:
+            pr_res = (
+                supabase.table("profiles")
+                .select("id, email, role")
+                .in_("id", user_ids)
+                .execute()
+            )
+            for p in pr_res.data or []:
+                uid = p.get("id")
+                if uid:
+                    profiles_by_id[str(uid)] = p
+                    if str(p.get("role") or "").lower() in ("admin", "super_admin"):
+                        admin_user_ids.add(str(uid))
+        except Exception as e:
+            return api_error(f"Failed to fetch profiles: {e}", status_code=500)
+    for sub in subs:
+        user_id = sub.get("user_id")
+        if not user_id:
+            continue
+        uid_str = str(user_id)
+        if uid_str in admin_user_ids:
+            skipped_admin += 1
+            continue
+        sub_id = sub.get("id")
+        tier = sub.get("tier") or sub.get("plan_type") or "free"
+        try:
+            supabase.table("subscriptions").update({
+                "status": "canceled",
+                "updated_at": now.isoformat() + "Z",
+            }).eq("id", sub_id).execute()
+            deactivated += 1
+        except Exception as e:
+            errors += 1
+            continue
+        email = None
+        profile = profiles_by_id.get(uid_str)
+        if profile and (profile.get("email") or "").strip():
+            email = (profile["email"] or "").strip()
+        if not email and sub.get("stripe_customer_id"):
+            try:
+                cust = stripe.Customer.retrieve(sub["stripe_customer_id"])
+                email = (
+                    getattr(cust, "email", None)
+                    or (cust.get("email") if isinstance(cust, dict) else None)
+                    or ""
+                ).strip()
+            except Exception:
+                pass
+        if not email:
+            errors += 1
+            continue
+        try:
+            if send_trial_ended_renew_email(to_email=email, plan_name=tier or "free trial"):
+                emails_sent += 1
+            else:
+                errors += 1
+        except Exception as e:
+            errors += 1
+    return api_ok(
+        data={
+            "deactivated": deactivated,
+            "emails_sent": emails_sent,
+            "errors": errors,
+            "skipped_admin": skipped_admin,
+            "message": f"Trial ended: {deactivated} deactivated, {emails_sent} emails sent, {skipped_admin} admins skipped.",
         }
     )

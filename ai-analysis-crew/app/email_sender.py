@@ -574,6 +574,52 @@ You can manage or cancel your subscription here:
     return _send_billing_email(to_email=to_email, subject=subject, html=html, text=text)
 
 
+def send_trial_ended_renew_email(
+    *,
+    to_email: str,
+    plan_name: str = "free trial",
+    billing_url: str = "https://sparefinder.org/dashboard/billing",
+) -> bool:
+    """
+    Send when a user's free trial has ended. Ask them to renew/upgrade to keep access.
+    """
+    subject = "Your SpareFinder trial has ended – renew to continue"
+    text = f"""Hi,
+
+Your SpareFinder {plan_name} has ended. To keep using full access and features, please choose a plan and renew.
+
+Renew or upgrade here: {billing_url}
+
+If you have any questions, contact us at support@sparefinder.org.
+
+— SpareFinder
+"""
+    body = f"""
+      <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
+        <tr>
+          <td style="text-align: center; padding-bottom: 16px;">
+            <span style="display: inline-block; width: 52px; height: 52px; line-height: 52px; font-size: 24px; background: #f59e0b; border-radius: 50%; color: #fff;">⏱</span>
+          </td>
+        </tr>
+        <tr>
+          <td>
+            <h2 style="margin: 0 0 8px 0; font-size: 20px; font-weight: 700; color: #0f172a;">Your trial has ended</h2>
+            <p style="margin: 0; font-size: 15px; color: #475569; line-height: 1.6;">Your SpareFinder <strong>{plan_name}</strong> has ended. Renew or upgrade to continue using full access and features.</p>
+          </td>
+        </tr>
+        <tr><td height="16"></td></tr>
+        <tr>
+          <td style="background: #fffbeb; border-radius: 8px; padding: 16px; border-left: 4px solid #f59e0b;">
+            <p style="margin: 0 0 8px 0; font-size: 13px; font-weight: 600; color: #92400e;">Renew your plan</p>
+            <p style="margin: 0 0 12px 0; font-size: 14px; color: #b45309; line-height: 1.5;">Choose a plan and continue with full access to part identification, supplier info, and more.</p>
+            <a href="{billing_url}" style="display: inline-block; padding: 10px 18px; background: #6366f1; color: #fff; text-decoration: none; font-weight: 600; font-size: 14px; border-radius: 8px;">Renew or upgrade</a>
+          </td>
+        </tr>
+      </table>"""
+    html = _wrap_subscription_email(body, billing_url)
+    return _send_billing_email(to_email=to_email, subject=subject, html=html, text=text)
+
+
 def send_email_with_attachment(
     to_email: str,
     subject: str,
