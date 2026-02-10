@@ -4,10 +4,11 @@ from __future__ import annotations
 
 import os
 import logging
+import uuid
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from .auth_dependencies import CurrentUser, get_current_user
 from .responses import api_error, api_ok
@@ -27,8 +28,31 @@ def _env(name: str, default: str = "") -> str:
 
 class CreateTicketBody(BaseModel):
     subject: str = Field(min_length=1, max_length=200)
-    message: str = Field(min_length=10, max_length=5000)
+    message: str = Field(min_length=1, max_length=5000)
     priority: str = Field(default="medium", pattern=r"^(low|medium|high)$")
+
+    @field_validator("subject", "message", mode="before")
+    @classmethod
+    def strip_strings(cls, v: object) -> str:
+        if v is None:
+            return ""
+        return str(v).strip()
+
+    @field_validator("priority", mode="before")
+    @classmethod
+    def normalize_priority(cls, v: object) -> str:
+        if v is None or (isinstance(v, str) and not v.strip()):
+            return "medium"
+        s = str(v).strip().lower()
+        if s in ("low", "medium", "high"):
+            return s
+        return "medium"
+
+    @model_validator(mode="after")
+    def message_min_length(self) -> "CreateTicketBody":
+        if len(self.message) < 10:
+            raise ValueError("Message must be at least 10 characters")
+        return self
 
 
 # ---------- Notify all admins of new ticket ----------
@@ -124,18 +148,26 @@ async def create_ticket(
     """Create a new support ticket. Notifies admin by email."""
     try:
         supabase = get_supabase_admin()
+        ticket_id = str(uuid.uuid4())
         row = {
+            "id": ticket_id,
             "user_id": user.id,
             "subject": payload.subject.strip(),
             "message": payload.message.strip(),
             "status": "open",
             "priority": payload.priority,
         }
-        res = supabase.table("support_tickets").insert(row).select("id, subject, status, created_at").execute()
-        if not res.data or len(res.data) == 0:
-            return api_error("Failed to create ticket", status_code=500)
-        ticket = res.data[0]
-        ticket_id = ticket.get("id")
+        res = supabase.table("support_tickets").insert(row).execute()
+        # Client may not return inserted row (e.g. no .select() after .insert()); use row + id
+        if res.data and len(res.data) > 0:
+            ticket = res.data[0]
+        else:
+            ticket = {
+                "id": ticket_id,
+                "subject": row["subject"],
+                "status": row["status"],
+                "created_at": None,
+            }
         if ticket_id:
             _notify_admin_new_ticket(
                 ticket_id=str(ticket_id),

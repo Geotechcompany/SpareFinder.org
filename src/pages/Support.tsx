@@ -128,15 +128,21 @@ const Support = () => {
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!createForm.subject.trim() || !createForm.message.trim()) {
+    const subject = createForm.subject.trim();
+    const message = createForm.message.trim();
+    if (!subject || !message) {
       toast.error("Subject and message are required");
+      return;
+    }
+    if (message.length < 10) {
+      toast.error("Message must be at least 10 characters");
       return;
     }
     setSubmitting(true);
     try {
       const res = await api.tickets.create({
-        subject: createForm.subject.trim(),
-        message: createForm.message.trim(),
+        subject,
+        message,
         priority: createForm.priority,
       });
       if (res?.success) {
