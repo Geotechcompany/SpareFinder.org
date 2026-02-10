@@ -349,6 +349,8 @@ async def root():
         "version": "2.0.0",
         "endpoints": {
             "health": "/health",
+            "api_health": "/api/health",
+            "ping": "/ping",
             "websocket": "/ws/progress"
         }
     }
@@ -356,12 +358,28 @@ async def root():
 
 @app.get("/health")
 async def health():
-    """Health check endpoint for monitoring."""
+    """Health check endpoint for Render and monitoring."""
     return {
         "status": "healthy",
         "service": "AI Spare Part Analyzer API",
-        "timestamp": datetime.now().isoformat()
+        "timestamp": datetime.now().isoformat(),
     }
+
+
+@app.get("/api/health")
+async def api_health():
+    """Health check under /api for consistency. Use for keep-alive pings."""
+    return {
+        "status": "healthy",
+        "service": "AI Spare Part Analyzer API",
+        "timestamp": datetime.now().isoformat(),
+    }
+
+
+@app.get("/ping")
+async def ping():
+    """Minimal keep-alive endpoint. Ping every 14 min (e.g. cron) to keep Render service active."""
+    return {"ok": True}
 
 
 class EmailProxyRequest(BaseModel):

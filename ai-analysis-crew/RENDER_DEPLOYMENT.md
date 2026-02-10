@@ -118,9 +118,15 @@ git push
 
 ### Health Check
 
-Endpoint: `GET /health`
+Endpoints (use any for monitoring or keep-alive):
 
-Response:
+| Endpoint | Use |
+|----------|-----|
+| `GET /health` | Render health check, monitoring |
+| `GET /api/health` | Same as above, under `/api` |
+| `GET /ping` | Minimal keep-alive (e.g. cron every 14 min) |
+
+Response (for `/health` and `/api/health`):
 ```json
 {
   "status": "healthy",
@@ -128,6 +134,8 @@ Response:
   "timestamp": "2025-11-01T20:15:30.123456"
 }
 ```
+
+**Keep Render service active (free tier):** To avoid spin-down from inactivity, ping one of the above URLs every 10–14 minutes using [cron-job.org](https://cron-job.org) or similar. Example: `GET https://YOUR_RENDER_URL/ping`.
 
 ### WebSocket Support
 
