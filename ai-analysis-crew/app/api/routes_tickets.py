@@ -31,7 +31,32 @@ class CreateTicketBody(BaseModel):
     priority: str = Field(default="medium", pattern=r"^(low|medium|high)$")
 
 
-# ---------- Notify admin of new ticket ----------
+# ---------- Notify all admins of new ticket ----------
+
+
+def _get_admin_emails() -> list[str]:
+    """Return list of email addresses for all admin and super_admin profiles."""
+    fallback = _env("ADMIN_NOTIFY_EMAIL") or _env("CONTACT_TO_EMAIL") or ""
+    try:
+        supabase = get_supabase_admin()
+        res = (
+            supabase.table("profiles")
+            .select("email")
+            .in_("role", ["admin", "super_admin"])
+            .execute()
+        )
+        emails = []
+        for row in (res.data or []):
+            e = (row.get("email") or "").strip()
+            if e and "@" in e and e not in emails:
+                emails.append(e)
+        if emails:
+            return emails
+    except Exception as e:
+        logger.warning("Could not fetch admin emails from profiles: %s", e)
+    if fallback:
+        return [fallback]
+    return []
 
 
 def _notify_admin_new_ticket(
@@ -43,12 +68,12 @@ def _notify_admin_new_ticket(
     user_name: str | None,
     priority: str,
 ) -> None:
-    """Send email to admin when a new support ticket is created."""
-    to_email = _env("ADMIN_NOTIFY_EMAIL") or _env("CONTACT_TO_EMAIL") or ""
-    if not to_email:
-        logger.warning("ADMIN_NOTIFY_EMAIL / CONTACT_TO_EMAIL not set; skipping new-ticket notification")
+    """Send new-ticket notification email to all admins (and fallback address if no admins in DB)."""
+    admin_emails = _get_admin_emails()
+    if not admin_emails:
+        logger.warning("No admin emails found (profiles with role admin/super_admin or ADMIN_NOTIFY_EMAIL); skipping new-ticket notification")
         return
-    frontend = _env("FRONTEND_URL", "https://app.sparefinder.org").rstrip("/")
+    frontend = _env("FRONTEND_URL", "https://sparefinder.org").rstrip("/")
     admin_tickets_url = f"{frontend}/admin/tickets"
     try:
         from ..email_sender import send_basic_email_smtp, send_email_via_email_service
@@ -73,13 +98,17 @@ def _notify_admin_new_ticket(
             f"{message[:2000]}\n\n"
             f"Open tickets: {admin_tickets_url}\n"
         )
-        ok = send_basic_email_smtp(to_email=to_email, subject=subject_email, html=html, text=text)
-        if not ok:
-            ok = send_email_via_email_service(to_email=to_email, subject=subject_email, html=html, text=text)
-        if ok:
-            logger.info("Admin notified of new ticket %s", ticket_id)
+        sent = 0
+        for to_email in admin_emails:
+            ok = send_basic_email_smtp(to_email=to_email, subject=subject_email, html=html, text=text)
+            if not ok:
+                ok = send_email_via_email_service(to_email=to_email, subject=subject_email, html=html, text=text)
+            if ok:
+                sent += 1
+        if sent:
+            logger.info("New ticket %s notification sent to %d admin(s)", ticket_id, sent)
         else:
-            logger.warning("Failed to send new-ticket notification email")
+            logger.warning("Failed to send new-ticket notification to any admin")
     except Exception as e:
         logger.exception("Error sending new-ticket notification: %s", e)
 
