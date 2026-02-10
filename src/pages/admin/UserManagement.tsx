@@ -215,22 +215,32 @@ const UserManagement = () => {
     }
   };
 
+  const VALID_TIERS = ["free", "pro", "enterprise", "no_plan"] as const;
+
   const handlePlanUpdate = async (
     userId: string,
-    newTier: "free" | "pro" | "enterprise"
+    newTier: "free" | "pro" | "enterprise" | "no_plan"
   ) => {
+    if (!newTier || !VALID_TIERS.includes(newTier)) return;
     try {
       const response = await api.admin.updateUserPlan(userId, newTier);
 
       if (response.success) {
+        const isNoPlan = newTier === "no_plan";
         toast({
           title: "Plan Updated",
-          description: "User plan has been updated successfully.",
+          description: isNoPlan
+            ? "User has been set to no plan."
+            : "User plan has been updated successfully.",
         });
         setUsers((prev) =>
           prev.map((u) =>
             u.id === userId
-              ? { ...u, subscription_tier: newTier, subscription_status: "active" }
+              ? {
+                  ...u,
+                  subscription_tier: isNoPlan ? "free" : newTier,
+                  subscription_status: isNoPlan ? "canceled" : "active",
+                }
               : u
           )
         );
@@ -519,11 +529,15 @@ const UserManagement = () => {
                                 </TableCell>
                                 <TableCell>
                                   <Select
-                                    value={user.subscription_tier || "free"}
+                                    value={
+                                      user.subscription_status === "canceled"
+                                        ? "no_plan"
+                                        : (user.subscription_tier || "free")
+                                    }
                                     onValueChange={(value) =>
                                       handlePlanUpdate(
                                         user.id,
-                                        value as "free" | "pro" | "enterprise"
+                                        value as "free" | "pro" | "enterprise" | "no_plan"
                                       )
                                     }
                                   >
@@ -531,6 +545,9 @@ const UserManagement = () => {
                                       <SelectValue placeholder="Plan" />
                                     </SelectTrigger>
                                     <SelectContent>
+                                      <SelectItem value="no_plan">
+                                        No plan
+                                      </SelectItem>
                                       <SelectItem value="free">
                                         Starter
                                       </SelectItem>

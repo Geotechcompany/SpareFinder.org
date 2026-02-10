@@ -9,8 +9,8 @@ export const PlanRequiredCard: React.FC<{
   title?: string;
   description?: string;
 }> = ({
-  title = "Activate a plan to continue",
-  description = "Start a free trial or subscribe to unlock uploads, history, reviews, and analytics.",
+  title = "No active plan",
+  description = "You have no active plan. Select a plan to get started and unlock uploads, history, reviews, and analytics.",
 }) => {
   const navigate = useNavigate();
   const { user, isLoading } = useAuth();
@@ -54,7 +54,7 @@ export const PlanRequiredCard: React.FC<{
                 }}
                 className="w-full sm:w-auto bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 shadow-lg shadow-purple-500/20"
               >
-                Choose a plan / start trial
+                Select a plan
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
               <Button

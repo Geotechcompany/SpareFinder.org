@@ -843,7 +843,7 @@ export const adminApi = {
 
   updateUserPlan: async (
     userId: string,
-    tier: "free" | "pro" | "enterprise"
+    tier: "free" | "pro" | "enterprise" | "no_plan"
   ): Promise<ApiResponse> => {
     const response = await apiClient.patch(`/admin/users/${userId}/plan`, {
       tier,

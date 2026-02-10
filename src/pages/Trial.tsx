@@ -19,6 +19,8 @@ const Trial: React.FC = () => {
   const { user, isLoading } = useAuth();
   const [loadingTier, setLoadingTier] = useState<PlanTier | null>(null);
   const [loadingMode, setLoadingMode] = useState<"trial" | "paid" | null>(null);
+  const [trialUsed, setTrialUsed] = useState(false);
+  const [trialUsedLoading, setTrialUsedLoading] = useState(true);
 
   // Enforce post-signup onboarding before plan selection.
   React.useEffect(() => {
@@ -31,12 +33,35 @@ const Trial: React.FC = () => {
     }
   }, [isLoading, user, navigate]);
 
+  // Fetch whether user has already used a trial (one trial per account).
+  React.useEffect(() => {
+    let mounted = true;
+    api.billing
+      .getBillingInfo()
+      .then((res: any) => {
+        if (!mounted) return;
+        const data = res?.data ?? res;
+        setTrialUsed(Boolean(data?.trial_used));
+      })
+      .catch(() => {
+        if (mounted) setTrialUsed(false);
+      })
+      .finally(() => {
+        if (mounted) setTrialUsedLoading(false);
+      });
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
   const startCheckout = async (args: { tier: PlanTier; mode: "trial" | "paid" }) => {
     try {
       setLoadingTier(args.tier);
       setLoadingMode(args.mode);
       const selectedPlan = PLAN_CONFIG[args.tier];
-      const trialDays = args.mode === "trial" ? selectedPlan.trial?.days ?? 0 : 0;
+      // Backend also enforces one trial; pass 0 if user already used trial.
+      const trialDays =
+        args.mode === "trial" && !trialUsed ? selectedPlan.trial?.days ?? 0 : 0;
 
       const resp = (await api.billing.createCheckoutSession({
         plan: selectedPlan.name,
@@ -152,15 +177,21 @@ const Trial: React.FC = () => {
 
                   <div className="mt-5 space-y-3">
                     {hasTrial ? (
-                      <Button
-                        onClick={() => startCheckout({ tier, mode: "trial" })}
-                        disabled={loadingTier !== null}
-                        className="h-11 w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 shadow-lg shadow-purple-500/20"
-                      >
-                        {isTrialLoading
-                          ? "Redirecting…"
-                          : `Start ${plan.trial?.days}-day Free Trial`}
-                      </Button>
+                      trialUsed ? (
+                        <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-700 dark:text-amber-200">
+                          Trial already used. Subscribe below to get started.
+                        </div>
+                      ) : (
+                        <Button
+                          onClick={() => startCheckout({ tier, mode: "trial" })}
+                          disabled={loadingTier !== null || trialUsedLoading}
+                          className="h-11 w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 shadow-lg shadow-purple-500/20"
+                        >
+                          {isTrialLoading
+                            ? "Redirecting…"
+                            : `Start ${plan.trial?.days}-day Free Trial`}
+                        </Button>
+                      )
                     ) : (
                       <div className="rounded-xl border border-border bg-muted/40 p-3 text-sm text-muted-foreground">
                         Enterprise plans are provisioned with a custom agreement.
@@ -173,7 +204,7 @@ const Trial: React.FC = () => {
                       disabled={loadingTier !== null}
                       className="h-11 w-full"
                     >
-                      {isPaidLoading ? "Redirecting…" : "Continue without trial"}
+                      {isPaidLoading ? "Redirecting…" : trialUsed && hasTrial ? "Subscribe now" : "Continue without trial"}
                     </Button>
                   </div>
                 </div>

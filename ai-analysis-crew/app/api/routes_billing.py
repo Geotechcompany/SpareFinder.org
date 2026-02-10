@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import os
 from datetime import datetime, timedelta
-from typing import Any
+from typing import Any, Optional
 
 import stripe
 from fastapi import APIRouter, Depends, Request
@@ -121,6 +121,21 @@ async def get_billing_info(user: CurrentUser = Depends(get_current_user)):
                 "status": "active",
             }
 
+        # Whether user has already used a free trial (prevents second trial)
+        trial_used = False
+        try:
+            profile_row = (
+                supabase.table("profiles")
+                .select("trial_used")
+                .eq("id", user_id)
+                .limit(1)
+                .execute()
+            )
+            if profile_row.data and len(profile_row.data) > 0 and profile_row.data[0].get("trial_used"):
+                trial_used = True
+        except Exception:
+            pass
+
         # Usage data
         user_usage = usage or {
             "searches_count": 0,
@@ -153,6 +168,7 @@ async def get_billing_info(user: CurrentUser = Depends(get_current_user)):
         return api_ok(
             data={
                 "subscription": user_subscription,
+                "trial_used": trial_used,
                 "usage": {
                     "current_period": {
                         "searches": user_usage.get("searches_count", 0),
@@ -275,6 +291,7 @@ class CheckoutSessionRequest(BaseModel):
     billing_cycle: str = "monthly"
     success_url: str
     cancel_url: str
+    trial_days: Optional[int] = None
 
 
 @router.post("/checkout-session")
@@ -296,6 +313,23 @@ async def create_checkout_session(
             )
 
         stripe.api_key = stripe_secret_key
+
+        # Enforce one trial per user: if they already used a trial, do not grant another
+        trial_days = payload.trial_days or 0
+        if trial_days > 0:
+            try:
+                profile_row = (
+                    get_supabase_admin()
+                    .table("profiles")
+                    .select("trial_used")
+                    .eq("id", user.id)
+                    .limit(1)
+                    .execute()
+                )
+                if profile_row.data and len(profile_row.data) > 0 and profile_row.data[0].get("trial_used"):
+                    trial_days = 0
+            except Exception:
+                pass
 
         # Calculate price in pence/cents (Stripe uses smallest currency unit)
         amount_in_cents = int(payload.amount * 100)
@@ -377,6 +411,7 @@ async def create_checkout_session(
                         "plan": payload.plan,
                         "tier": tier,
                     },
+                    **({"trial_period_days": trial_days} if trial_days and trial_days > 0 else {}),
                 },
             )
 
@@ -455,14 +490,33 @@ async def stripe_webhook(request: Request):
             print("⚠️ successfully paid with Stripe but no plan was given in session metadata")
         tier = _plan_to_tier(plan or "")
         now = datetime.utcnow()
+        period_start = now
         period_end = datetime(now.year, now.month, now.day) + timedelta(days=30)
+        status = "active"
+        subscription_id = session.get("subscription")
+        if subscription_id:
+            try:
+                sub = stripe.Subscription.retrieve(subscription_id)
+                if sub.get("trial_end"):
+                    status = "trialing"
+                    if sub.get("current_period_start"):
+                        period_start = datetime.utcfromtimestamp(sub["current_period_start"])
+                    if sub.get("current_period_end"):
+                        period_end = datetime.utcfromtimestamp(sub["current_period_end"])
+                    # Mark trial as used so user cannot start another trial
+                    try:
+                        supabase.table("profiles").update({"trial_used": True}).eq("id", user_id).execute()
+                    except Exception as e:
+                        print(f"⚠️ Could not set trial_used for user {user_id}: {e}")
+            except stripe.error.StripeError as e:
+                print(f"⚠️ Could not retrieve subscription for trial check: {e}")
         payload = {
             "user_id": user_id,
             "tier": tier,
-            "status": "active",
+            "status": status,
             "stripe_customer_id": session.get("customer") or "",
-            "stripe_subscription_id": session.get("subscription") or "",
-            "current_period_start": now.isoformat(),
+            "stripe_subscription_id": subscription_id or "",
+            "current_period_start": period_start.isoformat(),
             "current_period_end": period_end.isoformat(),
             "cancel_at_period_end": False,
         }
@@ -479,7 +533,7 @@ async def stripe_webhook(request: Request):
                 supabase.table("subscriptions").update(payload).eq("id", row_id).execute()
             else:
                 supabase.table("subscriptions").insert(payload).execute()
-            print(f"✅ Subscription updated for user {user_id}, tier={tier} (plan={plan})")
+            print(f"✅ Subscription updated for user {user_id}, tier={tier}, status={status} (plan={plan})")
             # Send purchase confirmation email (modern SaaS)
             customer_email = (
                 session.get("customer_email")

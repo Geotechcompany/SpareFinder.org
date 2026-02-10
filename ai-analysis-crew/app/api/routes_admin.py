@@ -10,7 +10,7 @@ from email.utils import formataddr
 from typing import Any, Optional
 
 from fastapi import APIRouter, Body, Depends, Path, Query
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from .auth_dependencies import CurrentUser, require_roles
 from .errors import ApiError
@@ -188,7 +188,17 @@ async def admin_update_user_role(
 
 
 class UpdatePlanBody(BaseModel):
-    tier: str = Field(pattern=r"^(free|pro|enterprise)$")
+    tier: str = Field(pattern=r"^(free|pro|enterprise|no_plan)$")
+
+    @field_validator("tier", mode="before")
+    @classmethod
+    def normalize_tier(cls, v: object) -> str:
+        if v is None:
+            raise ValueError("tier is required")
+        s = str(v).strip().lower()
+        if s == "no plan":
+            return "no_plan"
+        return s
 
 
 @router.patch("/users/{userId}/plan")
@@ -197,54 +207,72 @@ async def admin_update_user_plan(
     payload: UpdatePlanBody = Body(...),
     _admin: CurrentUser = Depends(require_roles("admin", "super_admin")),
 ):
-    """Update a user's subscription plan (tier). Creates or updates the subscriptions row."""
+    """Update a user's subscription plan (tier). Use 'no_plan' to cancel and set to free."""
     supabase = get_supabase_admin()
     tier = payload.tier
     now = datetime.utcnow()
     period_end = now + timedelta(days=30)
+    is_no_plan = tier == "no_plan"
+    if is_no_plan:
+        tier = "free"
 
     existing = (
         supabase.table("subscriptions")
         .select("id, user_id, tier, status")
         .eq("user_id", userId)
         .execute()
-        .data
     )
-    if existing and len(existing) > 0:
-        supabase.table("subscriptions").update({
+    rows = (existing.data or []) if hasattr(existing, "data") else []
+    if rows:
+        payload_update = {
             "tier": tier,
-            "status": "active",
-            "current_period_start": now.isoformat() + "Z",
-            "current_period_end": period_end.isoformat() + "Z",
+            "status": "canceled" if is_no_plan else "active",
             "updated_at": now.isoformat() + "Z",
-        }).eq("user_id", userId).execute()
+        }
+        if not is_no_plan:
+            payload_update["current_period_start"] = now.isoformat() + "Z"
+            payload_update["current_period_end"] = period_end.isoformat() + "Z"
+        supabase.table("subscriptions").update(payload_update).eq("user_id", userId).execute()
         updated_list = (
             supabase.table("subscriptions")
             .select("*")
             .eq("user_id", userId)
-            .limit(1)
             .execute()
-            .data
         )
-        updated = updated_list[0] if updated_list else None
-        return api_ok(message="User plan updated successfully", data={"subscription": updated})
-    supabase.table("subscriptions").insert({
-        "user_id": userId,
-        "tier": tier,
-        "status": "active",
-        "current_period_start": now.isoformat() + "Z",
-        "current_period_end": period_end.isoformat() + "Z",
-    }).execute()
+        data_list = (updated_list.data or []) if hasattr(updated_list, "data") else []
+        updated = data_list[0] if data_list else None
+        return api_ok(
+            message="User plan set to no plan." if is_no_plan else "User plan updated successfully",
+            data={"subscription": updated},
+        )
+    if is_no_plan:
+        supabase.table("subscriptions").insert({
+            "user_id": userId,
+            "tier": "free",
+            "status": "canceled",
+            "current_period_start": now.isoformat() + "Z",
+            "current_period_end": period_end.isoformat() + "Z",
+        }).execute()
+    else:
+        supabase.table("subscriptions").insert({
+            "user_id": userId,
+            "tier": tier,
+            "status": "active",
+            "current_period_start": now.isoformat() + "Z",
+            "current_period_end": period_end.isoformat() + "Z",
+        }).execute()
     inserted_list = (
         supabase.table("subscriptions")
         .select("*")
         .eq("user_id", userId)
-        .limit(1)
         .execute()
-        .data
     )
-    inserted = inserted_list[0] if inserted_list else None
-    return api_ok(message="User plan set successfully", data={"subscription": inserted})
+    data_list = (inserted_list.data or []) if hasattr(inserted_list, "data") else []
+    inserted = data_list[0] if data_list else None
+    return api_ok(
+        message="User plan set to no plan." if is_no_plan else "User plan set successfully",
+        data={"subscription": inserted},
+    )
 
 
 @router.delete("/users/{userId}")
@@ -252,7 +280,7 @@ async def admin_delete_user(
     userId: str = Path(...),
     admin: CurrentUser = Depends(require_roles("admin", "super_admin")),
 ):
-    if userId == admin.user_id:
+    if userId == admin.id:
         return api_error(status_code=400, error="Cannot delete own account", message="Administrators cannot delete their own account")
 
     supabase = get_supabase_admin()

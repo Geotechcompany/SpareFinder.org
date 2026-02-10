@@ -73,6 +73,7 @@ interface BillingData {
     stripe_customer_id?: string;
     cancel_at_period_end?: boolean;
   };
+  trial_used?: boolean;
   invoices?: Invoice[];
   usage?: {
     uploads_count?: number;
@@ -171,6 +172,7 @@ const Billing = () => {
   const [hoveredFeature, setHoveredFeature] = useState<string | null>(null);
   const [showPaymentSuccessBanner, setShowPaymentSuccessBanner] = useState(false);
   const [paymentSuccessTier, setPaymentSuccessTier] = useState<string | null>(null);
+  const [trialUsed, setTrialUsed] = useState(false);
 
   const handleToggleSidebar = () => {
     setIsCollapsed(!isCollapsed);
@@ -293,6 +295,7 @@ const Billing = () => {
           const sub = nextBillingData.subscription;
           const isActive = sub?.status === "active" || sub?.status === "trialing";
           setCurrentPlan(isActive ? sub?.tier || "free" : "none");
+          setTrialUsed(Boolean((billingResponse as any).data?.trial_used ?? (billingResponse as any).trial_used ?? nextBillingData.trial_used));
 
           // If the billing info already contains invoices, use them first
           let hasInvoicesFromBilling = false;
@@ -417,15 +420,16 @@ const Billing = () => {
 
   const handlePlanChange = async (planId: string) => {
     try {
-      // Starter (free) -> begin 30-day trial at £12.99/month via Stripe
+      // Starter (free) -> begin 30-day trial at £12.99/month via Stripe (trial only if not already used)
       if (planId === "free") {
         const starterPlan = allPlans.find((p) => p.id === "free" || p.id === "starter") || getPlan("free");
+        const trialDays = trialUsed ? 0 : (starterPlan.trial?.days ?? 30);
         const checkoutResponse = (await api.billing.createCheckoutSession({
           plan: starterPlan.name,
           amount: starterPlan.price,
           currency: starterPlan.currency.toUpperCase(),
           billing_cycle: "monthly",
-          trial_days: starterPlan.trial?.days || 30,
+          trial_days: trialDays,
           success_url: `${window.location.origin}/dashboard/billing?payment_success=true&tier=starter`,
           cancel_url: `${window.location.origin}/dashboard/billing?payment_cancelled=true`,
         })) as CheckoutResponse;
@@ -848,12 +852,23 @@ const Billing = () => {
                       <CardTitle className="flex items-center space-x-2 text-foreground dark:text-white">
                         <Crown className="w-5 h-5 text-yellow-400" />
                         <span>Current Subscription</span>
-                        <Badge className="bg-green-600/20 text-green-400 border-green-500/30">
-                          {currentSubscription.status}
+                        <Badge
+                          className={
+                            hasActiveSubscription
+                              ? "bg-green-600/20 text-green-400 border-green-500/30"
+                              : "bg-amber-600/20 text-amber-400 border-amber-500/30"
+                          }
+                        >
+                          {hasActiveSubscription ? currentSubscription.status : "No active plan"}
                         </Badge>
                       </CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-6">
+                      {!hasActiveSubscription && (
+                        <p className="text-sm text-amber-600 dark:text-amber-400 bg-amber-500/10 border border-amber-500/20 rounded-lg px-3 py-2">
+                          You have no active plan. Select a plan to continue using analyses.
+                        </p>
+                      )}
                       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                         <div>
                           <h3 className="mb-2 text-2xl font-bold text-foreground dark:text-white">
