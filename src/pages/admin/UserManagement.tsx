@@ -30,6 +30,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -55,7 +66,9 @@ import {
   Menu,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
 } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface UserData {
   id: string;
@@ -97,7 +110,11 @@ const UserManagement = () => {
   const [roleFilter, setRoleFilter] = useState<string>("all");
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkActionLoading, setBulkActionLoading] = useState(false);
+  const [bulkDeleteDialogOpen, setBulkDeleteDialogOpen] = useState(false);
   const { toast } = useToast();
+  const { user: currentUser } = useAuth();
 
   // Debounce search to avoid too many API calls
   useEffect(() => {
@@ -266,6 +283,11 @@ const UserManagement = () => {
           title: "User Deleted",
           description: "User has been deleted successfully.",
         });
+        setSelectedIds((prev) => {
+          const next = new Set(prev);
+          next.delete(userId);
+          return next;
+        });
         fetchUsers(); // Refresh the list
       } else {
         throw new Error(response.error || "Failed to delete user");
@@ -278,6 +300,122 @@ const UserManagement = () => {
         description: "Failed to delete user. Please try again.",
       });
     }
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === users.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(users.map((u) => u.id)));
+    }
+  };
+
+  const toggleUser = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const selectedForBulkDelete = currentUser?.id
+    ? Array.from(selectedIds).filter((id) => id !== currentUser.id)
+    : Array.from(selectedIds);
+
+  const handleBulkSetRole = async (role: "user" | "admin" | "super_admin") => {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) return;
+    setBulkActionLoading(true);
+    let ok = 0;
+    let err = 0;
+    for (const userId of ids) {
+      try {
+        const res = await api.admin.updateUserRole(userId, role);
+        if (res.success) ok++;
+        else err++;
+      } catch {
+        err++;
+      }
+    }
+    setBulkActionLoading(false);
+    setSelectedIds(new Set());
+    fetchUsers();
+    toast({
+      title: "Bulk role update",
+      description: `${ok} updated. ${err > 0 ? `${err} failed.` : ""}`,
+      variant: err > 0 ? "destructive" : "default",
+    });
+  };
+
+  const handleBulkSetPlan = async (tier: "free" | "pro" | "enterprise" | "no_plan") => {
+    if (!VALID_TIERS.includes(tier)) return;
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) return;
+    setBulkActionLoading(true);
+    let ok = 0;
+    let err = 0;
+    for (const userId of ids) {
+      try {
+        const res = await api.admin.updateUserPlan(userId, tier);
+        if (res.success) ok++;
+        else err++;
+      } catch {
+        err++;
+      }
+    }
+    setBulkActionLoading(false);
+    setSelectedIds(new Set());
+    setUsers((prev) =>
+      prev.map((u) =>
+        ids.includes(u.id)
+          ? {
+              ...u,
+              subscription_tier: tier === "no_plan" ? "free" : tier,
+              subscription_status: tier === "no_plan" ? "canceled" : "active",
+            }
+          : u
+      )
+    );
+    fetchUsers();
+    toast({
+      title: "Bulk plan update",
+      description: `${ok} updated. ${err > 0 ? `${err} failed.` : ""}`,
+      variant: err > 0 ? "destructive" : "default",
+    });
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedForBulkDelete.length === 0) {
+      toast({
+        variant: "destructive",
+        title: "Cannot delete",
+        description: "Selected set includes you; you cannot delete your own account.",
+      });
+      setBulkDeleteDialogOpen(false);
+      return;
+    }
+    setBulkActionLoading(true);
+    let ok = 0;
+    let err = 0;
+    for (const userId of selectedForBulkDelete) {
+      try {
+        const res = await api.admin.deleteUser(userId);
+        if (res.success) ok++;
+        else err++;
+      } catch {
+        err++;
+      }
+    }
+    setBulkActionLoading(false);
+    setSelectedIds(new Set());
+    setBulkDeleteDialogOpen(false);
+    fetchUsers();
+    toast({
+      title: "Bulk delete",
+      description: `${ok} deleted. ${err > 0 ? `${err} failed.` : ""}`,
+      variant: err > 0 ? "destructive" : "default",
+    });
   };
 
   const getRoleIcon = (role: string) => {

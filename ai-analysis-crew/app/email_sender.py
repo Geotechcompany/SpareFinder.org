@@ -667,6 +667,53 @@ If you have any questions, contact us at support@sparefinder.org.
     return _send_billing_email(to_email=to_email, subject=subject, html=html, text=text)
 
 
+def send_expired_plan_resubscribe_email(
+    *,
+    to_email: str,
+    plan_name: str = "your plan",
+    billing_url: str = "https://sparefinder.org/dashboard/billing",
+) -> bool:
+    """
+    Send a reminder to users whose plan has expired, encouraging them to resubscribe.
+    Call from cron (e.g. /billing/cron/expired-plan-reminders).
+    """
+    subject = "Your SpareFinder plan has expired – resubscribe to continue"
+    text = f"""Hi,
+
+Your SpareFinder {plan_name} plan has expired. To get back full access to part identification, supplier info, and more, choose a plan and resubscribe.
+
+Resubscribe here: {billing_url}
+
+If you have any questions, contact us at support@sparefinder.org.
+
+— SpareFinder
+"""
+    body = f"""
+      <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
+        <tr>
+          <td style="text-align: center; padding-bottom: 16px;">
+            <span style="display: inline-block; width: 52px; height: 52px; line-height: 52px; font-size: 24px; background: #6366f1; border-radius: 50%; color: #fff;">✨</span>
+          </td>
+        </tr>
+        <tr>
+          <td>
+            <h2 style="margin: 0 0 8px 0; font-size: 20px; font-weight: 700; color: #0f172a;">Your plan has expired</h2>
+            <p style="margin: 0; font-size: 15px; color: #475569; line-height: 1.6;">Your SpareFinder <strong>{plan_name}</strong> plan has expired. Resubscribe to restore full access to AI identification, catalog storage, and more.</p>
+          </td>
+        </tr>
+        <tr><td height="16"></td></tr>
+        <tr>
+          <td style="background: #eef2ff; border-radius: 8px; padding: 16px; border-left: 4px solid #6366f1;">
+            <p style="margin: 0 0 8px 0; font-size: 13px; font-weight: 600; color: #3730a3;">Resubscribe anytime</p>
+            <p style="margin: 0 0 12px 0; font-size: 14px; color: #4f46e5; line-height: 1.5;">Choose a plan and get back full access to part identification, supplier info, and more.</p>
+            <a href="{billing_url}" style="display: inline-block; padding: 10px 18px; background: #6366f1; color: #fff; text-decoration: none; font-weight: 600; font-size: 14px; border-radius: 8px;">View plans & resubscribe</a>
+          </td>
+        </tr>
+      </table>"""
+    html = _wrap_subscription_email(body, billing_url)
+    return _send_billing_email(to_email=to_email, subject=subject, html=html, text=text)
+
+
 def send_email_with_attachment(
     to_email: str,
     subject: str,

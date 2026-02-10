@@ -14,6 +14,7 @@ from .auth_dependencies import CurrentUser, get_current_user
 from .responses import api_error, api_ok
 from .supabase_admin import get_supabase_admin
 from ..email_sender import (
+    send_expired_plan_resubscribe_email,
     send_payment_failed_email,
     send_purchase_confirmation_email,
     send_receipt_email,
@@ -994,12 +995,125 @@ async def cron_cancel_unpaid_plans():
                 errors += 1
         except Exception as e:
             errors += 1
+        return api_ok(
+            data={
+                "canceled": canceled,
+                "emails_sent": emails_sent,
+                "errors": errors,
+                "skipped_admin": skipped_admin,
+                "message": f"Unpaid plans: {canceled} canceled, {emails_sent} emails sent, {skipped_admin} admins skipped.",
+            }
+        )
+
+
+@router.get("/cron/expired-plan-reminders")
+async def cron_expired_plan_reminders():
+    """
+    Public cron endpoint: remind users with no active plan (expired or canceled
+    and period ended) to resubscribe. Excludes admin/super_admin.
+    Call daily or weekly (e.g. cron-job.org).
+    """
+    now = datetime.utcnow()
+    now_iso = now.strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
+    supabase = get_supabase_admin()
+    sent = 0
+    errors = 0
+    skipped_admin = 0
+    try:
+        rows = (
+            supabase.table("subscriptions")
+            .select("id, user_id, tier, status, current_period_end, stripe_customer_id")
+            .in_("status", ["expired", "canceled", "cancelled"])
+            .execute()
+        )
+        raw_subs = rows.data or []
+    except Exception as e:
+        return api_error(f"Failed to fetch subscriptions: {e}", status_code=500)
+
+    # Only include subs whose period has actually ended (or no period end = treat as ended)
+    subs = []
+    for sub in raw_subs:
+        period_end = sub.get("current_period_end")
+        if not period_end:
+            subs.append(sub)
+            continue
+        # Compare ISO strings for simplicity (period_end <= now)
+        if period_end <= now_iso:
+            subs.append(sub)
+
+    if not subs:
+        return api_ok(
+            data={
+                "sent": 0,
+                "errors": 0,
+                "skipped_admin": 0,
+                "message": "No expired-plan users to remind.",
+            }
+        )
+
+    user_ids = list({s["user_id"] for s in subs if s.get("user_id")})
+    profiles_by_id = {}
+    admin_user_ids = set()
+    try:
+        pr_res = (
+            supabase.table("profiles")
+            .select("id, email, role")
+            .in_("id", user_ids)
+            .execute()
+        )
+        for p in pr_res.data or []:
+            uid = p.get("id")
+            if uid:
+                profiles_by_id[str(uid)] = p
+                if str(p.get("role") or "").lower() in ("admin", "super_admin"):
+                    admin_user_ids.add(str(uid))
+    except Exception as e:
+        return api_error(f"Failed to fetch profiles: {e}", status_code=500)
+
+    # One email per user (use first subscription for plan name)
+    seen_user_ids = set()
+    for sub in subs:
+        user_id = sub.get("user_id")
+        if not user_id or str(user_id) in seen_user_ids:
+            continue
+        uid_str = str(user_id)
+        if uid_str in admin_user_ids:
+            skipped_admin += 1
+            seen_user_ids.add(uid_str)
+            continue
+        seen_user_ids.add(uid_str)
+        email = None
+        profile = profiles_by_id.get(uid_str)
+        if profile and (profile.get("email") or "").strip():
+            email = (profile["email"] or "").strip()
+        if not email and sub.get("stripe_customer_id"):
+            try:
+                cust = stripe.Customer.retrieve(sub["stripe_customer_id"])
+                email = (
+                    getattr(cust, "email", None)
+                    or (cust.get("email") if isinstance(cust, dict) else None)
+                    or ""
+                ).strip()
+            except Exception:
+                pass
+        if not email:
+            errors += 1
+            continue
+        tier = sub.get("tier") or sub.get("plan_type") or "subscription"
+        try:
+            if send_expired_plan_resubscribe_email(to_email=email, plan_name=tier):
+                sent += 1
+            else:
+                errors += 1
+        except Exception as e:
+            errors += 1
+
     return api_ok(
         data={
-            "canceled": canceled,
-            "emails_sent": emails_sent,
+            "sent": sent,
             "errors": errors,
             "skipped_admin": skipped_admin,
-            "message": f"Unpaid plans: {canceled} canceled, {emails_sent} emails sent, {skipped_admin} admins skipped.",
+            "total_eligible": len(user_ids),
+            "message": f"Expired plan reminders: {sent} sent, {errors} errors.",
         }
     )
