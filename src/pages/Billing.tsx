@@ -294,7 +294,12 @@ const Billing = () => {
           setBillingData(nextBillingData);
           const sub = nextBillingData.subscription;
           const isActive = sub?.status === "active" || sub?.status === "trialing";
-          setCurrentPlan(isActive ? sub?.tier || "free" : "none");
+          const rawTier = (sub?.tier || "free").toString().toLowerCase().trim();
+          const normalizedTier =
+            rawTier === "starter" || rawTier === "free" ? "free"
+            : rawTier === "professional" || rawTier === "pro" ? "pro"
+            : "enterprise";
+          setCurrentPlan(isActive ? normalizedTier : "none");
           setTrialUsed(Boolean((billingResponse as any).data?.trial_used ?? (billingResponse as any).trial_used ?? nextBillingData.trial_used));
 
           // If the billing info already contains invoices, use them first
@@ -397,13 +402,14 @@ const Billing = () => {
   }
 
   const allPlans = plansFromApi.length > 0 ? plansFromApi : getAllPlans();
+  const normalizePlanId = (id: string): PlanTier => {
+    const lower = (id || "").toLowerCase().trim();
+    if (lower === "starter" || lower === "free") return "free";
+    if (lower === "professional" || lower === "pro") return "pro";
+    return "enterprise";
+  };
   const plans = allPlans.map((plan) => ({
-    id:
-      plan.id === "starter"
-        ? "free"
-        : plan.id === "professional"
-        ? "pro"
-        : ("enterprise" as PlanTier),
+    id: normalizePlanId(plan.id),
     name: plan.name,
     price: plan.price,
     period: plan.period,
@@ -1021,21 +1027,19 @@ const Billing = () => {
                                 : "bg-white/5 border-white/10 hover:border-white/20 hover:bg-white/10"
                             }`}
                           >
-                            {plan.popular && (
+                            {(currentPlan === plan.id || plan.popular) && (
                               <div className="absolute -top-3 left-6">
-                                <Badge className="bg-gradient-to-r from-purple-600 to-blue-600 text-white border-purple-500/30">
-                                  <Star className="w-3 h-3 mr-1" />
-                                  Most Popular
-                                </Badge>
-                              </div>
-                            )}
-
-                            {currentPlan === plan.id && (
-                              <div className="absolute -top-3 left-6">
-                                <Badge className="bg-gradient-to-r from-green-600 to-emerald-600 text-white border-green-500/30">
-                                  <Check className="w-3 h-3 mr-1" />
-                                  Current Plan
-                                </Badge>
+                                {currentPlan === plan.id ? (
+                                  <Badge className="bg-gradient-to-r from-green-600 to-emerald-600 text-white border-green-500/30">
+                                    <Check className="w-3 h-3 mr-1" />
+                                    Current Plan
+                                  </Badge>
+                                ) : (
+                                  <Badge className="bg-gradient-to-r from-purple-600 to-blue-600 text-white border-purple-500/30">
+                                    <Star className="w-3 h-3 mr-1" />
+                                    Most Popular
+                                  </Badge>
+                                )}
                               </div>
                             )}
 

@@ -172,9 +172,13 @@ export async function fetchPlansFromApi(): Promise<PlanFeature[]> {
     }
     const apiPlans = (res as any).data.plans as ApiPlan[];
     return apiPlans.map((p) => {
-      const tier = (p.tier || "free").toLowerCase();
+      const tier = (p.tier || "free").toLowerCase().trim();
+      const normalizedId =
+        tier === "free" || tier === "starter" ? "starter"
+        : tier === "pro" || tier === "professional" ? "professional"
+        : "enterprise";
       return {
-        id: p.tier === "free" ? "starter" : p.tier === "pro" ? "professional" : p.tier,
+        id: normalizedId,
         name: p.name,
         price: Number(p.price) || 0,
         currency: (p.currency as "GBP") || "GBP",
