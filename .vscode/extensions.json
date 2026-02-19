@@ -1,6 +1,7 @@
 {
   "recommendations": [
     "denoland.vscode-deno",
-    "vrishnviswasathyamoorthy.cursor-prompt-enhancer"
+    "vrishnviswasathyamoorthy.cursor-prompt-enhancer",
+    "highagency.pencildev"
   ]
 }

@@ -94,6 +94,16 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
       if (response?.success && response.data?.user) {
         setUser(response.data.user);
+        // Apply pending referral code (from invite link) if any
+        try {
+          const pendingRef = sessionStorage.getItem("sparefinder_pending_referral");
+          if (pendingRef && pendingRef.trim()) {
+            sessionStorage.removeItem("sparefinder_pending_referral");
+            api.referrals.apply(pendingRef.trim()).catch(() => {});
+          }
+        } catch {
+          /* ignore */
+        }
       } else {
         console.warn("❌ Failed to load app profile:", response?.error || response?.message);
         setUser(null);

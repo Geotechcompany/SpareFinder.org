@@ -8,11 +8,23 @@ import { authClerkAppearance } from "@/components/auth/clerk-appearance";
 import { Link } from "react-router-dom";
 import { useSearchParams } from "react-router-dom";
 
+const PENDING_REFERRAL_KEY = "sparefinder_pending_referral";
+
 const Register = () => {
   const { isLoading, isAuthenticated } = useAuth();
   const [searchParams] = useSearchParams();
   const isMigrate = searchParams.get("migrate") === "1";
   const migrateEmail = searchParams.get("email");
+
+  // Capture invite ref from URL so we can apply after signup
+  const ref = searchParams.get("ref");
+  if (ref && typeof ref === "string" && ref.trim()) {
+    try {
+      sessionStorage.setItem(PENDING_REFERRAL_KEY, ref.trim());
+    } catch {
+      /* ignore */
+    }
+  }
 
   if (!isLoading && isAuthenticated) {
     return <Navigate to="/dashboard" replace />;

@@ -43,6 +43,8 @@ import {
   Trash2,
   Wifi,
   DollarSign,
+  UserPlus,
+  Copy,
 } from "lucide-react";
 import DashboardSidebar from "@/components/DashboardSidebar";
 import MobileSidebar from "@/components/MobileSidebar";
@@ -179,6 +181,11 @@ const Settings = () => {
   const [createdApiKey, setCreatedApiKey] = useState<ApiKeyRow | null>(null);
   const [apiKeyActionId, setApiKeyActionId] = useState<string | null>(null);
 
+  const [referralCode, setReferralCode] = useState<string>("");
+  const [referredCount, setReferredCount] = useState(0);
+  const [creditsEarned, setCreditsEarned] = useState(0);
+  const [referralLoading, setReferralLoading] = useState(false);
+
   const fetchApiKeys = async () => {
     if (!isApiKeysEnabled) return;
     try {
@@ -213,6 +220,29 @@ const Settings = () => {
 
   useEffect(() => {
     fetchUserProfile();
+  }, []);
+
+  useEffect(() => {
+    let mounted = true;
+    setReferralLoading(true);
+    api.referrals
+      .getMe()
+      .then((res) => {
+        if (!mounted) return;
+        const d = res?.data;
+        if (d) {
+          setReferralCode(d.referral_code || "");
+          setReferredCount(d.referred_count ?? 0);
+          setCreditsEarned(d.credits_earned ?? 0);
+        }
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (mounted) setReferralLoading(false);
+      });
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   useEffect(() => {
@@ -1362,6 +1392,69 @@ const Settings = () => {
                             placeholder="https://example.com/avatar.jpg"
                           />
                         </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+
+                  {/* Invite friends – earn 2 credits per signup */}
+                  <div className="relative">
+                    <div className="absolute inset-0 rounded-3xl bg-gradient-to-r from-emerald-600/10 to-teal-600/10 blur-xl opacity-80" />
+                    <Card className="relative h-full rounded-3xl border border-border bg-card text-foreground shadow-soft-elevated backdrop-blur-xl dark:bg-black/20 dark:border-white/10">
+                      <CardHeader>
+                        <CardTitle className="flex items-center space-x-2 text-foreground dark:text-white">
+                          <UserPlus className="w-5 h-5 text-emerald-500" />
+                          <span>Invite friends</span>
+                        </CardTitle>
+                        <CardDescription className="text-muted-foreground dark:text-gray-400">
+                          Share your link. You get <strong>2 credits</strong> when someone registers.
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        {referralLoading ? (
+                          <div className="flex items-center gap-2 text-muted-foreground">
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                            <span>Loading invite link…</span>
+                          </div>
+                        ) : referralCode ? (
+                          <>
+                            <div className="flex gap-2">
+                              <Input
+                                readOnly
+                                value={
+                                  typeof window !== "undefined"
+                                    ? `${window.location.origin}/register?ref=${referralCode}`
+                                    : ""
+                                }
+                                className="font-mono text-sm bg-muted/50"
+                              />
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="icon"
+                                onClick={() => {
+                                  const url =
+                                    typeof window !== "undefined"
+                                      ? `${window.location.origin}/register?ref=${referralCode}`
+                                      : "";
+                                  navigator.clipboard?.writeText(url).then(
+                                    () =>
+                                      toast({
+                                        title: "Copied",
+                                        description: "Invite link copied to clipboard.",
+                                      }),
+                                    () => {}
+                                  );
+                                }}
+                              >
+                                <Copy className="h-4 w-4" />
+                              </Button>
+                            </div>
+                            <p className="text-sm text-muted-foreground">
+                              {referredCount} {referredCount === 1 ? "person" : "people"} joined
+                              {creditsEarned > 0 && ` · ${creditsEarned} credits earned`}
+                            </p>
+                          </>
+                        ) : null}
                       </CardContent>
                     </Card>
                   </div>

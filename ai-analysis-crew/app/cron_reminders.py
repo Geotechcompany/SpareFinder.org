@@ -10,7 +10,6 @@ logger = logging.getLogger(__name__)
 
 from .database_storage import SUPABASE_URL, SUPABASE_HEADERS
 from .email_sender import send_email_via_email_service, send_basic_email_smtp
-from .image_generator import image_generator
 from .ai_email_generator import ai_email_generator
 from .engagement_email_storage import store_engagement_email, update_engagement_email_status
 from .unsubscribe_utils import (
@@ -117,7 +116,7 @@ def _send_onboarding_email(*, to_email: str, user_name: str) -> bool:
 
 
 def _send_reengagement_email(*, to_email: str, user_name: str) -> bool:
-    """Send an appealing reengagement email with AI-generated content and images."""
+    """Send an appealing reengagement email with AI-generated content."""
     # Check if user has unsubscribed
     if check_user_unsubscribed(to_email, "reengagement"):
         logger.info(f"⏭️ Skipping email to {to_email} - user has unsubscribed")
@@ -141,26 +140,14 @@ def _send_reengagement_email(*, to_email: str, user_name: str) -> bool:
     )
     unsubscribe_url = create_unsubscribe_url(unsubscribe_base_url, unsubscribe_token)
     
-    # Generate theme for images (random selection)
-    import random
-    themes = ["industrial", "parts", "maintenance", "technology"]
-    theme = random.choice(themes)
-    
-    # Generate hero image (top of email)
-    hero_image_url = image_generator.generate_reengagement_image(theme)
-    
-    # Generate inline image (middle of email content)
-    inline_image_url = image_generator.generate_reengagement_image(theme)
-    
-    # If inline image generation failed, use hero image as fallback
-    if not inline_image_url or inline_image_url == hero_image_url:
-        # Generate a different theme for variety
-        other_themes = [t for t in themes if t != theme]
-        if other_themes:
-            inline_theme = random.choice(other_themes)
-            inline_image_url = image_generator.generate_reengagement_image(inline_theme)
-        if not inline_image_url:
-            inline_image_url = hero_image_url  # Fallback to hero image
+    # Fixed images for usage reminder
+    hero_image_url = (
+        "https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?auto=format&fit=crop&w=1200"
+    )
+    inline_image_url = (
+        "https://images.unsplash.com/photo-1565680018434-b513d5e261bc?auto=format&fit=crop&w=800"
+    )
+    image_theme = "industrial"
     
     # Generate complete email content using AI
     try:
@@ -191,7 +178,7 @@ def _send_reengagement_email(*, to_email: str, user_name: str) -> bool:
             text_content=text_content,
             hero_image_url=hero_image_url,
             inline_image_url=inline_image_url,
-            image_theme=theme,
+            image_theme=image_theme,
             ai_model="gpt-4o",
             dashboard_url=dashboard_url,
             upload_url=upload_url,

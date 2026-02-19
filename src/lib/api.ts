@@ -1860,6 +1860,16 @@ export const api = {
   reviews: reviewsApi,
   analysisReviews: analysisReviewsApi,
   tickets: ticketsApi,
+  referrals: {
+    getMe: async (): Promise<ApiResponse<{ referral_code: string; referred_count: number; credits_earned: number }>> => {
+      const response = await apiClient.get("/referrals/me");
+      return response.data;
+    },
+    apply: async (code: string): Promise<ApiResponse> => {
+      const response = await apiClient.post("/referrals/apply", { code });
+      return response.data;
+    },
+  },
 };
 
 // Export individual APIs for backward compatibility
