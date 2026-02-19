@@ -91,6 +91,7 @@ import { api, dashboardApi } from "@/lib/api";
 import KeywordMarkdownResults from "@/components/KeywordMarkdownResults";
 import { ComprehensiveAnalysisModal } from "@/components/ComprehensiveAnalysisModal";
 import { useDetectedRegion } from "@/hooks/useDetectedRegion";
+import TiltedCard from "@/components/TiltedCard";
 // Pending jobs UI removed; redirect goes to History
 
 // Enhanced CSS styles for technical data visibility
@@ -3763,62 +3764,84 @@ const Upload = () => {
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
                       {/* Image Only Option */}
-                      <motion.button
-                        whileHover={{ scale: 1.05 }}
-                        whileTap={{ scale: 0.95 }}
+                      <button
+                        type="button"
                         onClick={() => handleModeSelection("image")}
-                        className="p-6 rounded-2xl border border-border bg-card text-left hover:border-primary/40 hover:shadow-soft-elevated transition-all group dark:bg-gradient-to-br dark:from-purple-600/20 dark:to-purple-800/20 dark:border-purple-500/30"
+                        className="group flex flex-col gap-3 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/70 focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded-2xl"
                       >
-                        <div className="flex items-center justify-center w-12 h-12 rounded-full bg-purple-600/30 mb-4 group-hover:bg-purple-600/50">
-                          <Camera className="w-6 h-6 text-purple-300" />
-                        </div>
-                        <h3 className="text-lg font-semibold text-foreground dark:text-white mb-2">
-                          Image Only
-                        </h3>
-                        <p className="text-sm text-muted-foreground">
-                          Upload an image and let AI identify the part
-                          automatically
-                        </p>
-                      </motion.button>
+                        <TiltedCard
+                          imageSrc="/Illustrations/imagesearchicon.png"
+                          altText="Close-up of an industrial spare part"
+                          captionText="Image only"
+                          containerHeight="220px"
+                          imageHeight="220px"
+                          displayOverlayContent
+                          overlayContent={
+                            <div>
+                              <p className="font-semibold text-sm sm:text-base">
+                                Image Only
+                              </p>
+                              <p className="mt-1 text-xs text-slate-200/90 sm:text-sm">
+                                Upload a clear photo and let SpareFinder identify the part automatically.
+                              </p>
+                            </div>
+                          }
+                        />
+                      </button>
 
                       {/* Keywords Only Option */}
-                      <motion.button
-                        whileHover={{ scale: 1.05 }}
-                        whileTap={{ scale: 0.95 }}
+                      <button
+                        type="button"
                         onClick={() => handleModeSelection("keywords")}
-                        className="p-6 rounded-2xl border border-border bg-card text-left hover:border-primary/40 hover:shadow-soft-elevated transition-all group dark:bg-gradient-to-br dark:from-blue-600/20 dark:to-blue-800/20 dark:border-blue-500/30"
+                        className="group flex flex-col gap-3 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/70 focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded-2xl"
                       >
-                        <div className="flex items-center justify-center w-12 h-12 rounded-full bg-blue-600/30 mb-4 group-hover:bg-blue-600/50">
-                          <Search className="w-6 h-6 text-blue-300" />
-                        </div>
-                        <h3 className="text-lg font-semibold text-foreground dark:text-white mb-2">
-                          Keywords Only
-                        </h3>
-                        <p className="text-sm text-muted-foreground">
-                          Describe your part using keywords for a targeted
-                          search
-                        </p>
-                      </motion.button>
+                        <TiltedCard
+                          imageSrc="/Illustrations/keywordicon.png"
+                          altText="Engineer typing detailed part keywords"
+                          captionText="Keywords only"
+                          containerHeight="220px"
+                          imageHeight="220px"
+                          displayOverlayContent
+                          overlayContent={
+                            <div>
+                              <p className="font-semibold text-sm sm:text-base">
+                                Keywords Only
+                              </p>
+                              <p className="mt-1 text-xs text-slate-200/90 sm:text-sm">
+                                Describe the part using precise terms for a focused, text-only search.
+                              </p>
+                            </div>
+                          }
+                        />
+                      </button>
 
                       {/* Both Option */}
-                      <motion.button
-                        whileHover={{ scale: 1.05 }}
-                        whileTap={{ scale: 0.95 }}
+                      <button
+                        type="button"
                         onClick={() => handleModeSelection("both")}
-                        className="p-6 rounded-2xl border border-border bg-card text-left hover:border-emerald-400/60 hover:shadow-soft-elevated transition-all group dark:bg-gradient-to-br dark:from-emerald-600/20 dark:to-emerald-800/20 dark:border-emerald-500/30"
+                        className="group flex flex-col gap-3 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/70 focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded-2xl"
                       >
-                        <div className="flex items-center justify-center w-12 h-12 rounded-full bg-emerald-600/30 mb-4 group-hover:bg-emerald-600/50">
-                          <ImagePlus className="w-6 h-6 text-emerald-300" />
-                        </div>
-                        <h3 className="text-lg font-semibold text-foreground dark:text-white mb-2">
-                          Both
-                        </h3>
-                        <p className="text-sm text-muted-foreground">
-                          Upload an image and add keywords for maximum accuracy
-                        </p>
-                      </motion.button>
+                        <TiltedCard
+                          imageSrc="/Illustrations/bothsearcgh icon.png"
+                          altText="Technician capturing a photo and notes for a spare part"
+                          captionText="Image + keywords"
+                          containerHeight="220px"
+                          imageHeight="220px"
+                          displayOverlayContent
+                          overlayContent={
+                            <div>
+                              <p className="font-semibold text-sm sm:text-base">
+                                Both
+                              </p>
+                              <p className="mt-1 text-xs text-slate-200/90 sm:text-sm">
+                                Combine an image with 3–5 keywords for the highest‑confidence match.
+                              </p>
+                            </div>
+                          }
+                        />
+                      </button>
                     </div>
                   </CardContent>
                 </Card>
