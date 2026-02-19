@@ -1788,19 +1788,6 @@ const History = () => {
           transition={{ duration: 0.5 }}
           className="space-y-4 md:space-y-6 lg:space-y-8"
         >
-          {/* History Page Tour */}
-          <OnboardingGuide
-            storageKey="history_tour_seen_v1"
-            showWelcome={false}
-            steps={[
-              {
-                selector: "#tour-past-jobs-table",
-                title: "Track progress here",
-                description:
-                  "This table shows your past and active jobs. Status updates in real time as the analysis runs.",
-              },
-            ]}
-          />
           {/* Header */}
           <div className="relative">
             <div className="absolute inset-0 rounded-2xl md:rounded-3xl bg-gradient-to-r from-[#3A5AFE0A] via-[#8B5CF60A] to-transparent blur-xl opacity-80 dark:from-purple-600/10 dark:to-blue-600/10" />
