@@ -196,7 +196,7 @@ def _send_reengagement_email(*, to_email: str, user_name: str) -> bool:
         logger.error(traceback.format_exc())
         # Fallback to basic template
         year = datetime.now().year
-        subject = f"Welcome back, {user_name}!"
+        subject = f"Your next part is one photo away, {user_name}"
         html_content = f"""
 <!doctype html>
 <html>
@@ -240,7 +240,7 @@ def _send_reengagement_email(*, to_email: str, user_name: str) -> bool:
                       <img src="{logo_url}" alt="SpareFinder" style="max-height:28px;width:auto;display:block;border-radius:6px;" />
                     </td>
                     <td style="text-align:right;vertical-align:middle;font-size:11px;" class="muted">
-                      Usage reminder · Inactive account
+                      SpareFinder
                     </td>
                   </tr>
                 </table>
@@ -253,8 +253,8 @@ def _send_reengagement_email(*, to_email: str, user_name: str) -> bool:
             </tr>
             <tr>
               <td style="padding:28px;">
-                <h1 style="margin:0 0 12px 0;font-size:24px;color:#0f172a;">Welcome back, {user_name}!</h1>
-                <p style="margin:0 0 20px 0;font-size:14px;color:#64748b;">We've missed you! SpareFinder makes identifying industrial parts faster and easier.</p>
+                <h1 style="margin:0 0 12px 0;font-size:24px;color:#0f172a;">Your part-search shortcut is ready</h1>
+                <p style="margin:0 0 20px 0;font-size:14px;color:#64748b;">SpareFinder turns a single photo into a part ID and supplier options—no catalog flipping.</p>
                 <img src="{inline_image_url or hero_image_url or ''}" alt="Parts workflow" style="display:block;width:100%;max-width:500px;margin:20px auto;border-radius:8px;" />
                 <p style="margin:20px 0;font-size:14px;color:#64748b;">Upload a photo, get instant identification, and share results with your team—all in seconds.</p>
                 <table role="presentation" cellspacing="0" cellpadding="0" style="margin:24px 0;">
@@ -299,7 +299,7 @@ def _send_reengagement_email(*, to_email: str, user_name: str) -> bool:
 
         text_content = f"""Hi {user_name},
 
-Welcome back! We've missed you. SpareFinder makes identifying industrial parts faster and easier.
+Your part-search shortcut is ready. SpareFinder turns a single photo into a part ID and supplier options.
 
 Start identifying parts: {upload_url}
 View dashboard: {dashboard_url}

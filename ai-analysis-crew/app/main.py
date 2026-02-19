@@ -561,8 +561,8 @@ class TestReengagementEmailRequest(BaseModel):
 @app.post("/test/reengagement-email")
 async def test_reengagement_email(payload: TestReengagementEmailRequest):
     """
-    Test endpoint to send a reengagement email with AI-generated image.
-    Useful for testing the email generation and image creation.
+    Test endpoint to send a reengagement email.
+    Useful for testing the email content and delivery.
     """
     try:
         from .cron_reminders import _send_reengagement_email

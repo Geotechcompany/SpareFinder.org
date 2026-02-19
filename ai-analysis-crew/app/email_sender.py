@@ -259,7 +259,7 @@ def _email_footer(billing_url: str = "https://sparefinder.org/dashboard/billing"
   <tr>
     <td style="padding: 24px 32px; background: #f8fafc; border-radius: 0 0 12px 12px; border: 1px solid #e2e8f0; border-top: none;">
       <p style="margin: 0; font-size: 12px; color: #64748b; text-align: center;">
-        Need help? <a href="mailto:support@sparefinder.org" style="color: #6366f1; text-decoration: none;">support@sparefinder.org</a>
+        Need help? <a href="mailto:email@sparefinder.org" style="color: #6366f1; text-decoration: none;">email@sparefinder.org</a>
         &nbsp;·&nbsp;
         <a href="{billing_url}" style="color: #6366f1; text-decoration: none;">Billing</a>
         &nbsp;·&nbsp;
@@ -316,7 +316,7 @@ Thank you for subscribing to SpareFinder. Your {plan_name} plan is now active.
 What's next:
 • Use your full access in the dashboard
 • Manage your subscription, invoices, and payment methods at: {billing_url}
-• Contact us at support@sparefinder.org if you have any questions
+• Contact us at email@sparefinder.org if you have any questions
 {amount_line}
 
 — SpareFinder
@@ -345,7 +345,7 @@ What's next:
             <ul style="margin: 0; padding-left: 20px; font-size: 14px; color: #475569; line-height: 1.8;">
               <li>Upload parts and run AI-powered identification in the <a href="https://sparefinder.org/dashboard" style="color: #6366f1; text-decoration: none;">dashboard</a></li>
               <li>View usage, invoices, and payment methods in <a href="{billing_url}" style="color: #6366f1; text-decoration: none;">Billing</a></li>
-              <li>Get help anytime at <a href="mailto:support@sparefinder.org" style="color: #6366f1; text-decoration: none;">support@sparefinder.org</a></li>
+              <li>Get help anytime at <a href="mailto:email@sparefinder.org" style="color: #6366f1; text-decoration: none;">email@sparefinder.org</a></li>
             </ul>
           </td>
         </tr>
@@ -436,7 +436,7 @@ We couldn't process your payment for your SpareFinder subscription.
 Please update your payment method to avoid any interruption to your plan:
 {billing_url}
 
-If you have questions, contact us at support@sparefinder.org.
+If you have questions, contact us at email@sparefinder.org.
 
 — SpareFinder
 """
@@ -466,7 +466,7 @@ If you have questions, contact us at support@sparefinder.org.
             <a href="{billing_url}" style="display: inline-block; padding: 12px 20px; background: #d97706; color: #fff; text-decoration: none; font-weight: 600; font-size: 14px; border-radius: 8px;">Update payment method</a>
           </td>
         </tr>
-        <tr><td style="padding-top: 16px; font-size: 13px; color: #64748b;">Questions? Reply to this email or contact <a href="mailto:support@sparefinder.org" style="color: #6366f1; text-decoration: none;">support@sparefinder.org</a>.</td></tr>
+        <tr><td style="padding-top: 16px; font-size: 13px; color: #64748b;">Questions? Reply to this email or contact <a href="mailto:email@sparefinder.org" style="color: #6366f1; text-decoration: none;">email@sparefinder.org</a>.</td></tr>
       </table>"""
     html = _wrap_subscription_email(body, billing_url)
     return _send_billing_email(to_email=to_email, subject=subject, html=html, text=text)
@@ -492,7 +492,7 @@ Your SpareFinder {plan_name} plan has been canceled.
 You can resubscribe anytime from your dashboard:
 {billing_url}
 
-We're sorry to see you go. If you change your mind, we're here to help – contact support@sparefinder.org.
+We're sorry to see you go. If you change your mind, we're here to help – contact email@sparefinder.org.
 
 — SpareFinder
 """
@@ -522,7 +522,7 @@ We're sorry to see you go. If you change your mind, we're here to help – conta
             <a href="{billing_url}" style="display: inline-block; padding: 10px 18px; background: #6366f1; color: #fff; text-decoration: none; font-weight: 600; font-size: 14px; border-radius: 8px;">View plans & resubscribe</a>
           </td>
         </tr>
-        <tr><td style="padding-top: 16px; font-size: 13px; color: #64748b;">We're sorry to see you go. Questions? <a href="mailto:support@sparefinder.org" style="color: #6366f1; text-decoration: none;">support@sparefinder.org</a></td></tr>
+        <tr><td style="padding-top: 16px; font-size: 13px; color: #64748b;">We're sorry to see you go. Questions? <a href="mailto:email@sparefinder.org" style="color: #6366f1; text-decoration: none;">email@sparefinder.org</a></td></tr>
       </table>"""
     html = _wrap_subscription_email(body, billing_url)
     return _send_billing_email(to_email=to_email, subject=subject, html=html, text=text)
@@ -590,7 +590,7 @@ Your SpareFinder {plan_name} has ended. To keep using full access and features, 
 
 Renew or upgrade here: {billing_url}
 
-If you have any questions, contact us at support@sparefinder.org.
+If you have any questions, contact us at email@sparefinder.org.
 
 — SpareFinder
 """
@@ -637,7 +637,7 @@ Your SpareFinder {plan_name} has been canceled because we don't have a valid pay
 
 Subscribe here: {billing_url}
 
-If you have any questions, contact us at support@sparefinder.org.
+If you have any questions, contact us at email@sparefinder.org.
 
 — SpareFinder
 """
@@ -684,7 +684,7 @@ Your SpareFinder {plan_name} plan has expired. To get back full access to part i
 
 Resubscribe here: {billing_url}
 
-If you have any questions, contact us at support@sparefinder.org.
+If you have any questions, contact us at email@sparefinder.org.
 
 — SpareFinder
 """

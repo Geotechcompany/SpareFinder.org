@@ -78,9 +78,9 @@ Generate compelling, personalized re-engagement EMAIL COPY (not HTML) for SpareF
 - They haven't used the app in a while and need to be re-engaged
 
 **Requirements:**
-1. Create a catchy, personalized subject line (max 60 characters)
-2. Provide concise, scannable copy:
-   - A compelling headline (short)
+1. Create a UNIQUE, catchy subject line (max 60 chars). Do NOT use generic phrases like "Welcome back", "We've missed you", or "Your account is waiting".
+2. Provide distinctive, scannable copy:
+   - A compelling headline that feels specific to SpareFinder and parts identification (avoid "Welcome back" or "We've missed you")
    - A short intro paragraph (1–2 sentences) **WITHOUT any greeting** (do NOT start with "Hi/Hello/Hey {user_name}" — greeting is handled by the template)
    - 3–5 benefit bullet points (plain text, no emojis)
    - A short closing line (optional)
@@ -92,11 +92,11 @@ Generate compelling, personalized re-engagement EMAIL COPY (not HTML) for SpareF
 - Footer includes Help/Contact/Settings and Unsubscribe: {unsubscribe_url}
 
 **Style Guidelines:**
-- Professional but friendly tone
+- Professional but friendly tone; sound human and specific, not like a template
 - Focus on solving their problem (identifying parts quickly)
 - Use action-oriented language
 - Keep paragraphs short and scannable
-- Avoid gimmicks and excessive hype
+- Avoid gimmicks, hype, and stock phrases—every line should feel written for this product
 
 **Output Format:**
 Return a JSON object with:
@@ -125,7 +125,7 @@ Only valid JSON. No markdown."""
                         "content": prompt
                     }
                 ],
-                temperature=0.8,  # Creative but consistent
+                temperature=0.9,  # More variety and uniqueness
                 max_tokens=4000,
                 response_format={"type": "json_object"}
             )
@@ -136,9 +136,9 @@ Only valid JSON. No markdown."""
             
             logger.info("Email content generated successfully by AI")
 
-            subject = (ai_content.get("subject") or f"Welcome back, {user_name}!").strip()
-            headline = (ai_content.get("headline") or f"{user_name}, identify parts faster").strip()
-            intro = (ai_content.get("intro") or "Upload a photo, get an instant match, and share clean results with your team.").strip()
+            subject = (ai_content.get("subject") or f"One photo away from your next part match, {user_name}").strip()
+            headline = (ai_content.get("headline") or f"Your part-search shortcut is ready").strip()
+            intro = (ai_content.get("intro") or "SpareFinder turns a single photo into a part ID and supplier options—no catalog flipping.").strip()
             intro = self._strip_greeting(intro, user_name=user_name)
             bullets = ai_content.get("bullets") or []
             if not isinstance(bullets, list):
@@ -219,7 +219,7 @@ Only valid JSON. No markdown."""
         from datetime import datetime
         year = datetime.now().year
         
-        subject = f"Welcome back, {user_name}! Your parts are waiting"
+        subject = f"Your next part is one photo away, {user_name}"
         
         html_content = f"""
 <!doctype html>
@@ -246,10 +246,10 @@ Only valid JSON. No markdown."""
             <tr>
               <td style="padding:28px;">
                 <h1 style="margin:0 0 12px 0;font-size:24px;line-height:1.25;color:#0f172a;">
-                  Welcome back, {user_name}!
+                  Your part-search shortcut is ready
                 </h1>
                 <p style="margin:0 0 20px 0;font-size:14px;line-height:1.6;color:#64748b;">
-                  We've missed you! SpareFinder makes identifying industrial parts faster and easier than ever.
+                  SpareFinder turns a single photo into a part ID and supplier options—no catalog flipping.
                 </p>
                 <img src="{inline_image_url}" alt="Parts identification workflow" style="display:block;width:100%;max-width:500px;margin:20px auto;border-radius:8px;" />
                 <p style="margin:20px 0;font-size:14px;line-height:1.6;color:#64748b;">
@@ -291,11 +291,11 @@ Only valid JSON. No markdown."""
   </body>
 </html>"""
         
-        text_content = f"""Welcome back, {user_name}!
+        text_content = f"""Hi {user_name},
 
-We've missed you! SpareFinder makes identifying industrial parts faster and easier than ever.
+Your part-search shortcut is ready. SpareFinder turns a single photo into a part ID and supplier options—no catalog flipping.
 
-Upload a photo, get instant identification, and share results with your team—all in seconds.
+Upload a photo, get instant identification, and share results with your team.
 
 Start Identifying Parts: {upload_url}
 View Dashboard: {dashboard_url}
