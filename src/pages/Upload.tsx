@@ -29,6 +29,8 @@ import {
   Info,
   AlertCircle,
   Search,
+  MapPin,
+  Globe,
 } from "lucide-react";
 import {
   Card,
@@ -87,8 +89,8 @@ import {
 } from "@/components/ui/dialog";
 import { api, dashboardApi } from "@/lib/api";
 import KeywordMarkdownResults from "@/components/KeywordMarkdownResults";
-import OnboardingGuide from "@/components/OnboardingGuide";
 import { ComprehensiveAnalysisModal } from "@/components/ComprehensiveAnalysisModal";
+import { useDetectedRegion } from "@/hooks/useDetectedRegion";
 // Pending jobs UI removed; redirect goes to History
 
 // Enhanced CSS styles for technical data visibility
@@ -885,6 +887,17 @@ const Upload = () => {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const { inLayout } = useDashboardLayout();
   const { isPlanActive, isLoading: subscriptionLoading } = useSubscription();
+  const { regionLabel, isLoading: regionLoading, error: regionError } = useDetectedRegion();
+  const REGION_PREFERENCE_KEY = "sparefinder_region_enabled";
+  const [regionEnabled, setRegionEnabled] = useState<boolean | null>(() => {
+    try {
+      const v = localStorage.getItem(REGION_PREFERENCE_KEY);
+      if (v === "1") return true;
+      if (v === "0") return false;
+    } catch {}
+    return null;
+  });
+  const [showRegionModal, setShowRegionModal] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [analysisResults, setAnalysisResults] =
@@ -904,23 +917,6 @@ const Upload = () => {
   const [confirmKeywordSearchOpen, setConfirmKeywordSearchOpen] =
     useState(false);
   const [isKeywordSearching, setIsKeywordSearching] = useState(false);
-  const [showOnboarding, setShowOnboarding] = useState<boolean>(() => {
-    try {
-      const seen = localStorage.getItem("onboarding_seen_v1");
-      const force = localStorage.getItem("onboarding_force_start_v1");
-      if (force === "1") {
-        try {
-          localStorage.removeItem("onboarding_force_start_v1");
-        } catch {}
-        return true;
-      }
-      return seen !== "1";
-    } catch {
-      return true;
-    }
-  });
-  const [skipWelcome, setSkipWelcome] = useState<boolean>(false);
-
   if (!subscriptionLoading && !isPlanActive) {
     return <PlanRequiredCard title="Activate a plan to upload" />;
   }
@@ -936,9 +932,6 @@ const Upload = () => {
   const [wizardProgress, setWizardProgress] = useState(0);
   const [showComprehensiveAnalysis, setShowComprehensiveAnalysis] =
     useState(false);
-  const [aiOnboardingSummary, setAiOnboardingSummary] = useState<string | null>(
-    null
-  );
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const keywordsInputRef = useRef<HTMLInputElement>(null);
@@ -969,63 +962,6 @@ const Upload = () => {
   const { toast } = useToast();
   const { uploadFile } = useFileUpload();
   const navigate = useNavigate();
-
-  useEffect(() => {
-    try {
-      const seen = localStorage.getItem("onboarding_seen_v1");
-      let shouldShow = seen !== "1";
-      const force = localStorage.getItem("onboarding_force_start_v1");
-      if (force === "1") {
-        shouldShow = true;
-        try {
-          localStorage.removeItem("onboarding_force_start_v1");
-        } catch {}
-        setSkipWelcome(true);
-      }
-      setShowOnboarding(shouldShow);
-    } catch {}
-  }, []);
-
-  // Fetch user statistics once to generate an AI-style onboarding summary
-  useEffect(() => {
-    const fetchStatsForOnboarding = async () => {
-      try {
-        const response = await api.statistics.getStats();
-        const stats = (response as any)?.statistics;
-        if (stats) {
-          const total = stats.total_uploads ?? 0;
-          const successful = stats.total_successful_identifications ?? 0;
-          const avgConf = Number(stats.average_confidence_score ?? 0);
-
-          const partsPhrase =
-            total === 0
-              ? "This looks like your first upload."
-              : `You've uploaded ${total} part${total === 1 ? "" : "s"} so far${
-                  successful
-                    ? `, with ${successful} successful identifications`
-                    : ""
-                }.`;
-
-          const confidencePhrase =
-            avgConf > 0
-              ? `Your current average confidence is about ${Math.round(
-                  avgConf
-                )}%.`
-              : "We don't have enough data yet to estimate your confidence.";
-
-          setAiOnboardingSummary(
-            `${partsPhrase} ${confidencePhrase} For best accuracy, combine a clear image with 3–5 precise keywords (part number, make/model/year).`
-          );
-        }
-      } catch {
-        // Silent failure – onboarding still works without AI summary
-      }
-    };
-
-    if (showOnboarding) {
-      fetchStatsForOnboarding();
-    }
-  }, [showOnboarding]);
 
   const getProgressStageColor = (stage: string) => {
     switch (stage) {
@@ -2191,10 +2127,6 @@ const Upload = () => {
           title: "Scheduled",
           description: "Your analysis was queued. You can track it below.",
         });
-        try {
-          localStorage.setItem("onboarding_seen_v1", "1");
-          setShowOnboarding(false);
-        } catch {}
         navigate("/dashboard/history");
         return;
       }
@@ -2205,10 +2137,6 @@ const Upload = () => {
         title: "Started",
         description: "Your analysis started. Track progress below.",
       });
-      try {
-        localStorage.setItem("onboarding_seen_v1", "1");
-        setShowOnboarding(false);
-      } catch {}
       navigate("/dashboard/history");
     } catch (e: any) {
       toast({
@@ -3440,74 +3368,114 @@ const Upload = () => {
           transition={{ duration: 0.5 }}
           className="space-y-4 sm:space-y-6 lg:space-y-8 max-w-3xl md:max-w-5xl lg:max-w-6xl mx-auto"
         >
-          {/* Header */}
-          <div className="relative">
-            <div className="absolute inset-0 rounded-3xl bg-gradient-to-r from-[#3A5AFE0A] via-[#06B6D40A] to-transparent blur-xl opacity-80 dark:from-purple-600/10 dark:to-blue-600/10" />
-            <div className="relative rounded-3xl border border-border bg-card shadow-soft-elevated backdrop-blur-xl dark:bg-black/30 dark:border-white/10">
-              {/* Credits Display - Top Right */}
-              <motion.div
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.1 }}
-                className="absolute top-4 right-4"
-              >
-                <CreditsDisplay
-                  size="small"
-                  className="bg-card/95 border border-border shadow-soft-elevated dark:bg-black/40 dark:border-white/20"
-                />
-              </motion.div>
-
-              <div className="text-center">
-                <motion.div
-                  initial={{ opacity: 0, scale: 0.8 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={{ delay: 0.2 }}
-                  className="inline-flex items-center px-4 py-2 rounded-full border border-border bg-gradient-to-r from-[#3A5AFE14] via-[#06B6D414] to-transparent text-xs sm:text-sm font-medium text-foreground/80 backdrop-blur-xl mb-4 dark:border-purple-500/30 dark:from-purple-600/20 dark:to-blue-600/20 dark:text-purple-300"
-                >
-                  <motion.div
-                    animate={{ rotate: [0, 360] }}
-                    transition={{
-                      duration: 3,
-                      repeat: Infinity,
-                      ease: "linear",
-                    }}
-                    className="mr-2"
-                  >
-                    <Sparkles className="w-4 h-4 text-primary dark:text-purple-400" />
-                  </motion.div>
-                  <span className="font-semibold">
-                    SpareFinder AI‑Powered
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.25 }}
+            className="mt-3 flex flex-wrap items-center gap-2"
+          >
+            {regionEnabled === true && (
+              <div className="inline-flex items-center gap-2 rounded-2xl border border-border bg-background/80 px-3 py-1.5 text-xs sm:text-sm text-muted-foreground shadow-sm dark:bg-white/5 dark:border-white/10">
+                <MapPin className="h-3.5 w-3.5 shrink-0 text-primary/80" />
+                {regionLoading ? (
+                  <span className="animate-pulse">Detecting your location…</span>
+                ) : regionLabel ? (
+                  <span>
+                    You're in <span className="font-medium text-foreground/90">{regionLabel}</span>
                   </span>
-                </motion.div>
-                <motion.h1
-                  className="text-3xl lg:text-4xl font-bold text-foreground dark:bg-gradient-to-r dark:from-white dark:via-purple-200 dark:to-blue-200 dark:bg-clip-text dark:text-transparent mb-3"
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.3 }}
+                ) : (
+                  <span>Location unavailable</span>
+                )}
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 px-2 text-xs text-muted-foreground hover:text-foreground"
+                  onClick={() => setShowRegionModal(true)}
                 >
-                  Upload Part Image
-                </motion.h1>
-                <motion.p
-                  className="text-lg text-muted-foreground"
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.4 }}
-                >
-                  {wizardStep === "landing"
-                    ? "Welcome to SpareFinder AI - Let's identify your Manufacturing spares part!"
-                    : wizardStep === "selection"
-                    ? "Choose how you'd like to identify your Manufacturing spares part"
-                    : wizardStep === "image"
-                    ? selectedMode === "both"
-                      ? "Upload an image - step 1 of 2"
-                      : "Upload an image of your Manufacturing spares part for AI analysis"
-                    : wizardStep === "keywords"
-                    ? "Add keywords to refine your search - step 2 of 2"
-                    : "Review and submit your request"}
-                </motion.p>
+                  Change
+                </Button>
               </div>
-            </div>
-          </div>
+            )}
+            {regionEnabled === false && (
+              <div className="inline-flex items-center gap-2 rounded-2xl border border-border bg-background/80 px-3 py-1.5 text-xs sm:text-sm text-muted-foreground shadow-sm dark:bg-white/5 dark:border-white/10">
+                <Globe className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                <span>Results: global</span>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 px-2 text-xs text-muted-foreground hover:text-foreground"
+                  onClick={() => setShowRegionModal(true)}
+                >
+                  Change
+                </Button>
+              </div>
+            )}
+            {regionEnabled === null && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="rounded-2xl border-border bg-background/80 shadow-sm dark:bg-white/5 dark:border-white/10"
+                onClick={() => setShowRegionModal(true)}
+              >
+                <MapPin className="mr-2 h-3.5 w-3.5 text-primary/80" />
+                Use my region for better results
+              </Button>
+            )}
+          </motion.div>
+
+          {/* Region preference modal */}
+          <Dialog open={showRegionModal} onOpenChange={setShowRegionModal}>
+            <DialogContent className="sm:max-w-md">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  <MapPin className="h-5 w-5 text-primary" />
+                  Use your region for better results
+                </DialogTitle>
+                <DialogDescription asChild>
+                  <div className="space-y-3 pt-1 text-muted-foreground">
+                    <p>
+                      When enabled, we use your country or region to prioritise suppliers near you. We do not store your precise location.
+                    </p>
+                    <p>
+                      This can improve the relevance of your results—for example, by surfacing local suppliers and availability in your area. You can switch to global results at any time.
+                    </p>
+                  </div>
+                </DialogDescription>
+              </DialogHeader>
+              <DialogFooter className="flex-col gap-2 sm:flex-row">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full sm:w-auto"
+                  onClick={() => {
+                    try {
+                      localStorage.setItem(REGION_PREFERENCE_KEY, "0");
+                    } catch {}
+                    setRegionEnabled(false);
+                    setShowRegionModal(false);
+                  }}
+                >
+                  Remain global
+                </Button>
+                <Button
+                  type="button"
+                  className="w-full sm:w-auto"
+                  onClick={() => {
+                    try {
+                      localStorage.setItem(REGION_PREFERENCE_KEY, "1");
+                    } catch {}
+                    setRegionEnabled(true);
+                    setShowRegionModal(false);
+                  }}
+                >
+                  Enable region
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
 
           {/* Wizard Progress Bar - Snake-style stepped */}
           {wizardStep !== "landing" && wizardStep !== "selection" && (() => {
@@ -4548,56 +4516,7 @@ const Upload = () => {
                   transition={{ delay: 0.35 }}
                   className="w-full"
                 >
-                  {showOnboarding && (
-                    <OnboardingGuide
-                      userId={null}
-                      force
-                      showWelcome={!skipWelcome}
-                      onStart={() => {
-                        // Ensure the tour always begins from the landing step
-                        handleResetWizard();
-                      }}
-                      onDismiss={() => setShowOnboarding(false)}
-                      className="mb-6"
-                      welcomeTitle="AI‑guided upload"
-                      welcomeDescription="Let SpareFinder AI walk you through capturing the best image and keywords so we can identify your part as accurately as possible."
-                      aiSummary={aiOnboardingSummary || undefined}
-                      steps={[
-                        {
-                          selector: "#tour-start-analyzing-button",
-                          title: "Start the guided flow",
-                          description:
-                            "Click this button to begin the 3‑step SpareFinder AI wizard.",
-                          aiHint:
-                            "We’ll first ask how you want to search, then walk you through image upload and keywords for best accuracy.",
-                        },
-                        {
-                          selector: "#tour-upload-dropzone",
-                          title: "Choose a clear image",
-                          description:
-                            "Click Choose File and pick a sharp, well‑lit photo where the part fills most of the frame.",
-                          aiHint:
-                            "AI models work best when the part is centered, in focus, and not obstructed by packaging or clutter.",
-                        },
-                        {
-                          selector: "#tour-keywords-input",
-                          title: "Add precise keywords",
-                          description:
-                            "Optionally add 3–5 focused terms like part number, make/model/year, and position (e.g., front‑left).",
-                          aiHint:
-                            "Keywords help the AI disambiguate visually similar parts and find the closest matches faster.",
-                        },
-                        {
-                          selector: "#tour-search-keywords-btn",
-                          title: "Run the AI analysis",
-                          description:
-                            "Press Analyze Part. We'll process the image and keywords, then send you to History to track the job in real time.",
-                          aiHint:
-                            "Behind the scenes, SpareFinder AI combines vision, text understanding, and your past searches to improve match quality over time.",
-                        },
-                      ]}
-                    />
-                  )}
+                  {/* AI-guided onboarding removed; new flow can be added here */}
                   <Card className="bg-card/95 text-foreground border border-border shadow-soft-elevated backdrop-blur-xl dark:bg-black/30 dark:border-white/10">
                     <CardHeader>
                       <CardTitle className="flex items-center text-foreground dark:text-white">
