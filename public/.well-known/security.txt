@@ -1,4 +1,4 @@
-Contact: mailto:support@sparefinder.org
+Contact: mailto:email@sparefinder.org
 Expires: 2026-12-31T23:59:59.000Z
 Preferred-Languages: en
 Canonical: https://sparefinder.org/.well-known/security.txt
