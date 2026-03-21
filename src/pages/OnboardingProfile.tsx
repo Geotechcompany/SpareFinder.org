@@ -256,9 +256,9 @@ const OnboardingProfile: React.FC = () => {
 
   return (
     <div className="flex min-h-[100dvh] flex-col bg-gradient-to-b from-background via-[#F0F2F5] to-[#E8EBF1] dark:from-slate-950 dark:via-slate-950 dark:to-slate-900">
-      <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-0 lg:grid lg:min-h-[100dvh] lg:grid-cols-2 lg:gap-10 lg:p-6">
-          <Card className="flex min-h-[100dvh] flex-col rounded-none border-0 border-border bg-card shadow-soft-elevated dark:bg-card/95 lg:h-full lg:min-h-0 lg:rounded-2xl lg:border lg:bg-card/90 lg:backdrop-blur-xl">
-            <CardHeader className="shrink-0 space-y-2 px-4 pt-6 sm:px-6">
+      <div className="flex w-full max-w-none flex-1 flex-col gap-0 lg:grid lg:min-h-[100dvh] lg:grid-cols-2 lg:gap-0">
+          <Card className="flex min-h-[100dvh] flex-col rounded-none border-0 border-border bg-card shadow-soft-elevated dark:bg-card/95 lg:h-full lg:min-h-0 lg:border-r lg:border-border lg:bg-card/90 lg:backdrop-blur-xl lg:shadow-none">
+            <CardHeader className="shrink-0 space-y-2 px-4 pt-6 sm:px-6 lg:px-10 xl:px-14 2xl:px-20">
               <div className="flex items-start justify-between gap-3">
                 <div className="space-y-1">
                   <CardTitle className="text-2xl">Quick onboarding</CardTitle>
@@ -273,7 +273,7 @@ const OnboardingProfile: React.FC = () => {
               </div>
               <Progress value={progressValue} className="h-2 bg-muted/50" />
             </CardHeader>
-            <CardContent className="flex min-h-0 flex-1 flex-col gap-0 px-4 pb-6 sm:px-6">
+            <CardContent className="flex min-h-0 flex-1 flex-col gap-0 px-4 pb-6 sm:px-6 lg:px-10 xl:px-14 2xl:px-20">
               <div className="flex shrink-0 items-center gap-3 rounded-2xl border border-border bg-background/60 p-4">
                 <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-r from-purple-600 to-blue-600 text-white">
                   {React.createElement(activeStep.icon, { className: "h-5 w-5" })}
@@ -508,22 +508,22 @@ const OnboardingProfile: React.FC = () => {
             </CardContent>
           </Card>
 
-          {/* Right-side visuals (desktop: full-height column; mobile: form uses full viewport above) */}
-          <div className="relative hidden min-h-0 lg:flex">
-            <div className="relative h-full min-h-[min(100dvh,900px)] w-full overflow-hidden rounded-2xl border border-border bg-card/80 shadow-soft-elevated">
+          {/* Right-side visuals: full viewport width on lg (50% grid column), edge-to-edge image */}
+          <div className="relative hidden min-h-0 lg:flex lg:min-h-[100dvh]">
+            <div className="relative h-full min-h-[100dvh] w-full overflow-hidden border-0 bg-card/80 lg:shadow-none">
               <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-purple-500/10 via-transparent to-blue-500/10" />
 
-              <div className="absolute inset-0 p-6">
-                <div className="relative h-full overflow-hidden rounded-xl border border-border bg-background/60">
+              <div className="absolute inset-0 lg:p-0">
+                <div className="relative h-full min-h-[100dvh] overflow-hidden border-0 bg-background/60 lg:rounded-none">
                   <img
                     src={rightImageSrc}
                     alt={activeStep.image.alt}
-                    className="h-full w-full object-cover"
+                    className="h-full w-full min-h-[100dvh] object-cover"
                     loading="lazy"
                     onError={() => setRightImageSrc(activeStep.image.fallbackSrc)}
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/55 via-black/10 to-transparent" />
-                  <div className="absolute bottom-4 left-4 right-4 text-white">
+                  <div className="absolute bottom-6 left-6 right-6 text-white lg:bottom-10 lg:left-10 lg:right-10 xl:bottom-14 xl:left-14 xl:right-14">
                     <div className="text-sm font-semibold">{activeStep.image.kicker}</div>
                     <div className="mt-1 text-xs opacity-95">{activeStep.image.caption}</div>
                   </div>
