@@ -27,7 +27,7 @@ const Trial: React.FC = () => {
     if (isLoading) return;
     if (!user) return;
     if (!user.company || user.company.trim().length === 0) {
-      navigate(`/onboarding/profile?next=${encodeURIComponent("/onboarding/trial")}`, {
+      navigate(`/onboarding/profile?next=${encodeURIComponent("/dashboard/billing")}`, {
         replace: true,
       });
     }

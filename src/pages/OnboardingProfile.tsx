@@ -109,7 +109,7 @@ const OnboardingProfile: React.FC = () => {
 
   const nextPath = useMemo(() => {
     const next = searchParams.get("next");
-    return typeof next === "string" && next.startsWith("/") ? next : "/onboarding/trial";
+    return typeof next === "string" && next.startsWith("/") ? next : "/dashboard/billing";
   }, [searchParams]);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -233,7 +233,7 @@ const OnboardingProfile: React.FC = () => {
         console.warn("Onboarding survey insert failed:", err);
       }
 
-      await checkAuth(); // refresh auth-context user.company
+      await checkAuth(); // refresh auth-context user.company (requires /auth/current-user to return company)
       navigate(nextPath, { replace: true });
       toast({ title: "All set", description: "Thanks — your preferences are saved." });
     } catch (err) {

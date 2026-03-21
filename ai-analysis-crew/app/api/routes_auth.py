@@ -22,7 +22,8 @@ async def current_user(user: CurrentUser = Depends(get_current_user)):
                 "email": user.email,
                 "full_name": user.full_name,
                 "role": user.role,
-                "clerk_user_id": user.clerk_user_id
+                "clerk_user_id": user.clerk_user_id,
+                "company": user.company,
             }
         }
     )

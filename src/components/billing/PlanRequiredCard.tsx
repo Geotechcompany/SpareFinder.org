@@ -48,7 +48,7 @@ export const PlanRequiredCard: React.FC<{
                     !isLoading && user && (!user.company || user.company.trim().length === 0);
                   navigate(
                     needsOnboarding
-                      ? `/onboarding/profile?next=${encodeURIComponent("/onboarding/trial")}`
+                      ? `/onboarding/profile?next=${encodeURIComponent("/dashboard/billing")}`
                       : "/onboarding/trial"
                   );
                 }}

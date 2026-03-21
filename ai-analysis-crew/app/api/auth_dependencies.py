@@ -20,6 +20,7 @@ class CurrentUser(BaseModel):
     full_name: str | None = None
     role: str = "user"
     clerk_user_id: str | None = None
+    company: str | None = None
 
 
 async def get_current_user(
@@ -221,6 +222,7 @@ async def get_current_user(
                             full_name=profile.get("full_name"),
                             role=profile.get("role", "user"),
                             clerk_user_id=clerk_user_id,
+                            company=profile.get("company") if isinstance(profile.get("company"), str) else None,
                         )
                         _cache_current_user(u)
                         return u
@@ -269,6 +271,7 @@ async def get_current_user(
                     full_name=inserted.get("full_name"),
                     role=inserted.get("role", "user"),
                     clerk_user_id=clerk_user_id,
+                    company=inserted.get("company") if isinstance(inserted.get("company"), str) else None,
                 )
                 _cache_current_user(u)
                 return u
@@ -280,6 +283,7 @@ async def get_current_user(
                 full_name=profile.get("full_name"),
                 role=profile.get("role", "user"),
                 clerk_user_id=clerk_user_id,
+                company=profile.get("company") if isinstance(profile.get("company"), str) else None,
             )
             _cache_current_user(u)
             return u
@@ -300,6 +304,7 @@ async def get_current_user(
                     full_name=profile.get("full_name"),
                     role=profile.get("role", "user"),
                     clerk_user_id=profile.get("clerk_user_id"),
+                    company=profile.get("company") if isinstance(profile.get("company"), str) else None,
                 )
                 _cache_current_user(u)
                 return u
@@ -329,6 +334,7 @@ async def get_current_user(
                         full_name=profile.get("full_name"),
                         role=profile.get("role", "user"),
                         clerk_user_id=profile.get("clerk_user_id"),
+                        company=profile.get("company") if isinstance(profile.get("company"), str) else None,
                     )
                     _cache_current_user(u)
                     return u
@@ -356,6 +362,7 @@ async def get_current_user(
                         full_name=inserted.get("full_name"),
                         role=inserted.get("role", "user"),
                         clerk_user_id=inserted.get("clerk_user_id"),
+                        company=inserted.get("company") if isinstance(inserted.get("company"), str) else None,
                     )
                     _cache_current_user(u)
                     return u
