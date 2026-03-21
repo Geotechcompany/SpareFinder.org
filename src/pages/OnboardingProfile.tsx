@@ -136,8 +136,13 @@ const OnboardingProfile: React.FC = () => {
 
     const run = async () => {
       if (isLoading) return;
-      if (!user) return;
+      if (!user) {
+        // Never leave the button stuck disabled when auth is not loading but user is missing.
+        setIsPrefillLoading(false);
+        return;
+      }
 
+      setIsPrefillLoading(true);
       try {
         const resp = await api.user.getProfile();
         const profile = (resp as any)?.data?.profile;
@@ -162,7 +167,7 @@ const OnboardingProfile: React.FC = () => {
       }
     };
 
-    run();
+    void run();
     return () => {
       isMounted = false;
     };
@@ -231,23 +236,29 @@ const OnboardingProfile: React.FC = () => {
       await checkAuth(); // refresh auth-context user.company
       navigate(nextPath, { replace: true });
       toast({ title: "All set", description: "Thanks — your preferences are saved." });
+    } catch (err) {
+      console.error("Onboarding save failed:", err);
+      toast({
+        variant: "destructive",
+        title: "Could not save",
+        description: "We couldn’t save your profile. Check your connection and try again.",
+      });
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const isCompleteDisabled = isSubmitting || isPrefillLoading || !company.trim();
+  const isCompleteDisabled = isSubmitting || isLoading || isPrefillLoading || !company.trim();
 
   useEffect(() => {
     setRightImageSrc(activeStep.image.src);
   }, [activeStep.id]);
 
   return (
-    <div className="min-h-[100dvh] bg-gradient-to-b from-background via-[#F0F2F5] to-[#E8EBF1] dark:from-slate-950 dark:via-slate-950 dark:to-slate-900 p-4 sm:p-6">
-      <div className="mx-auto w-full max-w-6xl">
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 lg:gap-10">
-          <Card className="border-border bg-card/90 backdrop-blur-xl shadow-soft-elevated">
-            <CardHeader className="space-y-2">
+    <div className="flex min-h-[100dvh] flex-col bg-gradient-to-b from-background via-[#F0F2F5] to-[#E8EBF1] dark:from-slate-950 dark:via-slate-950 dark:to-slate-900">
+      <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-0 lg:grid lg:min-h-[100dvh] lg:grid-cols-2 lg:gap-10 lg:p-6">
+          <Card className="flex min-h-[100dvh] flex-col rounded-none border-0 border-border bg-card shadow-soft-elevated dark:bg-card/95 lg:h-full lg:min-h-0 lg:rounded-2xl lg:border lg:bg-card/90 lg:backdrop-blur-xl">
+            <CardHeader className="shrink-0 space-y-2 px-4 pt-6 sm:px-6">
               <div className="flex items-start justify-between gap-3">
                 <div className="space-y-1">
                   <CardTitle className="text-2xl">Quick onboarding</CardTitle>
@@ -262,8 +273,8 @@ const OnboardingProfile: React.FC = () => {
               </div>
               <Progress value={progressValue} className="h-2 bg-muted/50" />
             </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="flex items-center gap-3 rounded-2xl border border-border bg-background/60 p-4">
+            <CardContent className="flex min-h-0 flex-1 flex-col gap-0 px-4 pb-6 sm:px-6">
+              <div className="flex shrink-0 items-center gap-3 rounded-2xl border border-border bg-background/60 p-4">
                 <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-r from-purple-600 to-blue-600 text-white">
                   {React.createElement(activeStep.icon, { className: "h-5 w-5" })}
                 </div>
@@ -273,6 +284,7 @@ const OnboardingProfile: React.FC = () => {
                 </div>
               </div>
 
+              <div className="mt-6 min-h-0 flex-1 overflow-y-auto pr-1 [-webkit-overflow-scrolling:touch]">
               <AnimatePresence mode="wait">
                 <motion.div
                   key={activeStep.id}
@@ -299,7 +311,7 @@ const OnboardingProfile: React.FC = () => {
                       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                         <div className="space-y-2">
                           <Label>Your role</Label>
-                          <Select value={role} onValueChange={setRole}>
+                          <Select value={role || undefined} onValueChange={setRole}>
                             <SelectTrigger>
                               <SelectValue placeholder="Select role" />
                             </SelectTrigger>
@@ -316,7 +328,7 @@ const OnboardingProfile: React.FC = () => {
 
                         <div className="space-y-2">
                           <Label>Company size</Label>
-                          <Select value={companySize} onValueChange={setCompanySize}>
+                          <Select value={companySize || undefined} onValueChange={setCompanySize}>
                             <SelectTrigger>
                               <SelectValue placeholder="Select size" />
                             </SelectTrigger>
@@ -337,7 +349,7 @@ const OnboardingProfile: React.FC = () => {
                     <>
                       <div className="space-y-2">
                         <Label>Primary goal</Label>
-                        <Select value={primaryGoal} onValueChange={setPrimaryGoal}>
+                        <Select value={primaryGoal || undefined} onValueChange={setPrimaryGoal}>
                           <SelectTrigger>
                             <SelectValue placeholder="What do you want to achieve first?" />
                           </SelectTrigger>
@@ -381,7 +393,7 @@ const OnboardingProfile: React.FC = () => {
                     <>
                       <div className="space-y-2">
                         <Label>Where did you hear about SpareFinder?</Label>
-                        <Select value={referralSource} onValueChange={setReferralSource}>
+                        <Select value={referralSource || undefined} onValueChange={setReferralSource}>
                           <SelectTrigger>
                             <SelectValue placeholder="Select an option" />
                           </SelectTrigger>
@@ -455,8 +467,9 @@ const OnboardingProfile: React.FC = () => {
                   ) : null}
                 </motion.div>
               </AnimatePresence>
+              </div>
 
-              <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="mt-6 flex shrink-0 flex-col-reverse gap-3 border-t border-border/60 pt-6 sm:flex-row sm:items-center sm:justify-between">
                 <Button
                   type="button"
                   variant="ghost"
@@ -484,7 +497,7 @@ const OnboardingProfile: React.FC = () => {
                   <Button
                     type="button"
                     onClick={() => setStepIndex((s) => Math.min(STEP_META.length - 1, s + 1))}
-                    disabled={isSubmitting || isPrefillLoading || !canGoNext()}
+                    disabled={isSubmitting || isLoading || isPrefillLoading || !canGoNext()}
                     className="w-full sm:w-auto bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
                   >
                     Next
@@ -495,9 +508,9 @@ const OnboardingProfile: React.FC = () => {
             </CardContent>
           </Card>
 
-          {/* Right-side visuals */}
-          <div className="hidden lg:block">
-            <div className="relative h-full min-h-[520px] overflow-hidden rounded-2xl border border-border bg-card/80 shadow-soft-elevated">
+          {/* Right-side visuals (desktop: full-height column; mobile: form uses full viewport above) */}
+          <div className="relative hidden min-h-0 lg:flex">
+            <div className="relative h-full min-h-[min(100dvh,900px)] w-full overflow-hidden rounded-2xl border border-border bg-card/80 shadow-soft-elevated">
               <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-purple-500/10 via-transparent to-blue-500/10" />
 
               <div className="absolute inset-0 p-6">
@@ -518,7 +531,6 @@ const OnboardingProfile: React.FC = () => {
               </div>
             </div>
           </div>
-        </div>
       </div>
     </div>
   );

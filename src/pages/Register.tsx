@@ -26,8 +26,10 @@ const Register = () => {
     }
   }
 
+  // After sign-up, Clerk authenticates immediately; send users to onboarding before the app shell.
+  // (ClerkProvider afterSignUpUrl also targets this path — this avoids racing to /dashboard from here.)
   if (!isLoading && isAuthenticated) {
-    return <Navigate to="/dashboard" replace />;
+    return <Navigate to="/onboarding/profile" replace />;
   }
 
   return (
@@ -85,6 +87,7 @@ const Register = () => {
         routing="path"
         path="/register"
         signInUrl="/login"
+        forceRedirectUrl="/onboarding/profile"
         appearance={authClerkAppearance as any}
       />
       <div className="mt-5 text-center text-xs text-muted-foreground">
