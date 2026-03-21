@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 from typing import Any, Optional
+from io import StringIO
+import csv
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Response
 
 from .auth_dependencies import CurrentUser, get_current_user
 from .responses import api_ok, api_error
@@ -187,3 +189,67 @@ async def get_history_stats(user: CurrentUser = Depends(get_current_user)):
         print(f"❌ Error fetching history stats: {e}")
         return api_error("Failed to fetch history stats", status_code=500)
 
+
+@router.get("/export")
+async def export_history(
+    format: str = Query(default="csv"),
+    user: CurrentUser = Depends(get_current_user),
+):
+    """
+    Export the current user's upload history.
+
+    Currently supports only CSV export because the frontend downloads a file
+    and does not expect the standard JSON API wrapper used elsewhere.
+    """
+    if format.lower() != "csv":
+        return api_error("Only CSV export is supported", status_code=400)
+
+    try:
+        supabase = get_supabase_admin()
+        user_id = user.id
+
+        # Fetch all uploads for this user, ordered by created_at desc
+        result = (
+            supabase.table("part_searches")
+            .select("*")
+            .eq("user_id", user_id)
+            .order("created_at", desc=True)
+            .execute()
+        )
+        uploads: list[dict[str, Any]] = result.data or []
+
+        # If no data, still return a valid empty CSV with headers
+        # Use a stable set of columns the UI cares about
+        fieldnames = [
+            "id",
+            "created_at",
+            "analysis_status",
+            "file_name",
+            "file_size",
+            "mime_type",
+            "source",
+            "job_id",
+            "top_match_label",
+            "top_match_score",
+        ]
+
+        buffer = StringIO()
+        writer = csv.DictWriter(buffer, fieldnames=fieldnames)
+        writer.writeheader()
+
+        for row in uploads:
+            writer.writerow({k: row.get(k, "") for k in fieldnames})
+
+        csv_bytes = buffer.getvalue().encode("utf-8")
+
+        return Response(
+            content=csv_bytes,
+            media_type="text/csv; charset=utf-8",
+            headers={
+                "Content-Disposition": 'attachment; filename="upload-history.csv"'
+            },
+        )
+
+    except Exception as e:
+        print(f"❌ Error exporting upload history: {e}")
+        return api_error("Failed to export upload history", status_code=500)
