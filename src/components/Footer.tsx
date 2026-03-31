@@ -189,10 +189,10 @@ const Footer = () => {
                 <div>
                   Email:{' '}
                   <a
-                    href="mailto:tps@tpsinternational.co.uk"
+                    href="mailto:email@sparefinder.org"
                     className="underline-offset-2 hover:underline"
                   >
-                    tps@tpsinternational.co.uk
+                    email@sparefinder.org
                   </a>
                 </div>
               </div>

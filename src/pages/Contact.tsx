@@ -176,7 +176,7 @@ const Contact: React.FC = () => {
                         Email
                       </p>
                       <p className="text-sm text-muted-foreground dark:text-gray-300">
-                        tps@tpsinternational.co.uk
+                        email@sparefinder.org
                       </p>
                       <p className="text-sm text-muted-foreground dark:text-gray-300">
                         sales@tpsinternational.co.uk
