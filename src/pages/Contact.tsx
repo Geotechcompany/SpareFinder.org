@@ -218,10 +218,19 @@ const Contact: React.FC = () => {
                         Location
                       </p>
                       <p className="text-sm text-muted-foreground dark:text-gray-300">
-                        Durham Workspace – Abbey Road
+                        Collingwood Buildings
                       </p>
                       <p className="text-sm text-muted-foreground dark:text-gray-300">
-                        Durham DH1 5JZ, UK
+                        38 Collingwood Street
+                      </p>
+                      <p className="text-sm text-muted-foreground dark:text-gray-300">
+                        Newcastle
+                      </p>
+                      <p className="text-sm text-muted-foreground dark:text-gray-300">
+                        NE1 1JF
+                      </p>
+                      <p className="text-sm text-muted-foreground dark:text-gray-300">
+                        GB
                       </p>
                     </div>
                   </div>

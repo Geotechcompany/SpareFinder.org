@@ -177,9 +177,12 @@ const Footer = () => {
               {/* Company contact details */}
               <div className="pt-2 text-xs text-muted-foreground dark:text-gray-400 space-y-1 sm:text-sm">
                 <div className="font-medium text-foreground dark:text-white">
-                  Durham Workspace – Abbey Road
+                  Collingwood Buildings
                 </div>
-                <div>Durham DH1 5JZ, UK</div>
+                <div>38 Collingwood Street</div>
+                <div>Newcastle</div>
+                <div>NE1 1JF</div>
+                <div>GB</div>
                 <div>
                   Call Us: +44 1916499741 · +44 7415892946
                 </div>
