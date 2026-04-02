@@ -9,13 +9,14 @@ export default defineConfig(({ mode }) => ({
   server: {
     host: "localhost",
     port: 3000,
+    // Use "/api/" (trailing slash) so "/api-docs" is not mistaken for "/api" + "docs"
     proxy: {
-      '/api': {
-        target: process.env.VITE_API_URL || 'http://localhost:4000',
+      "^/api/": {
+        target: process.env.VITE_API_URL || "http://localhost:4000",
         changeOrigin: true,
-        secure: false
-      }
-    }
+        secure: false,
+      },
+    },
   },
   plugins: [
     react(),

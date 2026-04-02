@@ -182,9 +182,12 @@ export const SEO = ({
     schemaScript.textContent = JSON.stringify(finalSchema);
     document.head.appendChild(schemaScript);
 
+    // Signals build-time prerender (Puppeteer) that head + route SEO have been applied.
+    document.documentElement.setAttribute("data-prerender-ready", "1");
+
     // Cleanup function
     return () => {
-      // Optional: Clean up on unmount if needed
+      document.documentElement.removeAttribute("data-prerender-ready");
     };
   }, [
     title,
