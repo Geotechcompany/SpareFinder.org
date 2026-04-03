@@ -55,7 +55,7 @@ const IndustrialApplications = () => {
           <h2 className="mb-6 text-4xl font-bold tracking-tight text-foreground sm:text-5xl lg:text-6xl dark:bg-gradient-to-r dark:from-white dark:via-orange-200 dark:to-red-200 dark:bg-clip-text dark:text-transparent">
             Serving Every Industry
           </h2>
-          <p className="mx-auto max-w-3xl text-xl leading-relaxed text-muted-foreground dark:text-gray-400">
+          <p className="mx-auto max-w-3xl text-xl leading-relaxed text-slate-600 dark:text-gray-400">
             From Engineering spares to aerospace, our AI-powered part identification works across all major industrial sectors
           </p>
         </div>
@@ -74,7 +74,7 @@ const IndustrialApplications = () => {
 
         {/* Bottom CTA */}
         <div className="mt-20 text-center">
-          <p className="text-lg text-muted-foreground dark:text-gray-400">
+          <p className="text-lg text-slate-600 dark:text-gray-400">
             Don't see your industry? Our AI recognizes parts across 50+ categories
           </p>
         </div>

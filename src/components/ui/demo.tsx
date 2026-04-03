@@ -41,8 +41,12 @@ const DemoOne = () => {
         <div className="flex flex-col items-center justify-center space-y-3 px-4 md:space-y-4">
           <h1 className="max-w-3xl text-2xl font-semibold leading-tight tracking-tight text-foreground sm:text-3xl md:text-5xl lg:text-6xl dark:text-white">
             Next-Generation AI Technology
+            <span className="sr-only">
+              {" "}
+              — SpareFinder: AI-powered industrial spare parts identification
+            </span>
           </h1>
-          <p className="max-w-2xl px-4 text-base text-muted-foreground md:text-lg dark:text-neutral-300">
+          <p className="max-w-2xl px-4 text-base text-slate-600 md:text-lg dark:text-neutral-300">
             Revolutionary computer vision technology that identifies industrial
             parts with 99.9% accuracy in milliseconds.
           </p>
@@ -73,9 +77,9 @@ const DemoOne = () => {
                 size={16}
                 className="text-primary md:h-[18px] md:w-[18px] dark:text-white/80"
               />
-              <h3 className="text-xs font-medium line-clamp-1 md:text-sm lg:text-base">
+              <p className="text-xs font-medium line-clamp-1 md:text-sm lg:text-base">
                 {feature.title}
-              </h3>
+              </p>
               <p className="text-xs text-muted-foreground line-clamp-2 md:text-sm dark:text-neutral-400">
                 {feature.description}
               </p>

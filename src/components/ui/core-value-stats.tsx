@@ -32,7 +32,7 @@ export default function CoreValueStats({
         <h2 className="text-3xl font-semibold leading-tight tracking-tight text-foreground md:text-5xl dark:bg-gradient-to-r dark:from-white dark:via-purple-200 dark:to-blue-200 dark:bg-clip-text dark:text-transparent">
           {title}
         </h2>
-        <p className="mx-auto max-w-3xl text-lg text-muted-foreground">
+        <p className="mx-auto max-w-3xl text-lg text-slate-600 dark:text-gray-300">
           {description}
         </p>
       </div>

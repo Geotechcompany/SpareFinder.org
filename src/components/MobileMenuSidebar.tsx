@@ -26,12 +26,21 @@ export function MobileMenuSidebar({
   resources,
   className,
 }: MobileMenuSidebarProps) {
+  const asideRef = React.useRef<HTMLAsideElement>(null);
+
   React.useEffect(() => {
     if (open) document.body.style.overflow = "hidden";
     else document.body.style.overflow = "";
     return () => {
       document.body.style.overflow = "";
     };
+  }, [open]);
+
+  React.useEffect(() => {
+    const el = asideRef.current;
+    if (!el) return;
+    if (open) el.removeAttribute("inert");
+    else el.setAttribute("inert", "");
   }, [open]);
 
   const sidebar = (
@@ -45,9 +54,10 @@ export function MobileMenuSidebar({
         aria-hidden="true"
       />
       <aside
+        ref={asideRef}
         className={cn(
           "fixed left-0 top-0 z-[120] flex h-full w-[280px] max-w-[85vw] flex-col border-r border-gray-200 bg-white shadow-xl transition-transform duration-300 ease-out dark:border-white/10 dark:bg-gray-900 lg:hidden",
-          open ? "translate-x-0" : "-translate-x-full",
+          open ? "translate-x-0" : "-translate-x-full pointer-events-none",
           className
         )}
         aria-hidden={!open}

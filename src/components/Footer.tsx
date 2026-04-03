@@ -47,10 +47,10 @@ const Footer = () => {
             transition={{ delay: 0.1, duration: 0.8 }}
             className="space-y-6"
           >
-            <h4 className="mb-6 flex items-center gap-2 text-xl font-bold text-foreground dark:text-white">
-              <div className="h-8 w-2 rounded-full bg-gradient-to-b from-purple-500 to-blue-500" />
+            <p className="mb-6 flex items-center gap-2 text-xl font-bold text-foreground dark:text-white">
+              <span className="h-8 w-2 rounded-full bg-gradient-to-b from-purple-500 to-blue-500" aria-hidden />
               Solutions
-            </h4>
+            </p>
             <ul className="space-y-4">
               {[
                 { name: 'AI Computer Vision', desc: 'Advanced image recognition' },
@@ -82,10 +82,10 @@ const Footer = () => {
             transition={{ delay: 0.2, duration: 0.8 }}
             className="space-y-6"
           >
-            <h4 className="mb-6 flex items-center gap-2 text-xl font-bold text-foreground dark:text-white">
-              <div className="h-8 w-2 rounded-full bg-gradient-to-b from-green-500 to-emerald-500" />
+            <p className="mb-6 flex items-center gap-2 text-xl font-bold text-foreground dark:text-white">
+              <span className="h-8 w-2 rounded-full bg-gradient-to-b from-green-500 to-emerald-500" aria-hidden />
               Industries
-            </h4>
+            </p>
             <ul className="space-y-4">
               {[
                 { name: 'Engineering spares', desc: 'Vehicle components' },
@@ -117,10 +117,10 @@ const Footer = () => {
             transition={{ delay: 0.3, duration: 0.8 }}
             className="space-y-6"
           >
-            <h4 className="mb-6 flex items-center gap-2 text-xl font-bold text-foreground dark:text-white">
-              <div className="h-8 w-2 rounded-full bg-gradient-to-b from-orange-500 to-red-500" />
+            <p className="mb-6 flex items-center gap-2 text-xl font-bold text-foreground dark:text-white">
+              <span className="h-8 w-2 rounded-full bg-gradient-to-b from-orange-500 to-red-500" aria-hidden />
               Resources
-            </h4>
+            </p>
             <ul className="space-y-4">
               {[
                 { name: 'Documentation', desc: 'Complete API guide' },
@@ -152,10 +152,10 @@ const Footer = () => {
             transition={{ delay: 0.4, duration: 0.8 }}
             className="space-y-6"
           >
-            <h4 className="mb-6 flex items-center gap-2 text-xl font-bold text-foreground dark:text-white">
-              <div className="h-8 w-2 rounded-full bg-gradient-to-b from-yellow-500 to-orange-500" />
+            <p className="mb-6 flex items-center gap-2 text-xl font-bold text-foreground dark:text-white">
+              <span className="h-8 w-2 rounded-full bg-gradient-to-b from-yellow-500 to-orange-500" aria-hidden />
               Stay Connected
-            </h4>
+            </p>
             <div className="space-y-4">
               <p className="text-muted-foreground dark:text-gray-400">
                 Get the latest updates on AI technology and industry insights.

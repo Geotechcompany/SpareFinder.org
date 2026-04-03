@@ -109,7 +109,7 @@ const CookieConsent = () => {
       className="fixed bottom-0 left-0 right-0 z-50 border-t border-border bg-background/95 p-4 text-foreground shadow-soft-elevated backdrop-blur-xl dark:border-gray-800 dark:bg-gray-900/95"
     >
       <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-4 sm:flex-row">
-        <p className="text-sm text-muted-foreground">
+        <p className="text-sm text-slate-600 dark:text-gray-300">
           We use cookies to enhance your experience. By continuing to visit this
           site you agree to our use of cookies.
         </p>
@@ -118,7 +118,7 @@ const CookieConsent = () => {
             variant="outline"
             size="sm"
             onClick={() => setShow(false)}
-            className="border-border text-muted-foreground hover:bg-muted dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-800"
+            className="border-border text-slate-700 hover:bg-muted dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
           >
             Decline
           </Button>
@@ -327,12 +327,8 @@ const Landing = () => {
     <div className="min-h-screen bg-background text-foreground dark:bg-black">
       <Header />
 
-      {/* Primary H1 for SEO */}
-      <h1 className="sr-only">
-        SpareFinder – AI-powered industrial spare parts identification platform
-      </h1>
-
-      {/* Hero Section (DemoOne) */}
+      <main id="main-content">
+      {/* Hero Section (DemoOne) — visible H1 lives in DemoOne */}
       <section className="relative mt-6 w-full overflow-visible pt-4 pb-8">
         {actualTheme === "light" && (
           <div className="pointer-events-none absolute inset-x-0 top-10 z-0 flex justify-center">
@@ -396,7 +392,7 @@ const Landing = () => {
             <h2 className="mb-6 text-5xl font-bold tracking-tight text-foreground lg:text-6xl dark:bg-gradient-to-r dark:from-white dark:via-purple-200 dark:to-blue-200 dark:bg-clip-text dark:text-transparent">
               Core Capabilities
             </h2>
-            <p className="mx-auto max-w-3xl text-xl leading-relaxed text-muted-foreground">
+            <p className="mx-auto max-w-3xl text-xl leading-relaxed text-slate-600 dark:text-gray-300">
               Revolutionary part identification technology that transforms how
               industrial teams work
             </p>
@@ -755,6 +751,8 @@ const Landing = () => {
 
       {/* FAQ Section (last content block before footer) */}
       <FAQDemo />
+
+      </main>
 
       <Footer />
 

@@ -56,39 +56,58 @@ export function FeatureSteps({
 
         <div className="flex flex-col gap-6 md:grid md:grid-cols-2 md:gap-10">
           <div className="order-2 space-y-8 md:order-1">
-            {features.map((feature, index) => (
-              <motion.div
-                key={index}
-                className="flex items-center gap-6 md:gap-8"
-                initial={{ opacity: 0.3 }}
-                animate={{ opacity: index === currentFeature ? 1 : 0.3 }}
-                transition={{ duration: 0.5 }}
-              >
+            {features.map((feature, index) => {
+              const isActive = index === currentFeature;
+              return (
                 <motion.div
-                  className={cn(
-                    "flex h-8 w-8 items-center justify-center rounded-full border-2 md:h-10 md:w-10",
-                    index === currentFeature
-                      ? "scale-110 border-primary bg-primary text-primary-foreground"
-                      : "border-muted-foreground bg-muted text-foreground"
-                  )}
+                  key={index}
+                  className="flex items-center gap-6 md:gap-8"
+                  initial={false}
+                  animate={{ opacity: 1 }}
+                  transition={{ duration: 0.5 }}
                 >
-                  {index <= currentFeature ? (
-                    <span className="text-lg font-bold">✓</span>
-                  ) : (
-                    <span className="text-lg font-semibold">{index + 1}</span>
-                  )}
-                </motion.div>
+                  <motion.div
+                    className={cn(
+                      "flex h-8 w-8 items-center justify-center rounded-full border-2 md:h-10 md:w-10",
+                      isActive
+                        ? "scale-110 border-primary bg-primary text-primary-foreground"
+                        : "border-muted-foreground bg-muted text-foreground"
+                    )}
+                    animate={{ opacity: isActive ? 1 : 0.55 }}
+                    transition={{ duration: 0.5 }}
+                  >
+                    {index <= currentFeature ? (
+                      <span className="text-lg font-bold">✓</span>
+                    ) : (
+                      <span className="text-lg font-semibold">{index + 1}</span>
+                    )}
+                  </motion.div>
 
-                <div className="flex-1">
-                  <h3 className="text-xl font-semibold md:text-2xl">
-                    {feature.title || feature.step}
-                  </h3>
-                  <p className="text-sm text-muted-foreground md:text-lg">
-                    {feature.content}
-                  </p>
-                </div>
-              </motion.div>
-            ))}
+                  <div className="flex-1">
+                    <h3
+                      className={cn(
+                        "text-xl font-semibold md:text-2xl",
+                        isActive
+                          ? "text-foreground"
+                          : "text-slate-600 dark:text-neutral-400"
+                      )}
+                    >
+                      {feature.title || feature.step}
+                    </h3>
+                    <p
+                      className={cn(
+                        "text-sm md:text-lg",
+                        isActive
+                          ? "text-slate-600 dark:text-neutral-300"
+                          : "text-slate-500 dark:text-neutral-500"
+                      )}
+                    >
+                      {feature.content}
+                    </p>
+                  </div>
+                </motion.div>
+              );
+            })}
 
           </div>
 
