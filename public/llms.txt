@@ -1,0 +1,21 @@
+# SpareFinder
+
+> AI-powered industrial spare parts identification. Upload a photo or search by keyword to identify manufacturing spares, retrieve specifications, pricing, and trusted suppliers.
+
+SpareFinder is a SaaS product for engineering and procurement teams. The public marketing site explains the product; authenticated users use dashboard and analysis flows that are not intended for broad automated summarization. For crawl and access policy, see [/robots.txt](https://sparefinder.org/robots.txt).
+
+## Site
+
+- [Home](https://sparefinder.org/): Product overview, features, pricing, and how it works.
+- [Reviews](https://sparefinder.org/reviews): Customer and user testimonials.
+- [Contact](https://sparefinder.org/contact): Contact and support entry points.
+
+## Policies
+
+- [Privacy policy](https://sparefinder.org/privacy-policy): Data handling and privacy practices.
+- [Terms of service](https://sparefinder.org/terms-of-service): Terms of use for the service.
+
+## Optional
+
+- [Sitemap](https://sparefinder.org/sitemap.xml): Machine-readable list of public URLs.
+- [Security disclosure](https://sparefinder.org/.well-known/security.txt): Coordinated vulnerability reporting contact.
