@@ -49,8 +49,8 @@ import StaggerTestimonialsDemo from "@/components/StaggerTestimonialsDemo";
 import Marquee from "@/components/ui/marquee";
 import IndustrialApplications from "@/components/IndustrialApplications";
 import FAQDemo from "@/components/FAQDemo";
-import Orb from "@/components/ui/Orb";
-import { Scene } from "@/components/ui/hero-section";
+import { LazyOrb } from "@/components/ui/lazy-orb";
+import { LazyHeroScene } from "@/components/ui/lazy-hero-scene";
 import { useTheme } from "@/contexts/ThemeContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { FeaturesSectionWithHoverEffects } from "@/components/ui/feature-section-with-hover-effects";
@@ -135,17 +135,7 @@ const CookieConsent = () => {
   );
 };
 
-const loadImage = (url: string) => {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    img.src = url;
-    img.onload = () => resolve(url);
-    img.onerror = (err) => reject(err);
-  });
-};
-
 const Landing = () => {
-  const [loadedImages, setLoadedImages] = useState<Set<string>>(new Set());
   const [billingCycle, setBillingCycle] = useState<BillingCycle>("monthly");
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const { scrollY, scrollYProgress } = useScroll();
@@ -311,18 +301,6 @@ const Landing = () => {
     fetchPlansFromApi().then(setPricingPlans);
   }, []);
 
-  useEffect(() => {
-    const allImages = [aiInterfaceImage, ...features.map((f) => f.image)];
-
-    Promise.all(
-      allImages.map((url) =>
-        loadImage(url).then(() => {
-          setLoadedImages((prev) => new Set([...prev, url]));
-        })
-      )
-    ).catch(console.error);
-  }, [features]);
-
   return (
     <div className="min-h-screen bg-background text-foreground dark:bg-black">
       <Header />
@@ -333,7 +311,7 @@ const Landing = () => {
         {actualTheme === "light" && (
           <div className="pointer-events-none absolute inset-x-0 top-10 z-0 flex justify-center">
             <div className="h-[720px] w-full max-w-6xl">
-              <Orb
+              <LazyOrb
                 hoverIntensity={0.6}
                 rotateOnHover
                 hue={0}
@@ -344,7 +322,7 @@ const Landing = () => {
         )}
         {actualTheme === "dark" && (
           <div className="pointer-events-none absolute inset-0 z-0">
-            <Scene />
+            <LazyHeroScene />
           </div>
         )}
         <div className="relative z-10">

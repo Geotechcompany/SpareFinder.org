@@ -1,20 +1,13 @@
 import React from "react";
 import { createRoot } from "react-dom/client";
-import {
-  ClerkFailed,
-  ClerkLoaded,
-  ClerkLoading,
-  ClerkProvider,
-} from "@clerk/clerk-react";
+import { ClerkFailed, ClerkProvider } from "@clerk/clerk-react";
 import App from "./App";
 import {
   AuthLoadFailureFallback,
   ClerkErrorBoundary,
 } from "./components/ClerkErrorBoundary";
-import { SpinningLogoLoader } from "./components/brand/spinning-logo-loader";
 import "./index.css";
 import "./styles/skeleton.css"; // Skeleton animations
-import "./services/keepAlive"; // Auto-start keep-alive service
 
 // Ensure this element exists in your index.html
 const rootElement = document.getElementById("root")!;
@@ -69,14 +62,17 @@ if (!clerkPublishableKey) {
           <ClerkFailed>
             <AuthLoadFailureFallback />
           </ClerkFailed>
-          <ClerkLoading>
-            <SpinningLogoLoader label="Starting authentication…" />
-          </ClerkLoading>
-          <ClerkLoaded>
-            <App />
-          </ClerkLoaded>
+          <App />
         </ClerkProvider>
       </ClerkErrorBoundary>
     </React.StrictMode>
   );
+}
+
+if (import.meta.env.PROD) {
+  queueMicrotask(() => {
+    void import("./services/keepAlive").then((m) => {
+      m.keepAliveService.start();
+    });
+  });
 }

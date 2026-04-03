@@ -82,12 +82,7 @@ class KeepAliveService {
   }
 }
 
-// Export singleton instance
+// Export singleton instance (started from main.tsx after first paint in production)
 export const keepAliveService = new KeepAliveService();
-
-// Auto-start in production
-if (import.meta.env.PROD) {
-  keepAliveService.start();
-}
 
 export default keepAliveService; 

@@ -88,33 +88,62 @@ function startPreview() {
   return child;
 }
 
+/** Normal Chrome UA — avoid Googlebot: Clerk/auth often never finishes for bot UAs in headless CI. */
+const PRERENDER_CHROME_UA =
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
+
 async function prerenderRoute(browser, routePath, outFile) {
   const page = await browser.newPage();
+  const pathForUrl = routePath === "/" ? "/" : routePath;
   try {
     await page.setViewport({ width: 1280, height: 720 });
-    await page.setUserAgent(
-      "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)"
-    );
+    await page.setUserAgent(process.env.PRERENDER_USER_AGENT || PRERENDER_CHROME_UA);
 
     // Use domcontentloaded, not networkidle2 — failed/retried API calls can prevent "idle" forever.
-    await page.goto(`${BASE}${routePath === "/" ? "/" : routePath}`, {
+    await page.goto(`${BASE}${pathForUrl}`, {
       waitUntil: "domcontentloaded",
       timeout: 180_000,
     });
 
-    // Clerk + React Strict Mode can briefly leave `data-prerender-ready` set while #root still
-    // shows the auth spinner — wait until real app content is present.
-    await page.waitForFunction(
-      () => {
-        const ready =
-          document.documentElement.getAttribute("data-prerender-ready") === "1";
-        const root = document.querySelector("#root");
-        const text = root?.innerText ?? "";
-        const pastClerkShell = !text.includes("Starting authentication");
-        return ready && pastClerkShell && text.length > 400;
-      },
-      { timeout: 180_000 }
-    );
+    // SEO sets `data-prerender-ready` after meta tags; still wait until the routed page is past
+    // Suspense/Clerk shells (chunk load + paint). Home uses `#main-content` for a stable signal.
+    try {
+      await page.waitForFunction(
+        (path) => {
+          const ready =
+            document.documentElement.getAttribute("data-prerender-ready") === "1";
+          if (!ready) return false;
+
+          const root = document.querySelector("#root");
+          const text = (root?.innerText ?? "").trim();
+          const lower = text.toLowerCase();
+
+          if (lower.includes("starting authentication")) return false;
+
+          if (path === "/") {
+            const main = document.querySelector("#main-content");
+            return !!main && main.innerText.trim().length >= 80;
+          }
+
+          return text.length >= 100;
+        },
+        { timeout: 180_000 },
+        pathForUrl
+      );
+    } catch (err) {
+      const dbg = await page.evaluate(() => ({
+        ready: document.documentElement.getAttribute("data-prerender-ready"),
+        textLen: document.querySelector("#root")?.innerText?.length ?? 0,
+        preview: (document.querySelector("#root")?.innerText ?? "").slice(0, 400),
+        mainLen:
+          document.querySelector("#main-content")?.innerText?.length ?? 0,
+      }));
+      console.error(
+        `[prerender] timeout waiting for route ${pathForUrl}:`,
+        JSON.stringify(dbg)
+      );
+      throw err;
+    }
 
     await sleep(400);
 

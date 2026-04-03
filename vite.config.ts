@@ -64,4 +64,19 @@ export default defineConfig(({ mode }) => ({
       "@": path.resolve(__dirname, "./src"),
     },
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (!id.includes("node_modules")) return;
+          if (id.includes("three") || id.includes("@react-three")) {
+            return "three-vendor";
+          }
+          if (id.includes("@clerk")) {
+            return "clerk-vendor";
+          }
+        },
+      },
+    },
+  },
 }));
