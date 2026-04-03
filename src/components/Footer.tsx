@@ -171,11 +171,14 @@ const Footer = () => {
                 </Button>
               </div>
               <p className="text-sm text-muted-foreground dark:text-gray-500">
-                Join 25,000+ professionals • No spam, unsubscribe anytime
+                No spam, unsubscribe anytime
               </p>
 
               {/* Company contact details */}
               <div className="pt-2 text-xs text-muted-foreground dark:text-gray-400 space-y-1 sm:text-sm">
+                <div className="font-semibold text-foreground dark:text-white">
+                  TPS E&P International Ltd
+                </div>
                 <div className="font-medium text-foreground dark:text-white">
                   Collingwood Buildings
                 </div>

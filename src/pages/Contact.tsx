@@ -217,6 +217,9 @@ const Contact: React.FC = () => {
                       <p className="font-medium text-foreground dark:text-white">
                         Location
                       </p>
+                      <p className="text-sm font-medium text-foreground dark:text-white">
+                        TPS E&P International Ltd
+                      </p>
                       <p className="text-sm text-muted-foreground dark:text-gray-300">
                         Collingwood Buildings
                       </p>
