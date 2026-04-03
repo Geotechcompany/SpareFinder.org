@@ -452,10 +452,14 @@ def _plan_to_tier(plan: str) -> str:
 
 
 @router.post("/webhook")
+@router.post("/stripe-webhook")
 async def stripe_webhook(request: Request):
     """
     Stripe webhook: on checkout.session.completed, update subscriptions with plan from metadata.
-    Configure this URL in Stripe Dashboard (e.g. https://your-api/api/billing/webhook).
+
+    Register either URL in Stripe Dashboard (both are equivalent):
+    - https://<your-api-host>/api/billing/webhook
+    - https://<your-api-host>/api/billing/stripe-webhook
     """
     stripe_secret = os.getenv("STRIPE_SECRET_KEY") or os.getenv("STRIPE_API_KEY")
     webhook_secret = os.getenv("STRIPE_WEBHOOK_SECRET") or os.getenv("STRIPE_WEBHOOK_SIGNING_SECRET")
