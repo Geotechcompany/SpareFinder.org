@@ -1,5 +1,6 @@
 [build]
-  command = "npm install && npm run build"
+  # Puppeteer 24+ does not bundle Chrome; prerender needs a downloaded browser on CI.
+  command = "npm install && npx puppeteer browsers install chrome && npm run build"
   publish = "dist"
   functions = "netlify/functions"
   
