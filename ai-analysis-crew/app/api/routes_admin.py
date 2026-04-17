@@ -8,6 +8,7 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.utils import formataddr
 from typing import Any, Optional
+import stripe
 
 from fastapi import APIRouter, Body, Depends, Path, Query
 from pydantic import BaseModel, Field, field_validator
@@ -58,6 +59,10 @@ def _smtp_from_settings(settings: dict[str, dict[str, Any]]) -> dict[str, Any]:
     from_name = str(email_settings.get("smtp_from_name") or _env("SMTP_FROM_NAME", "SpareFinder")).strip() or "SpareFinder"
     from_email = str(email_settings.get("smtp_user") or _env("SMTP_FROM", user)).strip()
     return {"host": host, "port": port, "secure": secure, "user": user, "password": password, "from_name": from_name, "from_email": from_email}
+
+
+def _get_stripe_secret() -> str:
+    return (os.getenv("STRIPE_SECRET_KEY") or os.getenv("STRIPE_API_KEY") or "").strip()
 
 
 def _send_test_email_smtp(*, smtp_cfg: dict[str, Any], to_email: str, subject: str, html: str, text: str) -> tuple[bool, str]:
@@ -218,15 +223,38 @@ async def admin_update_user_plan(
 
     existing = (
         supabase.table("subscriptions")
-        .select("id, user_id, tier, status")
+        .select("id, user_id, tier, status, stripe_subscription_id, cancel_at_period_end")
         .eq("user_id", userId)
         .execute()
     )
     rows = (existing.data or []) if hasattr(existing, "data") else []
     if rows:
+        if is_no_plan:
+            stripe_subscription_id = str(rows[0].get("stripe_subscription_id") or "").strip()
+            if stripe_subscription_id:
+                stripe_secret = _get_stripe_secret()
+                if not stripe_secret:
+                    return api_error(
+                        status_code=500,
+                        error="stripe_not_configured",
+                        message="Cannot cancel paid subscription because Stripe is not configured.",
+                    )
+                try:
+                    stripe.api_key = stripe_secret
+                    stripe_sub = stripe.Subscription.retrieve(stripe_subscription_id)
+                    if str(stripe_sub.get("status") or "").lower() not in ("canceled", "incomplete_expired"):
+                        stripe.Subscription.cancel(stripe_subscription_id)
+                except stripe.error.StripeError as e:
+                    return api_error(
+                        status_code=400,
+                        error="stripe_cancel_failed",
+                        message=f"Stripe cancellation failed: {e}",
+                    )
+
         payload_update = {
             "tier": tier,
             "status": "canceled" if is_no_plan else "active",
+            "cancel_at_period_end": False if is_no_plan else bool(rows[0].get("cancel_at_period_end")),
             "updated_at": now.isoformat() + "Z",
         }
         if not is_no_plan:

@@ -451,6 +451,137 @@ def _plan_to_tier(plan: str) -> str:
     return "pro" if "pro" in normalized else "free"
 
 
+def _get_stripe_secret() -> str:
+    return (os.getenv("STRIPE_SECRET_KEY") or os.getenv("STRIPE_API_KEY") or "").strip()
+
+
+@router.post("/subscription/cancel")
+async def cancel_subscription(user: CurrentUser = Depends(get_current_user)):
+    """Cancel current user's Stripe subscription at period end."""
+    try:
+        supabase = get_supabase_admin()
+        user_id = user.id
+        sub_result = (
+            supabase.table("subscriptions")
+            .select("*")
+            .eq("user_id", user_id)
+            .limit(1)
+            .execute()
+        )
+        row = (sub_result.data or [None])[0]
+        if not row:
+            return api_error("No active subscription found", status_code=404)
+
+        stripe_subscription_id = (row.get("stripe_subscription_id") or "").strip()
+        if not stripe_subscription_id:
+            # No Stripe subscription to cancel. Mark local record canceled.
+            supabase.table("subscriptions").update(
+                {
+                    "status": "canceled",
+                    "cancel_at_period_end": False,
+                    "tier": "free",
+                    "updated_at": datetime.utcnow().isoformat() + "Z",
+                }
+            ).eq("id", row.get("id")).execute()
+            return api_ok(
+                message="Subscription canceled locally (no Stripe subscription attached).",
+                data={"cancel_at_period_end": False, "status": "canceled"},
+            )
+
+        stripe_secret = _get_stripe_secret()
+        if not stripe_secret:
+            return api_error("Stripe is not configured", status_code=500)
+
+        stripe.api_key = stripe_secret
+        stripe_sub = stripe.Subscription.retrieve(stripe_subscription_id)
+        if (stripe_sub.get("status") or "").lower() in ("canceled", "incomplete_expired"):
+            supabase.table("subscriptions").update(
+                {
+                    "status": "canceled",
+                    "cancel_at_period_end": False,
+                    "tier": "free",
+                    "updated_at": datetime.utcnow().isoformat() + "Z",
+                }
+            ).eq("id", row.get("id")).execute()
+            return api_ok(
+                message="Subscription was already canceled in Stripe.",
+                data={"cancel_at_period_end": False, "status": "canceled"},
+            )
+
+        stripe.Subscription.modify(stripe_subscription_id, cancel_at_period_end=True)
+
+        supabase.table("subscriptions").update(
+            {
+                "cancel_at_period_end": True,
+                "updated_at": datetime.utcnow().isoformat() + "Z",
+            }
+        ).eq("id", row.get("id")).execute()
+
+        return api_ok(
+            message="Subscription will be canceled at period end.",
+            data={"cancel_at_period_end": True, "status": row.get("status", "active")},
+        )
+    except stripe.error.StripeError as e:
+        return api_error(f"Stripe cancellation failed: {e}", status_code=400)
+    except Exception as e:
+        print(f"❌ Error cancelling subscription: {e}")
+        return api_error("Failed to cancel subscription", status_code=500)
+
+
+@router.post("/subscription/reactivate")
+async def reactivate_subscription(user: CurrentUser = Depends(get_current_user)):
+    """Undo a scheduled cancellation by clearing cancel_at_period_end in Stripe."""
+    try:
+        supabase = get_supabase_admin()
+        user_id = user.id
+        sub_result = (
+            supabase.table("subscriptions")
+            .select("*")
+            .eq("user_id", user_id)
+            .limit(1)
+            .execute()
+        )
+        row = (sub_result.data or [None])[0]
+        if not row:
+            return api_error("No subscription found", status_code=404)
+
+        stripe_subscription_id = (row.get("stripe_subscription_id") or "").strip()
+        if not stripe_subscription_id:
+            return api_error("No Stripe subscription attached to this account", status_code=400)
+
+        stripe_secret = _get_stripe_secret()
+        if not stripe_secret:
+            return api_error("Stripe is not configured", status_code=500)
+
+        stripe.api_key = stripe_secret
+        stripe_sub = stripe.Subscription.retrieve(stripe_subscription_id)
+        if (stripe_sub.get("status") or "").lower() in ("canceled", "incomplete_expired"):
+            return api_error("Cannot reactivate a canceled subscription. Please subscribe again.", status_code=400)
+
+        stripe.Subscription.modify(
+            stripe_subscription_id,
+            cancel_at_period_end=False,
+        )
+
+        supabase.table("subscriptions").update(
+            {
+                "cancel_at_period_end": False,
+                "status": "active",
+                "updated_at": datetime.utcnow().isoformat() + "Z",
+            }
+        ).eq("id", row.get("id")).execute()
+
+        return api_ok(
+            message="Subscription reactivated successfully.",
+            data={"cancel_at_period_end": False, "status": "active"},
+        )
+    except stripe.error.StripeError as e:
+        return api_error(f"Stripe reactivation failed: {e}", status_code=400)
+    except Exception as e:
+        print(f"❌ Error reactivating subscription: {e}")
+        return api_error("Failed to reactivate subscription", status_code=500)
+
+
 @router.post("/webhook")
 @router.post("/stripe-webhook")
 async def stripe_webhook(request: Request):
