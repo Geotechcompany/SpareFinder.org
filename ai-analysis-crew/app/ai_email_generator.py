@@ -251,7 +251,7 @@ Only valid JSON. No markdown."""
                 <p style="margin:0 0 20px 0;font-size:14px;line-height:1.6;color:#64748b;">
                   SpareFinder turns a single photo into a part ID and supplier options—no catalog flipping.
                 </p>
-                <img src="{inline_image_url}" alt="Parts identification workflow" style="display:block;width:100%;max-width:500px;margin:20px auto;border-radius:8px;" />
+                <img src="{inline_image_url or hero_image_url}" alt="Parts identification workflow" style="display:block;width:100%;max-width:500px;margin:20px auto;border-radius:8px;" />
                 <p style="margin:20px 0;font-size:14px;line-height:1.6;color:#64748b;">
                   Upload a photo, get instant identification, and share results with your team—all in seconds.
                 </p>
@@ -376,7 +376,7 @@ Unsubscribe: {unsubscribe_url}
               <td class="px py" style="padding:24px 28px;">
                 <h1 style="margin:0 0 10px 0;font-size:22px;line-height:1.25;color:#0f172a;">{headline}</h1>
                 <p style="margin:0 0 18px 0;font-size:14px;line-height:1.6;color:#64748b;">Hi {user_name},<br />{intro}</p>
-                <img src="{inline_image_url}" alt="Parts identification workflow" style="display:block;width:100%;max-width:520px;margin:18px auto;border-radius:12px;" />
+                <img src="{inline_image_url or hero_image_url}" alt="Parts identification workflow" style="display:block;width:100%;max-width:520px;margin:18px auto;border-radius:12px;" />
                 <ul style="margin:18px 0 0 0;padding-left:18px;font-size:14px;line-height:1.6;color:#0f172a;">
                   {bullets_html}
                 </ul>

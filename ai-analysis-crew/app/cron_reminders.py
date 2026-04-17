@@ -145,7 +145,7 @@ def _send_reengagement_email(*, to_email: str, user_name: str) -> bool:
         "https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?auto=format&fit=crop&w=1200"
     )
     inline_image_url = (
-        "https://images.unsplash.com/photo-1565680018434-b513d5e261bc?auto=format&fit=crop&w=800"
+        "https://images.unsplash.com/photo-1581092580497-e0d23cbdf1dc?auto=format&fit=crop&w=1200&q=80"
     )
     image_theme = "industrial"
     
