@@ -233,7 +233,7 @@ apiClient.interceptors.response.use(
         pathname.startsWith("/migrate") ||
         pathname.startsWith("/login/sso-callback") ||
         pathname.startsWith("/register/sso-callback") ||
-        pathname.startsWith("/admin/login/sso-callback") ||
+        pathname.startsWith("/admin/login") ||
         pathname.startsWith("/account/sso-callback");
 
       // If we're using Clerk, try to refresh the token if it's expired

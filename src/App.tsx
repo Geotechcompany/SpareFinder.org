@@ -271,7 +271,7 @@ const App = () => (
                       </AdminProtectedRoute>
                     }
                   />
-                  <Route path="/admin/login" element={<AdminLogin />} />
+                  <Route path="/admin/login/*" element={<AdminLogin />} />
                   <Route path="/privacy-policy" element={<PrivacyPolicy />} />
                   <Route path="/terms-of-service" element={<TermsOfService />} />
                   <Route path="/help" element={<Help />} />
