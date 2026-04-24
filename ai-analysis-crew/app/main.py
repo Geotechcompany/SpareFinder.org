@@ -89,6 +89,7 @@ from .api.routes_admin import router as admin_router
 from .api.routes_tickets import router as tickets_router
 from .api.routes_referrals import router as referrals_router
 from .api.routes_reports import router as reports_router
+from .api.routes_api_keys import router as api_keys_router
 
 app.include_router(auth_router, prefix="/api")
 app.include_router(billing_router, prefix="/api")
@@ -106,6 +107,7 @@ app.include_router(admin_router, prefix="/api")
 app.include_router(tickets_router, prefix="/api")
 app.include_router(referrals_router, prefix="/api")
 app.include_router(reports_router, prefix="/api")
+app.include_router(api_keys_router, prefix="/api")
 
 print("All API routers registered successfully")
 logger.info("All API routers registered successfully")
