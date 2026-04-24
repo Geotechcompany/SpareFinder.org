@@ -158,14 +158,14 @@ const MobileSidebar: React.FC<MobileSidebarProps> = ({ isOpen, onClose }) => {
             animate={{ x: 0 }}
             exit={{ x: '-100%' }}
             transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-            className="fixed left-0 top-0 bottom-0 w-[280px] bg-sidebar text-sidebar-foreground border-r border-sidebar-border backdrop-blur-xl z-50 md:hidden dark:bg-black/95 dark:text-white dark:border-white/10"
+            className="fixed left-0 top-0 bottom-0 w-[280px] bg-sidebar text-sidebar-foreground border-r border-sidebar-border backdrop-blur-xl z-50 md:hidden dark:bg-[#0F1221] dark:text-white dark:border-white/10"
           >
             {/* Header */}
             <div className="flex items-center justify-between p-4 border-b border-sidebar-border/80 dark:border-white/10">
               <div className="flex items-center gap-3">
                 <Avatar className="w-8 h-8">
                   <AvatarImage src={user?.avatar_url} alt={displayName} />
-                  <AvatarFallback className="bg-gradient-to-r from-purple-600 to-blue-600 text-white text-sm">
+                  <AvatarFallback className="bg-primary/20 text-primary text-sm">
                     {userInitials}
                   </AvatarFallback>
                 </Avatar>
@@ -205,7 +205,7 @@ const MobileSidebar: React.FC<MobileSidebarProps> = ({ isOpen, onClose }) => {
                 type="button"
                 onClick={handleUpgrade}
                   disabled={subscriptionLoading}
-                className="h-11 w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 shadow-lg shadow-purple-500/20"
+                className="h-11 w-full premium-button bg-primary hover:bg-primary/90"
               >
                   {planCtaLabel}
               </Button>
@@ -230,17 +230,17 @@ const MobileSidebar: React.FC<MobileSidebarProps> = ({ isOpen, onClose }) => {
                   onClick={onClose}
                             className={`relative flex items-center gap-3 rounded-2xl px-3 py-3 transition-all duration-200 border ${
                               active
-                                ? "bg-sidebar-accent/80 text-sidebar-accent-foreground border-sidebar-border shadow-soft-elevated dark:bg-gradient-to-r dark:from-purple-600/15 dark:to-blue-600/15 dark:border-purple-500/25"
+                                ? "bg-sidebar-accent/80 text-sidebar-accent-foreground border-sidebar-border shadow-soft-elevated dark:bg-accent/10 dark:border-accent/30"
                                 : "border-transparent text-sidebar-foreground/80 hover:text-sidebar-foreground hover:bg-sidebar-accent/60 dark:text-gray-300 dark:hover:text-white dark:hover:bg-white/5"
                   }`}
                 >
                             {active ? (
-                              <span className="absolute left-0 top-1/2 h-7 w-1 -translate-y-1/2 rounded-r-full bg-gradient-to-b from-purple-500 to-blue-500" />
+                              <span className="absolute left-0 top-1/2 h-7 w-1 -translate-y-1/2 rounded-r-full bg-accent" />
                             ) : null}
                             <div
                               className={`flex h-10 w-10 items-center justify-center rounded-2xl ring-1 transition-colors ${
                                 active
-                                  ? "bg-gradient-to-r from-purple-600/20 to-blue-600/20 text-blue-300 ring-blue-500/25"
+                                  ? "bg-primary/20 text-primary ring-primary/40"
                                   : "bg-muted text-muted-foreground ring-border/60 dark:bg-gray-800/50 dark:text-gray-400 dark:ring-white/10"
                               }`}
                             >

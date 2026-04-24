@@ -178,11 +178,11 @@ const DashboardSidebar: React.FC<SidebarProps> = ({ isCollapsed = false, onToggl
   const renderUserSection = (isMobile = false) => (
     <div className={`p-4 border-t border-sidebar-border/80 dark:border-white/10 ${isMobile ? '' : ''}`}>
       <div className="relative overflow-hidden flex items-center space-x-3 p-3 rounded-2xl bg-sidebar-accent/40 border border-sidebar-border dark:bg-white/5 dark:border-white/10">
-        <div className="pointer-events-none absolute -top-10 -right-10 h-24 w-24 rounded-full bg-gradient-to-r from-purple-500/25 to-blue-500/20 blur-2xl" />
-        <div className="pointer-events-none absolute -bottom-10 -left-10 h-24 w-24 rounded-full bg-gradient-to-r from-emerald-500/20 to-teal-500/10 blur-2xl" />
+        <div className="pointer-events-none absolute -top-10 -right-10 h-24 w-24 rounded-full bg-accent/10 blur-2xl" />
+        <div className="pointer-events-none absolute -bottom-10 -left-10 h-24 w-24 rounded-full bg-primary/10 blur-2xl" />
         <Avatar className="w-10 h-10">
           <AvatarImage src={user?.avatar_url} />
-          <AvatarFallback className="bg-gradient-to-r from-green-600 to-emerald-600 text-white">
+          <AvatarFallback className="bg-primary/20 text-primary">
             {getUserInitials()}
           </AvatarFallback>
         </Avatar>
@@ -214,7 +214,7 @@ const DashboardSidebar: React.FC<SidebarProps> = ({ isCollapsed = false, onToggl
             type="button"
               onClick={handlePlanCta}
               disabled={subscriptionLoading}
-            className="w-full justify-center bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 shadow-lg shadow-purple-500/20"
+            className="w-full justify-center premium-button bg-primary hover:bg-primary/90"
           >
               {planCtaLabel}
           </Button>
@@ -254,7 +254,7 @@ const DashboardSidebar: React.FC<SidebarProps> = ({ isCollapsed = false, onToggl
         initial={{ x: -320 }}
         animate={{ x: isMobileOpen ? 0 : -320 }}
         transition={{ type: "spring", damping: 20, stiffness: 100 }}
-        className="fixed md:hidden z-50 h-full w-[280px] bg-sidebar text-sidebar-foreground border-r border-sidebar-border backdrop-blur-xl dark:bg-black/95 dark:border-white/10"
+        className="fixed md:hidden z-50 h-full w-[280px] bg-sidebar text-sidebar-foreground border-r border-sidebar-border backdrop-blur-xl dark:bg-[#0F1221] dark:border-white/10"
       >
         {/* Mobile Header */}
         <div className="flex items-center justify-between p-4 border-b border-sidebar-border/80 dark:border-white/10">
@@ -262,7 +262,7 @@ const DashboardSidebar: React.FC<SidebarProps> = ({ isCollapsed = false, onToggl
             <motion.div
               animate={{ rotate: [0, 360] }}
               transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
-              className="w-8 h-8 rounded-xl flex items-center justify-center bg-gradient-to-r from-[#3A5AFE] to-[#4C5DFF] text-white"
+              className="w-8 h-8 rounded-xl flex items-center justify-center bg-primary/20 text-primary"
             >
               <Zap className="w-5 h-5" />
             </motion.div>
@@ -308,17 +308,17 @@ const DashboardSidebar: React.FC<SidebarProps> = ({ isCollapsed = false, onToggl
                 onClick={toggleMobileMenu}
                           className={`relative flex items-center gap-3 rounded-2xl px-3 py-3 transition-all duration-200 border ${
                             active
-                              ? "bg-sidebar-accent/80 text-sidebar-accent-foreground border-sidebar-border shadow-soft-elevated dark:bg-gradient-to-r dark:from-purple-600/15 dark:to-blue-600/15 dark:border-purple-500/25"
+                              ? "bg-sidebar-accent/80 text-sidebar-accent-foreground border-sidebar-border shadow-soft-elevated dark:bg-accent/10 dark:border-accent/30"
                               : "border-transparent text-sidebar-foreground/80 hover:text-sidebar-foreground hover:bg-sidebar-accent/60 dark:text-gray-300 dark:hover:text-white dark:hover:bg-white/5"
                 }`}
               >
                           {active ? (
-                            <span className="absolute left-0 top-1/2 h-7 w-1 -translate-y-1/2 rounded-r-full bg-gradient-to-b from-purple-500 to-blue-500" />
+                            <span className="absolute left-0 top-1/2 h-7 w-1 -translate-y-1/2 rounded-r-full bg-accent" />
                           ) : null}
                           <div
                             className={`flex h-10 w-10 items-center justify-center rounded-2xl ring-1 transition-colors ${
                               active
-                                ? "bg-gradient-to-r from-purple-600/20 to-blue-600/20 text-blue-300 ring-blue-500/25"
+                                ? "bg-primary/20 text-primary ring-primary/40"
                                 : "bg-muted text-muted-foreground ring-border/60 dark:bg-gray-800/50 dark:text-gray-400 dark:ring-white/10"
                             }`}
                           >
@@ -356,7 +356,7 @@ const DashboardSidebar: React.FC<SidebarProps> = ({ isCollapsed = false, onToggl
           x: 0 
         }}
         transition={{ duration: 0.3, ease: "easeInOut" }}
-        className="hidden md:flex h-screen bg-sidebar text-sidebar-foreground border-r border-sidebar-border backdrop-blur-xl flex-col fixed left-0 top-0 z-30 dark:bg-black/95 dark:text-white dark:border-white/10"
+        className="hidden md:flex h-screen bg-sidebar text-sidebar-foreground border-r border-sidebar-border backdrop-blur-xl flex-col fixed left-0 top-0 z-30 dark:bg-[#0F1221] dark:text-white dark:border-white/10"
       >
         {/* Desktop Header */}
         <div className="flex items-center justify-between p-6 border-b border-sidebar-border/80 dark:border-white/10">
@@ -454,18 +454,18 @@ const DashboardSidebar: React.FC<SidebarProps> = ({ isCollapsed = false, onToggl
                         title={isCollapsed ? item.label : undefined}
                         className={`relative flex items-center gap-3 rounded-2xl px-3 py-2.5 transition-all duration-200 group border ${
                           active
-                            ? "bg-sidebar-accent/80 text-sidebar-accent-foreground border-sidebar-border shadow-soft-elevated dark:bg-gradient-to-r dark:from-purple-600/15 dark:to-blue-600/15 dark:border-purple-500/25"
+                            ? "bg-sidebar-accent/80 text-sidebar-accent-foreground border-sidebar-border shadow-soft-elevated dark:bg-accent/10 dark:border-accent/30"
                             : "border-transparent text-sidebar-foreground/80 hover:text-sidebar-foreground hover:bg-sidebar-accent/60 dark:text-gray-300 dark:hover:text-white dark:hover:bg-white/5"
                 }`}
               >
                         {active ? (
-                          <span className="absolute left-0 top-1/2 h-7 w-1 -translate-y-1/2 rounded-r-full bg-gradient-to-b from-purple-500 to-blue-500" />
+                          <span className="absolute left-0 top-1/2 h-7 w-1 -translate-y-1/2 rounded-r-full bg-accent" />
                         ) : null}
 
                         <div
                           className={`flex h-10 w-10 items-center justify-center rounded-2xl ring-1 transition-colors ${
                             active
-                              ? "bg-gradient-to-r from-purple-600/20 to-blue-600/20 text-blue-300 ring-blue-500/25"
+                              ? "bg-primary/20 text-primary ring-primary/40"
                               : "bg-muted text-muted-foreground ring-border/60 group-hover:bg-sidebar-accent/50 group-hover:text-sidebar-accent-foreground dark:bg-gray-800/50 dark:text-gray-400 dark:ring-white/10 dark:group-hover:bg-white/10 dark:group-hover:text-white"
                           }`}
                         >

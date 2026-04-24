@@ -359,10 +359,10 @@ const AdminDashboardLayout = () => {
 
   if (error) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-900 via-purple-900/20 to-blue-900/20">
+      <div className="dashboard-premium min-h-screen flex items-center justify-center bg-background">
         <div className="text-center">
           <AlertCircle className="w-10 h-10 text-purple-500 mx-auto mb-4" />
-          <p className="text-gray-400 mb-4">{error}</p>
+          <p className="text-muted-foreground mb-4">{error}</p>
           <div className="space-x-2">
             <Button onClick={handleTryAgain} variant="outline">
               Try Again
@@ -383,7 +383,7 @@ const AdminDashboardLayout = () => {
       value: stats?.total_users?.toLocaleString() || "0",
       change: `+${stats?.new_users_today || 0} today`,
       icon: Users,
-      color: "from-blue-600 to-cyan-600",
+      color: "bg-accent/20 text-accent",
       trend: "up",
     },
     {
@@ -391,7 +391,7 @@ const AdminDashboardLayout = () => {
       value: stats?.total_searches?.toLocaleString() || "0",
       change: `+${stats?.searches_today || 0} today`,
       icon: Search,
-      color: "from-green-600 to-emerald-600",
+      color: "bg-emerald-500/20 text-emerald-500",
       trend: "up",
     },
     {
@@ -399,7 +399,7 @@ const AdminDashboardLayout = () => {
       value: stats?.active_users?.toLocaleString() || "0",
       change: "Last 30 days",
       icon: Activity,
-      color: "from-purple-600 to-pink-600",
+      color: "bg-primary/20 text-primary",
       trend: "up",
     },
     {
@@ -407,7 +407,7 @@ const AdminDashboardLayout = () => {
       value: `${stats?.success_rate?.toFixed(1) || "0"}%`,
       change: "AI Accuracy",
       icon: TrendingUp,
-      color: "from-orange-600 to-red-600",
+      color: "bg-amber-500/20 text-amber-500",
       trend: "up",
     },
   ];
@@ -458,7 +458,7 @@ const AdminDashboardLayout = () => {
           : "0",
       change: "All plans",
       icon: Users,
-      color: "from-blue-600 to-cyan-600",
+      color: "bg-accent/20 text-accent",
     },
     {
       title: "Active Subscriptions",
@@ -468,7 +468,7 @@ const AdminDashboardLayout = () => {
           : "0",
       change: "Currently billed",
       icon: CreditCard,
-      color: "from-purple-600 to-pink-600",
+      color: "bg-primary/20 text-primary",
     },
     {
       title: "Canceled / Churned",
@@ -478,7 +478,7 @@ const AdminDashboardLayout = () => {
           : "0",
       change: "Total cancellations",
       icon: TrendingUp,
-      color: "from-orange-600 to-red-600",
+      color: "bg-amber-500/20 text-amber-500",
     },
   ];
 
@@ -527,11 +527,11 @@ const AdminDashboardLayout = () => {
   };
 
   return (
-    <div className="min-h-screen flex w-full bg-gradient-to-br from-background via-[#F0F2F5] to-[#E8EBF1] dark:from-[#0B1026] dark:via-[#1A1033] dark:to-[#0C1226] relative overflow-hidden">
+    <div className="dashboard-premium min-h-screen flex w-full bg-background relative overflow-hidden">
       {/* Animated Background Elements */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <motion.div
-          className="absolute top-1/4 -right-40 w-80 h-80 bg-purple-600/15 rounded-full blur-3xl opacity-60"
+          className="hidden"
           animate={{
             scale: [1, 1.3, 1],
             rotate: [0, 180, 360],
@@ -543,7 +543,7 @@ const AdminDashboardLayout = () => {
           }}
         />
         <motion.div
-          className="absolute -bottom-40 -left-40 w-96 h-96 bg-blue-600/10 rounded-full blur-3xl opacity-40"
+          className="hidden"
           animate={{
             scale: [1.2, 1, 1.2],
             x: [0, 50, 0],
@@ -571,9 +571,9 @@ const AdminDashboardLayout = () => {
       {/* Mobile Menu Button */}
       <button
         onClick={handleToggleMobileMenu}
-        className="fixed top-4 right-4 z-50 p-2 rounded-lg bg-black/20 backdrop-blur-xl border border-white/10 md:hidden"
+        className="fixed top-4 right-4 z-50 p-2 rounded-lg bg-card border border-border text-foreground md:hidden"
       >
-        <Menu className="w-5 h-5 text-white" />
+        <Menu className="w-5 h-5 text-foreground" />
       </button>
 
       {/* Main Content */}
@@ -613,7 +613,7 @@ const AdminDashboardLayout = () => {
                 </BreadcrumbList>
               </Breadcrumb>
               <div>
-                <h1 className="text-3xl lg:text-4xl font-bold tracking-tight text-foreground dark:bg-gradient-to-r dark:from-purple-200 dark:to-blue-200 dark:bg-clip-text dark:text-transparent">
+                <h1 className="text-3xl lg:text-4xl font-bold tracking-tight text-foreground tracking-[-0.02em]">
                   Admin Dashboard
                 </h1>
                 <p className="mt-1 text-sm text-muted-foreground">
@@ -624,7 +624,7 @@ const AdminDashboardLayout = () => {
             <div className="flex items-center space-x-2">
               <Badge
                 variant="secondary"
-                className="bg-purple-100 text-purple-700 border-purple-200 dark:bg-purple-600/20 dark:text-purple-400 dark:border-purple-500/30"
+                className="bg-primary/15 text-primary border-primary/30"
               >
                 <Shield className="w-3 h-3 mr-1" />
                 {adminUser?.role === "super_admin"
@@ -636,7 +636,7 @@ const AdminDashboardLayout = () => {
                 onClick={handleRefresh}
                 variant="outline"
                 size="sm"
-                className="border-border bg-background/80 text-foreground hover:bg-accent hover:text-accent-foreground dark:bg-white/5 dark:text-white dark:border-white/20 dark:hover:bg-white/10"
+                className="premium-button border-border bg-background/80 text-foreground hover:bg-accent/20"
               >
                 <RefreshCw className="w-4 h-4 mr-2" />
                 Refresh
@@ -645,7 +645,7 @@ const AdminDashboardLayout = () => {
                 onClick={handleLogout}
                 variant="ghost"
                 size="sm"
-                className="text-muted-foreground hover:text-foreground hover:bg-muted dark:text-gray-400 dark:hover:text-white dark:hover:bg-white/10"
+                className="text-muted-foreground hover:text-foreground hover:bg-muted"
               >
                 Logout
               </Button>
@@ -663,17 +663,15 @@ const AdminDashboardLayout = () => {
                 whileHover={{ y: -8, scale: 1.03 }}
                 className="relative group"
               >
-                <div
-                  className={`absolute inset-0 bg-gradient-to-r ${stat.color} opacity-10 rounded-2xl blur-xl group-hover:opacity-20 transition-opacity`}
-                />
-                <Card className="relative bg-card/95 backdrop-blur-xl border border-border/80 shadow-soft-elevated hover:border-primary/40 hover:shadow-lg transition-colors duration-300 dark:bg-black/40 dark:border-white/10">
+                <div className="hidden" />
+                <Card className="premium-card relative bg-card/95 backdrop-blur-md">
                   <CardContent className="p-6">
                     <div className="flex items-center justify-between">
                       <div>
                         <p className="text-sm font-medium text-muted-foreground">
                           {stat.title}
                         </p>
-                        <p className="mt-1 text-2xl font-bold text-foreground dark:text-white">
+                        <p className="mt-1 text-2xl font-bold text-foreground">
                           {stat.value}
                         </p>
                         <p className="mt-1 text-sm text-muted-foreground">
@@ -690,9 +688,9 @@ const AdminDashboardLayout = () => {
                           ease: "easeInOut",
                           delay: index * 0.15,
                         }}
-                        className={`p-3 rounded-xl bg-gradient-to-r ${stat.color} shadow-lg ring-1 ring-white/10 dark:ring-white/20 transition-transform duration-300 group-hover:scale-110 group-hover:rotate-3`}
+                        className="p-3 rounded-xl bg-primary/20 text-primary ring-1 ring-primary/30 transition-transform duration-300 group-hover:scale-105"
                       >
-                        <stat.icon className="w-6 h-6 text-white" />
+                        <stat.icon className="w-6 h-6" />
                       </motion.div>
                     </div>
                   </CardContent>
@@ -712,17 +710,15 @@ const AdminDashboardLayout = () => {
                 whileHover={{ y: -8, scale: 1.03 }}
                 className="relative group"
               >
-                <div
-                  className={`absolute inset-0 bg-gradient-to-r ${stat.color} opacity-10 rounded-2xl blur-xl group-hover:opacity-20 transition-opacity`}
-                />
-                <Card className="relative bg-card/95 backdrop-blur-xl border border-border/80 shadow-soft-elevated hover:border-primary/40 hover:shadow-lg transition-colors duration-300 dark:bg-black/40 dark:border-white/10">
+                <div className="hidden" />
+                <Card className="premium-card relative bg-card/95 backdrop-blur-md">
                   <CardContent className="p-6">
                     <div className="flex items-center justify-between">
                       <div>
                         <p className="text-sm font-medium text-muted-foreground">
                           {stat.title}
                         </p>
-                        <p className="mt-1 text-2xl font-bold text-foreground dark:text-white">
+                        <p className="mt-1 text-2xl font-bold text-foreground">
                           {stat.value}
                         </p>
                         <p className="mt-1 text-sm text-muted-foreground">
@@ -739,9 +735,9 @@ const AdminDashboardLayout = () => {
                           ease: "easeInOut",
                           delay: 0.3 + index * 0.15,
                         }}
-                        className={`p-3 rounded-xl bg-gradient-to-r ${stat.color} shadow-lg ring-1 ring-white/10 dark:ring-white/20 transition-transform duration-300 group-hover:scale-110 group-hover:-rotate-3`}
+                        className="p-3 rounded-xl bg-accent/20 text-accent ring-1 ring-accent/30 transition-transform duration-300 group-hover:scale-105"
                       >
-                        <stat.icon className="w-6 h-6 text-white" />
+                        <stat.icon className="w-6 h-6" />
                       </motion.div>
                     </div>
                   </CardContent>
@@ -759,12 +755,12 @@ const AdminDashboardLayout = () => {
               transition={{ delay: 0.45 }}
               className="relative lg:col-span-2"
             >
-              <div className="absolute inset-0 rounded-3xl bg-gradient-to-r from-purple-500/5 to-blue-500/5 blur-xl opacity-70 dark:from-purple-600/10 dark:to-blue-600/10" />
-              <Card className="relative bg-card/95 backdrop-blur-xl border-border shadow-soft-elevated dark:bg-black/20 dark:border-white/10">
+              <div className="hidden" />
+              <Card className="premium-card relative bg-card/95 backdrop-blur-md">
                 <CardHeader className="pb-2">
                   <div className="flex items-start justify-between gap-3">
                     <div>
-                      <CardTitle className="flex items-center gap-2 text-foreground dark:text-white">
+                      <CardTitle className="flex items-center gap-2 text-foreground">
                         <TrendingUp className="h-5 w-5 text-purple-500 dark:text-purple-400" />
                         Growth (last 30 days)
                       </CardTitle>
@@ -774,7 +770,7 @@ const AdminDashboardLayout = () => {
                     </div>
                     <Badge
                       variant="secondary"
-                      className="bg-purple-100 text-purple-700 border-purple-200 dark:bg-purple-600/20 dark:text-purple-300 dark:border-purple-500/30"
+                      className="bg-primary/15 text-primary border-primary/30"
                     >
                       {analytics?.time_range || "30d"}
                     </Badge>
@@ -842,10 +838,10 @@ const AdminDashboardLayout = () => {
               transition={{ delay: 0.5 }}
               className="relative"
             >
-              <div className="absolute inset-0 rounded-3xl bg-gradient-to-r from-emerald-500/5 to-blue-500/5 blur-xl opacity-70 dark:from-emerald-600/10 dark:to-blue-600/10" />
-              <Card className="relative h-full bg-card/95 backdrop-blur-xl border-border shadow-soft-elevated dark:bg-black/20 dark:border-white/10">
+              <div className="hidden" />
+              <Card className="premium-card relative h-full bg-card/95 backdrop-blur-md">
                 <CardHeader className="pb-2">
-                  <CardTitle className="flex items-center gap-2 text-foreground dark:text-white">
+                  <CardTitle className="flex items-center gap-2 text-foreground">
                     <CreditCard className="h-5 w-5 text-emerald-500 dark:text-emerald-400" />
                     Subscription mix
                   </CardTitle>
@@ -898,12 +894,12 @@ const AdminDashboardLayout = () => {
             transition={{ delay: 0.55 }}
             className="relative"
           >
-            <div className="absolute inset-0 rounded-3xl bg-gradient-to-r from-blue-500/5 to-purple-500/5 blur-xl opacity-70 dark:from-blue-600/10 dark:to-purple-600/10" />
-            <Card className="relative bg-card/95 backdrop-blur-xl border-border shadow-soft-elevated dark:bg-black/20 dark:border-white/10">
+            <div className="hidden" />
+            <Card className="premium-card relative bg-card/95 backdrop-blur-md">
               <CardHeader className="pb-2">
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <CardTitle className="flex items-center gap-2 text-foreground dark:text-white">
+                    <CardTitle className="flex items-center gap-2 text-foreground">
                       <FileText className="h-5 w-5 text-blue-500 dark:text-blue-400" />
                       Acquisition sources
                     </CardTitle>
@@ -913,7 +909,7 @@ const AdminDashboardLayout = () => {
                   </div>
                   <Badge
                     variant="secondary"
-                    className="bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-600/20 dark:text-blue-300 dark:border-blue-500/30"
+                    className="bg-accent/15 text-accent border-accent/30"
                   >
                     {onboardingSummary ? onboardingSummary.range : "—"}
                   </Badge>
@@ -957,10 +953,10 @@ const AdminDashboardLayout = () => {
               transition={{ delay: 0.6 }}
               className="relative"
             >
-              <div className="absolute inset-0 rounded-3xl bg-gradient-to-r from-purple-500/5 to-blue-500/5 blur-xl opacity-70 dark:from-purple-600/10 dark:to-blue-600/10" />
-              <Card className="relative h-full bg-card/95 backdrop-blur-xl border-border shadow-soft-elevated dark:bg-black/20 dark:border-white/10">
+              <div className="hidden" />
+              <Card className="premium-card relative h-full bg-card/95 backdrop-blur-md">
                 <CardHeader>
-                  <CardTitle className="flex items-center space-x-2 text-foreground dark:text-white">
+                  <CardTitle className="flex items-center space-x-2 text-foreground">
                     <Server className="w-5 h-5 text-purple-500 dark:text-purple-400" />
                     <span>System Performance</span>
                   </CardTitle>
@@ -973,13 +969,13 @@ const AdminDashboardLayout = () => {
                     {systemMetrics.map((metric, index) => (
                       <div
                         key={metric.title}
-                        className="flex items-center justify-between p-3 rounded-xl bg-muted/70 text-sm text-foreground dark:bg-white/5"
+                        className="flex items-center justify-between p-3 rounded-xl bg-muted/70 text-sm text-foreground"
                       >
                         <div className="flex items-center space-x-3">
                           <metric.icon className={`w-5 h-5 ${metric.color}`} />
-                          <span className="text-gray-300">{metric.title}</span>
+                          <span className="text-foreground">{metric.title}</span>
                         </div>
-                        <span className="font-semibold text-foreground dark:text-white">
+                        <span className="font-semibold text-foreground">
                           {metric.value}
                         </span>
                       </div>
@@ -996,10 +992,10 @@ const AdminDashboardLayout = () => {
               transition={{ delay: 0.6 }}
               className="relative"
             >
-              <div className="absolute inset-0 rounded-3xl bg-gradient-to-r from-blue-500/5 to-purple-500/5 blur-xl opacity-70 dark:from-blue-600/10 dark:to-purple-600/10" />
-              <Card className="relative h-full bg-card/95 backdrop-blur-xl border-border shadow-soft-elevated dark:bg-black/20 dark:border-white/10">
+              <div className="hidden" />
+              <Card className="premium-card relative h-full bg-card/95 backdrop-blur-md">
                 <CardHeader>
-                  <CardTitle className="flex items-center space-x-2 text-foreground dark:text-white">
+                  <CardTitle className="flex items-center space-x-2 text-foreground">
                     <Activity className="w-5 h-5 text-purple-500 dark:text-purple-400" />
                     <span>Recent Activity</span>
                   </CardTitle>
@@ -1014,13 +1010,13 @@ const AdminDashboardLayout = () => {
                       .map((search, index) => (
                         <div
                           key={search.id}
-                          className="flex items-center justify-between p-3 rounded-xl bg-white/5"
+                          className="flex items-center justify-between p-3 rounded-xl bg-muted/60 border border-border/60"
                         >
                           <div className="flex items-center space-x-3">
                             <Search className="w-4 h-4 text-blue-400" />
                             <div>
-                              <p className="text-white text-sm">Part Search</p>
-                              <p className="text-gray-400 text-xs">
+                              <p className="text-foreground text-sm">Part Search</p>
+                              <p className="text-muted-foreground text-xs">
                                 {search.profiles?.email || "Unknown user"}
                               </p>
                             </div>
@@ -1038,7 +1034,7 @@ const AdminDashboardLayout = () => {
                           </div>
                         </div>
                       )) || (
-                      <div className="text-center py-8 text-gray-400">
+                      <div className="text-center py-8 text-muted-foreground">
                         <Search className="w-8 h-8 mx-auto mb-2 opacity-50" />
                         <p>No recent activity</p>
                       </div>

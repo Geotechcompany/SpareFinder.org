@@ -109,7 +109,7 @@ const CookieConsent = () => {
       className="fixed bottom-0 left-0 right-0 z-50 border-t border-border bg-background/95 p-4 text-foreground shadow-soft-elevated backdrop-blur-xl dark:border-gray-800 dark:bg-gray-900/95"
     >
       <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-4 sm:flex-row">
-        <p className="text-sm text-slate-600 dark:text-gray-300">
+        <p className="text-sm text-slate-600 ">
           We use cookies to enhance your experience. By continuing to visit this
           site you agree to our use of cookies.
         </p>
@@ -118,14 +118,14 @@ const CookieConsent = () => {
             variant="outline"
             size="sm"
             onClick={() => setShow(false)}
-            className="border-border text-slate-700 hover:bg-muted dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
+            className="border-border text-slate-700 hover:bg-muted dark:border-gray-700  dark:hover:bg-gray-800"
           >
             Decline
           </Button>
           <Button
             size="sm"
             onClick={() => setShow(false)}
-            className="bg-gradient-to-r from-purple-600 to-blue-600 text-white shadow-lg shadow-purple-500/25 transition-all duration-300 hover:from-purple-700 hover:to-blue-700 hover:shadow-purple-500/40"
+            className="premium-button bg-primary text-primary-foreground hover:bg-primary/90"
           >
             Accept All
           </Button>
@@ -302,7 +302,7 @@ const Landing = () => {
   }, []);
 
   return (
-    <div className="min-h-screen bg-background text-foreground dark:bg-black">
+    <div className="landing-premium min-h-screen bg-background text-foreground">
       <Header />
 
       <main id="main-content">
@@ -331,12 +331,12 @@ const Landing = () => {
       </section>
 
       {/* Dashboard Scroll Animation */}
-      <section className="relative overflow-hidden bg-background dark:bg-black">
+      <section className="relative overflow-hidden bg-background">
         <DashboardScrollDemo />
       </section>
 
       {/* Core Values Section */}
-      <section className="relative overflow-hidden bg-background dark:bg-black">
+      <section className="relative overflow-hidden bg-background">
         <CoreValueStatsDemo />
       </section>
 
@@ -345,7 +345,7 @@ const Landing = () => {
         id="features"
         className="relative py-24 px-4 sm:px-6 lg:px-8 overflow-hidden"
       >
-        <div className="absolute inset-0 bg-gradient-to-b from-background via-[#F0F2F5] to-[#E8EBF1] dark:from-black dark:via-gray-900/50 dark:to-black" />
+        <div className="absolute inset-0 bg-gradient-to-b from-background via-muted/30 to-background" />
         <div className="absolute inset-0">
           <div className="absolute top-1/4 left-1/4 h-96 w-96 rounded-full bg-[#3A5AFE1A] blur-3xl dark:bg-purple-500/10" />
           <div className="absolute bottom-1/4 right-1/4 h-96 w-96 rounded-full bg-[#06B6D41A] blur-3xl dark:bg-blue-500/10" />
@@ -362,15 +362,15 @@ const Landing = () => {
               initial={{ opacity: 0, scale: 0.5 }}
               whileInView={{ opacity: 1, scale: 1 }}
               transition={{ duration: 0.5 }}
-              className="mb-8 inline-flex items-center rounded-full border border-border bg-gradient-to-r from-[#3A5AFE14] via-[#06B6D414] to-transparent px-4 py-2 text-xs font-medium text-muted-foreground backdrop-blur-xl dark:border-purple-500/30 dark:from-purple-500/20 dark:to-blue-500/20 dark:text-purple-300"
+              className="mb-8 inline-flex items-center rounded-full border border-border bg-card/80 px-4 py-2 text-xs font-medium text-muted-foreground backdrop-blur-xl"
             >
               <Sparkles className="mr-2 h-4 w-4 text-primary dark:text-purple-400" />
               <span>Powered by Advanced AI</span>
             </motion.div>
-            <h2 className="mb-6 text-5xl font-bold tracking-tight text-foreground lg:text-6xl dark:bg-gradient-to-r dark:from-white dark:via-purple-200 dark:to-blue-200 dark:bg-clip-text dark:text-transparent">
+            <h2 className="mb-6 text-5xl font-bold tracking-tight text-foreground lg:text-6xl">
               Core Capabilities
             </h2>
-            <p className="mx-auto max-w-3xl text-xl leading-relaxed text-slate-600 dark:text-gray-300">
+            <p className="mx-auto max-w-3xl text-xl leading-relaxed text-slate-600 ">
               Revolutionary part identification technology that transforms how
               industrial teams work
             </p>
@@ -391,7 +391,7 @@ const Landing = () => {
             className="w-full h-full object-cover opacity-20"
             alt="Circuit board background"
           />
-          <div className="absolute inset-0 bg-gradient-to-r from-background via-[#F0F2F5] to-[#E8EBF1] dark:from-black dark:via-black/90 dark:to-black" />
+          <div className="absolute inset-0 bg-gradient-to-r from-background via-muted/20 to-background" />
         </div>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
@@ -423,7 +423,7 @@ const Landing = () => {
       {/* Testimonials */}
       <section
         id="testimonials"
-        className="relative overflow-hidden bg-background py-24 px-4 sm:px-6 lg:px-8 dark:bg-black"
+        className="relative overflow-hidden bg-background py-24 px-4 sm:px-6 lg:px-8"
       >
         <div className="absolute inset-0">
           <div className="absolute top-1/4 left-1/4 h-96 w-96 rounded-full bg-[#3A5AFE1A] blur-3xl dark:bg-purple-500/10" />
@@ -442,12 +442,12 @@ const Landing = () => {
               initial={{ opacity: 0, scale: 0.5 }}
               whileInView={{ opacity: 1, scale: 1 }}
               transition={{ duration: 0.5 }}
-              className="mb-8 inline-flex items-center rounded-full border border-border bg-gradient-to-r from-[#3A5AFE14] via-[#06B6D414] to-transparent px-4 py-2 text-xs font-medium text-muted-foreground backdrop-blur-xl dark:border-purple-500/30 dark:from-purple-500/20 dark:to-blue-500/20 dark:text-purple-300"
+              className="mb-8 inline-flex items-center rounded-full border border-border bg-card/80 px-4 py-2 text-xs font-medium text-muted-foreground backdrop-blur-xl"
             >
               <Sparkles className="mr-2 h-4 w-4 text-primary dark:text-purple-400" />
               <span>Customer Reviews</span>
             </motion.div>
-            <h2 className="mb-6 text-4xl font-bold tracking-tight text-foreground md:text-5xl dark:text-white">
+            <h2 className="mb-6 text-4xl font-bold tracking-tight text-foreground md:text-5xl ">
               Loved by Professionals Worldwide
             </h2>
             <p className="mx-auto max-w-2xl text-xl text-muted-foreground">
@@ -478,7 +478,7 @@ const Landing = () => {
             <Button
               asChild
               variant="outline"
-              className="border-border text-foreground hover:bg-muted dark:border-purple-500/50 dark:text-white dark:hover:bg-purple-500/10"
+              className="border-border text-foreground hover:bg-muted dark:border-purple-500/50  dark:hover:bg-purple-500/10"
             >
               <Link to="/reviews">View All Reviews</Link>
             </Button>
@@ -490,7 +490,7 @@ const Landing = () => {
       <HowItWorks />
 
       {/* Enhanced Pricing Section */}
-      <section className="relative overflow-hidden bg-gradient-to-b from-background via-[#F0F2F5] to-[#E8EBF1] py-20 dark:from-gray-900 dark:via-black dark:to-black">
+      <section className="relative overflow-hidden bg-gradient-to-b from-background via-muted/20 to-background py-20">
         <div className="absolute inset-0">
           <div className="absolute inset-0 bg-[url('/images/grid-pattern.svg')] bg-repeat opacity-5" />
           <div className="absolute inset-0 bg-gradient-to-b from-background/80 via-[#F0F2F5]/90 to-[#E8EBF1]/95 opacity-95 dark:from-gray-900 dark:via-black dark:to-black" />
@@ -510,14 +510,14 @@ const Landing = () => {
       <AnimatePresence>
         {isPaymentModalOpen && (
           <Dialog open={isPaymentModalOpen} onOpenChange={resetPaymentModal}>
-            <DialogContent className="max-h-[90vh] max-w-[600px] overflow-y-auto border border-border bg-card text-foreground shadow-soft-elevated sm:max-w-[600px] dark:border-gray-700 dark:bg-gradient-to-br dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 dark:text-white">
+            <DialogContent className="max-h-[90vh] max-w-[600px] overflow-y-auto border border-border bg-card text-foreground shadow-soft-elevated sm:max-w-[600px]">
               <DialogHeader>
-                <DialogTitle className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent dark:from-purple-400 dark:to-blue-400">
+                <DialogTitle className="text-2xl font-bold text-foreground">
                   {selectedPlan
                     ? `Complete Your Payment for ${selectedPlan.name}`
                     : "Payment Required"}
                 </DialogTitle>
-                <DialogDescription className="text-muted-foreground dark:text-gray-300">
+                <DialogDescription className="text-muted-foreground ">
                   {selectedPlan
                     ? (() => {
                         const isAnnual = billingCycle === "annually";
@@ -543,16 +543,16 @@ const Landing = () => {
                     className="space-y-6 py-4"
                   >
                     {/* Plan Summary */}
-                    <div className="rounded-xl border border-border bg-gradient-to-r from-purple-500/10 via-indigo-500/10 to-blue-500/10 p-4 dark:border-purple-500/30 dark:from-purple-900/20 dark:to-blue-900/20">
+                    <div className="rounded-xl border border-border bg-primary/10 p-4">
                       <h3 className="mb-2 text-lg font-semibold text-primary dark:text-purple-300">
                         Plan Summary
                       </h3>
-                      <div className="flex items-center justify-between text-muted-foreground dark:text-gray-300">
+                      <div className="flex items-center justify-between text-muted-foreground ">
                         <span>
                           {selectedPlan?.name} Plan (
                           {billingCycle === "annually" ? "Annual" : "Monthly"})
                         </span>
-                        <span className="text-xl font-bold text-foreground dark:text-white">
+                        <span className="text-xl font-bold text-foreground ">
                           {(() => {
                             const isAnnual = billingCycle === "annually";
                             const amount = selectedPlan
@@ -603,7 +603,7 @@ const Landing = () => {
                       </div>
 
                       <div className="space-y-3">
-                        <p className="text-muted-foreground dark:text-gray-300">
+                        <p className="text-muted-foreground ">
                           🔒 You will be redirected to Stripe's secure payment
                           page to complete your payment.
                         </p>
@@ -622,7 +622,7 @@ const Landing = () => {
                         <Button
                           onClick={handleStripeCheckout}
                           disabled={isProcessing}
-                          className="flex h-12 w-full items-center justify-center bg-gradient-to-r from-purple-600 to-blue-600 text-lg font-semibold text-white shadow-lg shadow-purple-500/25 transition-all duration-300 hover:from-purple-700 hover:to-blue-700 hover:shadow-purple-500/40 disabled:opacity-70"
+                          className="premium-button flex h-12 w-full items-center justify-center bg-primary text-lg font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-70"
                         >
                           {isProcessing ? (
                             <>
@@ -642,7 +642,7 @@ const Landing = () => {
                           variant="outline"
                           onClick={resetPaymentModal}
                           disabled={isProcessing}
-                          className="w-full border border-border text-muted-foreground hover:bg-muted disabled:opacity-70 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800"
+                          className="w-full border border-border text-muted-foreground hover:bg-muted disabled:opacity-70 dark:border-gray-600  dark:hover:bg-gray-800"
                         >
                           Cancel
                         </Button>
@@ -678,7 +678,7 @@ const Landing = () => {
                     transition={{ duration: 0.3 }}
                     className="py-12 text-center"
                   >
-                    <h3 className="mb-2 text-xl font-semibold text-foreground dark:text-white">
+                    <h3 className="mb-2 text-xl font-semibold text-foreground ">
                       No Plan Selected
                     </h3>
                     <p className="mb-6 text-muted-foreground dark:text-gray-400">
@@ -686,7 +686,7 @@ const Landing = () => {
                     </p>
                     <Button
                       onClick={() => setIsPaymentModalOpen(false)}
-                      className="bg-muted text-foreground hover:bg-muted/80 dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-white"
+                      className="bg-muted text-foreground hover:bg-muted/80 dark:bg-gray-700 dark:hover:bg-gray-600 "
                     >
                       Cancel
                     </Button>
@@ -701,24 +701,24 @@ const Landing = () => {
       {/* Final CTA */}
       <section className="py-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <div className="rounded-3xl border border-border bg-gradient-to-r from-purple-500/10 via-indigo-500/10 to-blue-500/10 p-10 shadow-soft-elevated backdrop-blur-xl sm:p-16 dark:border-white/10 dark:from-purple-900/50 dark:to-blue-900/50">
-            <h2 className="mb-6 text-4xl font-bold tracking-tight text-foreground dark:text-white">
+          <div className="rounded-3xl border border-border bg-card p-10 shadow-soft-elevated backdrop-blur-xl sm:p-16">
+            <h2 className="mb-6 text-4xl font-bold tracking-tight text-foreground ">
               Ready to Revolutionize Your Part Identification?
             </h2>
-            <p className="mx-auto mb-8 max-w-2xl text-muted-foreground dark:text-gray-300">
+            <p className="mx-auto mb-8 max-w-2xl text-muted-foreground ">
               Join hundreds of manufacturers already using our AI-powered
               platform
             </p>
             <div className="flex justify-center gap-4">
               <Button
                 asChild
-                className="bg-gradient-to-r from-purple-600 to-blue-600 px-8 py-6 text-lg font-semibold text-white shadow-lg shadow-purple-500/25 transition-all duration-300 hover:from-purple-700 hover:to-blue-700 hover:shadow-purple-500/40"
+                className="premium-button bg-primary px-8 py-6 text-lg font-semibold text-primary-foreground hover:bg-primary/90"
               >
                 <Link to="/register">Start Free Trial</Link>
               </Button>
               <Button
                 variant="outline"
-                className="border-border px-8 py-6 text-lg font-medium text-foreground hover:bg-muted dark:border-gray-600 dark:text-white dark:hover:bg-white/10"
+                className="border-border px-8 py-6 text-lg font-medium text-foreground hover:bg-muted dark:border-gray-600  dark:hover:bg-white/10"
               >
                 Contact Sales
               </Button>

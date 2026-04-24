@@ -46,35 +46,7 @@ const DashboardLayout: React.FC = () => {
 
   return (
     <DashboardLayoutProvider>
-      <div className="min-h-screen flex w-full bg-gradient-to-br from-background via-[#F0F2F5] to-[#E8EBF1] dark:from-[#0B1026] dark:via-[#1A1033] dark:to-[#0C1226] relative overflow-hidden">
-        {/* Animated Background Elements */}
-        <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          <motion.div
-            className="absolute top-1/3 -right-40 w-80 h-80 bg-purple-600/15 rounded-full blur-3xl opacity-60"
-            animate={{
-              scale: [1, 1.3, 1],
-              rotate: [0, 180, 360],
-            }}
-            transition={{
-              duration: 20,
-              repeat: Infinity,
-              ease: "linear",
-            }}
-          />
-          <motion.div
-            className="absolute -bottom-40 -left-40 w-96 h-96 bg-blue-600/10 rounded-full blur-3xl opacity-40"
-            animate={{
-              scale: [1.2, 1, 1.2],
-              x: [0, 50, 0],
-              y: [0, -30, 0],
-            }}
-            transition={{
-              duration: 25,
-              repeat: Infinity,
-              ease: "easeInOut",
-            }}
-          />
-        </div>
+      <div className="dashboard-premium min-h-screen flex w-full relative overflow-hidden">
 
         {/* Desktop Sidebar */}
         <DashboardSidebar
@@ -91,7 +63,7 @@ const DashboardLayout: React.FC = () => {
         {/* Mobile Menu Button */}
         <button
           onClick={handleToggleMobileMenu}
-          className="fixed top-3 right-3 z-40 flex h-9 w-9 items-center justify-center rounded-full border border-border bg-card/95 text-muted-foreground shadow-soft-elevated backdrop-blur-sm md:hidden dark:bg-black/70 dark:border-white/10 dark:text-white"
+          className="fixed top-3 right-3 z-40 flex h-9 w-9 items-center justify-center rounded-full border border-border bg-card text-foreground shadow-soft-elevated backdrop-blur-sm md:hidden"
           aria-label="Open navigation"
         >
           <Menu className="w-5 h-5" />
@@ -109,9 +81,9 @@ const DashboardLayout: React.FC = () => {
               : "calc(100% - var(--expanded-sidebar-width, 320px))",
           }}
           transition={{ duration: 0.3, ease: "easeInOut" }}
-          className="flex-1 p-2 pb-16 sm:p-4 sm:pb-6 lg:p-8 relative z-10 overflow-x-hidden md:overflow-x-visible"
+          className="flex-1 px-3 pb-16 pt-3 sm:px-6 sm:pb-6 sm:pt-6 lg:px-8 lg:py-8 relative z-10 overflow-x-hidden md:overflow-x-visible"
         >
-          <div className="mx-auto flex h-full max-w-6xl flex-col">
+          <div className="mx-auto flex h-full w-full max-w-[var(--dashboard-content-max-width)] flex-col">
             <DashboardHeader />
             <Outlet />
           </div>

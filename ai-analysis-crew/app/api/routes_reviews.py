@@ -141,7 +141,7 @@ async def public_review_stats():
 
 @router.post("")
 async def submit_public_review(payload: PublicReviewBody, user: CurrentUser = Depends(get_current_user)):
-    _require_subscription_or_trial(user_id=user.user_id)
+    _require_subscription_or_trial(user_id=user.id)
 
     supabase = get_supabase_admin()
     now = datetime.utcnow().isoformat()
@@ -251,7 +251,7 @@ async def list_analysis_reviews(user: CurrentUser = Depends(get_current_user)):
     rows = (
         supabase.table("analysis_reviews")
         .select("*")
-        .eq("user_id", user.user_id)
+        .eq("user_id", user.id)
         .order("created_at", desc=True)
         .execute()
         .data
@@ -275,7 +275,7 @@ async def create_analysis_review(payload: AnalysisReviewCreateBody, user: Curren
             .insert(
                 [
                     {
-                        "user_id": user.user_id,
+                        "user_id": user.id,
                         "job_id": payload.job_id,
                         "job_type": payload.job_type,
                         "part_search_id": payload.part_search_id or None,
@@ -304,7 +304,7 @@ async def create_analysis_review(payload: AnalysisReviewCreateBody, user: Curren
 @router.delete("/analysis/{reviewId}")
 async def delete_analysis_review(reviewId: str, user: CurrentUser = Depends(get_current_user)):
     supabase = get_supabase_admin()
-    supabase.table("analysis_reviews").delete().eq("id", reviewId).eq("user_id", user.user_id).execute()
+    supabase.table("analysis_reviews").delete().eq("id", reviewId).eq("user_id", user.id).execute()
     return api_ok(message="Review deleted successfully")
 
 

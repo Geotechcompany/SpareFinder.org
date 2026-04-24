@@ -1,6 +1,7 @@
 :root {
     --collapsed-sidebar-width: 80px;
     --expanded-sidebar-width: 320px;
+    --dashboard-content-max-width: 1240px;
 }
 
 

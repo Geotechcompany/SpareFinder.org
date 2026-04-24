@@ -97,7 +97,7 @@ const Dashboard = () => {
       value: "0ms",
       change: "0ms",
       icon: Activity,
-      color: "from-purple-600 to-violet-600",
+      color: "bg-primary/20 text-primary",
     },
   ]);
   const [analyticsSeries, setAnalyticsSeries] = useState<any[]>(() => []);
@@ -442,7 +442,7 @@ const Dashboard = () => {
               normalizedResponseTimeChange || 0
             }ms`,
             icon: Activity,
-            color: "from-purple-600 to-violet-600",
+            color: "bg-primary/20 text-primary",
           },
         ]);
       } else {
@@ -470,7 +470,7 @@ const Dashboard = () => {
             value: "0ms",
             change: "0ms",
             icon: Activity,
-            color: "from-purple-600 to-violet-600",
+            color: "bg-primary/20 text-primary",
           },
         ]);
       }
@@ -639,7 +639,7 @@ const Dashboard = () => {
 
   if (!subscriptionLoading && !isPlanActive) {
     return (
-      <div className="min-h-screen flex w-full bg-gradient-to-br from-gray-50 via-gray-100 to-gray-200 dark:from-[#0B1026] dark:via-[#1A1033] dark:to-[#0C1226]">
+      <div className="dashboard-premium min-h-screen flex w-full bg-background">
         <PlanRequiredCard />
       </div>
     );
@@ -650,34 +650,7 @@ const Dashboard = () => {
   }
 
   return (
-    <div className="min-h-screen flex w-full bg-gradient-to-br from-gray-50 via-gray-100 to-gray-200 dark:from-[#0B1026] dark:via-[#1A1033] dark:to-[#0C1226] text-slate-900 dark:text-slate-100">
-      {/* Animated Background Elements */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <motion.div
-          className="absolute -top-40 -left-40 w-80 h-80 bg-purple-600/10 rounded-full blur-2xl opacity-30"
-          animate={{
-            scale: [1, 1.2, 1],
-            rotate: [0, 180, 360],
-          }}
-          transition={{
-            duration: 20,
-            repeat: Infinity,
-            ease: "linear",
-          }}
-        />
-        <motion.div
-          className="absolute top-1/2 -right-40 w-96 h-96 bg-blue-600/10 rounded-full blur-2xl opacity-25"
-          animate={{
-            scale: [1.2, 1, 1.2],
-            rotate: [360, 180, 0],
-          }}
-          transition={{
-            duration: 25,
-            repeat: Infinity,
-            ease: "linear",
-          }}
-        />
-      </div>
+    <div className="dashboard-premium min-h-screen flex w-full bg-background text-foreground">
 
       {/* Sidebar and mobile menu handled by layout when inLayout */}
       {!inLayout && (
@@ -692,7 +665,7 @@ const Dashboard = () => {
           />
           <button
             onClick={handleToggleMobileMenu}
-            className="fixed top-3 right-3 z-40 flex h-9 w-9 items-center justify-center rounded-full border border-border bg-card/95 text-muted-foreground shadow-soft-elevated backdrop-blur-sm md:hidden dark:bg-black/70 dark:border-white/10 dark:text-white"
+            className="fixed top-3 right-3 z-40 flex h-9 w-9 items-center justify-center rounded-full border border-border bg-card text-foreground shadow-soft-elevated backdrop-blur-sm md:hidden"
             aria-label="Open navigation"
           >
             <Menu className="w-5 h-5" />
@@ -716,7 +689,7 @@ const Dashboard = () => {
               }
         }
         transition={{ duration: 0.3, ease: "easeInOut" }}
-        className="flex-1 p-2 sm:p-4 lg:p-8 relative z-10 overflow-x-hidden md:overflow-x-visible"
+        className="flex-1 px-3 pb-6 pt-3 sm:px-6 sm:pt-6 lg:px-8 lg:py-8 relative z-10 overflow-x-hidden md:overflow-x-visible"
       >
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -726,14 +699,13 @@ const Dashboard = () => {
         >
           {/* Header */}
           <div className="relative">
-            <div className="relative rounded-2xl sm:rounded-3xl border border-border/80 bg-card shadow-soft-elevated dark:bg-card/90 dark:shadow-[0_18px_45px_rgba(15,23,42,0.55)]">
-              <div className="pointer-events-none absolute inset-0 rounded-2xl sm:rounded-3xl dark:bg-gradient-to-r dark:from-purple-500/15 dark:via-blue-500/10 dark:to-transparent" />
+            <div className="relative rounded-[18px] border border-white/5 bg-card shadow-[0_18px_48px_rgba(5,8,20,0.3)]">
               <div className="flex flex-col gap-4 px-4 py-3 sm:px-6 sm:py-4">
                 {/* Top Row - Welcome Message and Actions */}
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
                   <div>
                     <motion.h1
-                      className="text-2xl sm:text-3xl lg:text-4xl font-bold text-foreground dark:bg-gradient-to-r dark:from-foreground dark:via-purple-300 dark:to-blue-300 dark:bg-clip-text dark:text-transparent"
+                      className="text-2xl sm:text-3xl lg:text-4xl font-bold text-foreground tracking-[-0.02em]"
                       initial={{ opacity: 0, x: -20 }}
                       animate={{ opacity: 1, x: 0 }}
                       transition={{ delay: 0.2 }}
@@ -764,7 +736,7 @@ const Dashboard = () => {
                     >
                       <Button
                         onClick={() => navigate("/dashboard/upload")}
-                        className="w-full sm:w-auto bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-400 hover:to-blue-500 shadow-lg shadow-blue-500/20 focus:ring-2 focus:ring-blue-400/40"
+                        className="premium-button w-full sm:w-auto bg-primary hover:bg-primary/90 focus:ring-2 focus:ring-primary/40"
                       >
                         <Upload className="w-4 h-4 mr-2" />
                         New Upload
@@ -777,7 +749,7 @@ const Dashboard = () => {
                     >
                       <Button
                         onClick={startOnboarding}
-                        className="w-full sm:w-auto bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 shadow-lg shadow-purple-500/25 focus:ring-2 focus:ring-purple-400/40"
+                        className="premium-button w-full sm:w-auto bg-secondary text-foreground hover:bg-secondary/80 border border-white/5"
                       >
                         <Zap className="w-4 h-4 mr-2" /> Start Guided Tour
                       </Button>
@@ -795,25 +767,25 @@ const Dashboard = () => {
                 title: "Total Uploads",
                 value: String(stats.totalUploads || 0),
                 icon: FileText,
-                color: "from-purple-600 to-blue-600",
+                color: "bg-primary/20 text-primary",
               },
               {
                 title: "Completed",
                 value: String(stats.successfulUploads || 0),
                 icon: CheckCircle,
-                color: "from-green-600 to-emerald-600",
+                color: "bg-[#2EE6A6]/20 text-[#2EE6A6]",
               },
               {
                 title: "Avg Confidence",
                 value: `${Number(stats.avgConfidence || 0).toFixed(1)}%`,
                 icon: TrendingUp,
-                color: "from-blue-600 to-cyan-600",
+                color: "bg-accent/20 text-accent",
               },
               {
                 title: "Avg Processing",
                 value: formatProcessingDisplay(Number(stats.avgProcessTime) || 0),
                 icon: Clock,
-                color: "from-orange-600 to-red-600",
+                color: "bg-white/10 text-foreground",
               },
             ].map((stat, index) => (
               <motion.div
@@ -821,11 +793,10 @@ const Dashboard = () => {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.1 * index, duration: 0.5 }}
-                whileHover={{ y: -2, scale: 1.02 }}
+                whileHover={{ y: -4, scale: 1.01 }}
                 className="relative group"
               >
-                <div className="absolute inset-0 rounded-xl md:rounded-2xl bg-card/80 blur-xl opacity-60 group-hover:opacity-80 transition-opacity" />
-                <Card className="relative border border-border bg-card text-foreground shadow-soft-elevated backdrop-blur-xl transition-all duration-300 hover:border-[#C7D2FE] dark:bg-black/40 dark:border-white/10 dark:hover:border-white/20">
+                <Card className="premium-card relative text-foreground backdrop-blur-md">
                   <CardContent className="p-4 sm:p-6">
                     <div className="flex items-center justify-between">
                       <div className="flex-1 min-w-0">
@@ -837,9 +808,9 @@ const Dashboard = () => {
                         </p>
                       </div>
                       <div
-                        className={`p-3 rounded-xl bg-gradient-to-r ${stat.color} shadow-lg flex-shrink-0`}
+                        className={`p-3 rounded-xl ${stat.color} flex-shrink-0`}
                       >
-                        <stat.icon className="w-5 h-5 text-white" />
+                        <stat.icon className="w-5 h-5" />
                       </div>
                     </div>
                   </CardContent>
@@ -855,7 +826,7 @@ const Dashboard = () => {
             transition={{ delay: 0.6 }}
             className="relative"
           >
-            <Card className="relative border border-border bg-card/95 backdrop-blur-xl shadow-[0_18px_45px_rgba(15,23,42,0.06)] dark:bg-gradient-to-br dark:from-slate-900/70 dark:to-slate-800/40 dark:border-slate-700/60">
+            <Card className="premium-card relative bg-card/95 backdrop-blur-md">
               <CardHeader className="p-4 sm:p-6">
                 <CardTitle className="flex items-center space-x-2 text-lg sm:text-xl text-foreground dark:text-white">
                   <Zap className="w-5 h-5 text-yellow-500 dark:text-yellow-400" />
@@ -881,7 +852,7 @@ const Dashboard = () => {
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: 0.8 }}
             >
-              <Card className="h-full border border-border bg-card/95 bg-grid-soft backdrop-blur-xl shadow-soft-elevated dark:bg-gradient-to-br dark:from-slate-900/70 dark:to-slate-800/40 dark:border-slate-700/60 dark:shadow-[0_18px_45px_rgba(15,23,42,0.35)]">
+              <Card className="premium-card h-full bg-card/95 backdrop-blur-md">
                 <CardHeader className="p-4 sm:p-6">
                   <CardTitle className="flex items-center space-x-2 text-lg sm:text-xl text-foreground dark:text-white">
                     <Activity className="w-5 h-5 text-primary" />
@@ -917,7 +888,7 @@ const Dashboard = () => {
                         <div className="absolute left-0 top-4 flex h-3 w-3 -translate-x-1/2 items-center justify-center rounded-full bg-background ring-4 ring-muted/80 dark:ring-slate-800">
                           <span className="block h-2 w-2 rounded-full bg-primary" />
                         </div>
-                        <div className="flex h-9 w-9 items-center justify-center rounded-full border border-border bg-muted/80 shadow-sm group-hover:shadow-md dark:bg-gradient-to-r dark:from-slate-800/60 dark:to-slate-700/40 dark:border-slate-700/60">
+                        <div className="flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-muted/80 shadow-sm group-hover:border-accent/40">
                           {activity.type === "upload" ? (
                             <Upload className="w-4 h-4 text-primary" />
                           ) : (
@@ -957,7 +928,7 @@ const Dashboard = () => {
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: 0.8 }}
             >
-              <Card className="h-full border border-border bg-card/95 backdrop-blur-xl shadow-[0_18px_45px_rgba(15,23,42,0.06)] dark:bg-gradient-to-br dark:from-slate-900/70 dark:to-slate-800/40 dark:border-slate-700/60">
+              <Card className="premium-card h-full bg-card/95 backdrop-blur-md">
                 <CardHeader className="p-4 sm:p-6">
                   <CardTitle className="flex items-center space-x-2 text-lg sm:text-xl text-foreground dark:text-white">
                     <TrendingUp className="w-5 h-5 text-emerald-500" />
@@ -973,25 +944,25 @@ const Dashboard = () => {
                       label: "Upload New Part",
                       icon: Upload,
                       href: "/dashboard/upload",
-                      color: "from-blue-500 to-blue-600",
+                      color: "bg-primary/20 text-primary",
                     },
                     {
                       label: "View History",
                       icon: FileText,
                       href: "/history",
-                      color: "from-slate-600 to-slate-500",
+                      color: "bg-white/10 text-foreground",
                     },
                     {
                       label: "View Profile",
                       icon: Eye,
                       href: "/profile",
-                      color: "from-emerald-500 to-emerald-600",
+                      color: "bg-[#2EE6A6]/20 text-[#2EE6A6]",
                     },
                     {
                       label: "Settings",
                       icon: Download,
                       href: "/settings",
-                      color: "from-amber-500 to-amber-600",
+                      color: "bg-accent/20 text-accent",
                     },
                   ].map((action, index) => (
                     <motion.div
@@ -1009,9 +980,9 @@ const Dashboard = () => {
                       >
                         <div className="flex items-center gap-3">
                           <div
-                            className={`flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-r ${action.color} shadow-md shadow-primary/20`}
+                            className={`flex h-9 w-9 items-center justify-center rounded-full ${action.color}`}
                           >
-                            <action.icon className="w-4 h-4 text-white" />
+                            <action.icon className="w-4 h-4" />
                           </div>
                           <span className="font-medium text-foreground">
                             {action.label}
