@@ -1575,13 +1575,18 @@ const History = () => {
         throw new Error("Failed to create shareable link");
       }
 
-      const data = await response.json();
+      const payload = await response.json();
+      const shareUrl =
+        payload?.data?.shareUrl ?? payload?.shareUrl ?? payload?.data?.url;
+      if (!shareUrl || typeof shareUrl !== "string") {
+        throw new Error("Share URL was not returned by the server");
+      }
 
       // Copy to clipboard
-      await navigator.clipboard.writeText(data.shareUrl);
+      await navigator.clipboard.writeText(shareUrl);
 
       // Open in new tab
-      window.open(data.shareUrl, "_blank");
+      window.open(shareUrl, "_blank", "noopener,noreferrer");
 
       toast({
         title: "Shareable Link Created!",
