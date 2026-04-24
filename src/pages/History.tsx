@@ -1566,9 +1566,8 @@ const History = () => {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            "x-user-id": user?.id || "",
+            ...(await getAuthHeaders()),
           },
-          body: JSON.stringify({ userId: user?.id }),
         }
       );
 
