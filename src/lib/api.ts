@@ -998,6 +998,14 @@ export const adminApi = {
     const response = await apiClient.patch(`/admin/tickets/${ticketId}`, payload);
     return response.data;
   },
+
+  postTicketMessage: async (
+    ticketId: string,
+    payload: { body: string; is_internal?: boolean; set_status?: string }
+  ): Promise<ApiResponse> => {
+    const response = await apiClient.post(`/admin/tickets/${ticketId}/messages`, payload);
+    return response.data;
+  },
 };
 
 // Tickets API (user support)
@@ -1030,6 +1038,11 @@ export const ticketsApi = {
 
   get: async (ticketId: string): Promise<ApiResponse> => {
     const response = await apiClient.get(`/tickets/${ticketId}`);
+    return response.data;
+  },
+
+  postMessage: async (ticketId: string, message: string): Promise<ApiResponse> => {
+    const response = await apiClient.post(`/tickets/${ticketId}/messages`, { message });
     return response.data;
   },
 };

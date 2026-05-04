@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Card,
@@ -84,6 +84,8 @@ const Support = () => {
   const [detailLoading, setDetailLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [createForm, setCreateForm] = useState({ subject: "", message: "", priority: "medium" as TicketPriority });
+  const [followUp, setFollowUp] = useState("");
+  const [followUpSending, setFollowUpSending] = useState(false);
 
   const limit = 20;
 
@@ -112,6 +114,7 @@ const Support = () => {
   const openDetail = async (id: string) => {
     setDetailTicket(null);
     setDetailLoading(true);
+    setFollowUp("");
     try {
       const res = await api.tickets.get(id);
       if (res?.success && res?.data) {
@@ -123,6 +126,56 @@ const Support = () => {
       toast.error("Failed to load ticket");
     } finally {
       setDetailLoading(false);
+    }
+  };
+
+  const publicThread = useMemo(() => {
+    if (!detailTicket) return [];
+    const msgs = [...(detailTicket.messages || [])];
+    const legacy = (detailTicket.admin_notes || "").trim();
+    if (
+      legacy &&
+      !msgs.some((m) => (m.body || "").trim() === legacy)
+    ) {
+      msgs.push({
+        id: `legacy-${detailTicket.id}`,
+        body: legacy,
+        author_role: "admin",
+        author_display: "Support",
+        created_at: detailTicket.updated_at,
+        _legacy: true,
+      });
+    }
+    return msgs.sort(
+      (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+    );
+  }, [detailTicket]);
+
+  const sendFollowUp = async () => {
+    if (!detailTicket) return;
+    const text = followUp.trim();
+    if (!text) {
+      toast.error("Enter a message");
+      return;
+    }
+    setFollowUpSending(true);
+    try {
+      const res = await api.tickets.postMessage(detailTicket.id, text);
+      if (res?.success) {
+        toast.success(res?.message || "Reply sent");
+        setFollowUp("");
+        const refreshed = await api.tickets.get(detailTicket.id);
+        if (refreshed?.success && refreshed?.data) {
+          setDetailTicket(refreshed.data as TicketDetail);
+        }
+        fetchTickets();
+      } else {
+        toast.error(res?.message || "Failed to send reply");
+      }
+    } catch (e) {
+      toast.error("Failed to send reply");
+    } finally {
+      setFollowUpSending(false);
     }
   };
 
@@ -337,52 +390,107 @@ const Support = () => {
 
       {/* Ticket detail dialog */}
       <Dialog open={!!detailTicket || detailLoading} onOpenChange={(open) => !open && setDetailTicket(null)}>
-        <DialogContent className="sm:max-w-lg">
+        <DialogContent className="flex max-h-[min(90vh,720px)] flex-col gap-0 overflow-hidden p-0 sm:max-w-xl">
           {detailLoading ? (
             <div className="flex items-center justify-center py-12">
               <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
             </div>
           ) : detailTicket ? (
             <>
-              <DialogHeader>
-                <div className="flex items-center gap-2">
+              <div className="border-b px-6 py-4">
+                <DialogHeader>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => setDetailTicket(null)}
+                      className="shrink-0"
+                    >
+                      <ArrowLeft className="h-4 w-4" />
+                    </Button>
+                    <div className="min-w-0 flex-1">
+                      <DialogTitle className="truncate pr-2">{detailTicket.subject}</DialogTitle>
+                      <DialogDescription className="mt-1 flex flex-wrap items-center gap-2">
+                        <Badge variant={statusVariant[detailTicket.status as TicketStatus]}>
+                          {statusLabels[detailTicket.status as TicketStatus]}
+                        </Badge>
+                        <span>{priorityLabels[detailTicket.priority as TicketPriority]}</span>
+                        <span className="text-muted-foreground">Created {formatDate(detailTicket.created_at)}</span>
+                      </DialogDescription>
+                    </div>
+                  </div>
+                </DialogHeader>
+              </div>
+
+              <ScrollArea className="max-h-[min(40vh,320px)] flex-1 px-6 py-4">
+                <div className="space-y-4 pr-3">
+                  <div>
+                    <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">Your message</p>
+                    <div className="rounded-2xl rounded-tl-md border bg-muted/40 px-4 py-3 text-sm">
+                      <p className="whitespace-pre-wrap">{detailTicket.message}</p>
+                    </div>
+                  </div>
+                  {publicThread.length > 0 && (
+                    <>
+                      <Separator />
+                      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Thread</p>
+                      <div className="space-y-3">
+                        {publicThread.map((m) => {
+                          const fromYou = m.author_role === "user";
+                          return (
+                            <div key={m.id} className={cn("flex", fromYou ? "justify-start" : "justify-end")}>
+                              <div
+                                className={cn(
+                                  "max-w-[90%] rounded-2xl px-4 py-3 text-sm",
+                                  fromYou
+                                    ? "rounded-tl-md border bg-muted/60"
+                                    : "rounded-tr-md border border-primary/25 bg-primary text-primary-foreground"
+                                )}
+                              >
+                                <p className="mb-1 text-xs opacity-80">
+                                  {fromYou ? "You" : m.author_display || "Support"} · {formatDate(m.created_at)}
+                                  {m._legacy ? " · earlier reply" : ""}
+                                </p>
+                                <p className="whitespace-pre-wrap">{m.body}</p>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </>
+                  )}
+                  <p className="text-xs text-muted-foreground">Last updated {formatDate(detailTicket.updated_at)}</p>
+                </div>
+              </ScrollArea>
+
+              <div className="border-t bg-muted/20 px-6 py-4">
+                <Label htmlFor="follow-up" className="text-sm">
+                  Add a reply
+                </Label>
+                <Textarea
+                  id="follow-up"
+                  value={followUp}
+                  onChange={(e) => setFollowUp(e.target.value.slice(0, 5000))}
+                  placeholder="Add details or ask a follow-up question…"
+                  rows={3}
+                  className="mt-2 resize-none"
+                />
+                <div className="mt-2 flex justify-end gap-2">
                   <Button
                     type="button"
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => setDetailTicket(null)}
-                    className="shrink-0"
+                    size="sm"
+                    onClick={sendFollowUp}
+                    disabled={followUpSending || !followUp.trim()}
                   >
-                    <ArrowLeft className="h-4 w-4" />
+                    {followUpSending ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <Send className="mr-2 h-4 w-4" />
+                    )}
+                    Send
                   </Button>
-                  <div className="min-w-0 flex-1">
-                    <DialogTitle className="truncate">{detailTicket.subject}</DialogTitle>
-                    <DialogDescription className="flex flex-wrap items-center gap-2 mt-1">
-                      <Badge variant={statusVariant[detailTicket.status as TicketStatus]}>
-                        {statusLabels[detailTicket.status as TicketStatus]}
-                      </Badge>
-                      <span>{priorityLabels[detailTicket.priority as TicketPriority]}</span>
-                      <span>Created {formatDate(detailTicket.created_at)}</span>
-                    </DialogDescription>
-                  </div>
                 </div>
-              </DialogHeader>
-              <div className="space-y-4">
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground mb-1">Your message</p>
-                  <p className="text-sm whitespace-pre-wrap rounded-md bg-muted/50 p-3">{detailTicket.message}</p>
-                </div>
-                {detailTicket.admin_notes && (
-                  <div>
-                    <p className="text-sm font-medium text-muted-foreground mb-1">Response from support</p>
-                    <p className="text-sm whitespace-pre-wrap rounded-md bg-muted/50 p-3 border border-border">
-                      {detailTicket.admin_notes}
-                    </p>
-                  </div>
-                )}
-                <p className="text-xs text-muted-foreground">
-                  Last updated {formatDate(detailTicket.updated_at)}
-                </p>
               </div>
             </>
           ) : null}

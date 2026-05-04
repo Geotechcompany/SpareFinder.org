@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 import logging
 import uuid
+from datetime import datetime
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -12,6 +13,7 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 
 from .auth_dependencies import CurrentUser, get_current_user
 from .responses import api_error, api_ok
+from .support_ticket_thread import enrich_ticket_messages_authors, fetch_ticket_messages_raw
 from .supabase_admin import get_supabase_admin
 
 logger = logging.getLogger(__name__)
@@ -53,6 +55,19 @@ class CreateTicketBody(BaseModel):
         if len(self.message) < 10:
             raise ValueError("Message must be at least 10 characters")
         return self
+
+
+class UserReplyTicketBody(BaseModel):
+    """Follow-up message on an existing ticket."""
+
+    message: str = Field(min_length=1, max_length=5000)
+
+    @field_validator("message", mode="before")
+    @classmethod
+    def strip_message(cls, v: object) -> str:
+        if v is None:
+            return ""
+        return str(v).strip()
 
 
 # ---------- Notify all admins of new ticket ----------
@@ -214,6 +229,57 @@ async def list_my_tickets(
         return api_error("Failed to list tickets", status_code=500)
 
 
+@router.post("/{ticket_id}/messages")
+async def post_user_ticket_reply(
+    ticket_id: str,
+    payload: UserReplyTicketBody,
+    user: CurrentUser = Depends(get_current_user),
+) -> dict[str, Any]:
+    """Add a follow-up message to your ticket (visible to support)."""
+    supabase = get_supabase_admin()
+    own = (
+        supabase.table("support_tickets")
+        .select("id, status")
+        .eq("id", ticket_id)
+        .eq("user_id", user.id)
+        .limit(1)
+        .execute()
+    )
+    if not own.data or len(own.data) == 0:
+        raise HTTPException(status_code=404, detail="Ticket not found")
+    body = (payload.message or "").strip()
+    if not body:
+        return api_error("Message is required", status_code=400)
+    rowm: dict[str, Any] = {
+        "ticket_id": ticket_id,
+        "body": body,
+        "is_internal": False,
+        "author_role": "user",
+        "author_id": user.id,
+    }
+    try:
+        ins = supabase.table("support_ticket_messages").insert([rowm]).execute()
+        if not ins.data or len(ins.data) == 0:
+            return api_error("Could not save reply", status_code=500)
+    except Exception as e:
+        logger.exception("User ticket reply: %s", e)
+        return api_error(
+            "Could not save reply. Ask an admin to run docs/sql/support_ticket_messages.sql in Supabase.",
+            status_code=500,
+        )
+    ticket_updates: dict[str, Any] = {"updated_at": datetime.utcnow().isoformat()}
+    st = str((own.data[0] or {}).get("status") or "").lower()
+    if st == "answered":
+        ticket_updates["status"] = "open"
+    elif st == "closed":
+        ticket_updates["status"] = "open"
+    try:
+        supabase.table("support_tickets").update(ticket_updates).eq("id", ticket_id).execute()
+    except Exception as e:
+        logger.warning("Ticket metadata update after reply failed: %s", e)
+    return api_ok(data={"message": ins.data[0]}, message="Reply added")
+
+
 @router.get("/{ticket_id}")
 async def get_my_ticket(
     ticket_id: str,
@@ -234,7 +300,11 @@ async def get_my_ticket(
         )
         if not res.data or len(res.data) == 0:
             raise HTTPException(status_code=404, detail="Ticket not found")
-        return api_ok(data=res.data[0])
+        ticket = res.data[0]
+        msgs = fetch_ticket_messages_raw(supabase, ticket_id, include_internal=False)
+        enrich_ticket_messages_authors(supabase, msgs)
+        ticket["messages"] = msgs
+        return api_ok(data=ticket)
     except HTTPException:
         raise
     except Exception as e:

@@ -16,6 +16,7 @@ from pydantic import BaseModel, Field, field_validator
 from .auth_dependencies import CurrentUser, require_roles
 from .errors import ApiError
 from .responses import api_error, api_ok
+from .support_ticket_thread import enrich_ticket_messages_authors, fetch_ticket_messages_raw
 from .supabase_admin import get_supabase_admin
 from .supabase_auth_admin import delete_supabase_auth_user
 
@@ -1108,7 +1109,68 @@ async def admin_get_ticket(
             ticket["profile"] = None
     else:
         ticket["profile"] = None
+    msgs = fetch_ticket_messages_raw(supabase, ticket_id, include_internal=True)
+    enrich_ticket_messages_authors(supabase, msgs)
+    ticket["messages"] = msgs
     return api_ok(data=ticket)
+
+
+class AdminPostTicketMessageBody(BaseModel):
+    body: str = Field(..., min_length=1, max_length=10000)
+    is_internal: bool = False
+    set_status: Optional[str] = Field(default=None, pattern=r"^(open|in_progress|answered|closed)$")
+
+    @field_validator("body", mode="before")
+    @classmethod
+    def _strip_body(cls, v: object) -> str:
+        if v is None:
+            return ""
+        return str(v).strip()
+
+
+@router.post("/tickets/{ticket_id}/messages")
+async def admin_post_ticket_message(
+    ticket_id: str,
+    payload: AdminPostTicketMessageBody,
+    admin: CurrentUser = Depends(require_roles("admin", "super_admin")),
+):
+    """Append a reply (public or internal). Public replies sync latest text to support_tickets.admin_notes."""
+    supabase = get_supabase_admin()
+    chk = supabase.table("support_tickets").select("id").eq("id", ticket_id).limit(1).execute()
+    if not chk.data or len(chk.data) == 0:
+        return api_error("Ticket not found", status_code=404)
+    body = (payload.body or "").strip()
+    if not body:
+        return api_error("Message body is required", status_code=400)
+    rowm: dict[str, Any] = {
+        "ticket_id": ticket_id,
+        "body": body,
+        "is_internal": bool(payload.is_internal),
+        "author_role": "admin",
+        "author_id": admin.id,
+    }
+    try:
+        ins = supabase.table("support_ticket_messages").insert([rowm]).execute()
+        created_rows = ins.data or []
+        created = created_rows[0] if created_rows else None
+    except Exception as e:
+        return api_error(
+            f"Could not save reply. Apply docs/sql/support_ticket_messages.sql in Supabase, then retry. ({e})",
+            status_code=500,
+        )
+    ticket_updates: dict[str, Any] = {"updated_at": datetime.utcnow().isoformat()}
+    if not payload.is_internal:
+        ticket_updates["admin_notes"] = body
+    if payload.set_status is not None:
+        ticket_updates["status"] = payload.set_status
+    try:
+        supabase.table("support_tickets").update(ticket_updates).eq("id", ticket_id).execute()
+    except Exception as e:
+        return api_error(f"Reply saved but ticket metadata update failed: {e}", status_code=500)
+    if created:
+        created = dict(created)
+        created["author_display"] = admin.full_name or admin.email or "Support"
+    return api_ok(data={"message": created, "ticket_id": ticket_id}, message="Reply posted")
 
 
 class AdminUpdateTicketBody(BaseModel):

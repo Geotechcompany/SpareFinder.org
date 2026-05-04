@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import {
   Card,
   CardContent,
@@ -33,11 +33,24 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Separator } from "@/components/ui/separator";
+import { Switch } from "@/components/ui/switch";
 import { api } from "@/lib/api";
 import AdminDesktopSidebar from "@/components/AdminDesktopSidebar";
 import { TableSkeleton } from "@/components/skeletons";
-import { Loader2, Ticket, Mail, User } from "lucide-react";
+import {
+  Loader2,
+  Ticket,
+  Mail,
+  User,
+  Send,
+  Lock,
+  Sparkles,
+  MessageSquare,
+} from "lucide-react";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 
 type TicketStatus = "open" | "in_progress" | "answered" | "closed";
 
@@ -52,9 +65,20 @@ interface TicketRow {
   profile?: { email?: string; full_name?: string; company?: string };
 }
 
+interface TicketMessage {
+  id: string;
+  body: string;
+  is_internal?: boolean;
+  author_role?: string;
+  author_display?: string | null;
+  created_at: string;
+  _legacy?: boolean;
+}
+
 interface TicketDetail extends TicketRow {
   message: string;
   admin_notes?: string | null;
+  messages?: TicketMessage[];
 }
 
 const statusLabels: Record<TicketStatus, string> = {
@@ -71,6 +95,15 @@ const statusVariants: Record<TicketStatus, "default" | "secondary" | "destructiv
   closed: "secondary",
 };
 
+const QUICK_REPLIES = [
+  "Thanks for reaching out — we're reviewing this and will update you shortly.",
+  "Could you share a part number, photo, or any error message you are seeing?",
+  "We believe this is resolved on our side. Please try again and let us know if anything still fails.",
+  "I've updated your account; you may need to sign out and back in to see the change.",
+];
+
+const MAX_REPLY = 10000;
+
 const TicketManagement = () => {
   const [tickets, setTickets] = useState<TicketRow[]>([]);
   const [pagination, setPagination] = useState({ page: 1, limit: 20, total: 0, pages: 0 });
@@ -80,8 +113,10 @@ const TicketManagement = () => {
   const [selectedTicket, setSelectedTicket] = useState<TicketDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [editStatus, setEditStatus] = useState<TicketStatus | "">("");
-  const [editNotes, setEditNotes] = useState("");
+  const [replyDraft, setReplyDraft] = useState("");
+  const [internalOnly, setInternalOnly] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [sendingReply, setSendingReply] = useState(false);
 
   const fetchTickets = useCallback(async () => {
     try {
@@ -91,7 +126,12 @@ const TicketManagement = () => {
         pagination.limit,
         statusFilter === "all" ? undefined : statusFilter
       );
-      const data = res?.data as { tickets?: TicketRow[]; pagination?: { total: number; page: number; limit: number; pages: number } } | undefined;
+      const data = res?.data as
+        | {
+            tickets?: TicketRow[];
+            pagination?: { total: number; page: number; limit: number; pages: number };
+          }
+        | undefined;
       if (res?.success && data) {
         setTickets(data.tickets || []);
         if (data.pagination) {
@@ -115,18 +155,27 @@ const TicketManagement = () => {
     fetchTickets();
   }, [fetchTickets]);
 
+  const reloadTicketDetail = async (id: string) => {
+    const res = await api.admin.getTicket(id);
+    const data = res?.data as TicketDetail | undefined;
+    if (res?.success && data) {
+      setSelectedTicket(data);
+      setEditStatus(data.status as TicketStatus);
+    }
+  };
+
   const openDetail = async (id: string) => {
     setSelectedTicket(null);
     setDetailLoading(true);
     setEditStatus("");
-    setEditNotes("");
+    setReplyDraft("");
+    setInternalOnly(false);
     try {
       const res = await api.admin.getTicket(id);
       const data = res?.data as TicketDetail | undefined;
       if (res?.success && data) {
         setSelectedTicket(data);
         setEditStatus(data.status as TicketStatus);
-        setEditNotes(data.admin_notes || "");
       } else {
         toast.error("Failed to load ticket");
       }
@@ -137,26 +186,83 @@ const TicketManagement = () => {
     }
   };
 
-  const saveTicket = async () => {
+  const threadItems = useMemo(() => {
+    if (!selectedTicket) return [];
+    const msgs = [...(selectedTicket.messages || [])];
+    const legacy = (selectedTicket.admin_notes || "").trim();
+    if (
+      legacy &&
+      !msgs.some((m) => !(m as TicketMessage).is_internal && (m.body || "").trim() === legacy)
+    ) {
+      msgs.push({
+        id: `legacy-${selectedTicket.id}`,
+        body: legacy,
+        is_internal: false,
+        author_role: "admin",
+        author_display: "Support",
+        created_at: selectedTicket.updated_at,
+        _legacy: true,
+      });
+    }
+    return msgs.sort(
+      (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+    );
+  }, [selectedTicket]);
+
+  const saveStatusOnly = async () => {
     if (!selectedTicket) return;
     setSaving(true);
     try {
       const res = await api.admin.updateTicket(selectedTicket.id, {
         status: editStatus || undefined,
-        admin_notes: editNotes,
       });
       if (res?.success) {
-        toast.success("Ticket updated");
-        setSelectedTicket((t) => (t ? { ...t, status: (editStatus as TicketStatus) || t.status, admin_notes: editNotes } : null));
+        toast.success("Status updated");
+        setSelectedTicket((t) =>
+          t ? { ...t, status: (editStatus as TicketStatus) || t.status } : null
+        );
         fetchTickets();
       } else {
-        toast.error(res?.message || "Failed to update ticket");
+        toast.error(res?.message || "Failed to update status");
       }
     } catch (e) {
-      toast.error("Failed to update ticket");
+      toast.error("Failed to update status");
     } finally {
       setSaving(false);
     }
+  };
+
+  const sendReply = async () => {
+    if (!selectedTicket) return;
+    const body = replyDraft.trim();
+    if (!body) {
+      toast.error("Write a message before sending");
+      return;
+    }
+    setSendingReply(true);
+    try {
+      const res = await api.admin.postTicketMessage(selectedTicket.id, {
+        body,
+        is_internal: internalOnly,
+        set_status: internalOnly ? undefined : editStatus || undefined,
+      });
+      if (res?.success) {
+        toast.success(internalOnly ? "Internal note saved" : "Reply sent");
+        setReplyDraft("");
+        await reloadTicketDetail(selectedTicket.id);
+        fetchTickets();
+      } else {
+        toast.error(res?.message || "Failed to send reply");
+      }
+    } catch (e) {
+      toast.error("Failed to send reply");
+    } finally {
+      setSendingReply(false);
+    }
+  };
+
+  const applyQuickReply = (text: string) => {
+    setReplyDraft((prev) => (prev ? `${prev.trim()}\n\n${text}` : text));
   };
 
   const formatDate = (s: string) => {
@@ -178,7 +284,9 @@ const TicketManagement = () => {
               Support tickets
             </h1>
             <p className="text-muted-foreground mt-1">
-              View and manage user support tickets. New tickets trigger an email to the admin address.
+              Threaded replies, internal notes, and quick snippets. Run{" "}
+              <code className="text-xs rounded bg-muted px-1">docs/sql/support_ticket_messages.sql</code> in
+              Supabase if replies fail to save.
             </p>
           </div>
 
@@ -274,69 +382,195 @@ const TicketManagement = () => {
         </div>
       </main>
 
-      {/* Ticket detail / edit dialog */}
       <Dialog open={!!selectedTicket || detailLoading} onOpenChange={(open) => !open && setSelectedTicket(null)}>
-        <DialogContent className="sm:max-w-xl">
+        <DialogContent className="flex max-h-[min(90vh,880px)] flex-col gap-0 overflow-hidden p-0 sm:max-w-2xl">
           {detailLoading ? (
-            <div className="flex items-center justify-center py-12">
+            <div className="flex items-center justify-center py-16">
               <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
             </div>
           ) : selectedTicket ? (
             <>
-              <DialogHeader>
-                <DialogTitle>{selectedTicket.subject}</DialogTitle>
-                <DialogDescription className="flex flex-wrap items-center gap-2 mt-1">
-                  <span className="flex items-center gap-1">
-                    <User className="h-3.5 w-3" />
-                    {selectedTicket.profile?.full_name || "—"}
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <Mail className="h-3.5 w-3" />
-                    {selectedTicket.profile?.email || "—"}
-                  </span>
-                  <span>{formatDate(selectedTicket.created_at)}</span>
-                </DialogDescription>
-              </DialogHeader>
-              <div className="space-y-4">
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground mb-1">User message</p>
-                  <p className="text-sm whitespace-pre-wrap rounded-md bg-muted/50 p-3">{selectedTicket.message}</p>
+              <div className="border-b bg-muted/30 px-6 py-4">
+                <DialogHeader className="space-y-1 text-left">
+                  <DialogTitle className="pr-8 text-lg">{selectedTicket.subject}</DialogTitle>
+                  <DialogDescription className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                    <span className="inline-flex items-center gap-1">
+                      <User className="h-3.5 w-3.5" />
+                      {selectedTicket.profile?.full_name || "—"}
+                    </span>
+                    <span className="inline-flex items-center gap-1">
+                      <Mail className="h-3.5 w-3.5" />
+                      {selectedTicket.profile?.email || "—"}
+                    </span>
+                    <Badge variant={statusVariants[selectedTicket.status as TicketStatus] || "secondary"}>
+                      {statusLabels[selectedTicket.status as TicketStatus] || selectedTicket.status}
+                    </Badge>
+                    <span className="text-muted-foreground">{formatDate(selectedTicket.created_at)}</span>
+                  </DialogDescription>
+                </DialogHeader>
+              </div>
+
+              <ScrollArea className="max-h-[min(42vh,360px)] flex-1 px-6 py-4">
+                <div className="space-y-4 pr-3">
+                  <div>
+                    <p className="mb-2 flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                      <MessageSquare className="h-3.5 w-3.5" />
+                      Original request
+                    </p>
+                    <div
+                      className={cn(
+                        "rounded-2xl rounded-tl-md border bg-card px-4 py-3 text-sm shadow-sm",
+                        "border-border"
+                      )}
+                    >
+                      <p className="mb-1 text-xs text-muted-foreground">
+                        {selectedTicket.profile?.full_name || "Customer"} · {formatDate(selectedTicket.created_at)}
+                      </p>
+                      <p className="whitespace-pre-wrap text-foreground">{selectedTicket.message}</p>
+                    </div>
+                  </div>
+
+                  {threadItems.length > 0 && (
+                    <>
+                      <Separator />
+                      <p className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                        <Sparkles className="h-3.5 w-3.5" />
+                        Conversation
+                      </p>
+                      <div className="space-y-3">
+                        {threadItems.map((m) => {
+                          const isAdmin = m.author_role === "admin";
+                          const internal = !!m.is_internal;
+                          return (
+                            <div
+                              key={m.id}
+                              className={cn("flex", isAdmin && !internal ? "justify-end" : "justify-start")}
+                            >
+                              <div
+                                className={cn(
+                                  "max-w-[92%] rounded-2xl px-4 py-3 text-sm shadow-sm sm:max-w-[85%]",
+                                  internal &&
+                                    "border border-amber-500/40 bg-amber-500/5 text-foreground dark:bg-amber-500/10",
+                                  !internal &&
+                                    isAdmin &&
+                                    "rounded-tr-md border border-primary/25 bg-primary text-primary-foreground",
+                                  !internal &&
+                                    !isAdmin &&
+                                    "rounded-tl-md border bg-muted/80 text-foreground"
+                                )}
+                              >
+                                <div className="mb-1 flex flex-wrap items-center gap-2 text-xs opacity-90">
+                                  {internal && (
+                                    <span className="inline-flex items-center gap-0.5 font-medium text-amber-700 dark:text-amber-400">
+                                      <Lock className="h-3 w-3" />
+                                      Internal
+                                    </span>
+                                  )}
+                                  {m._legacy && (
+                                    <Badge variant="outline" className="text-[10px]">
+                                      Legacy
+                                    </Badge>
+                                  )}
+                                  <span>{m.author_display || (isAdmin ? "Support" : "Customer")}</span>
+                                  <span className="text-muted-foreground">· {formatDate(m.created_at)}</span>
+                                </div>
+                                <p className="whitespace-pre-wrap">{m.body}</p>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </>
+                  )}
                 </div>
-                <div>
-                  <Label>Status</Label>
-                  <Select
-                    value={editStatus}
-                    onValueChange={(v) => setEditStatus(v as TicketStatus)}
-                  >
-                    <SelectTrigger className="mt-1">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="open">Open</SelectItem>
-                      <SelectItem value="in_progress">In progress</SelectItem>
-                      <SelectItem value="answered">Answered</SelectItem>
-                      <SelectItem value="closed">Closed</SelectItem>
-                    </SelectContent>
-                  </Select>
+              </ScrollArea>
+
+              <div className="space-y-3 border-t bg-background px-6 py-4">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                  <div className="flex-1 space-y-2">
+                    <Label className="text-xs text-muted-foreground">Ticket status</Label>
+                    <Select value={editStatus} onValueChange={(v) => setEditStatus(v as TicketStatus)}>
+                      <SelectTrigger className="w-full sm:w-[220px]">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="open">Open</SelectItem>
+                        <SelectItem value="in_progress">In progress</SelectItem>
+                        <SelectItem value="answered">Answered</SelectItem>
+                        <SelectItem value="closed">Closed</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <Button type="button" variant="secondary" size="sm" onClick={saveStatusOnly} disabled={saving}>
+                    {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save status only"}
+                  </Button>
                 </div>
+
                 <div>
-                  <Label>Admin notes / response (visible to user)</Label>
+                  <Label className="text-xs text-muted-foreground">Quick replies</Label>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {QUICK_REPLIES.map((q, i) => (
+                      <Button
+                        key={i}
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-auto max-w-full whitespace-normal text-left text-xs font-normal"
+                        onClick={() => applyQuickReply(q)}
+                      >
+                        {q.slice(0, 52)}
+                        {q.length > 52 ? "…" : ""}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between gap-3 rounded-lg border bg-muted/20 px-3 py-2">
+                  <div className="flex items-center gap-2">
+                    <Switch
+                      id="internal-only"
+                      checked={internalOnly}
+                      onCheckedChange={(c) => setInternalOnly(!!c)}
+                    />
+                    <Label htmlFor="internal-only" className="cursor-pointer text-sm font-normal">
+                      Internal note (hidden from customer)
+                    </Label>
+                  </div>
+                </div>
+
+                <div>
+                  <Label htmlFor="reply-draft" className="text-sm">
+                    {internalOnly ? "Internal note" : "Reply to customer"}
+                  </Label>
                   <Textarea
-                    value={editNotes}
-                    onChange={(e) => setEditNotes(e.target.value)}
-                    placeholder="Add a response or internal notes..."
+                    id="reply-draft"
+                    value={replyDraft}
+                    onChange={(e) => setReplyDraft(e.target.value.slice(0, MAX_REPLY))}
+                    placeholder={
+                      internalOnly
+                        ? "Visible only to your team…"
+                        : "Write a helpful reply. It will appear in the customer's ticket view."
+                    }
                     rows={4}
-                    className="mt-1"
+                    className="mt-2 resize-none"
                   />
+                  <p className="mt-1 text-right text-xs text-muted-foreground">
+                    {replyDraft.length} / {MAX_REPLY}
+                  </p>
                 </div>
               </div>
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setSelectedTicket(null)}>
+
+              <DialogFooter className="border-t bg-muted/20 px-6 py-3 sm:justify-between">
+                <Button type="button" variant="ghost" onClick={() => setSelectedTicket(null)}>
                   Close
                 </Button>
-                <Button onClick={saveTicket} disabled={saving}>
-                  {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                  Save changes
+                <Button type="button" onClick={sendReply} disabled={sendingReply || !replyDraft.trim()}>
+                  {sendingReply ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <Send className="mr-2 h-4 w-4" />
+                  )}
+                  {internalOnly ? "Save note" : "Send reply"}
                 </Button>
               </DialogFooter>
             </>
