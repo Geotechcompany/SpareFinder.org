@@ -1,11 +1,8 @@
 import React from "react";
 import { createRoot } from "react-dom/client";
-import { ClerkFailed, ClerkProvider } from "@clerk/clerk-react";
+import { ClerkProvider } from "@clerk/clerk-react";
 import App from "./App";
-import {
-  AuthLoadFailureFallback,
-  ClerkErrorBoundary,
-} from "./components/ClerkErrorBoundary";
+import { ClerkErrorBoundary } from "./components/ClerkErrorBoundary";
 import "./index.css";
 import "./styles/skeleton.css"; // Skeleton animations
 
@@ -59,9 +56,6 @@ if (!clerkPublishableKey) {
           // New signups should complete post-signup profile onboarding before picking a plan.
           afterSignUpUrl="/onboarding/profile"
         >
-          <ClerkFailed>
-            <AuthLoadFailureFallback />
-          </ClerkFailed>
           <App />
         </ClerkProvider>
       </ClerkErrorBoundary>
