@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import html
 import os
 import smtplib
 from datetime import datetime, timedelta
@@ -16,6 +17,7 @@ from pydantic import BaseModel, Field, field_validator
 from .auth_dependencies import CurrentUser, require_roles
 from .errors import ApiError
 from .responses import api_error, api_ok
+from .support_ticket_email import format_ticket_message_html_for_email, format_ticket_message_plain_for_email
 from .support_ticket_thread import enrich_ticket_messages_authors, fetch_ticket_messages_raw
 from .supabase_admin import get_supabase_admin
 from .supabase_auth_admin import delete_supabase_auth_user
@@ -1158,21 +1160,22 @@ def _notify_user_ticket_reply_email(
     ticket_url = f"{frontend}/support"
     subj = ticket_subject.strip() or "Support"
     subject_email = f"[SpareFinder] Reply on your ticket: {subj[:50]}{'…' if len(subj) > 50 else ''}"
-    safe_body = (reply_body or "")[:4000]
+    plain_body = format_ticket_message_plain_for_email(reply_body, max_chars=8000)
+    html_body = format_ticket_message_html_for_email(reply_body, max_chars=8000)
     html = f"""
 <h2>New reply from SpareFinder support</h2>
-<p>Hi {recipient_name or "there"},</p>
-<p>We posted an update on your ticket <strong>{subj}</strong>.</p>
+<p>Hi {html.escape(recipient_name or "there")},</p>
+<p>We posted an update on your ticket <strong>{html.escape(subj)}</strong>.</p>
 <hr/>
-<p style="white-space: pre-wrap">{safe_body}</p>
+{html_body}
 <hr/>
 <p><a href="{ticket_url}">Open your tickets in SpareFinder</a> to view the full thread.</p>
-<p style="font-size:12px;color:#64748b">Ticket ID: {ticket_id}</p>
+<p style="font-size:12px;color:#64748b">Ticket ID: {html.escape(ticket_id)}</p>
 """
     text = (
         f"New reply from SpareFinder support\n\n"
         f"Ticket: {subj}\n\n"
-        f"{safe_body}\n\n"
+        f"{plain_body}\n\n"
         f"View your tickets: {ticket_url}\n"
         f"Ticket ID: {ticket_id}\n"
     )

@@ -340,7 +340,9 @@ export function AdminTicketReplyComposer({
                   {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
                 </Button>
               </TooltipTrigger>
-              <TooltipContent side="bottom">Save status without sending a message</TooltipContent>
+              <TooltipContent side="right" align="center" sideOffset={8} collisionPadding={16}>
+                Save status without sending a message
+              </TooltipContent>
             </Tooltip>
 
             <div className="mx-0.5 hidden h-5 w-px bg-border/80 sm:block" />
@@ -367,7 +369,9 @@ export function AdminTicketReplyComposer({
                   <Lock className="h-4 w-4" />
                 </Button>
               </TooltipTrigger>
-              <TooltipContent side="bottom">Internal — hidden from customer</TooltipContent>
+              <TooltipContent side="right" align="center" sideOffset={8} collisionPadding={16}>
+                Internal — hidden from customer
+              </TooltipContent>
             </Tooltip>
 
             {!internalOnly ? (
@@ -389,7 +393,9 @@ export function AdminTicketReplyComposer({
                     <Mail className={cn("h-4 w-4", !notifyEmail && "opacity-40")} />
                   </Button>
                 </TooltipTrigger>
-                <TooltipContent side="bottom">Email customer a copy (needs SMTP)</TooltipContent>
+                <TooltipContent side="right" align="center" sideOffset={8} collisionPadding={16}>
+                  Email customer a copy (needs SMTP)
+                </TooltipContent>
               </Tooltip>
             ) : null}
 
@@ -406,7 +412,7 @@ export function AdminTicketReplyComposer({
                   <ImagePlus className="h-4 w-4" />
                 </Button>
               </TooltipTrigger>
-              <TooltipContent side="bottom">
+              <TooltipContent side="right" align="center" sideOffset={8} collisionPadding={16}>
                 Attach photos (compressed, up to {MAX_IMAGES}). Shown as thumbnails — not pasted into the text box.
               </TooltipContent>
             </Tooltip>

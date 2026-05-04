@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-import os
+import html
 import logging
+import os
 import uuid
 from datetime import datetime
 from typing import Any
@@ -13,6 +14,7 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 
 from .auth_dependencies import CurrentUser, get_current_user
 from .responses import api_error, api_ok
+from .support_ticket_email import format_ticket_message_html_for_email, format_ticket_message_plain_for_email
 from .support_ticket_thread import enrich_ticket_messages_authors, fetch_ticket_messages_raw
 from .supabase_admin import get_supabase_admin
 
@@ -118,14 +120,16 @@ def _notify_admin_new_ticket(
         from ..email_sender import send_basic_email_smtp, send_email_via_email_service
 
         subject_email = f"[SpareFinder] New support ticket: {subject[:50]}{'…' if len(subject) > 50 else ''}"
+        msg_html = format_ticket_message_html_for_email(message, max_chars=4000)
+        msg_plain = format_ticket_message_plain_for_email(message, max_chars=4000)
         html = f"""
 <h2>New support ticket</h2>
-<p><strong>Ticket ID:</strong> {ticket_id}</p>
-<p><strong>From:</strong> {user_name or '—'} &lt;{user_email}&gt;</p>
-<p><strong>Subject:</strong> {subject}</p>
-<p><strong>Priority:</strong> {priority}</p>
+<p><strong>Ticket ID:</strong> {html.escape(ticket_id)}</p>
+<p><strong>From:</strong> {html.escape(user_name or '—')} &lt;{html.escape(user_email)}&gt;</p>
+<p><strong>Subject:</strong> {html.escape(subject)}</p>
+<p><strong>Priority:</strong> {html.escape(priority)}</p>
 <hr/>
-<p style="white-space: pre-wrap">{message[:2000]}</p>
+{msg_html}
 <p><a href="{admin_tickets_url}">Open tickets in admin</a></p>
 """
         text = (
@@ -134,7 +138,7 @@ def _notify_admin_new_ticket(
             f"From: {user_name or '—'} <{user_email}>\n"
             f"Subject: {subject}\n"
             f"Priority: {priority}\n\n"
-            f"{message[:2000]}\n\n"
+            f"{msg_plain}\n\n"
             f"Open tickets: {admin_tickets_url}\n"
         )
         sent = 0
@@ -172,21 +176,22 @@ def _notify_admins_ticket_user_followup(
 
         subj = (subject or "Support ticket").strip()
         subject_email = f"[SpareFinder] Customer reply: {subj[:45]}{'…' if len(subj) > 45 else ''}"
-        safe_msg = (message or "")[:2000]
+        msg_html = format_ticket_message_html_for_email(message, max_chars=4000)
+        msg_plain = format_ticket_message_plain_for_email(message, max_chars=4000)
         html = f"""
 <h2>New message on a ticket</h2>
-<p><strong>Ticket ID:</strong> {ticket_id}</p>
-<p><strong>Subject:</strong> {subj}</p>
-<p><strong>From:</strong> {user_name or '—'} &lt;{user_email}&gt;</p>
+<p><strong>Ticket ID:</strong> {html.escape(ticket_id)}</p>
+<p><strong>Subject:</strong> {html.escape(subj)}</p>
+<p><strong>From:</strong> {html.escape(user_name or '—')} &lt;{html.escape(user_email)}&gt;</p>
 <hr/>
-<p style="white-space: pre-wrap">{safe_msg}</p>
+{msg_html}
 <p><a href="{admin_tickets_url}">Open admin tickets</a></p>
 """
         text = (
             f"Customer replied on ticket {ticket_id}\n"
             f"Subject: {subj}\n"
             f"From: {user_name or '—'} <{user_email}>\n\n"
-            f"{safe_msg}\n\n"
+            f"{msg_plain}\n\n"
             f"{admin_tickets_url}\n"
         )
         sent = 0
