@@ -180,15 +180,17 @@ async def admin_update_user_role(
     _admin: CurrentUser = Depends(require_roles("admin", "super_admin")),
 ):
     supabase = get_supabase_admin()
-    updated = (
+    # postgrest-py 2.x: .update() returns a filter builder — no .select() after .eq().
+    res = (
         supabase.table("profiles")
         .update({"role": payload.role, "updated_at": datetime.utcnow().isoformat()})
         .eq("id", userId)
-        .select("*")
-        .single()
         .execute()
-        .data
     )
+    rows = res.data or []
+    updated = rows[0] if rows else None
+    if not updated:
+        return api_error("User not found", status_code=404)
     return api_ok(message="User role updated successfully", data={"user": updated})
 
 
@@ -785,16 +787,22 @@ async def admin_create_email_template(
         "status": payload.status or "draft",
         "description": payload.description,
         "variables": payload.variables or [],
-        "created_by": admin.user_id,
-        "updated_by": admin.user_id,
+        "created_by": admin.id,
+        "updated_by": admin.id,
     }
     try:
-        created = supabase.table("email_templates").insert([row]).select("*").single().execute().data
+        ins = supabase.table("email_templates").insert([row]).execute()
+        rows = ins.data or []
+        created = rows[0] if rows else None
     except Exception:
         # Fallback for minimal schema
         minimal = {k: v for k, v in row.items() if k in ("name", "subject", "html_content", "text_content", "status")}
-        created = supabase.table("email_templates").insert([minimal]).select("*").single().execute().data
+        ins = supabase.table("email_templates").insert([minimal]).execute()
+        rows = ins.data or []
+        created = rows[0] if rows else None
 
+    if not created:
+        return api_error("Email template insert returned no row", status_code=500)
     return api_ok(status_code=201, message="Email template created successfully", data=created)
 
 
@@ -813,14 +821,20 @@ async def admin_update_email_template(
         "status": payload.status or "draft",
         "description": payload.description,
         "variables": payload.variables or [],
-        "updated_by": admin.user_id,
+        "updated_by": admin.id,
     }
     try:
-        updated = supabase.table("email_templates").update(patch).eq("id", id).select("*").single().execute().data
+        res = supabase.table("email_templates").update(patch).eq("id", id).execute()
+        rows = res.data or []
+        updated = rows[0] if rows else None
     except Exception:
         minimal = {k: v for k, v in patch.items() if k in ("name", "subject", "html_content", "text_content", "status")}
-        updated = supabase.table("email_templates").update(minimal).eq("id", id).select("*").single().execute().data
+        res = supabase.table("email_templates").update(minimal).eq("id", id).execute()
+        rows = res.data or []
+        updated = rows[0] if rows else None
 
+    if not updated:
+        return api_error("Email template not found or update returned no row", status_code=404)
     return api_ok(message="Email template updated successfully", data=updated)
 
 
@@ -1117,16 +1131,22 @@ async def admin_update_ticket(
     if len(updates) <= 1:
         return api_error("No updates provided", status_code=400)
     try:
-        res = (
-            supabase.table("support_tickets")
-            .update(updates)
-            .eq("id", ticket_id)
-            .select("id, subject, status, admin_notes, updated_at")
-            .execute()
-        )
+        # postgrest-py 2.x: SyncFilterRequestBuilder has no .select(); Prefer return=representation
+        # already returns updated row(s) on .execute().
+        res = supabase.table("support_tickets").update(updates).eq("id", ticket_id).execute()
         if not res.data or len(res.data) == 0:
             return api_error("Ticket not found", status_code=404)
-        return api_ok(data=res.data[0], message="Ticket updated")
+        row = res.data[0]
+        return api_ok(
+            data={
+                "id": row.get("id"),
+                "subject": row.get("subject"),
+                "status": row.get("status"),
+                "admin_notes": row.get("admin_notes"),
+                "updated_at": row.get("updated_at"),
+            },
+            message="Ticket updated",
+        )
     except Exception as e:
         return api_error(f"Failed to update ticket: {e}", status_code=500)
 
