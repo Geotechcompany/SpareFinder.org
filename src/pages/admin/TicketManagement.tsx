@@ -223,12 +223,12 @@ const TicketManagement = () => {
     }
   };
 
-  const sendReply = async () => {
-    if (!selectedTicket) return;
-    const body = replyDraft.trim();
+  const sendReply = async (composedBody?: string): Promise<boolean> => {
+    if (!selectedTicket) return false;
+    const body = (composedBody ?? replyDraft).trim();
     if (!body) {
-      toast.error("Write a message before sending");
-      return;
+      toast.error("Write a message or attach an image before sending");
+      return false;
     }
     setSendingReply(true);
     try {
@@ -249,11 +249,13 @@ const TicketManagement = () => {
         setReplyDraft("");
         await reloadTicketDetail(selectedTicket.id);
         fetchTickets();
-      } else {
-        toast.error(res?.message || "Failed to send reply");
+        return true;
       }
+      toast.error(res?.message || "Failed to send reply");
+      return false;
     } catch (e) {
       toast.error("Failed to send reply");
+      return false;
     } finally {
       setSendingReply(false);
     }
@@ -569,6 +571,7 @@ const TicketManagement = () => {
                 <div className="shrink-0 border-t border-border/60 bg-muted/15 px-3 pb-3 pt-2 backdrop-blur-md dark:bg-muted/25 sm:px-4">
                   <AdminTicketReplyComposer
                     variant="dock"
+                    ticketId={selectedTicket.id}
                     replyDraft={replyDraft}
                     onReplyDraftChange={setReplyDraft}
                     internalOnly={internalOnly}

@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -21,6 +21,7 @@ import {
   Save,
   Send,
   Timer,
+  X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ticketStatusIconClass } from "@/lib/ticketBadgeStyles";
@@ -81,7 +82,20 @@ function countEmbeddedImages(text: string): number {
   return n;
 }
 
+function buildComposedBody(text: string, images: readonly { dataUrl: string }[]): string {
+  const chunks: string[] = [];
+  const t = text.trim();
+  if (t) chunks.push(t);
+  for (const img of images) {
+    chunks.push(`![image](${img.dataUrl})`);
+  }
+  return chunks.join("\n\n");
+}
+
+type PendingImage = { id: string; dataUrl: string; name: string };
+
 export type AdminTicketReplyComposerProps = {
+  ticketId: string;
   replyDraft: string;
   onReplyDraftChange: (value: string) => void;
   internalOnly: boolean;
@@ -93,7 +107,8 @@ export type AdminTicketReplyComposerProps = {
   onSaveStatusOnly: () => void;
   saving: boolean;
   sendingReply: boolean;
-  onSend: () => void;
+  /** Returns true when the message was accepted so local attachments can clear. */
+  onSend: (composedBody: string) => Promise<boolean>;
   onClose: () => void;
   maxLength: number;
   quickReplies: readonly string[];
@@ -102,6 +117,7 @@ export type AdminTicketReplyComposerProps = {
 };
 
 export function AdminTicketReplyComposer({
+  ticketId,
   replyDraft,
   onReplyDraftChange,
   internalOnly,
@@ -124,6 +140,17 @@ export function AdminTicketReplyComposer({
   const fileRef = useRef<HTMLInputElement>(null);
   const [cursor, setCursor] = useState(0);
   const [slashHighlight, setSlashHighlight] = useState(0);
+  const [pendingImages, setPendingImages] = useState<PendingImage[]>([]);
+
+  useEffect(() => {
+    setPendingImages([]);
+  }, [ticketId]);
+
+  const composedBody = useMemo(
+    () => buildComposedBody(replyDraft, pendingImages),
+    [replyDraft, pendingImages]
+  );
+  const composedLength = composedBody.length;
 
   const updateCursor = useCallback(() => {
     const el = taRef.current;
@@ -214,31 +241,49 @@ export function AdminTicketReplyComposer({
         toast.error("Choose image files only");
         return;
       }
-      let draft = replyDraft;
-      let existing = countEmbeddedImages(draft);
       for (const file of list) {
-        if (existing >= MAX_IMAGES) {
-          toast.error(`Maximum ${MAX_IMAGES} images per message`);
-          break;
-        }
+        let dataUrl: string;
         try {
-          const dataUrl = await fileToCompressedDataUrl(file);
-          const snippet = `\n\n![image](${dataUrl})\n\n`;
-          if (draft.length + snippet.length > maxLength) {
-            toast.error("Message too large — remove an image or shorten text");
-            break;
-          }
-          draft += snippet;
-          existing += 1;
+          dataUrl = await fileToCompressedDataUrl(file);
         } catch {
           toast.error(`Could not attach ${file.name}`);
+          continue;
         }
+        setPendingImages((prev) => {
+          const embedded = countEmbeddedImages(replyDraft);
+          if (embedded + prev.length >= MAX_IMAGES) {
+            toast.error(`Maximum ${MAX_IMAGES} images per message`);
+            return prev;
+          }
+          const next: PendingImage[] = [
+            ...prev,
+            { id: `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`, dataUrl, name: file.name },
+          ];
+          if (buildComposedBody(replyDraft, next).length > maxLength) {
+            toast.error("Message too large — remove an image or shorten text");
+            return prev;
+          }
+          return next;
+        });
       }
-      onReplyDraftChange(draft.slice(0, maxLength));
       if (fileRef.current) fileRef.current.value = "";
     },
-    [maxLength, onReplyDraftChange, replyDraft]
+    [maxLength, replyDraft]
   );
+
+  const removePendingImage = useCallback((id: string) => {
+    setPendingImages((prev) => prev.filter((p) => p.id !== id));
+  }, []);
+
+  const handleSend = useCallback(async () => {
+    const body = composedBody.trim();
+    if (!body) {
+      toast.error("Write a message or attach an image before sending");
+      return;
+    }
+    const ok = await onSend(body);
+    if (ok) setPendingImages([]);
+  }, [composedBody, onSend]);
 
   const StatusIcon = statusMeta[editStatus].Icon;
 
@@ -361,7 +406,9 @@ export function AdminTicketReplyComposer({
                   <ImagePlus className="h-4 w-4" />
                 </Button>
               </TooltipTrigger>
-              <TooltipContent side="bottom">Attach photos (compressed, up to {MAX_IMAGES})</TooltipContent>
+              <TooltipContent side="bottom">
+                Attach photos (compressed, up to {MAX_IMAGES}). Shown as thumbnails — not pasted into the text box.
+              </TooltipContent>
             </Tooltip>
 
             <input
@@ -375,6 +422,28 @@ export function AdminTicketReplyComposer({
 
             <p className="ml-auto hidden pr-2 text-[10px] text-muted-foreground sm:block">Type / for quick replies</p>
           </div>
+
+          {pendingImages.length > 0 ? (
+            <div className="flex flex-wrap gap-2 border-b border-border/40 px-2 py-2">
+              {pendingImages.map((img) => (
+                <div
+                  key={img.id}
+                  className="group relative h-16 w-16 shrink-0 overflow-hidden rounded-lg border border-border/60 bg-muted/40 shadow-sm"
+                >
+                  <img src={img.dataUrl} alt={img.name} className="h-full w-full object-cover" />
+                  <button
+                    type="button"
+                    disabled={sendingReply}
+                    className="absolute right-0.5 top-0.5 flex h-6 w-6 items-center justify-center rounded-full bg-black/55 text-white opacity-90 ring-1 ring-white/20 transition hover:bg-black/70 disabled:pointer-events-none disabled:opacity-40"
+                    aria-label={`Remove ${img.name}`}
+                    onClick={() => removePendingImage(img.id)}
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          ) : null}
 
           <div className={cn("relative", !dock && "min-h-0 flex-1")}>
             <Textarea
@@ -429,10 +498,17 @@ export function AdminTicketReplyComposer({
             ) : null}
           </div>
 
-          <div className="flex shrink-0 items-center justify-between border-t border-border/50 px-2 py-1.5 text-xs text-muted-foreground">
+          <div className="flex shrink-0 flex-wrap items-center justify-between gap-x-2 gap-y-1 border-t border-border/50 px-2 py-1.5 text-xs text-muted-foreground">
             <span className="pl-1 sm:hidden">/ quick · photo icon</span>
-            <span className="tabular-nums">
-              {replyDraft.length} / {maxLength}
+            <span className="ml-auto flex flex-wrap items-center gap-x-2 tabular-nums sm:ml-0">
+              {pendingImages.length > 0 ? (
+                <span className="text-[10px] font-medium text-violet-700 dark:text-violet-300">
+                  {pendingImages.length} photo{pendingImages.length !== 1 ? "s" : ""} (sent with message)
+                </span>
+              ) : null}
+              <span>
+                {composedLength} / {maxLength}
+              </span>
             </span>
           </div>
         </div>
@@ -443,9 +519,9 @@ export function AdminTicketReplyComposer({
           </Button>
           <Button
             type="button"
-            disabled={sendingReply || !replyDraft.trim()}
+            disabled={sendingReply || !composedBody.trim()}
             className="h-11 w-full rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 text-white shadow-lg shadow-violet-500/30 transition hover:from-violet-500 hover:to-indigo-500 disabled:opacity-50 sm:w-auto sm:min-w-[160px]"
-            onClick={onSend}
+            onClick={() => void handleSend()}
           >
             {sendingReply ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
             {internalOnly ? "Save note" : "Send reply"}
