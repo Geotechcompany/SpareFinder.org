@@ -242,7 +242,7 @@ const TicketManagement = () => {
         if (internalOnly) {
           toast.success("Internal note saved");
         } else if (notifyEmail) {
-          toast.success("Reply sent — customer emailed if SMTP is configured");
+          toast.success("Reply sent — customer emailed");
         } else {
           toast.success("Reply sent");
         }

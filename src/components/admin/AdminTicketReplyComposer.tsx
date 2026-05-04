@@ -23,8 +23,10 @@ import {
   Timer,
   X,
 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { ticketStatusIconClass } from "@/lib/ticketBadgeStyles";
+import { api } from "@/lib/api";
 import { toast } from "sonner";
 
 export type TicketStatus = "open" | "in_progress" | "answered" | "closed";
@@ -94,6 +96,14 @@ function buildComposedBody(text: string, images: readonly { dataUrl: string }[])
 
 type PendingImage = { id: string; dataUrl: string; name: string };
 
+function smtpConfiguredFromSettings(email: Record<string, unknown> | undefined): boolean {
+  if (!email) return false;
+  const host = String(email.smtp_host ?? "").trim();
+  const user = String(email.smtp_user ?? "").trim();
+  const pass = String(email.smtp_password ?? "").trim();
+  return Boolean(host && user && pass);
+}
+
 export type AdminTicketReplyComposerProps = {
   ticketId: string;
   replyDraft: string;
@@ -135,16 +145,41 @@ export function AdminTicketReplyComposer({
   quickReplies,
   variant = "panel",
 }: AdminTicketReplyComposerProps) {
+  const navigate = useNavigate();
   const dock = variant === "dock";
   const taRef = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const [cursor, setCursor] = useState(0);
   const [slashHighlight, setSlashHighlight] = useState(0);
   const [pendingImages, setPendingImages] = useState<PendingImage[]>([]);
+  const [smtpReady, setSmtpReady] = useState<boolean | null>(null);
 
   useEffect(() => {
     setPendingImages([]);
   }, [ticketId]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setSmtpReady(null);
+    (async () => {
+      try {
+        const res = await api.admin.getSmtpSettings();
+        const email = (res?.data as { settings?: { email?: Record<string, unknown> } } | undefined)?.settings?.email;
+        if (!cancelled) setSmtpReady(smtpConfiguredFromSettings(email));
+      } catch {
+        if (!cancelled) setSmtpReady(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [ticketId]);
+
+  useEffect(() => {
+    if (smtpReady === false && notifyEmail) {
+      onNotifyEmailChange(false);
+    }
+  }, [smtpReady, notifyEmail, onNotifyEmailChange]);
 
   const composedBody = useMemo(
     () => buildComposedBody(replyDraft, pendingImages),
@@ -361,7 +396,7 @@ export function AdminTicketReplyComposer({
                     const next = !internalOnly;
                     onInternalOnlyChange(next);
                     if (next) onNotifyEmailChange(false);
-                    else onNotifyEmailChange(true);
+                    else onNotifyEmailChange(smtpReady === true);
                   }}
                   aria-pressed={internalOnly}
                   aria-label="Internal note"
@@ -383,18 +418,45 @@ export function AdminTicketReplyComposer({
                     size="icon"
                     className={cn(
                       "h-9 w-9 rounded-xl",
-                      notifyEmail ? "text-sky-600 dark:text-sky-400" : "text-muted-foreground"
+                      notifyEmail && smtpReady === true && "text-sky-600 dark:text-sky-400",
+                      (!notifyEmail || smtpReady !== true) && "text-muted-foreground",
+                      smtpReady === false && "opacity-70"
                     )}
-                    onClick={() => onNotifyEmailChange(!notifyEmail)}
-                    aria-pressed={notifyEmail}
-                    aria-label="Email customer"
-                    title={notifyEmail ? "Customer will get an email copy (if SMTP is set up)" : "Email copy disabled"}
+                    onClick={() => {
+                      if (smtpReady === null) return;
+                      if (smtpReady !== true) {
+                        toast.message("Email delivery is not configured", {
+                          description: "Add SMTP host, username, and password in Email SMTP settings.",
+                          action: {
+                            label: "Open settings",
+                            onClick: () => navigate("/admin/email-smtp"),
+                          },
+                        });
+                        return;
+                      }
+                      onNotifyEmailChange(!notifyEmail);
+                    }}
+                    aria-pressed={notifyEmail && smtpReady === true}
+                    aria-label="Email customer a copy of this reply"
+                    title={
+                      smtpReady === false
+                        ? "Configure Email SMTP to send copies to the customer"
+                        : notifyEmail
+                          ? "Customer will get an email copy of this reply"
+                          : "Email copy to customer is off"
+                    }
                   >
-                    <Mail className={cn("h-4 w-4", !notifyEmail && "opacity-40")} />
+                    <Mail className={cn("h-4 w-4", (!notifyEmail || smtpReady !== true) && "opacity-40")} />
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent side="right" align="center" sideOffset={8} collisionPadding={16}>
-                  Email customer a copy (needs SMTP)
+                  {smtpReady === false
+                    ? "SMTP is not configured. Click the icon to open Email SMTP settings."
+                    : smtpReady === null
+                      ? "Checking email settings…"
+                      : notifyEmail
+                        ? "Customer will receive an email copy when you send."
+                        : "Turn on to email the customer a copy when you send."}
                 </TooltipContent>
               </Tooltip>
             ) : null}
