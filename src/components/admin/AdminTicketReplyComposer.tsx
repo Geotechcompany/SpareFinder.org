@@ -77,6 +77,14 @@ async function fileToCompressedDataUrl(file: File, maxW = 1280, quality = 0.82):
   });
 }
 
+async function compressImageToJpegFile(file: File, maxW = 1280, quality = 0.82): Promise<File> {
+  const dataUrl = await fileToCompressedDataUrl(file, maxW, quality);
+  const res = await fetch(dataUrl);
+  const blob = await res.blob();
+  const base = file.name.replace(/\.[^.]+$/, "") || "image";
+  return new File([blob], `${base}.jpg`, { type: "image/jpeg" });
+}
+
 function countEmbeddedImages(text: string): number {
   const re = /!\[[^\]]*\]\([^)]+\)/g;
   let n = 0;
@@ -84,17 +92,17 @@ function countEmbeddedImages(text: string): number {
   return n;
 }
 
-function buildComposedBody(text: string, images: readonly { dataUrl: string }[]): string {
+function buildComposedBody(text: string, images: readonly { publicUrl: string }[]): string {
   const chunks: string[] = [];
   const t = text.trim();
   if (t) chunks.push(t);
   for (const img of images) {
-    chunks.push(`![image](${img.dataUrl})`);
+    chunks.push(`![image](${img.publicUrl})`);
   }
   return chunks.join("\n\n");
 }
 
-type PendingImage = { id: string; dataUrl: string; name: string };
+type PendingImage = { id: string; publicUrl: string; name: string };
 
 function smtpConfiguredFromSettings(email: Record<string, unknown> | undefined): boolean {
   if (!email) return false;
@@ -152,6 +160,7 @@ export function AdminTicketReplyComposer({
   const [cursor, setCursor] = useState(0);
   const [slashHighlight, setSlashHighlight] = useState(0);
   const [pendingImages, setPendingImages] = useState<PendingImage[]>([]);
+  const [isUploadingTicketImages, setIsUploadingTicketImages] = useState(false);
   const [smtpReady, setSmtpReady] = useState<boolean | null>(null);
 
   useEffect(() => {
@@ -276,34 +285,60 @@ export function AdminTicketReplyComposer({
         toast.error("Choose image files only");
         return;
       }
-      for (const file of list) {
-        let dataUrl: string;
-        try {
-          dataUrl = await fileToCompressedDataUrl(file);
-        } catch {
-          toast.error(`Could not attach ${file.name}`);
-          continue;
-        }
-        setPendingImages((prev) => {
-          const embedded = countEmbeddedImages(replyDraft);
-          if (embedded + prev.length >= MAX_IMAGES) {
-            toast.error(`Maximum ${MAX_IMAGES} images per message`);
-            return prev;
-          }
-          const next: PendingImage[] = [
-            ...prev,
-            { id: `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`, dataUrl, name: file.name },
-          ];
-          if (buildComposedBody(replyDraft, next).length > maxLength) {
-            toast.error("Message too large — remove an image or shorten text");
-            return prev;
-          }
-          return next;
-        });
+      const embedded = countEmbeddedImages(replyDraft);
+      const room = MAX_IMAGES - embedded - pendingImages.length;
+      if (room <= 0) {
+        toast.error(`Maximum ${MAX_IMAGES} images per message`);
+        if (fileRef.current) fileRef.current.value = "";
+        return;
       }
-      if (fileRef.current) fileRef.current.value = "";
+      const slice = list.slice(0, room);
+      if (slice.length < list.length) {
+        toast.error(`Only ${room} more image slot(s); skipped extra file(s)`);
+      }
+      setIsUploadingTicketImages(true);
+      try {
+        for (const file of slice) {
+          let jpeg: File;
+          try {
+            jpeg = await compressImageToJpegFile(file);
+          } catch {
+            toast.error(`Could not read ${file.name}`);
+            continue;
+          }
+          let res: Awaited<ReturnType<typeof api.admin.uploadSupportTicketMessageImage>>;
+          try {
+            res = await api.admin.uploadSupportTicketMessageImage(ticketId, jpeg);
+          } catch {
+            toast.error(`Upload failed for ${file.name}`);
+            continue;
+          }
+          const url =
+            res?.success && res.data && typeof (res.data as { url?: string }).url === "string"
+              ? (res.data as { url: string }).url
+              : null;
+          if (!url) {
+            toast.error(res?.error || res?.message || `Upload failed for ${file.name}`);
+            continue;
+          }
+          setPendingImages((prev) => {
+            const next: PendingImage[] = [
+              ...prev,
+              { id: `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`, publicUrl: url, name: file.name },
+            ];
+            if (buildComposedBody(replyDraft, next).length > maxLength) {
+              toast.error("Message too large — remove an image or shorten text");
+              return prev;
+            }
+            return next;
+          });
+        }
+      } finally {
+        setIsUploadingTicketImages(false);
+        if (fileRef.current) fileRef.current.value = "";
+      }
     },
-    [maxLength, replyDraft]
+    [maxLength, pendingImages.length, replyDraft, ticketId]
   );
 
   const removePendingImage = useCallback((id: string) => {
@@ -467,15 +502,21 @@ export function AdminTicketReplyComposer({
                   type="button"
                   variant="ghost"
                   size="icon"
+                  disabled={sendingReply || isUploadingTicketImages}
                   className="h-9 w-9 rounded-xl text-muted-foreground hover:text-foreground"
                   onClick={() => fileRef.current?.click()}
                   aria-label="Attach images"
                 >
-                  <ImagePlus className="h-4 w-4" />
+                  {isUploadingTicketImages ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <ImagePlus className="h-4 w-4" />
+                  )}
                 </Button>
               </TooltipTrigger>
               <TooltipContent side="right" align="center" sideOffset={8} collisionPadding={16}>
-                Attach photos (compressed, up to {MAX_IMAGES}). Shown as thumbnails — not pasted into the text box.
+                Attach photos (compressed, up to {MAX_IMAGES}). Each file uploads to storage first, then is linked in
+                the message (no giant base64 in email).
               </TooltipContent>
             </Tooltip>
 
@@ -498,10 +539,10 @@ export function AdminTicketReplyComposer({
                   key={img.id}
                   className="group relative h-16 w-16 shrink-0 overflow-hidden rounded-lg border border-border/60 bg-muted/40 shadow-sm"
                 >
-                  <img src={img.dataUrl} alt={img.name} className="h-full w-full object-cover" />
+                  <img src={img.publicUrl} alt={img.name} className="h-full w-full object-cover" />
                   <button
                     type="button"
-                    disabled={sendingReply}
+                    disabled={sendingReply || isUploadingTicketImages}
                     className="absolute right-0.5 top-0.5 flex h-6 w-6 items-center justify-center rounded-full bg-black/55 text-white opacity-90 ring-1 ring-white/20 transition hover:bg-black/70 disabled:pointer-events-none disabled:opacity-40"
                     aria-label={`Remove ${img.name}`}
                     onClick={() => removePendingImage(img.id)}
@@ -587,7 +628,7 @@ export function AdminTicketReplyComposer({
           </Button>
           <Button
             type="button"
-            disabled={sendingReply || !composedBody.trim()}
+            disabled={sendingReply || isUploadingTicketImages || !composedBody.trim()}
             className="h-11 w-full rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 text-white shadow-lg shadow-violet-500/30 transition hover:from-violet-500 hover:to-indigo-500 disabled:opacity-50 sm:w-auto sm:min-w-[160px]"
             onClick={() => void handleSend()}
           >

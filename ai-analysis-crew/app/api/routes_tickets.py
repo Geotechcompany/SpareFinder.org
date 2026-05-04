@@ -122,7 +122,7 @@ def _notify_admin_new_ticket(
         subject_email = f"[SpareFinder] New support ticket: {subject[:50]}{'…' if len(subject) > 50 else ''}"
         msg_html = format_ticket_message_html_for_email(message, max_chars=4000)
         msg_plain = format_ticket_message_plain_for_email(message, max_chars=4000)
-        html = f"""
+        email_html = f"""
 <h2>New support ticket</h2>
 <p><strong>Ticket ID:</strong> {html.escape(ticket_id)}</p>
 <p><strong>From:</strong> {html.escape(user_name or '—')} &lt;{html.escape(user_email)}&gt;</p>
@@ -143,9 +143,9 @@ def _notify_admin_new_ticket(
         )
         sent = 0
         for to_email in admin_emails:
-            ok = send_basic_email_smtp(to_email=to_email, subject=subject_email, html=html, text=text)
+            ok = send_basic_email_smtp(to_email=to_email, subject=subject_email, html=email_html, text=text)
             if not ok:
-                ok = send_email_via_email_service(to_email=to_email, subject=subject_email, html=html, text=text)
+                ok = send_email_via_email_service(to_email=to_email, subject=subject_email, html=email_html, text=text)
             if ok:
                 sent += 1
         if sent:
@@ -178,7 +178,7 @@ def _notify_admins_ticket_user_followup(
         subject_email = f"[SpareFinder] Customer reply: {subj[:45]}{'…' if len(subj) > 45 else ''}"
         msg_html = format_ticket_message_html_for_email(message, max_chars=4000)
         msg_plain = format_ticket_message_plain_for_email(message, max_chars=4000)
-        html = f"""
+        email_html = f"""
 <h2>New message on a ticket</h2>
 <p><strong>Ticket ID:</strong> {html.escape(ticket_id)}</p>
 <p><strong>Subject:</strong> {html.escape(subj)}</p>
@@ -196,9 +196,9 @@ def _notify_admins_ticket_user_followup(
         )
         sent = 0
         for to_email in admin_emails:
-            ok = send_basic_email_smtp(to_email=to_email, subject=subject_email, html=html, text=text)
+            ok = send_basic_email_smtp(to_email=to_email, subject=subject_email, html=email_html, text=text)
             if not ok:
-                ok = send_email_via_email_service(to_email=to_email, subject=subject_email, html=html, text=text)
+                ok = send_email_via_email_service(to_email=to_email, subject=subject_email, html=email_html, text=text)
             if ok:
                 sent += 1
         if sent:

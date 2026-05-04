@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Card,
@@ -87,7 +87,7 @@ const Support = () => {
   const [loading, setLoading] = useState(true);
   const [createOpen, setCreateOpen] = useState(false);
   const [detailTicket, setDetailTicket] = useState<TicketDetail | null>(null);
-  const [detailLoading, setDetailLoading] = useState(false);
+  const detailFetchGen = useRef(0);
   const [submitting, setSubmitting] = useState(false);
   const [createForm, setCreateForm] = useState({ subject: "", message: "", priority: "medium" as TicketPriority });
   const [followUp, setFollowUp] = useState("");
@@ -117,21 +117,48 @@ const Support = () => {
     fetchTickets();
   }, [fetchTickets]);
 
-  const openDetail = async (id: string) => {
+  const closeTicketDetail = useCallback(() => {
+    detailFetchGen.current += 1;
     setDetailTicket(null);
-    setDetailLoading(true);
+  }, []);
+
+  const openDetail = async (id: string) => {
+    const myGen = ++detailFetchGen.current;
+    const row = tickets.find((t) => t.id === id);
     setFollowUp("");
+    if (row) {
+      setDetailTicket({
+        ...row,
+        message: "",
+        messages: [],
+        admin_notes: null,
+      });
+    } else {
+      setDetailTicket({
+        id,
+        subject: "Ticket",
+        status: "open",
+        priority: "medium",
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        message: "",
+        messages: [],
+        admin_notes: null,
+      });
+    }
     try {
       const res = await api.tickets.get(id);
+      if (myGen !== detailFetchGen.current) return;
       if (res?.success && res?.data) {
         setDetailTicket(res.data as TicketDetail);
       } else {
         toast.error("Failed to load ticket");
+        closeTicketDetail();
       }
     } catch (e) {
+      if (myGen !== detailFetchGen.current) return;
       toast.error("Failed to load ticket");
-    } finally {
-      setDetailLoading(false);
+      closeTicketDetail();
     }
   };
 
@@ -419,19 +446,9 @@ const Support = () => {
       </Dialog>
 
       {/* Ticket detail dialog */}
-      <Dialog open={!!detailTicket || detailLoading} onOpenChange={(open) => !open && setDetailTicket(null)}>
+      <Dialog open={!!detailTicket} onOpenChange={(open) => !open && closeTicketDetail()}>
         <DialogContent className="flex max-h-[90dvh] w-[calc(100vw-1rem)] max-w-3xl flex-col gap-0 overflow-hidden rounded-2xl border-border/60 p-0 shadow-2xl sm:w-full">
-          {detailLoading ? (
-            <>
-              <DialogHeader className="sr-only">
-                <DialogTitle>Loading ticket</DialogTitle>
-                <DialogDescription>Loading your ticket details and messages.</DialogDescription>
-              </DialogHeader>
-              <div className="flex items-center justify-center py-20" aria-hidden="true">
-                <Loader2 className="h-9 w-9 animate-spin text-violet-500" />
-              </div>
-            </>
-          ) : detailTicket ? (
+          {detailTicket ? (
             <>
               <div className="shrink-0 border-b border-border/60 bg-gradient-to-r from-violet-500/12 via-background to-sky-500/10 px-4 py-4 sm:px-6">
                 <DialogHeader>
@@ -440,7 +457,7 @@ const Support = () => {
                       type="button"
                       variant="outline"
                       size="icon"
-                      onClick={() => setDetailTicket(null)}
+                      onClick={closeTicketDetail}
                       className="h-10 w-10 shrink-0 rounded-xl border-border/80"
                     >
                       <ArrowLeft className="h-4 w-4" />
@@ -470,12 +487,14 @@ const Support = () => {
               <div className="flex min-h-0 flex-1 flex-col border-t border-border/50">
                 <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-3 [-webkit-overflow-scrolling:touch] sm:py-4">
                   <div className="space-y-4 pr-0.5">
-                      <div>
-                        <p className="mb-2 text-xs font-medium text-muted-foreground">Your message</p>
-                        <div className="rounded-2xl rounded-tl-md border border-slate-200/80 bg-slate-50/90 px-4 py-3.5 text-sm dark:border-slate-700/80 dark:bg-slate-900/60">
-                          <p className="whitespace-pre-wrap leading-relaxed">{detailTicket.message}</p>
+                      {(detailTicket.message || "").trim().length > 0 ? (
+                        <div>
+                          <p className="mb-2 text-xs font-medium text-muted-foreground">Your message</p>
+                          <div className="rounded-2xl rounded-tl-md border border-slate-200/80 bg-slate-50/90 px-4 py-3.5 text-sm dark:border-slate-700/80 dark:bg-slate-900/60">
+                            <p className="whitespace-pre-wrap leading-relaxed">{detailTicket.message}</p>
+                          </div>
                         </div>
-                      </div>
+                      ) : null}
                       {publicThread.length > 0 && (
                         <>
                           <Separator className="bg-border/60" />

@@ -1006,6 +1006,21 @@ export const adminApi = {
     const response = await apiClient.post(`/admin/tickets/${ticketId}/messages`, payload);
     return response.data;
   },
+
+  /** Uploads a ticket reply image to Supabase (same bucket as crew analysis). Returns public `url` for markdown body. */
+  uploadSupportTicketMessageImage: async (
+    ticketId: string,
+    file: File
+  ): Promise<ApiResponse<{ url: string }>> => {
+    const formData = new FormData();
+    formData.append("image", file);
+    const response = await apiClient.post(
+      `/upload/support-tickets/${encodeURIComponent(ticketId)}/message-image`,
+      formData,
+      { timeout: 60000 }
+    );
+    return response.data;
+  },
 };
 
 // Tickets API (user support)

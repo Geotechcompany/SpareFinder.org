@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import {
   Card,
   CardContent,
@@ -37,13 +37,7 @@ import { AdminTicketReplyComposer } from "@/components/admin/AdminTicketReplyCom
 import { TicketMessageRichBody } from "@/components/admin/ticketMessageRichBody";
 import AdminDesktopSidebar from "@/components/AdminDesktopSidebar";
 import { TableSkeleton } from "@/components/skeletons";
-import {
-  Loader2,
-  Ticket,
-  Mail,
-  User,
-  Lock,
-} from "lucide-react";
+import { Ticket, Mail, User, Lock } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { ticketPriorityBadgeCn, ticketStatusBadgeCn } from "@/lib/ticketBadgeStyles";
@@ -100,7 +94,8 @@ const TicketManagement = () => {
   const [loading, setLoading] = useState(true);
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [selectedTicket, setSelectedTicket] = useState<TicketDetail | null>(null);
-  const [detailLoading, setDetailLoading] = useState(false);
+  /** Bumped when the detail dialog closes or a new ticket is opened — ignores stale getTicket responses. */
+  const detailFetchGen = useRef(0);
   const [editStatus, setEditStatus] = useState<TicketStatus | "">("");
   const [replyDraft, setReplyDraft] = useState("");
   const [internalOnly, setInternalOnly] = useState(false);
@@ -154,26 +149,55 @@ const TicketManagement = () => {
     }
   };
 
-  const openDetail = async (id: string) => {
+  const closeTicketDetail = useCallback(() => {
+    detailFetchGen.current += 1;
     setSelectedTicket(null);
-    setDetailLoading(true);
-    setEditStatus("");
+  }, []);
+
+  const openDetail = async (id: string) => {
+    const myGen = ++detailFetchGen.current;
+    const row = tickets.find((t) => t.id === id);
     setReplyDraft("");
     setInternalOnly(false);
     setNotifyEmail(true);
+    if (row) {
+      setSelectedTicket({
+        ...row,
+        message: "",
+        messages: [],
+        admin_notes: null,
+      });
+      setEditStatus(row.status as TicketStatus);
+    } else {
+      setSelectedTicket({
+        id,
+        user_id: "",
+        subject: "Ticket",
+        status: "open",
+        priority: "medium",
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        message: "",
+        messages: [],
+        admin_notes: null,
+      });
+      setEditStatus("open");
+    }
     try {
       const res = await api.admin.getTicket(id);
+      if (myGen !== detailFetchGen.current) return;
       const data = res?.data as TicketDetail | undefined;
       if (res?.success && data) {
         setSelectedTicket(data);
         setEditStatus(data.status as TicketStatus);
       } else {
         toast.error("Failed to load ticket");
+        closeTicketDetail();
       }
     } catch (e) {
+      if (myGen !== detailFetchGen.current) return;
       toast.error("Failed to load ticket");
-    } finally {
-      setDetailLoading(false);
+      closeTicketDetail();
     }
   };
 
@@ -423,19 +447,9 @@ const TicketManagement = () => {
         </div>
       </main>
 
-      <Dialog open={!!selectedTicket || detailLoading} onOpenChange={(open) => !open && setSelectedTicket(null)}>
+      <Dialog open={!!selectedTicket} onOpenChange={(open) => !open && closeTicketDetail()}>
         <DialogContent className="flex max-h-[90dvh] w-[calc(100vw-1rem)] max-w-3xl flex-col gap-0 overflow-hidden rounded-2xl border-border/60 p-0 shadow-2xl sm:w-full">
-          {detailLoading ? (
-            <>
-              <DialogHeader className="sr-only">
-                <DialogTitle>Loading ticket</DialogTitle>
-                <DialogDescription>Loading ticket details and conversation.</DialogDescription>
-              </DialogHeader>
-              <div className="flex items-center justify-center py-20" aria-hidden="true">
-                <Loader2 className="h-9 w-9 animate-spin text-violet-500" />
-              </div>
-            </>
-          ) : selectedTicket ? (
+          {selectedTicket ? (
             <>
               <div className="shrink-0 border-b border-border/60 bg-gradient-to-r from-violet-500/12 via-background to-sky-500/10 px-4 py-4 sm:px-6">
                 <DialogHeader className="space-y-2 text-left">
@@ -469,21 +483,23 @@ const TicketManagement = () => {
               <div className="flex min-h-0 flex-1 flex-col border-t border-border/50">
                 <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-3 [-webkit-overflow-scrolling:touch] sm:py-4">
                   <div className="space-y-4 pr-0.5">
-                      <div>
-                        <p className="mb-2 text-xs font-medium text-muted-foreground">Original request</p>
-                        <div
-                          className={cn(
-                            "rounded-2xl rounded-tl-md border border-slate-200/80 bg-slate-50/90 px-4 py-3.5 text-sm shadow-sm",
-                            "dark:border-slate-700/80 dark:bg-slate-900/60"
-                          )}
-                        >
-                          <p className="mb-1.5 text-xs text-muted-foreground">
-                            {selectedTicket.profile?.full_name || "Customer"} ·{" "}
-                            {formatDate(selectedTicket.created_at)}
-                          </p>
-                          <TicketMessageRichBody body={selectedTicket.message} />
+                      {(selectedTicket.message || "").trim().length > 0 ? (
+                        <div>
+                          <p className="mb-2 text-xs font-medium text-muted-foreground">Original request</p>
+                          <div
+                            className={cn(
+                              "rounded-2xl rounded-tl-md border border-slate-200/80 bg-slate-50/90 px-4 py-3.5 text-sm shadow-sm",
+                              "dark:border-slate-700/80 dark:bg-slate-900/60"
+                            )}
+                          >
+                            <p className="mb-1.5 text-xs text-muted-foreground">
+                              {selectedTicket.profile?.full_name || "Customer"} ·{" "}
+                              {formatDate(selectedTicket.created_at)}
+                            </p>
+                            <TicketMessageRichBody body={selectedTicket.message} />
+                          </div>
                         </div>
-                      </div>
+                      ) : null}
 
                       {threadItems.length > 0 && (
                         <>
@@ -584,7 +600,7 @@ const TicketManagement = () => {
                     saving={saving}
                     sendingReply={sendingReply}
                     onSend={sendReply}
-                    onClose={() => setSelectedTicket(null)}
+                    onClose={closeTicketDetail}
                     maxLength={MAX_REPLY}
                     quickReplies={QUICK_REPLIES}
                   />

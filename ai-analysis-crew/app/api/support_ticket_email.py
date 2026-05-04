@@ -7,6 +7,9 @@ import re
 
 _MD_IMAGE = re.compile(r"!\[([^\]]*)\]\(([^)]+)\)")
 
+# Cap input size before regex (avoids pathological multi‑MB bodies); still large enough for real tickets.
+_MAX_BODY_PROCESS_CHARS = 2_000_000
+
 # Placeholder inserted before escape; must not appear in escaped output differently.
 _PH_IMG = "[[[SPF_IMAGE]]]"
 
@@ -29,10 +32,12 @@ def format_ticket_message_plain_for_email(body: str, max_chars: int = 8000) -> s
             return "\n[Image - open your ticket in SpareFinder to view]\n"
         return m.group(0)
 
-    raw = (body or "")[:max_chars]
+    # Strip images on the full body first. Truncating before regex breaks long data: URIs
+    # (no closing ")" in the first max_chars), so the raw ![...](data:...) leaks into email.
+    raw = (body or "")[:_MAX_BODY_PROCESS_CHARS]
     out = _MD_IMAGE.sub(repl, raw)
     out = re.sub(r"\n{3,}", "\n\n", out)
-    return out.strip()
+    return out.strip()[:max_chars]
 
 
 def format_ticket_message_html_for_email(body: str, max_chars: int = 8000) -> str:
@@ -43,9 +48,10 @@ def format_ticket_message_html_for_email(body: str, max_chars: int = 8000) -> st
             return f"\n{_PH_IMG}\n"
         return m.group(0)
 
-    raw = (body or "")[:max_chars]
+    raw = (body or "")[:_MAX_BODY_PROCESS_CHARS]
     text = _MD_IMAGE.sub(repl, raw)
     text = re.sub(r"\n{3,}", "\n\n", text)
+    text = text[:max_chars]
     esc = html.escape(text)
     note = (
         '<div style="margin:10px 0;padding:10px 12px;border-radius:8px;background:#f1f5f9;'

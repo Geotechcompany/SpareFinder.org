@@ -2,12 +2,16 @@
 
 from __future__ import annotations
 
-from typing import Any, Optional
 import logging
+import os
+import re
+import uuid
+from pathlib import Path
+from typing import Any, Optional
 
-from fastapi import APIRouter, Depends, File, Form, UploadFile, HTTPException
+from fastapi import APIRouter, Depends, File, Form, UploadFile
 
-from .auth_dependencies import CurrentUser, get_current_user
+from .auth_dependencies import CurrentUser, get_current_user, require_roles
 from .plan_enforcement import check_upload_limit
 from .responses import api_ok, api_error
 from .supabase_admin import get_supabase_admin
@@ -15,6 +19,10 @@ from .supabase_admin import get_supabase_admin
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/upload", tags=["upload"])
+
+_TICKET_ID_RE = re.compile(r"^[0-9a-fA-F-]{36}$")
+_SUPPORT_TICKET_IMAGE_MAX_BYTES = 8 * 1024 * 1024
+_SUPPORT_TICKET_ALLOWED_CT = frozenset({"image/jpeg", "image/png", "image/webp"})
 
 
 @router.get("/crew-analysis-jobs")
@@ -226,6 +234,82 @@ async def create_crew_analysis_job(
     except Exception as e:
         logger.error(f"❌ Failed to create crew analysis job: {e}")
         return api_error(f"Failed to create job: {str(e)}", status_code=500)
+
+
+@router.post("/support-tickets/{ticket_id}/message-image")
+async def upload_support_ticket_message_image(
+    ticket_id: str,
+    image: UploadFile = File(...),
+    _admin: CurrentUser = Depends(require_roles("admin", "super_admin")),
+):
+    """
+    Persist ticket reply photos to Supabase Storage (same public bucket layout as crew analysis:
+    bucket `sparefinder`, path `support-tickets/{ticket_id}/...`) so message bodies store HTTPS
+    URLs instead of base64 data URIs (smaller DB, sane notification emails).
+    """
+    tid = (ticket_id or "").strip()
+    if not _TICKET_ID_RE.match(tid):
+        return api_error("Invalid ticket id", status_code=400)
+
+    raw_ct = (image.content_type or "").split(";", 1)[0].strip().lower()
+    if raw_ct == "image/jpg":
+        raw_ct = "image/jpeg"
+    if raw_ct not in _SUPPORT_TICKET_ALLOWED_CT:
+        return api_error("Only JPEG, PNG, or WebP images are allowed", status_code=400)
+
+    image_data = await image.read()
+    if not image_data:
+        return api_error("Empty file", status_code=400)
+    if len(image_data) > _SUPPORT_TICKET_IMAGE_MAX_BYTES:
+        return api_error("Image too large (max 8 MB)", status_code=413)
+
+    supabase_url = os.getenv("SUPABASE_URL") or os.getenv("VITE_SUPABASE_URL")
+    supabase_key = os.getenv("SUPABASE_SERVICE_KEY") or os.getenv("SUPABASE_ANON_KEY")
+    if not supabase_url or not supabase_key:
+        logger.error("Supabase not configured for support ticket image upload")
+        return api_error("File storage is not configured", status_code=503)
+
+    suffix = Path(image.filename or "").suffix.lower()
+    if suffix not in (".jpg", ".jpeg", ".png", ".webp"):
+        suffix = { "image/jpeg": ".jpg", "image/png": ".png", "image/webp": ".webp" }.get(raw_ct, ".jpg")
+
+    storage_path = f"support-tickets/{tid}/{uuid.uuid4().hex}{suffix}"
+    bucket_name = "sparefinder"
+    supabase = get_supabase_admin()
+    image_url: str | None = None
+
+    try:
+        upload_result = supabase.storage.from_(bucket_name).upload(
+            storage_path,
+            image_data,
+            file_options={"content-type": raw_ct, "x-upsert": "false"},
+        )
+        if not upload_result:
+            return api_error("Upload failed", status_code=500)
+
+        try:
+            public_url_response = supabase.storage.from_(bucket_name).get_public_url(storage_path)
+            if isinstance(public_url_response, dict):
+                image_url = public_url_response.get("publicUrl") or public_url_response.get("url")
+            elif hasattr(public_url_response, "data"):
+                image_url = (
+                    public_url_response.data.get("publicUrl")
+                    if isinstance(public_url_response.data, dict)
+                    else str(public_url_response.data)
+                )
+            else:
+                image_url = str(public_url_response)
+            if not image_url or str(image_url).startswith("None"):
+                image_url = f"{supabase_url.rstrip('/')}/storage/v1/object/public/{bucket_name}/{storage_path}"
+        except Exception as url_error:
+            logger.warning("Could not get public URL for ticket image, constructing manually: %s", url_error)
+            image_url = f"{supabase_url.rstrip('/')}/storage/v1/object/public/{bucket_name}/{storage_path}"
+
+        logger.info("Support ticket message image uploaded: %s", image_url)
+        return api_ok(data={"url": image_url})
+    except Exception as e:
+        logger.exception("Support ticket image upload failed: %s", e)
+        return api_error("Upload failed", status_code=500)
 
 
 @router.delete("/crew-analysis/{job_id}")

@@ -1162,7 +1162,8 @@ def _notify_user_ticket_reply_email(
     subject_email = f"[SpareFinder] Reply on your ticket: {subj[:50]}{'…' if len(subj) > 50 else ''}"
     plain_body = format_ticket_message_plain_for_email(reply_body, max_chars=8000)
     html_body = format_ticket_message_html_for_email(reply_body, max_chars=8000)
-    html = f"""
+    # Name must not be `html` — it shadows the stdlib `html` module used for .escape().
+    email_html = f"""
 <h2>New reply from SpareFinder support</h2>
 <p>Hi {html.escape(recipient_name or "there")},</p>
 <p>We posted an update on your ticket <strong>{html.escape(subj)}</strong>.</p>
@@ -1179,9 +1180,9 @@ def _notify_user_ticket_reply_email(
         f"View your tickets: {ticket_url}\n"
         f"Ticket ID: {ticket_id}\n"
     )
-    ok = send_basic_email_smtp(to_email=to_email, subject=subject_email, html=html, text=text)
+    ok = send_basic_email_smtp(to_email=to_email, subject=subject_email, html=email_html, text=text)
     if not ok:
-        ok = send_email_via_email_service(to_email=to_email, subject=subject_email, html=html, text=text)
+        ok = send_email_via_email_service(to_email=to_email, subject=subject_email, html=email_html, text=text)
     if ok:
         log.info("Ticket %s: reply notification emailed to customer", ticket_id)
     else:
