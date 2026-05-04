@@ -229,91 +229,102 @@ const Support = () => {
   return (
     <div className="flex min-h-screen flex-col bg-background md:flex-row">
       <DashboardSidebar isCollapsed={isCollapsed} onToggle={() => setIsCollapsed(!isCollapsed)} />
-      <main className="flex-1 p-4 md:p-6 lg:p-8">
-        <div className="mx-auto max-w-4xl space-y-6">
+      <main className="flex-1 bg-gradient-to-b from-background via-violet-50/25 to-sky-50/15 pb-10 dark:via-violet-950/15 dark:to-slate-950/30">
+        <div className="mx-auto max-w-4xl space-y-6 p-3 sm:p-6 lg:p-8">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h1 className="text-2xl font-semibold tracking-tight flex items-center gap-2">
-                <Ticket className="h-6 w-6" />
-                Support tickets
-              </h1>
-              <p className="text-muted-foreground mt-1">
-                Create a ticket for help or browse your previous requests.
-              </p>
+            <div className="flex min-w-0 items-start gap-3">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-600 to-indigo-600 text-white shadow-lg shadow-violet-500/30">
+                <Ticket className="h-5 w-5" />
+              </div>
+              <div className="min-w-0">
+                <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">Support tickets</h1>
+                <p className="mt-1 text-sm text-muted-foreground sm:text-base">
+                  Create a ticket or continue a conversation with our team.
+                </p>
+              </div>
             </div>
-            <Button onClick={() => setCreateOpen(true)} className="shrink-0">
+            <Button
+              type="button"
+              onClick={() => setCreateOpen(true)}
+              className="h-11 shrink-0 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 px-5 text-white shadow-lg shadow-violet-500/25 transition hover:from-violet-500 hover:to-indigo-500 sm:self-start"
+            >
               <MessageSquarePlus className="mr-2 h-4 w-4" />
               New ticket
             </Button>
           </div>
 
-          <Card>
-            <CardHeader className="pb-2">
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <Card className="overflow-hidden rounded-2xl border-border/60 shadow-md shadow-black/[0.04] dark:border-border/80 dark:shadow-black/25">
+            <CardHeader className="space-y-4 border-b border-border/50 bg-card/80 pb-4 sm:flex-row sm:items-center sm:justify-between sm:space-y-0">
+              <div>
                 <CardTitle className="text-lg">Your tickets</CardTitle>
-                <Select value={statusFilter} onValueChange={setStatusFilter}>
-                  <SelectTrigger className="w-[180px]">
-                    <SelectValue placeholder="Status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All statuses</SelectItem>
-                    <SelectItem value="open">Open</SelectItem>
-                    <SelectItem value="in_progress">In progress</SelectItem>
-                    <SelectItem value="answered">Answered</SelectItem>
-                    <SelectItem value="closed">Closed</SelectItem>
-                  </SelectContent>
-                </Select>
+                <CardDescription className="mt-1">
+                  {total} ticket{total !== 1 ? "s" : ""} total
+                </CardDescription>
               </div>
-              <CardDescription>
-                {total} ticket{total !== 1 ? "s" : ""} total
-              </CardDescription>
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="h-11 w-full rounded-xl border-border/80 sm:w-[200px]">
+                  <SelectValue placeholder="Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All statuses</SelectItem>
+                  <SelectItem value="open">Open</SelectItem>
+                  <SelectItem value="in_progress">In progress</SelectItem>
+                  <SelectItem value="answered">Answered</SelectItem>
+                  <SelectItem value="closed">Closed</SelectItem>
+                </SelectContent>
+              </Select>
             </CardHeader>
-            <CardContent>
+            <CardContent className="p-3 sm:p-6">
               {loading ? (
-                <div className="flex items-center justify-center py-12">
-                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                <div className="flex items-center justify-center py-16">
+                  <Loader2 className="h-9 w-9 animate-spin text-violet-500" />
                 </div>
               ) : tickets.length === 0 ? (
-                <p className="text-muted-foreground text-center py-12">
+                <p className="py-14 text-center text-muted-foreground">
                   No tickets yet. Create one if you need help.
                 </p>
               ) : (
-                <ul className="divide-y divide-border">
+                <ul className="space-y-2 sm:space-y-1">
                   {tickets.map((t) => (
                     <li key={t.id}>
                       <button
                         type="button"
                         onClick={() => openDetail(t.id)}
-                        className="w-full flex items-center gap-3 py-3 px-1 text-left hover:bg-muted/50 rounded-md transition-colors"
+                        className="flex min-h-[4.5rem] w-full items-center gap-3 rounded-2xl border border-transparent px-3 py-3 text-left transition hover:border-violet-200/60 hover:bg-violet-500/[0.06] active:scale-[0.99] dark:hover:border-violet-500/20 dark:hover:bg-violet-500/10 sm:min-h-0 sm:rounded-xl sm:px-2 sm:py-3"
                       >
-                        <div className="flex-1 min-w-0">
-                          <p className="font-medium truncate">{t.subject}</p>
-                          <p className="text-sm text-muted-foreground">
+                        <div className="min-w-0 flex-1">
+                          <p className="font-medium leading-snug text-foreground">{t.subject}</p>
+                          <p className="mt-0.5 text-sm text-muted-foreground">
                             {formatDate(t.created_at)} · {priorityLabels[t.priority as TicketPriority] || t.priority}
                           </p>
                         </div>
-                        <Badge variant={statusVariant[t.status as TicketStatus] || "secondary"}>
+                        <Badge
+                          variant={statusVariant[t.status as TicketStatus] || "secondary"}
+                          className="shrink-0 rounded-lg"
+                        >
                           {statusLabels[t.status as TicketStatus] || t.status}
                         </Badge>
-                        <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+                        <ChevronRight className="h-5 w-5 shrink-0 text-muted-foreground" />
                       </button>
                     </li>
                   ))}
                 </ul>
               )}
               {total > limit && (
-                <div className="flex justify-center gap-2 mt-4">
+                <div className="mt-6 flex flex-col gap-2 sm:flex-row sm:justify-center">
                   <Button
+                    type="button"
                     variant="outline"
-                    size="sm"
+                    className="h-11 flex-1 rounded-xl border-border/80 sm:flex-none sm:px-8"
                     disabled={page <= 1}
                     onClick={() => setPage((p) => p - 1)}
                   >
                     Previous
                   </Button>
                   <Button
+                    type="button"
                     variant="outline"
-                    size="sm"
+                    className="h-11 flex-1 rounded-xl border-border/80 sm:flex-none sm:px-8"
                     disabled={page * limit >= total}
                     onClick={() => setPage((p) => p + 1)}
                   >
@@ -328,14 +339,12 @@ const Support = () => {
 
       {/* Create ticket dialog */}
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>New support ticket</DialogTitle>
-            <DialogDescription>
-              Describe your issue. We'll respond as soon as possible.
-            </DialogDescription>
+        <DialogContent className="w-[calc(100vw-1rem)] max-w-md rounded-2xl border-border/60 p-5 shadow-2xl sm:w-full sm:p-6">
+          <DialogHeader className="space-y-2 text-left">
+            <DialogTitle className="text-xl">New support ticket</DialogTitle>
+            <DialogDescription>Describe your issue. We will respond as soon as we can.</DialogDescription>
           </DialogHeader>
-          <form onSubmit={handleCreate} className="space-y-4">
+          <form onSubmit={handleCreate} className="space-y-4 pt-2">
             <div>
               <Label htmlFor="subject">Subject</Label>
               <Input
@@ -344,7 +353,7 @@ const Support = () => {
                 onChange={(e) => setCreateForm((f) => ({ ...f, subject: e.target.value }))}
                 placeholder="Brief summary"
                 maxLength={200}
-                className="mt-1"
+                className="mt-2 h-11 rounded-xl border-border/80"
               />
             </div>
             <div>
@@ -356,7 +365,7 @@ const Support = () => {
                 placeholder="Describe your issue in detail..."
                 rows={5}
                 maxLength={5000}
-                className="mt-1"
+                className="mt-2 min-h-[140px] resize-none rounded-xl border-border/80 text-base sm:text-sm"
               />
             </div>
             <div>
@@ -365,7 +374,7 @@ const Support = () => {
                 value={createForm.priority}
                 onValueChange={(v) => setCreateForm((f) => ({ ...f, priority: v as TicketPriority }))}
               >
-                <SelectTrigger className="mt-1">
+                <SelectTrigger className="mt-2 h-11 rounded-xl border-border/80">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -375,12 +384,21 @@ const Support = () => {
                 </SelectContent>
               </Select>
             </div>
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setCreateOpen(false)}>
+            <DialogFooter className="flex-col-reverse gap-2 pt-2 sm:flex-row sm:justify-end">
+              <Button
+                type="button"
+                variant="outline"
+                className="h-11 w-full rounded-xl sm:w-auto"
+                onClick={() => setCreateOpen(false)}
+              >
                 Cancel
               </Button>
-              <Button type="submit" disabled={submitting}>
-                {submitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              <Button
+                type="submit"
+                disabled={submitting}
+                className="h-11 w-full rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 text-white shadow-lg shadow-violet-500/25 hover:from-violet-500 hover:to-indigo-500 sm:w-auto sm:px-8"
+              >
+                {submitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                 Submit ticket
               </Button>
             </DialogFooter>
@@ -390,51 +408,53 @@ const Support = () => {
 
       {/* Ticket detail dialog */}
       <Dialog open={!!detailTicket || detailLoading} onOpenChange={(open) => !open && setDetailTicket(null)}>
-        <DialogContent className="flex max-h-[min(90vh,720px)] flex-col gap-0 overflow-hidden p-0 sm:max-w-xl">
+        <DialogContent className="flex h-[min(92dvh,760px)] w-[calc(100vw-1rem)] max-w-xl flex-col gap-0 overflow-hidden rounded-2xl border-border/60 p-0 shadow-2xl sm:h-auto sm:max-h-[min(90vh,760px)] sm:w-full">
           {detailLoading ? (
-            <div className="flex items-center justify-center py-12">
-              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            <div className="flex items-center justify-center py-20">
+              <Loader2 className="h-9 w-9 animate-spin text-violet-500" />
             </div>
           ) : detailTicket ? (
             <>
-              <div className="border-b px-6 py-4">
+              <div className="border-b border-border/60 bg-gradient-to-r from-violet-500/12 via-background to-sky-500/10 px-4 py-4 sm:px-6">
                 <DialogHeader>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-start gap-2 sm:items-center">
                     <Button
                       type="button"
-                      variant="ghost"
+                      variant="outline"
                       size="icon"
                       onClick={() => setDetailTicket(null)}
-                      className="shrink-0"
+                      className="h-10 w-10 shrink-0 rounded-xl border-border/80"
                     >
                       <ArrowLeft className="h-4 w-4" />
                     </Button>
                     <div className="min-w-0 flex-1">
-                      <DialogTitle className="truncate pr-2">{detailTicket.subject}</DialogTitle>
-                      <DialogDescription className="mt-1 flex flex-wrap items-center gap-2">
-                        <Badge variant={statusVariant[detailTicket.status as TicketStatus]}>
+                      <DialogTitle className="pr-2 text-lg leading-snug">{detailTicket.subject}</DialogTitle>
+                      <DialogDescription className="mt-2 flex flex-wrap items-center gap-2 text-foreground/80">
+                        <Badge variant={statusVariant[detailTicket.status as TicketStatus]} className="rounded-lg">
                           {statusLabels[detailTicket.status as TicketStatus]}
                         </Badge>
-                        <span>{priorityLabels[detailTicket.priority as TicketPriority]}</span>
-                        <span className="text-muted-foreground">Created {formatDate(detailTicket.created_at)}</span>
+                        <span className="text-sm">{priorityLabels[detailTicket.priority as TicketPriority]}</span>
+                        <span className="text-sm text-muted-foreground">Created {formatDate(detailTicket.created_at)}</span>
                       </DialogDescription>
                     </div>
                   </div>
                 </DialogHeader>
               </div>
 
-              <ScrollArea className="max-h-[min(40vh,320px)] flex-1 px-6 py-4">
-                <div className="space-y-4 pr-3">
+              <ScrollArea className="min-h-0 flex-1 px-4 py-4 sm:max-h-[min(40vh,340px)] sm:px-6">
+                <div className="space-y-4 pr-2 sm:pr-3">
                   <div>
-                    <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">Your message</p>
-                    <div className="rounded-2xl rounded-tl-md border bg-muted/40 px-4 py-3 text-sm">
-                      <p className="whitespace-pre-wrap">{detailTicket.message}</p>
+                    <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                      Your message
+                    </p>
+                    <div className="rounded-2xl rounded-tl-md border border-slate-200/80 bg-slate-50/90 px-4 py-3.5 text-sm dark:border-slate-700/80 dark:bg-slate-900/60">
+                      <p className="whitespace-pre-wrap leading-relaxed">{detailTicket.message}</p>
                     </div>
                   </div>
                   {publicThread.length > 0 && (
                     <>
-                      <Separator />
-                      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Thread</p>
+                      <Separator className="bg-border/60" />
+                      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Thread</p>
                       <div className="space-y-3">
                         {publicThread.map((m) => {
                           const fromYou = m.author_role === "user";
@@ -442,17 +462,22 @@ const Support = () => {
                             <div key={m.id} className={cn("flex", fromYou ? "justify-start" : "justify-end")}>
                               <div
                                 className={cn(
-                                  "max-w-[90%] rounded-2xl px-4 py-3 text-sm",
+                                  "max-w-[min(92vw,100%)] rounded-2xl px-4 py-3.5 text-sm shadow-md sm:max-w-[88%]",
                                   fromYou
-                                    ? "rounded-tl-md border bg-muted/60"
-                                    : "rounded-tr-md border border-primary/25 bg-primary text-primary-foreground"
+                                    ? "rounded-tl-md border border-slate-200/90 bg-white dark:border-slate-700 dark:bg-slate-800/90"
+                                    : "rounded-tr-md border-0 bg-gradient-to-br from-violet-600 to-indigo-600 text-white shadow-lg shadow-violet-500/25"
                                 )}
                               >
-                                <p className="mb-1 text-xs opacity-80">
+                                <p
+                                  className={cn(
+                                    "mb-1.5 text-xs",
+                                    fromYou ? "text-muted-foreground" : "text-white/85"
+                                  )}
+                                >
                                   {fromYou ? "You" : m.author_display || "Support"} · {formatDate(m.created_at)}
                                   {m._legacy ? " · earlier reply" : ""}
                                 </p>
-                                <p className="whitespace-pre-wrap">{m.body}</p>
+                                <p className="whitespace-pre-wrap leading-relaxed">{m.body}</p>
                               </div>
                             </div>
                           );
@@ -464,8 +489,8 @@ const Support = () => {
                 </div>
               </ScrollArea>
 
-              <div className="border-t bg-muted/20 px-6 py-4">
-                <Label htmlFor="follow-up" className="text-sm">
+              <div className="border-t border-border/60 bg-muted/20 px-4 py-4 sm:px-6">
+                <Label htmlFor="follow-up" className="text-sm font-medium">
                   Add a reply
                 </Label>
                 <Textarea
@@ -474,12 +499,12 @@ const Support = () => {
                   onChange={(e) => setFollowUp(e.target.value.slice(0, 5000))}
                   placeholder="Add details or ask a follow-up question…"
                   rows={3}
-                  className="mt-2 resize-none"
+                  className="mt-2 min-h-[100px] resize-none rounded-xl border-border/80 text-base sm:text-sm"
                 />
-                <div className="mt-2 flex justify-end gap-2">
+                <div className="mt-3 flex justify-stretch sm:justify-end">
                   <Button
                     type="button"
-                    size="sm"
+                    className="h-11 w-full rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 text-white shadow-lg shadow-violet-500/25 hover:from-violet-500 hover:to-indigo-500 disabled:opacity-50 sm:w-auto sm:min-w-[140px]"
                     onClick={sendFollowUp}
                     disabled={followUpSending || !followUp.trim()}
                   >
@@ -488,7 +513,7 @@ const Support = () => {
                     ) : (
                       <Send className="mr-2 h-4 w-4" />
                     )}
-                    Send
+                    Send reply
                   </Button>
                 </div>
               </div>

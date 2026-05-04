@@ -276,100 +276,139 @@ const TicketManagement = () => {
   return (
     <div className="flex min-h-screen flex-col bg-background md:flex-row">
       <AdminDesktopSidebar isCollapsed={isCollapsed} onToggle={() => setIsCollapsed(!isCollapsed)} />
-      <main className="flex-1 p-4 md:p-6 lg:p-8">
-        <div className="mx-auto max-w-6xl space-y-6">
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight flex items-center gap-2">
-              <Ticket className="h-6 w-6" />
-              Support tickets
-            </h1>
-            <p className="text-muted-foreground mt-1">
-              Threaded replies, internal notes, and quick snippets. Run{" "}
-              <code className="text-xs rounded bg-muted px-1">docs/sql/support_ticket_messages.sql</code> in
-              Supabase if replies fail to save.
-            </p>
+      <main className="flex-1 bg-gradient-to-b from-background via-violet-50/30 to-sky-50/20 pb-10 dark:via-violet-950/20 dark:to-slate-950/40">
+        <div className="mx-auto max-w-6xl space-y-6 p-3 sm:p-6 lg:p-8">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div className="min-w-0">
+              <div className="flex items-center gap-3">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-600 to-indigo-600 text-white shadow-lg shadow-violet-500/30">
+                  <Ticket className="h-5 w-5" />
+                </div>
+                <div>
+                  <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">Support tickets</h1>
+                </div>
+              </div>
+            </div>
           </div>
 
-          <Card>
-            <CardHeader className="pb-2">
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <Card className="overflow-hidden rounded-2xl border-border/60 shadow-md shadow-black/[0.04] dark:border-border/80 dark:shadow-black/30">
+            <CardHeader className="space-y-4 border-b border-border/50 bg-card/80 pb-4 pt-5 sm:flex-row sm:items-center sm:justify-between sm:space-y-0">
+              <div>
                 <CardTitle className="text-lg">All tickets</CardTitle>
-                <Select value={statusFilter} onValueChange={setStatusFilter}>
-                  <SelectTrigger className="w-[180px]">
-                    <SelectValue placeholder="Status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All statuses</SelectItem>
-                    <SelectItem value="open">Open</SelectItem>
-                    <SelectItem value="in_progress">In progress</SelectItem>
-                    <SelectItem value="answered">Answered</SelectItem>
-                    <SelectItem value="closed">Closed</SelectItem>
-                  </SelectContent>
-                </Select>
+                <CardDescription className="mt-1">
+                  {pagination.total} ticket{pagination.total !== 1 ? "s" : ""}
+                </CardDescription>
               </div>
-              <CardDescription>
-                {pagination.total} ticket{pagination.total !== 1 ? "s" : ""}
-              </CardDescription>
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="h-11 w-full rounded-xl border-border/80 sm:w-[200px]">
+                  <SelectValue placeholder="Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All statuses</SelectItem>
+                  <SelectItem value="open">Open</SelectItem>
+                  <SelectItem value="in_progress">In progress</SelectItem>
+                  <SelectItem value="answered">Answered</SelectItem>
+                  <SelectItem value="closed">Closed</SelectItem>
+                </SelectContent>
+              </Select>
             </CardHeader>
-            <CardContent>
+            <CardContent className="p-3 sm:p-6">
               {loading ? (
                 <TableSkeleton rows={10} columns={5} />
               ) : tickets.length === 0 ? (
-                <p className="text-muted-foreground text-center py-12">No tickets found.</p>
+                <p className="py-14 text-center text-muted-foreground">No tickets found.</p>
               ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Subject</TableHead>
-                      <TableHead>User</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Priority</TableHead>
-                      <TableHead>Created</TableHead>
-                      <TableHead className="w-[80px]"></TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
+                <>
+                  <div className="space-y-3 md:hidden">
                     {tickets.map((t) => (
-                      <TableRow key={t.id}>
-                        <TableCell className="font-medium max-w-[200px] truncate" title={t.subject}>
-                          {t.subject}
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex flex-col gap-0.5">
-                            <span className="text-sm">{t.profile?.full_name || "—"}</span>
-                            <span className="text-xs text-muted-foreground">{t.profile?.email || ""}</span>
-                          </div>
-                        </TableCell>
-                        <TableCell>
+                      <div
+                        key={t.id}
+                        className="rounded-2xl border border-border/60 bg-card/90 p-4 shadow-sm transition active:scale-[0.99]"
+                      >
+                        <p className="font-medium leading-snug text-foreground">{t.subject}</p>
+                        <p className="mt-1 text-sm text-muted-foreground">
+                          {t.profile?.full_name || "—"} · {t.profile?.email}
+                        </p>
+                        <div className="mt-3 flex flex-wrap items-center gap-2">
                           <Badge variant={statusVariants[t.status as TicketStatus] || "secondary"}>
                             {statusLabels[t.status as TicketStatus] || t.status}
                           </Badge>
-                        </TableCell>
-                        <TableCell className="capitalize">{t.priority}</TableCell>
-                        <TableCell className="text-muted-foreground text-sm">{formatDate(t.created_at)}</TableCell>
-                        <TableCell>
-                          <Button variant="ghost" size="sm" onClick={() => openDetail(t.id)}>
-                            View
-                          </Button>
-                        </TableCell>
-                      </TableRow>
+                          <span className="text-xs capitalize text-muted-foreground">{t.priority}</span>
+                          <span className="text-xs text-muted-foreground">{formatDate(t.created_at)}</span>
+                        </div>
+                        <Button
+                          type="button"
+                          className="mt-4 h-11 w-full rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 text-white shadow-md shadow-violet-500/25 hover:from-violet-500 hover:to-indigo-500"
+                          onClick={() => openDetail(t.id)}
+                        >
+                          Open thread
+                        </Button>
+                      </div>
                     ))}
-                  </TableBody>
-                </Table>
+                  </div>
+                  <div className="hidden overflow-x-auto rounded-xl border border-border/40 md:block">
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="hover:bg-transparent">
+                          <TableHead>Subject</TableHead>
+                          <TableHead>User</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead>Priority</TableHead>
+                          <TableHead>Created</TableHead>
+                          <TableHead className="w-[100px]" />
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {tickets.map((t) => (
+                          <TableRow key={t.id} className="group">
+                            <TableCell className="max-w-[220px] truncate font-medium" title={t.subject}>
+                              {t.subject}
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex flex-col gap-0.5">
+                                <span className="text-sm">{t.profile?.full_name || "—"}</span>
+                                <span className="text-xs text-muted-foreground">{t.profile?.email || ""}</span>
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant={statusVariants[t.status as TicketStatus] || "secondary"}>
+                                {statusLabels[t.status as TicketStatus] || t.status}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="capitalize">{t.priority}</TableCell>
+                            <TableCell className="text-sm text-muted-foreground">{formatDate(t.created_at)}</TableCell>
+                            <TableCell>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="rounded-lg text-violet-600 hover:bg-violet-500/10 hover:text-violet-700 dark:text-violet-400 dark:hover:text-violet-300"
+                                onClick={() => openDetail(t.id)}
+                              >
+                                View
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </>
               )}
               {pagination.pages > 1 && (
-                <div className="flex justify-end gap-2 mt-4">
+                <div className="mt-6 flex flex-col gap-2 sm:flex-row sm:justify-end">
                   <Button
+                    type="button"
                     variant="outline"
-                    size="sm"
+                    className="h-11 min-h-11 flex-1 rounded-xl border-border/80 sm:flex-none sm:px-6"
                     disabled={pagination.page <= 1}
                     onClick={() => setPagination((p) => ({ ...p, page: p.page - 1 }))}
                   >
                     Previous
                   </Button>
                   <Button
+                    type="button"
                     variant="outline"
-                    size="sm"
+                    className="h-11 min-h-11 flex-1 rounded-xl border-border/80 sm:flex-none sm:px-6"
                     disabled={pagination.page >= pagination.pages}
                     onClick={() => setPagination((p) => ({ ...p, page: p.page + 1 }))}
                   >
@@ -383,47 +422,50 @@ const TicketManagement = () => {
       </main>
 
       <Dialog open={!!selectedTicket || detailLoading} onOpenChange={(open) => !open && setSelectedTicket(null)}>
-        <DialogContent className="flex max-h-[min(90vh,880px)] flex-col gap-0 overflow-hidden p-0 sm:max-w-2xl">
+        <DialogContent className="flex h-[min(92dvh,880px)] w-[calc(100vw-1rem)] max-w-2xl flex-col gap-0 overflow-hidden rounded-2xl border-border/60 p-0 shadow-2xl sm:h-auto sm:max-h-[min(90vh,880px)] sm:w-full">
           {detailLoading ? (
-            <div className="flex items-center justify-center py-16">
-              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            <div className="flex items-center justify-center py-20">
+              <Loader2 className="h-9 w-9 animate-spin text-violet-500" />
             </div>
           ) : selectedTicket ? (
             <>
-              <div className="border-b bg-muted/30 px-6 py-4">
-                <DialogHeader className="space-y-1 text-left">
-                  <DialogTitle className="pr-8 text-lg">{selectedTicket.subject}</DialogTitle>
-                  <DialogDescription className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                    <span className="inline-flex items-center gap-1">
-                      <User className="h-3.5 w-3.5" />
+              <div className="border-b border-border/60 bg-gradient-to-r from-violet-500/12 via-background to-sky-500/10 px-4 py-4 sm:px-6">
+                <DialogHeader className="space-y-2 text-left">
+                  <DialogTitle className="pr-8 text-lg leading-snug sm:text-xl">{selectedTicket.subject}</DialogTitle>
+                  <DialogDescription className="flex flex-wrap items-center gap-x-3 gap-y-2 text-foreground/80">
+                    <span className="inline-flex items-center gap-1.5 text-sm">
+                      <User className="h-4 w-4 text-violet-600 dark:text-violet-400" />
                       {selectedTicket.profile?.full_name || "—"}
                     </span>
-                    <span className="inline-flex items-center gap-1">
-                      <Mail className="h-3.5 w-3.5" />
+                    <span className="inline-flex items-center gap-1.5 text-sm">
+                      <Mail className="h-4 w-4 text-sky-600 dark:text-sky-400" />
                       {selectedTicket.profile?.email || "—"}
                     </span>
-                    <Badge variant={statusVariants[selectedTicket.status as TicketStatus] || "secondary"}>
+                    <Badge
+                      variant={statusVariants[selectedTicket.status as TicketStatus] || "secondary"}
+                      className="rounded-lg"
+                    >
                       {statusLabels[selectedTicket.status as TicketStatus] || selectedTicket.status}
                     </Badge>
-                    <span className="text-muted-foreground">{formatDate(selectedTicket.created_at)}</span>
+                    <span className="text-sm text-muted-foreground">{formatDate(selectedTicket.created_at)}</span>
                   </DialogDescription>
                 </DialogHeader>
               </div>
 
-              <ScrollArea className="max-h-[min(42vh,360px)] flex-1 px-6 py-4">
-                <div className="space-y-4 pr-3">
+              <ScrollArea className="min-h-0 flex-1 px-4 py-4 sm:max-h-[min(42vh,380px)] sm:px-6">
+                <div className="space-y-4 pr-2 sm:pr-3">
                   <div>
-                    <p className="mb-2 flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                      <MessageSquare className="h-3.5 w-3.5" />
+                    <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                      <MessageSquare className="h-3.5 w-3.5 text-violet-500" />
                       Original request
                     </p>
                     <div
                       className={cn(
-                        "rounded-2xl rounded-tl-md border bg-card px-4 py-3 text-sm shadow-sm",
-                        "border-border"
+                        "rounded-2xl rounded-tl-md border border-slate-200/80 bg-slate-50/90 px-4 py-3.5 text-sm shadow-sm",
+                        "dark:border-slate-700/80 dark:bg-slate-900/60"
                       )}
                     >
-                      <p className="mb-1 text-xs text-muted-foreground">
+                      <p className="mb-1.5 text-xs text-muted-foreground">
                         {selectedTicket.profile?.full_name || "Customer"} · {formatDate(selectedTicket.created_at)}
                       </p>
                       <p className="whitespace-pre-wrap text-foreground">{selectedTicket.message}</p>
@@ -432,9 +474,9 @@ const TicketManagement = () => {
 
                   {threadItems.length > 0 && (
                     <>
-                      <Separator />
-                      <p className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                        <Sparkles className="h-3.5 w-3.5" />
+                      <Separator className="bg-border/60" />
+                      <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                        <Sparkles className="h-3.5 w-3.5 text-indigo-500" />
                         Conversation
                       </p>
                       <div className="space-y-3">
@@ -448,33 +490,61 @@ const TicketManagement = () => {
                             >
                               <div
                                 className={cn(
-                                  "max-w-[92%] rounded-2xl px-4 py-3 text-sm shadow-sm sm:max-w-[85%]",
+                                  "max-w-[min(92vw,100%)] rounded-2xl px-4 py-3.5 text-sm shadow-md sm:max-w-[85%]",
                                   internal &&
-                                    "border border-amber-500/40 bg-amber-500/5 text-foreground dark:bg-amber-500/10",
+                                    "border border-amber-400/50 bg-amber-50/90 text-amber-950 shadow-amber-500/10 dark:border-amber-500/35 dark:bg-amber-950/30 dark:text-amber-50",
                                   !internal &&
                                     isAdmin &&
-                                    "rounded-tr-md border border-primary/25 bg-primary text-primary-foreground",
+                                    "rounded-tr-md border-0 bg-gradient-to-br from-violet-600 to-indigo-600 text-white shadow-lg shadow-violet-500/25",
                                   !internal &&
                                     !isAdmin &&
-                                    "rounded-tl-md border bg-muted/80 text-foreground"
+                                    "rounded-tl-md border border-slate-200/90 bg-white text-foreground dark:border-slate-700 dark:bg-slate-800/90"
                                 )}
                               >
-                                <div className="mb-1 flex flex-wrap items-center gap-2 text-xs opacity-90">
+                                <div
+                                  className={cn(
+                                    "mb-1.5 flex flex-wrap items-center gap-2 text-xs",
+                                    !internal && isAdmin ? "text-white/90" : "opacity-90"
+                                  )}
+                                >
                                   {internal && (
-                                    <span className="inline-flex items-center gap-0.5 font-medium text-amber-700 dark:text-amber-400">
+                                    <span className="inline-flex items-center gap-0.5 font-semibold text-amber-800 dark:text-amber-300">
                                       <Lock className="h-3 w-3" />
                                       Internal
                                     </span>
                                   )}
                                   {m._legacy && (
-                                    <Badge variant="outline" className="text-[10px]">
+                                    <Badge
+                                      variant="outline"
+                                      className={cn(
+                                        "text-[10px]",
+                                        !internal && isAdmin
+                                          ? "border-white/40 bg-white/15 text-white"
+                                          : "border-amber-800/30 text-amber-900 dark:border-amber-400/40 dark:text-amber-100"
+                                      )}
+                                    >
                                       Legacy
                                     </Badge>
                                   )}
-                                  <span>{m.author_display || (isAdmin ? "Support" : "Customer")}</span>
-                                  <span className="text-muted-foreground">· {formatDate(m.created_at)}</span>
+                                  <span
+                                    className={cn(
+                                      "font-medium",
+                                      internal && "text-amber-900 dark:text-amber-100",
+                                      !internal && isAdmin && "text-white",
+                                      !internal && !isAdmin && "text-foreground"
+                                    )}
+                                  >
+                                    {m.author_display || (isAdmin ? "Support" : "Customer")}
+                                  </span>
+                                  <span
+                                    className={cn(
+                                      !internal && isAdmin ? "text-white/75" : "text-muted-foreground"
+                                    )}
+                                  >
+                                    · {formatDate(m.created_at)}
+                                  </span>
                                 </div>
-                                <p className="whitespace-pre-wrap">{m.body}</p>
+                                <p className="whitespace-pre-wrap leading-relaxed">{m.body}</p>
                               </div>
                             </div>
                           );
@@ -485,12 +555,12 @@ const TicketManagement = () => {
                 </div>
               </ScrollArea>
 
-              <div className="space-y-3 border-t bg-background px-6 py-4">
+              <div className="space-y-4 border-t border-border/60 bg-muted/20 px-4 py-4 sm:px-6">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-                  <div className="flex-1 space-y-2">
-                    <Label className="text-xs text-muted-foreground">Ticket status</Label>
+                  <div className="min-w-0 flex-1 space-y-2">
+                    <Label className="text-xs font-medium text-muted-foreground">Ticket status</Label>
                     <Select value={editStatus} onValueChange={(v) => setEditStatus(v as TicketStatus)}>
-                      <SelectTrigger className="w-full sm:w-[220px]">
+                      <SelectTrigger className="h-11 w-full rounded-xl border-border/80 sm:w-[240px]">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -501,45 +571,48 @@ const TicketManagement = () => {
                       </SelectContent>
                     </Select>
                   </div>
-                  <Button type="button" variant="secondary" size="sm" onClick={saveStatusOnly} disabled={saving}>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="h-11 w-full shrink-0 rounded-xl border-border/80 sm:w-auto sm:px-5"
+                    onClick={saveStatusOnly}
+                    disabled={saving}
+                  >
                     {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save status only"}
                   </Button>
                 </div>
 
                 <div>
-                  <Label className="text-xs text-muted-foreground">Quick replies</Label>
-                  <div className="mt-2 flex flex-wrap gap-2">
+                  <Label className="text-xs font-medium text-muted-foreground">Quick replies</Label>
+                  <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
                     {QUICK_REPLIES.map((q, i) => (
                       <Button
                         key={i}
                         type="button"
                         variant="outline"
-                        size="sm"
-                        className="h-auto max-w-full whitespace-normal text-left text-xs font-normal"
+                        className="h-auto min-h-10 w-full justify-start rounded-xl border-violet-200/70 bg-violet-500/[0.06] px-3 py-2.5 text-left text-xs font-normal text-foreground transition-colors hover:bg-violet-500/10 dark:border-violet-500/25 dark:bg-violet-500/10 dark:hover:bg-violet-500/15 sm:w-auto sm:max-w-[280px]"
                         onClick={() => applyQuickReply(q)}
                       >
-                        {q.slice(0, 52)}
-                        {q.length > 52 ? "…" : ""}
+                        <span className="line-clamp-2">{q}</span>
                       </Button>
                     ))}
                   </div>
                 </div>
 
-                <div className="flex items-center justify-between gap-3 rounded-lg border bg-muted/20 px-3 py-2">
-                  <div className="flex items-center gap-2">
-                    <Switch
-                      id="internal-only"
-                      checked={internalOnly}
-                      onCheckedChange={(c) => setInternalOnly(!!c)}
-                    />
-                    <Label htmlFor="internal-only" className="cursor-pointer text-sm font-normal">
-                      Internal note (hidden from customer)
-                    </Label>
-                  </div>
+                <div className="flex items-start gap-3 rounded-xl border border-border/60 bg-background/80 px-3 py-3 sm:items-center">
+                  <Switch
+                    id="internal-only"
+                    checked={internalOnly}
+                    onCheckedChange={(c) => setInternalOnly(!!c)}
+                    className="mt-0.5 shrink-0 sm:mt-0"
+                  />
+                  <Label htmlFor="internal-only" className="cursor-pointer text-sm font-normal leading-snug">
+                    Internal note (hidden from customer)
+                  </Label>
                 </div>
 
                 <div>
-                  <Label htmlFor="reply-draft" className="text-sm">
+                  <Label htmlFor="reply-draft" className="text-sm font-medium">
                     {internalOnly ? "Internal note" : "Reply to customer"}
                   </Label>
                   <Textarea
@@ -552,19 +625,29 @@ const TicketManagement = () => {
                         : "Write a helpful reply. It will appear in the customer's ticket view."
                     }
                     rows={4}
-                    className="mt-2 resize-none"
+                    className="mt-2 min-h-[120px] resize-none rounded-xl border-border/80 text-base sm:text-sm"
                   />
-                  <p className="mt-1 text-right text-xs text-muted-foreground">
+                  <p className="mt-1.5 text-right text-xs text-muted-foreground">
                     {replyDraft.length} / {MAX_REPLY}
                   </p>
                 </div>
               </div>
 
-              <DialogFooter className="border-t bg-muted/20 px-6 py-3 sm:justify-between">
-                <Button type="button" variant="ghost" onClick={() => setSelectedTicket(null)}>
+              <DialogFooter className="flex flex-col-reverse gap-2 border-t border-border/60 bg-card px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="h-11 w-full rounded-xl sm:w-auto sm:min-w-[120px]"
+                  onClick={() => setSelectedTicket(null)}
+                >
                   Close
                 </Button>
-                <Button type="button" onClick={sendReply} disabled={sendingReply || !replyDraft.trim()}>
+                <Button
+                  type="button"
+                  disabled={sendingReply || !replyDraft.trim()}
+                  className="h-11 w-full rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 text-white shadow-lg shadow-violet-500/30 transition hover:from-violet-500 hover:to-indigo-500 disabled:opacity-50 sm:w-auto sm:min-w-[160px]"
+                  onClick={sendReply}
+                >
                   {sendingReply ? (
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   ) : (
