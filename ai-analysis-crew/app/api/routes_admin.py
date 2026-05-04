@@ -1116,7 +1116,7 @@ async def admin_get_ticket(
 
 
 class AdminPostTicketMessageBody(BaseModel):
-    body: str = Field(..., min_length=1, max_length=10000)
+    body: str = Field(..., min_length=1, max_length=250_000)
     is_internal: bool = False
     set_status: Optional[str] = Field(default=None, pattern=r"^(open|in_progress|answered|closed)$")
     notify_email: bool = Field(

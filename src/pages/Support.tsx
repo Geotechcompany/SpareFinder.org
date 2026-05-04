@@ -30,6 +30,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
 import { Loader2, MessageSquarePlus, Ticket, ChevronRight, ArrowLeft, Send } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { ticketPriorityBadgeCn, ticketStatusBadgeCn } from "@/lib/ticketBadgeStyles";
 import DashboardSidebar from "@/components/DashboardSidebar";
 import { useDashboardLayout } from "@/contexts/DashboardLayoutContext";
 import { PageSkeleton } from "@/components/skeletons";
@@ -68,13 +69,6 @@ const statusLabels: Record<TicketStatus, string> = {
   in_progress: "In progress",
   answered: "Answered",
   closed: "Closed",
-};
-
-const statusVariant: Record<TicketStatus, "default" | "secondary" | "destructive" | "outline"> = {
-  open: "default",
-  in_progress: "secondary",
-  answered: "outline",
-  closed: "secondary",
 };
 
 const priorityLabels: Record<TicketPriority, string> = {
@@ -306,13 +300,19 @@ const Support = () => {
                       >
                         <div className="min-w-0 flex-1">
                           <p className="font-medium leading-snug text-foreground">{t.subject}</p>
-                          <p className="mt-0.5 text-sm text-muted-foreground">
-                            {formatDate(t.created_at)} · {priorityLabels[t.priority as TicketPriority] || t.priority}
+                          <p className="mt-0.5 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+                            <span>{formatDate(t.created_at)}</span>
+                            <Badge
+                              variant="outline"
+                              className={ticketPriorityBadgeCn(t.priority, "text-[10px] font-semibold sm:text-xs")}
+                            >
+                              {priorityLabels[t.priority as TicketPriority] || t.priority}
+                            </Badge>
                           </p>
                         </div>
                         <Badge
-                          variant={statusVariant[t.status as TicketStatus] || "secondary"}
-                          className="shrink-0 rounded-lg"
+                          variant="outline"
+                          className={ticketStatusBadgeCn(t.status, "shrink-0 rounded-lg text-xs")}
                         >
                           {statusLabels[t.status as TicketStatus] || t.status}
                         </Badge>
@@ -420,11 +420,17 @@ const Support = () => {
 
       {/* Ticket detail dialog */}
       <Dialog open={!!detailTicket || detailLoading} onOpenChange={(open) => !open && setDetailTicket(null)}>
-        <DialogContent className="flex max-h-[90dvh] w-[calc(100vw-1rem)] max-w-xl flex-col gap-0 overflow-hidden rounded-2xl border-border/60 p-0 shadow-2xl sm:w-full">
+        <DialogContent className="flex max-h-[90dvh] w-[calc(100vw-1rem)] max-w-3xl flex-col gap-0 overflow-hidden rounded-2xl border-border/60 p-0 shadow-2xl sm:w-full">
           {detailLoading ? (
-            <div className="flex items-center justify-center py-20">
-              <Loader2 className="h-9 w-9 animate-spin text-violet-500" />
-            </div>
+            <>
+              <DialogHeader className="sr-only">
+                <DialogTitle>Loading ticket</DialogTitle>
+                <DialogDescription>Loading your ticket details and messages.</DialogDescription>
+              </DialogHeader>
+              <div className="flex items-center justify-center py-20" aria-hidden="true">
+                <Loader2 className="h-9 w-9 animate-spin text-violet-500" />
+              </div>
+            </>
           ) : detailTicket ? (
             <>
               <div className="shrink-0 border-b border-border/60 bg-gradient-to-r from-violet-500/12 via-background to-sky-500/10 px-4 py-4 sm:px-6">
@@ -442,10 +448,18 @@ const Support = () => {
                     <div className="min-w-0 flex-1">
                       <DialogTitle className="pr-2 text-lg leading-snug">{detailTicket.subject}</DialogTitle>
                       <DialogDescription className="mt-2 flex flex-wrap items-center gap-2 text-foreground/80">
-                        <Badge variant={statusVariant[detailTicket.status as TicketStatus]} className="rounded-lg">
+                        <Badge
+                          variant="outline"
+                          className={ticketStatusBadgeCn(detailTicket.status, "rounded-lg text-xs sm:text-sm")}
+                        >
                           {statusLabels[detailTicket.status as TicketStatus]}
                         </Badge>
-                        <span className="text-sm">{priorityLabels[detailTicket.priority as TicketPriority]}</span>
+                        <Badge
+                          variant="outline"
+                          className={ticketPriorityBadgeCn(detailTicket.priority, "rounded-lg text-xs sm:text-sm")}
+                        >
+                          {priorityLabels[detailTicket.priority as TicketPriority]}
+                        </Badge>
                         <span className="text-sm text-muted-foreground">Created {formatDate(detailTicket.created_at)}</span>
                       </DialogDescription>
                     </div>
@@ -453,70 +467,66 @@ const Support = () => {
                 </DialogHeader>
               </div>
 
-              <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4 [-webkit-overflow-scrolling:touch] sm:px-6">
-                <div className="space-y-4 pr-1 sm:pr-2">
-                  <div>
-                    <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                      Your message
-                    </p>
-                    <div className="rounded-2xl rounded-tl-md border border-slate-200/80 bg-slate-50/90 px-4 py-3.5 text-sm dark:border-slate-700/80 dark:bg-slate-900/60">
-                      <p className="whitespace-pre-wrap leading-relaxed">{detailTicket.message}</p>
-                    </div>
-                  </div>
-                  {publicThread.length > 0 && (
-                    <>
-                      <Separator className="bg-border/60" />
-                      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Thread</p>
-                      <div className="space-y-3">
-                        {publicThread.map((m) => {
-                          const fromYou = m.author_role === "user";
-                          return (
-                            <div key={m.id} className={cn("flex", fromYou ? "justify-start" : "justify-end")}>
-                              <div
-                                className={cn(
-                                  "max-w-[min(92vw,100%)] rounded-2xl px-4 py-3.5 text-sm shadow-md sm:max-w-[88%]",
-                                  fromYou
-                                    ? "rounded-tl-md border border-slate-200/90 bg-white dark:border-slate-700 dark:bg-slate-800/90"
-                                    : "rounded-tr-md border-0 bg-gradient-to-br from-violet-600 to-indigo-600 text-white shadow-lg shadow-violet-500/25"
-                                )}
-                              >
-                                <p
-                                  className={cn(
-                                    "mb-1.5 text-xs",
-                                    fromYou ? "text-muted-foreground" : "text-white/85"
-                                  )}
-                                >
-                                  {fromYou ? "You" : m.author_display || "Support"} · {formatDate(m.created_at)}
-                                  {m._legacy ? " · earlier reply" : ""}
-                                </p>
-                                <p className="whitespace-pre-wrap leading-relaxed">{m.body}</p>
-                              </div>
-                            </div>
-                          );
-                        })}
+              <div className="flex min-h-0 flex-1 flex-col border-t border-border/50">
+                <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-3 [-webkit-overflow-scrolling:touch] sm:py-4">
+                  <div className="space-y-4 pr-0.5">
+                      <div>
+                        <p className="mb-2 text-xs font-medium text-muted-foreground">Your message</p>
+                        <div className="rounded-2xl rounded-tl-md border border-slate-200/80 bg-slate-50/90 px-4 py-3.5 text-sm dark:border-slate-700/80 dark:bg-slate-900/60">
+                          <p className="whitespace-pre-wrap leading-relaxed">{detailTicket.message}</p>
+                        </div>
                       </div>
-                    </>
-                  )}
-                  <p className="text-xs text-muted-foreground">Last updated {formatDate(detailTicket.updated_at)}</p>
+                      {publicThread.length > 0 && (
+                        <>
+                          <Separator className="bg-border/60" />
+                          <div className="space-y-3">
+                            {publicThread.map((m) => {
+                              const fromYou = m.author_role === "user";
+                              return (
+                                <div key={m.id} className={cn("flex", fromYou ? "justify-start" : "justify-end")}>
+                                  <div
+                                    className={cn(
+                                      "max-w-[min(92vw,36rem)] rounded-2xl px-4 py-3.5 text-sm shadow-md",
+                                      fromYou
+                                        ? "rounded-tl-md border border-slate-200/90 bg-white dark:border-slate-700 dark:bg-slate-800/90"
+                                        : "rounded-tr-md border-0 bg-gradient-to-br from-violet-600 to-indigo-600 text-white shadow-lg shadow-violet-500/25"
+                                    )}
+                                  >
+                                    <p
+                                      className={cn(
+                                        "mb-1.5 text-xs",
+                                        fromYou ? "text-muted-foreground" : "text-white/85"
+                                      )}
+                                    >
+                                      {fromYou ? "You" : m.author_display || "Support"} · {formatDate(m.created_at)}
+                                      {m._legacy ? " · earlier reply" : ""}
+                                    </p>
+                                    <p className="whitespace-pre-wrap leading-relaxed">{m.body}</p>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </>
+                      )}
+                      <p className="text-xs text-muted-foreground">Last updated {formatDate(detailTicket.updated_at)}</p>
+                  </div>
                 </div>
-              </div>
 
-              <div className="shrink-0 border-t border-border/60 bg-muted/20 px-4 py-4 sm:px-6">
-                <Label htmlFor="follow-up" className="text-sm font-medium">
-                  Add a reply
-                </Label>
-                <Textarea
-                  id="follow-up"
-                  value={followUp}
-                  onChange={(e) => setFollowUp(e.target.value.slice(0, 5000))}
-                  placeholder="Add details or ask a follow-up question…"
-                  rows={3}
-                  className="mt-2 min-h-[100px] resize-none rounded-xl border-border/80 text-base sm:text-sm"
-                />
-                <div className="mt-3 flex justify-stretch sm:justify-end">
+                <div className="shrink-0 border-t border-border/60 bg-muted/15 px-4 pb-4 pt-3 backdrop-blur-md dark:bg-muted/25">
+                  <Label htmlFor="follow-up" className="text-sm font-medium">
+                    Your reply
+                  </Label>
+                  <Textarea
+                    id="follow-up"
+                    value={followUp}
+                    onChange={(e) => setFollowUp(e.target.value.slice(0, 5000))}
+                    placeholder="Add details or ask a follow-up question…"
+                    className="mt-2 min-h-[88px] max-h-[min(32vh,220px)] resize-y overflow-y-auto rounded-xl border-border/80 text-base sm:text-sm"
+                  />
                   <Button
                     type="button"
-                    className="h-11 w-full rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 text-white shadow-lg shadow-violet-500/25 hover:from-violet-500 hover:to-indigo-500 disabled:opacity-50 sm:w-auto sm:min-w-[140px]"
+                    className="mt-3 h-11 w-full rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 text-white shadow-lg shadow-violet-500/25 hover:from-violet-500 hover:to-indigo-500 disabled:opacity-50"
                     onClick={sendFollowUp}
                     disabled={followUpSending || !followUp.trim()}
                   >

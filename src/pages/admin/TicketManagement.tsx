@@ -9,7 +9,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -21,7 +20,6 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -34,8 +32,9 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Separator } from "@/components/ui/separator";
-import { Switch } from "@/components/ui/switch";
 import { api } from "@/lib/api";
+import { AdminTicketReplyComposer } from "@/components/admin/AdminTicketReplyComposer";
+import { TicketMessageRichBody } from "@/components/admin/ticketMessageRichBody";
 import AdminDesktopSidebar from "@/components/AdminDesktopSidebar";
 import { TableSkeleton } from "@/components/skeletons";
 import {
@@ -43,13 +42,11 @@ import {
   Ticket,
   Mail,
   User,
-  Send,
   Lock,
-  Sparkles,
-  MessageSquare,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { ticketPriorityBadgeCn, ticketStatusBadgeCn } from "@/lib/ticketBadgeStyles";
 
 type TicketStatus = "open" | "in_progress" | "answered" | "closed";
 
@@ -87,13 +84,6 @@ const statusLabels: Record<TicketStatus, string> = {
   closed: "Closed",
 };
 
-const statusVariants: Record<TicketStatus, "default" | "secondary" | "destructive" | "outline"> = {
-  open: "default",
-  in_progress: "secondary",
-  answered: "outline",
-  closed: "secondary",
-};
-
 const QUICK_REPLIES = [
   "Thanks for reaching out — we're reviewing this and will update you shortly.",
   "Could you share a part number, photo, or any error message you are seeing?",
@@ -101,7 +91,7 @@ const QUICK_REPLIES = [
   "I've updated your account; you may need to sign out and back in to see the change.",
 ];
 
-const MAX_REPLY = 10000;
+const MAX_REPLY = 250_000;
 
 const TicketManagement = () => {
   const [tickets, setTickets] = useState<TicketRow[]>([]);
@@ -269,10 +259,6 @@ const TicketManagement = () => {
     }
   };
 
-  const applyQuickReply = (text: string) => {
-    setReplyDraft((prev) => (prev ? `${prev.trim()}\n\n${text}` : text));
-  };
-
   const formatDate = (s: string) => {
     try {
       return new Date(s).toLocaleString(undefined, { dateStyle: "short", timeStyle: "short" });
@@ -338,10 +324,12 @@ const TicketManagement = () => {
                           {t.profile?.full_name || "—"} · {t.profile?.email}
                         </p>
                         <div className="mt-3 flex flex-wrap items-center gap-2">
-                          <Badge variant={statusVariants[t.status as TicketStatus] || "secondary"}>
+                          <Badge variant="outline" className={ticketStatusBadgeCn(t.status, "text-xs")}>
                             {statusLabels[t.status as TicketStatus] || t.status}
                           </Badge>
-                          <span className="text-xs capitalize text-muted-foreground">{t.priority}</span>
+                          <Badge variant="outline" className={ticketPriorityBadgeCn(t.priority, "text-xs")}>
+                            {t.priority}
+                          </Badge>
                           <span className="text-xs text-muted-foreground">{formatDate(t.created_at)}</span>
                         </div>
                         <Button
@@ -379,11 +367,15 @@ const TicketManagement = () => {
                               </div>
                             </TableCell>
                             <TableCell>
-                              <Badge variant={statusVariants[t.status as TicketStatus] || "secondary"}>
+                              <Badge variant="outline" className={ticketStatusBadgeCn(t.status, "text-xs")}>
                                 {statusLabels[t.status as TicketStatus] || t.status}
                               </Badge>
                             </TableCell>
-                            <TableCell className="capitalize">{t.priority}</TableCell>
+                            <TableCell>
+                              <Badge variant="outline" className={ticketPriorityBadgeCn(t.priority, "text-xs")}>
+                                {t.priority}
+                              </Badge>
+                            </TableCell>
                             <TableCell className="text-sm text-muted-foreground">{formatDate(t.created_at)}</TableCell>
                             <TableCell>
                               <Button
@@ -430,11 +422,17 @@ const TicketManagement = () => {
       </main>
 
       <Dialog open={!!selectedTicket || detailLoading} onOpenChange={(open) => !open && setSelectedTicket(null)}>
-        <DialogContent className="flex max-h-[90dvh] w-[calc(100vw-1rem)] max-w-2xl flex-col gap-0 overflow-hidden rounded-2xl border-border/60 p-0 shadow-2xl sm:w-full">
+        <DialogContent className="flex max-h-[90dvh] w-[calc(100vw-1rem)] max-w-3xl flex-col gap-0 overflow-hidden rounded-2xl border-border/60 p-0 shadow-2xl sm:w-full">
           {detailLoading ? (
-            <div className="flex items-center justify-center py-20">
-              <Loader2 className="h-9 w-9 animate-spin text-violet-500" />
-            </div>
+            <>
+              <DialogHeader className="sr-only">
+                <DialogTitle>Loading ticket</DialogTitle>
+                <DialogDescription>Loading ticket details and conversation.</DialogDescription>
+              </DialogHeader>
+              <div className="flex items-center justify-center py-20" aria-hidden="true">
+                <Loader2 className="h-9 w-9 animate-spin text-violet-500" />
+              </div>
+            </>
           ) : selectedTicket ? (
             <>
               <div className="shrink-0 border-b border-border/60 bg-gradient-to-r from-violet-500/12 via-background to-sky-500/10 px-4 py-4 sm:px-6">
@@ -450,239 +448,146 @@ const TicketManagement = () => {
                       {selectedTicket.profile?.email || "—"}
                     </span>
                     <Badge
-                      variant={statusVariants[selectedTicket.status as TicketStatus] || "secondary"}
-                      className="rounded-lg"
+                      variant="outline"
+                      className={ticketStatusBadgeCn(selectedTicket.status, "rounded-lg text-xs sm:text-sm")}
                     >
                       {statusLabels[selectedTicket.status as TicketStatus] || selectedTicket.status}
+                    </Badge>
+                    <Badge
+                      variant="outline"
+                      className={ticketPriorityBadgeCn(selectedTicket.priority, "rounded-lg text-xs sm:text-sm")}
+                    >
+                      {selectedTicket.priority}
                     </Badge>
                     <span className="text-sm text-muted-foreground">{formatDate(selectedTicket.created_at)}</span>
                   </DialogDescription>
                 </DialogHeader>
               </div>
 
-              <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4 [-webkit-overflow-scrolling:touch] sm:px-6">
-                <div className="space-y-4 pr-1 sm:pr-2">
-                  <div>
-                    <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                      <MessageSquare className="h-3.5 w-3.5 text-violet-500" />
-                      Original request
-                    </p>
-                    <div
-                      className={cn(
-                        "rounded-2xl rounded-tl-md border border-slate-200/80 bg-slate-50/90 px-4 py-3.5 text-sm shadow-sm",
-                        "dark:border-slate-700/80 dark:bg-slate-900/60"
-                      )}
-                    >
-                      <p className="mb-1.5 text-xs text-muted-foreground">
-                        {selectedTicket.profile?.full_name || "Customer"} · {formatDate(selectedTicket.created_at)}
-                      </p>
-                      <p className="whitespace-pre-wrap text-foreground">{selectedTicket.message}</p>
-                    </div>
-                  </div>
+              <div className="flex min-h-0 flex-1 flex-col border-t border-border/50">
+                <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-3 [-webkit-overflow-scrolling:touch] sm:py-4">
+                  <div className="space-y-4 pr-0.5">
+                      <div>
+                        <p className="mb-2 text-xs font-medium text-muted-foreground">Original request</p>
+                        <div
+                          className={cn(
+                            "rounded-2xl rounded-tl-md border border-slate-200/80 bg-slate-50/90 px-4 py-3.5 text-sm shadow-sm",
+                            "dark:border-slate-700/80 dark:bg-slate-900/60"
+                          )}
+                        >
+                          <p className="mb-1.5 text-xs text-muted-foreground">
+                            {selectedTicket.profile?.full_name || "Customer"} ·{" "}
+                            {formatDate(selectedTicket.created_at)}
+                          </p>
+                          <TicketMessageRichBody body={selectedTicket.message} />
+                        </div>
+                      </div>
 
-                  {threadItems.length > 0 && (
-                    <>
-                      <Separator className="bg-border/60" />
-                      <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                        <Sparkles className="h-3.5 w-3.5 text-indigo-500" />
-                        Conversation
-                      </p>
-                      <div className="space-y-3">
-                        {threadItems.map((m) => {
-                          const isAdmin = m.author_role === "admin";
-                          const internal = !!m.is_internal;
-                          return (
-                            <div
-                              key={m.id}
-                              className={cn("flex", isAdmin && !internal ? "justify-end" : "justify-start")}
-                            >
-                              <div
-                                className={cn(
-                                  "max-w-[min(92vw,100%)] rounded-2xl px-4 py-3.5 text-sm shadow-md sm:max-w-[85%]",
-                                  internal &&
-                                    "border border-amber-400/50 bg-amber-50/90 text-amber-950 shadow-amber-500/10 dark:border-amber-500/35 dark:bg-amber-950/30 dark:text-amber-50",
-                                  !internal &&
-                                    isAdmin &&
-                                    "rounded-tr-md border-0 bg-gradient-to-br from-violet-600 to-indigo-600 text-white shadow-lg shadow-violet-500/25",
-                                  !internal &&
-                                    !isAdmin &&
-                                    "rounded-tl-md border border-slate-200/90 bg-white text-foreground dark:border-slate-700 dark:bg-slate-800/90"
-                                )}
-                              >
+                      {threadItems.length > 0 && (
+                        <>
+                          <Separator className="bg-border/60" />
+                          <div className="space-y-3">
+                            {threadItems.map((m) => {
+                              const isAdmin = m.author_role === "admin";
+                              const internal = !!m.is_internal;
+                              return (
                                 <div
-                                  className={cn(
-                                    "mb-1.5 flex flex-wrap items-center gap-2 text-xs",
-                                    !internal && isAdmin ? "text-white/90" : "opacity-90"
-                                  )}
+                                  key={m.id}
+                                  className={cn("flex", isAdmin && !internal ? "justify-end" : "justify-start")}
                                 >
-                                  {internal && (
-                                    <span className="inline-flex items-center gap-0.5 font-semibold text-amber-800 dark:text-amber-300">
-                                      <Lock className="h-3 w-3" />
-                                      Internal
-                                    </span>
-                                  )}
-                                  {m._legacy && (
-                                    <Badge
-                                      variant="outline"
+                                  <div
+                                    className={cn(
+                                      "max-w-[min(92vw,36rem)] rounded-2xl px-4 py-3.5 text-sm shadow-md",
+                                      internal &&
+                                        "border border-amber-400/50 bg-amber-50/90 text-amber-950 shadow-amber-500/10 dark:border-amber-500/35 dark:bg-amber-950/30 dark:text-amber-50",
+                                      !internal &&
+                                        isAdmin &&
+                                        "rounded-tr-md border-0 bg-gradient-to-br from-violet-600 to-indigo-600 text-white shadow-lg shadow-violet-500/25",
+                                      !internal &&
+                                        !isAdmin &&
+                                        "rounded-tl-md border border-slate-200/90 bg-white text-foreground dark:border-slate-700 dark:bg-slate-800/90"
+                                    )}
+                                  >
+                                    <div
                                       className={cn(
-                                        "text-[10px]",
-                                        !internal && isAdmin
-                                          ? "border-white/40 bg-white/15 text-white"
-                                          : "border-amber-800/30 text-amber-900 dark:border-amber-400/40 dark:text-amber-100"
+                                        "mb-1.5 flex flex-wrap items-center gap-2 text-xs",
+                                        !internal && isAdmin ? "text-white/90" : "opacity-90"
                                       )}
                                     >
-                                      Legacy
-                                    </Badge>
-                                  )}
-                                  <span
-                                    className={cn(
-                                      "font-medium",
-                                      internal && "text-amber-900 dark:text-amber-100",
-                                      !internal && isAdmin && "text-white",
-                                      !internal && !isAdmin && "text-foreground"
-                                    )}
-                                  >
-                                    {m.author_display || (isAdmin ? "Support" : "Customer")}
-                                  </span>
-                                  <span
-                                    className={cn(
-                                      !internal && isAdmin ? "text-white/75" : "text-muted-foreground"
-                                    )}
-                                  >
-                                    · {formatDate(m.created_at)}
-                                  </span>
+                                      {internal && (
+                                        <span className="inline-flex items-center gap-0.5 font-semibold text-amber-800 dark:text-amber-300">
+                                          <Lock className="h-3 w-3" />
+                                          Internal
+                                        </span>
+                                      )}
+                                      {m._legacy && (
+                                        <Badge
+                                          variant="outline"
+                                          className={cn(
+                                            "text-[10px]",
+                                            !internal && isAdmin
+                                              ? "border-white/40 bg-white/15 text-white"
+                                              : "border-amber-800/30 text-amber-900 dark:border-amber-400/40 dark:text-amber-100"
+                                          )}
+                                        >
+                                          Legacy
+                                        </Badge>
+                                      )}
+                                      <span
+                                        className={cn(
+                                          "font-medium",
+                                          internal && "text-amber-900 dark:text-amber-100",
+                                          !internal && isAdmin && "text-white",
+                                          !internal && !isAdmin && "text-foreground"
+                                        )}
+                                      >
+                                        {m.author_display || (isAdmin ? "Support" : "Customer")}
+                                      </span>
+                                      <span
+                                        className={cn(
+                                          !internal && isAdmin ? "text-white/75" : "text-muted-foreground"
+                                        )}
+                                      >
+                                        · {formatDate(m.created_at)}
+                                      </span>
+                                    </div>
+                                    <TicketMessageRichBody
+                                      body={m.body}
+                                      variant={!internal && isAdmin ? "admin" : "default"}
+                                      className="leading-relaxed"
+                                    />
+                                  </div>
                                 </div>
-                                <p className="whitespace-pre-wrap leading-relaxed">{m.body}</p>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </>
-                  )}
+                              );
+                            })}
+                          </div>
+                        </>
+                      )}
+                  </div>
+                </div>
+
+                <div className="shrink-0 border-t border-border/60 bg-muted/15 px-3 pb-3 pt-2 backdrop-blur-md dark:bg-muted/25 sm:px-4">
+                  <AdminTicketReplyComposer
+                    variant="dock"
+                    replyDraft={replyDraft}
+                    onReplyDraftChange={setReplyDraft}
+                    internalOnly={internalOnly}
+                    onInternalOnlyChange={setInternalOnly}
+                    notifyEmail={notifyEmail}
+                    onNotifyEmailChange={setNotifyEmail}
+                    editStatus={(editStatus || "open") as TicketStatus}
+                    onEditStatusChange={(s) => setEditStatus(s)}
+                    onSaveStatusOnly={saveStatusOnly}
+                    saving={saving}
+                    sendingReply={sendingReply}
+                    onSend={sendReply}
+                    onClose={() => setSelectedTicket(null)}
+                    maxLength={MAX_REPLY}
+                    quickReplies={QUICK_REPLIES}
+                  />
                 </div>
               </div>
 
-              <div className="shrink-0 space-y-4 border-t border-border/60 bg-muted/20 px-4 py-4 sm:px-6">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-                  <div className="min-w-0 flex-1 space-y-2">
-                    <Label className="text-xs font-medium text-muted-foreground">Ticket status</Label>
-                    <Select value={editStatus} onValueChange={(v) => setEditStatus(v as TicketStatus)}>
-                      <SelectTrigger className="h-11 w-full rounded-xl border-border/80 sm:w-[240px]">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="open">Open</SelectItem>
-                        <SelectItem value="in_progress">In progress</SelectItem>
-                        <SelectItem value="answered">Answered</SelectItem>
-                        <SelectItem value="closed">Closed</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="h-11 w-full shrink-0 rounded-xl border-border/80 sm:w-auto sm:px-5"
-                    onClick={saveStatusOnly}
-                    disabled={saving}
-                  >
-                    {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save status only"}
-                  </Button>
-                </div>
-
-                <div>
-                  <Label className="text-xs font-medium text-muted-foreground">Quick replies</Label>
-                  <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-                    {QUICK_REPLIES.map((q, i) => (
-                      <Button
-                        key={i}
-                        type="button"
-                        variant="outline"
-                        className="h-auto min-h-10 w-full justify-start rounded-xl border-violet-200/70 bg-violet-500/[0.06] px-3 py-2.5 text-left text-xs font-normal text-foreground transition-colors hover:bg-violet-500/10 dark:border-violet-500/25 dark:bg-violet-500/10 dark:hover:bg-violet-500/15 sm:w-auto sm:max-w-[280px]"
-                        onClick={() => applyQuickReply(q)}
-                      >
-                        <span className="line-clamp-2">{q}</span>
-                      </Button>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-3 rounded-xl border border-border/60 bg-background/80 px-3 py-3 sm:items-center">
-                  <Switch
-                    id="internal-only"
-                    checked={internalOnly}
-                    onCheckedChange={(c) => {
-                      const next = !!c;
-                      setInternalOnly(next);
-                      setNotifyEmail(next ? false : true);
-                    }}
-                    className="mt-0.5 shrink-0 sm:mt-0"
-                  />
-                  <Label htmlFor="internal-only" className="cursor-pointer text-sm font-normal leading-snug">
-                    Internal note (hidden from customer)
-                  </Label>
-                </div>
-
-                {!internalOnly && (
-                  <div className="flex items-start gap-3 rounded-xl border border-sky-500/20 bg-sky-500/5 px-3 py-3 sm:items-center dark:border-sky-500/25 dark:bg-sky-950/30">
-                    <Switch
-                      id="notify-email"
-                      checked={notifyEmail}
-                      onCheckedChange={(c) => setNotifyEmail(!!c)}
-                      className="mt-0.5 shrink-0 sm:mt-0"
-                    />
-                    <Label htmlFor="notify-email" className="cursor-pointer text-sm font-normal leading-snug">
-                      Email the customer a copy of this reply (uses profile email; requires SMTP configured on the
-                      server)
-                    </Label>
-                  </div>
-                )}
-
-                <div>
-                  <Label htmlFor="reply-draft" className="text-sm font-medium">
-                    {internalOnly ? "Internal note" : "Reply to customer"}
-                  </Label>
-                  <Textarea
-                    id="reply-draft"
-                    value={replyDraft}
-                    onChange={(e) => setReplyDraft(e.target.value.slice(0, MAX_REPLY))}
-                    placeholder={
-                      internalOnly
-                        ? "Visible only to your team…"
-                        : "Write a helpful reply. It will appear in the customer's ticket view."
-                    }
-                    rows={4}
-                    className="mt-2 min-h-[120px] resize-none rounded-xl border-border/80 text-base sm:text-sm"
-                  />
-                  <p className="mt-1.5 text-right text-xs text-muted-foreground">
-                    {replyDraft.length} / {MAX_REPLY}
-                  </p>
-                </div>
-              </div>
-
-              <DialogFooter className="flex shrink-0 flex-col-reverse gap-2 border-t border-border/60 bg-card px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="h-11 w-full rounded-xl sm:w-auto sm:min-w-[120px]"
-                  onClick={() => setSelectedTicket(null)}
-                >
-                  Close
-                </Button>
-                <Button
-                  type="button"
-                  disabled={sendingReply || !replyDraft.trim()}
-                  className="h-11 w-full rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 text-white shadow-lg shadow-violet-500/30 transition hover:from-violet-500 hover:to-indigo-500 disabled:opacity-50 sm:w-auto sm:min-w-[160px]"
-                  onClick={sendReply}
-                >
-                  {sendingReply ? (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  ) : (
-                    <Send className="mr-2 h-4 w-4" />
-                  )}
-                  {internalOnly ? "Save note" : "Send reply"}
-                </Button>
-              </DialogFooter>
             </>
           ) : null}
         </DialogContent>
