@@ -1119,6 +1119,10 @@ class AdminPostTicketMessageBody(BaseModel):
     body: str = Field(..., min_length=1, max_length=10000)
     is_internal: bool = False
     set_status: Optional[str] = Field(default=None, pattern=r"^(open|in_progress|answered|closed)$")
+    notify_email: bool = Field(
+        default=True,
+        description="If true, email the ticket owner when this is a public (non-internal) reply.",
+    )
 
     @field_validator("body", mode="before")
     @classmethod
@@ -1126,6 +1130,59 @@ class AdminPostTicketMessageBody(BaseModel):
         if v is None:
             return ""
         return str(v).strip()
+
+
+def _notify_user_ticket_reply_email(
+    *,
+    to_email: str,
+    recipient_name: str | None,
+    ticket_id: str,
+    ticket_subject: str,
+    reply_body: str,
+) -> None:
+    """Email the customer when support posts a public reply."""
+    import logging
+
+    log = logging.getLogger(__name__)
+    to_email = (to_email or "").strip()
+    if not to_email or "@" not in to_email:
+        log.warning("Ticket %s: no customer email; skipping reply notification", ticket_id)
+        return
+    try:
+        from ..email_sender import send_basic_email_smtp, send_email_via_email_service
+    except Exception as e:
+        log.warning("Email imports failed for ticket reply: %s", e)
+        return
+
+    frontend = _env("FRONTEND_URL", "https://sparefinder.org").rstrip("/")
+    ticket_url = f"{frontend}/support"
+    subj = ticket_subject.strip() or "Support"
+    subject_email = f"[SpareFinder] Reply on your ticket: {subj[:50]}{'…' if len(subj) > 50 else ''}"
+    safe_body = (reply_body or "")[:4000]
+    html = f"""
+<h2>New reply from SpareFinder support</h2>
+<p>Hi {recipient_name or "there"},</p>
+<p>We posted an update on your ticket <strong>{subj}</strong>.</p>
+<hr/>
+<p style="white-space: pre-wrap">{safe_body}</p>
+<hr/>
+<p><a href="{ticket_url}">Open your tickets in SpareFinder</a> to view the full thread.</p>
+<p style="font-size:12px;color:#64748b">Ticket ID: {ticket_id}</p>
+"""
+    text = (
+        f"New reply from SpareFinder support\n\n"
+        f"Ticket: {subj}\n\n"
+        f"{safe_body}\n\n"
+        f"View your tickets: {ticket_url}\n"
+        f"Ticket ID: {ticket_id}\n"
+    )
+    ok = send_basic_email_smtp(to_email=to_email, subject=subject_email, html=html, text=text)
+    if not ok:
+        ok = send_email_via_email_service(to_email=to_email, subject=subject_email, html=html, text=text)
+    if ok:
+        log.info("Ticket %s: reply notification emailed to customer", ticket_id)
+    else:
+        log.warning("Ticket %s: failed to email reply to customer", ticket_id)
 
 
 @router.post("/tickets/{ticket_id}/messages")
@@ -1136,9 +1193,16 @@ async def admin_post_ticket_message(
 ):
     """Append a reply (public or internal). Public replies sync latest text to support_tickets.admin_notes."""
     supabase = get_supabase_admin()
-    chk = supabase.table("support_tickets").select("id").eq("id", ticket_id).limit(1).execute()
+    chk = (
+        supabase.table("support_tickets")
+        .select("id, subject, user_id")
+        .eq("id", ticket_id)
+        .limit(1)
+        .execute()
+    )
     if not chk.data or len(chk.data) == 0:
         return api_error("Ticket not found", status_code=404)
+    ticket_row = chk.data[0]
     body = (payload.body or "").strip()
     if not body:
         return api_error("Message body is required", status_code=400)
@@ -1170,6 +1234,35 @@ async def admin_post_ticket_message(
     if created:
         created = dict(created)
         created["author_display"] = admin.full_name or admin.email or "Support"
+
+    if not payload.is_internal and payload.notify_email:
+        uid = ticket_row.get("user_id")
+        subj = str(ticket_row.get("subject") or "Support ticket")
+        if uid:
+            try:
+                pr = (
+                    supabase.table("profiles")
+                    .select("email, full_name")
+                    .eq("id", uid)
+                    .limit(1)
+                    .execute()
+                )
+                rowp = (pr.data or [{}])[0] if pr.data else {}
+                cust_email = str(rowp.get("email") or "").strip()
+                cust_name = rowp.get("full_name")
+                if cust_email:
+                    _notify_user_ticket_reply_email(
+                        to_email=cust_email,
+                        recipient_name=cust_name if isinstance(cust_name, str) else None,
+                        ticket_id=ticket_id,
+                        ticket_subject=subj,
+                        reply_body=body,
+                    )
+            except Exception:
+                import logging
+
+                logging.getLogger(__name__).exception("Ticket %s: customer reply email failed", ticket_id)
+
     return api_ok(data={"message": created, "ticket_id": ticket_id}, message="Reply posted")
 
 

@@ -33,7 +33,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { api } from "@/lib/api";
@@ -115,6 +114,7 @@ const TicketManagement = () => {
   const [editStatus, setEditStatus] = useState<TicketStatus | "">("");
   const [replyDraft, setReplyDraft] = useState("");
   const [internalOnly, setInternalOnly] = useState(false);
+  const [notifyEmail, setNotifyEmail] = useState(true);
   const [saving, setSaving] = useState(false);
   const [sendingReply, setSendingReply] = useState(false);
 
@@ -170,6 +170,7 @@ const TicketManagement = () => {
     setEditStatus("");
     setReplyDraft("");
     setInternalOnly(false);
+    setNotifyEmail(true);
     try {
       const res = await api.admin.getTicket(id);
       const data = res?.data as TicketDetail | undefined;
@@ -245,9 +246,16 @@ const TicketManagement = () => {
         body,
         is_internal: internalOnly,
         set_status: internalOnly ? undefined : editStatus || undefined,
+        notify_email: internalOnly ? false : notifyEmail,
       });
       if (res?.success) {
-        toast.success(internalOnly ? "Internal note saved" : "Reply sent");
+        if (internalOnly) {
+          toast.success("Internal note saved");
+        } else if (notifyEmail) {
+          toast.success("Reply sent — customer emailed if SMTP is configured");
+        } else {
+          toast.success("Reply sent");
+        }
         setReplyDraft("");
         await reloadTicketDetail(selectedTicket.id);
         fetchTickets();
@@ -422,14 +430,14 @@ const TicketManagement = () => {
       </main>
 
       <Dialog open={!!selectedTicket || detailLoading} onOpenChange={(open) => !open && setSelectedTicket(null)}>
-        <DialogContent className="flex h-[min(92dvh,880px)] w-[calc(100vw-1rem)] max-w-2xl flex-col gap-0 overflow-hidden rounded-2xl border-border/60 p-0 shadow-2xl sm:h-auto sm:max-h-[min(90vh,880px)] sm:w-full">
+        <DialogContent className="flex max-h-[90dvh] w-[calc(100vw-1rem)] max-w-2xl flex-col gap-0 overflow-hidden rounded-2xl border-border/60 p-0 shadow-2xl sm:w-full">
           {detailLoading ? (
             <div className="flex items-center justify-center py-20">
               <Loader2 className="h-9 w-9 animate-spin text-violet-500" />
             </div>
           ) : selectedTicket ? (
             <>
-              <div className="border-b border-border/60 bg-gradient-to-r from-violet-500/12 via-background to-sky-500/10 px-4 py-4 sm:px-6">
+              <div className="shrink-0 border-b border-border/60 bg-gradient-to-r from-violet-500/12 via-background to-sky-500/10 px-4 py-4 sm:px-6">
                 <DialogHeader className="space-y-2 text-left">
                   <DialogTitle className="pr-8 text-lg leading-snug sm:text-xl">{selectedTicket.subject}</DialogTitle>
                   <DialogDescription className="flex flex-wrap items-center gap-x-3 gap-y-2 text-foreground/80">
@@ -452,8 +460,8 @@ const TicketManagement = () => {
                 </DialogHeader>
               </div>
 
-              <ScrollArea className="min-h-0 flex-1 px-4 py-4 sm:max-h-[min(42vh,380px)] sm:px-6">
-                <div className="space-y-4 pr-2 sm:pr-3">
+              <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4 [-webkit-overflow-scrolling:touch] sm:px-6">
+                <div className="space-y-4 pr-1 sm:pr-2">
                   <div>
                     <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                       <MessageSquare className="h-3.5 w-3.5 text-violet-500" />
@@ -553,9 +561,9 @@ const TicketManagement = () => {
                     </>
                   )}
                 </div>
-              </ScrollArea>
+              </div>
 
-              <div className="space-y-4 border-t border-border/60 bg-muted/20 px-4 py-4 sm:px-6">
+              <div className="shrink-0 space-y-4 border-t border-border/60 bg-muted/20 px-4 py-4 sm:px-6">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
                   <div className="min-w-0 flex-1 space-y-2">
                     <Label className="text-xs font-medium text-muted-foreground">Ticket status</Label>
@@ -603,13 +611,32 @@ const TicketManagement = () => {
                   <Switch
                     id="internal-only"
                     checked={internalOnly}
-                    onCheckedChange={(c) => setInternalOnly(!!c)}
+                    onCheckedChange={(c) => {
+                      const next = !!c;
+                      setInternalOnly(next);
+                      setNotifyEmail(next ? false : true);
+                    }}
                     className="mt-0.5 shrink-0 sm:mt-0"
                   />
                   <Label htmlFor="internal-only" className="cursor-pointer text-sm font-normal leading-snug">
                     Internal note (hidden from customer)
                   </Label>
                 </div>
+
+                {!internalOnly && (
+                  <div className="flex items-start gap-3 rounded-xl border border-sky-500/20 bg-sky-500/5 px-3 py-3 sm:items-center dark:border-sky-500/25 dark:bg-sky-950/30">
+                    <Switch
+                      id="notify-email"
+                      checked={notifyEmail}
+                      onCheckedChange={(c) => setNotifyEmail(!!c)}
+                      className="mt-0.5 shrink-0 sm:mt-0"
+                    />
+                    <Label htmlFor="notify-email" className="cursor-pointer text-sm font-normal leading-snug">
+                      Email the customer a copy of this reply (uses profile email; requires SMTP configured on the
+                      server)
+                    </Label>
+                  </div>
+                )}
 
                 <div>
                   <Label htmlFor="reply-draft" className="text-sm font-medium">
@@ -633,7 +660,7 @@ const TicketManagement = () => {
                 </div>
               </div>
 
-              <DialogFooter className="flex flex-col-reverse gap-2 border-t border-border/60 bg-card px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+              <DialogFooter className="flex shrink-0 flex-col-reverse gap-2 border-t border-border/60 bg-card px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
                 <Button
                   type="button"
                   variant="outline"

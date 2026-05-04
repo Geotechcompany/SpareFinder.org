@@ -27,7 +27,9 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
-import { Loader2, MessageSquarePlus, Ticket, ChevronRight, ArrowLeft } from "lucide-react";
+import { Separator } from "@/components/ui/separator";
+import { Loader2, MessageSquarePlus, Ticket, ChevronRight, ArrowLeft, Send } from "lucide-react";
+import { cn } from "@/lib/utils";
 import DashboardSidebar from "@/components/DashboardSidebar";
 import { useDashboardLayout } from "@/contexts/DashboardLayoutContext";
 import { PageSkeleton } from "@/components/skeletons";
@@ -46,9 +48,19 @@ interface TicketItem {
   updated_at: string;
 }
 
+interface TicketMessage {
+  id: string;
+  body: string;
+  author_role?: string;
+  author_display?: string | null;
+  created_at: string;
+  _legacy?: boolean;
+}
+
 interface TicketDetail extends TicketItem {
   message: string;
   admin_notes?: string | null;
+  messages?: TicketMessage[];
 }
 
 const statusLabels: Record<TicketStatus, string> = {
@@ -408,14 +420,14 @@ const Support = () => {
 
       {/* Ticket detail dialog */}
       <Dialog open={!!detailTicket || detailLoading} onOpenChange={(open) => !open && setDetailTicket(null)}>
-        <DialogContent className="flex h-[min(92dvh,760px)] w-[calc(100vw-1rem)] max-w-xl flex-col gap-0 overflow-hidden rounded-2xl border-border/60 p-0 shadow-2xl sm:h-auto sm:max-h-[min(90vh,760px)] sm:w-full">
+        <DialogContent className="flex max-h-[90dvh] w-[calc(100vw-1rem)] max-w-xl flex-col gap-0 overflow-hidden rounded-2xl border-border/60 p-0 shadow-2xl sm:w-full">
           {detailLoading ? (
             <div className="flex items-center justify-center py-20">
               <Loader2 className="h-9 w-9 animate-spin text-violet-500" />
             </div>
           ) : detailTicket ? (
             <>
-              <div className="border-b border-border/60 bg-gradient-to-r from-violet-500/12 via-background to-sky-500/10 px-4 py-4 sm:px-6">
+              <div className="shrink-0 border-b border-border/60 bg-gradient-to-r from-violet-500/12 via-background to-sky-500/10 px-4 py-4 sm:px-6">
                 <DialogHeader>
                   <div className="flex items-start gap-2 sm:items-center">
                     <Button
@@ -441,8 +453,8 @@ const Support = () => {
                 </DialogHeader>
               </div>
 
-              <ScrollArea className="min-h-0 flex-1 px-4 py-4 sm:max-h-[min(40vh,340px)] sm:px-6">
-                <div className="space-y-4 pr-2 sm:pr-3">
+              <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4 [-webkit-overflow-scrolling:touch] sm:px-6">
+                <div className="space-y-4 pr-1 sm:pr-2">
                   <div>
                     <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                       Your message
@@ -487,9 +499,9 @@ const Support = () => {
                   )}
                   <p className="text-xs text-muted-foreground">Last updated {formatDate(detailTicket.updated_at)}</p>
                 </div>
-              </ScrollArea>
+              </div>
 
-              <div className="border-t border-border/60 bg-muted/20 px-4 py-4 sm:px-6">
+              <div className="shrink-0 border-t border-border/60 bg-muted/20 px-4 py-4 sm:px-6">
                 <Label htmlFor="follow-up" className="text-sm font-medium">
                   Add a reply
                 </Label>

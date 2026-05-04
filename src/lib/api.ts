@@ -1001,7 +1001,7 @@ export const adminApi = {
 
   postTicketMessage: async (
     ticketId: string,
-    payload: { body: string; is_internal?: boolean; set_status?: string }
+    payload: { body: string; is_internal?: boolean; set_status?: string; notify_email?: boolean }
   ): Promise<ApiResponse> => {
     const response = await apiClient.post(`/admin/tickets/${ticketId}/messages`, payload);
     return response.data;

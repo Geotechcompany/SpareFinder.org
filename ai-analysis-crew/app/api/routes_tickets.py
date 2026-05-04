@@ -152,6 +152,56 @@ def _notify_admin_new_ticket(
         logger.exception("Error sending new-ticket notification: %s", e)
 
 
+def _notify_admins_ticket_user_followup(
+    *,
+    ticket_id: str,
+    subject: str,
+    message: str,
+    user_email: str,
+    user_name: str | None,
+) -> None:
+    """Alert admins when a customer adds a follow-up on an existing ticket."""
+    admin_emails = _get_admin_emails()
+    if not admin_emails:
+        logger.warning("No admin emails; skipping follow-up ticket notification")
+        return
+    frontend = _env("FRONTEND_URL", "https://sparefinder.org").rstrip("/")
+    admin_tickets_url = f"{frontend}/admin/tickets"
+    try:
+        from ..email_sender import send_basic_email_smtp, send_email_via_email_service
+
+        subj = (subject or "Support ticket").strip()
+        subject_email = f"[SpareFinder] Customer reply: {subj[:45]}{'…' if len(subj) > 45 else ''}"
+        safe_msg = (message or "")[:2000]
+        html = f"""
+<h2>New message on a ticket</h2>
+<p><strong>Ticket ID:</strong> {ticket_id}</p>
+<p><strong>Subject:</strong> {subj}</p>
+<p><strong>From:</strong> {user_name or '—'} &lt;{user_email}&gt;</p>
+<hr/>
+<p style="white-space: pre-wrap">{safe_msg}</p>
+<p><a href="{admin_tickets_url}">Open admin tickets</a></p>
+"""
+        text = (
+            f"Customer replied on ticket {ticket_id}\n"
+            f"Subject: {subj}\n"
+            f"From: {user_name or '—'} <{user_email}>\n\n"
+            f"{safe_msg}\n\n"
+            f"{admin_tickets_url}\n"
+        )
+        sent = 0
+        for to_email in admin_emails:
+            ok = send_basic_email_smtp(to_email=to_email, subject=subject_email, html=html, text=text)
+            if not ok:
+                ok = send_email_via_email_service(to_email=to_email, subject=subject_email, html=html, text=text)
+            if ok:
+                sent += 1
+        if sent:
+            logger.info("Ticket %s follow-up emailed to %d admin(s)", ticket_id, sent)
+    except Exception as e:
+        logger.exception("Follow-up ticket email error: %s", e)
+
+
 # ---------- User endpoints ----------
 
 
@@ -239,7 +289,7 @@ async def post_user_ticket_reply(
     supabase = get_supabase_admin()
     own = (
         supabase.table("support_tickets")
-        .select("id, status")
+        .select("id, status, subject")
         .eq("id", ticket_id)
         .eq("user_id", user.id)
         .limit(1)
@@ -277,6 +327,14 @@ async def post_user_ticket_reply(
         supabase.table("support_tickets").update(ticket_updates).eq("id", ticket_id).execute()
     except Exception as e:
         logger.warning("Ticket metadata update after reply failed: %s", e)
+    trow = own.data[0] or {}
+    _notify_admins_ticket_user_followup(
+        ticket_id=ticket_id,
+        subject=str(trow.get("subject") or ""),
+        message=body,
+        user_email=user.email,
+        user_name=user.full_name,
+    )
     return api_ok(data={"message": ins.data[0]}, message="Reply added")
 
 
