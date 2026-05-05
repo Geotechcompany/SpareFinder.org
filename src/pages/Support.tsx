@@ -32,6 +32,7 @@ import { Loader2, MessageSquarePlus, Ticket, ChevronRight, ArrowLeft, Send } fro
 import { cn } from "@/lib/utils";
 import { ticketPriorityBadgeCn, ticketStatusBadgeCn } from "@/lib/ticketBadgeStyles";
 import DashboardSidebar from "@/components/DashboardSidebar";
+import { TicketMessageRichBody } from "@/components/admin/ticketMessageRichBody";
 import { useDashboardLayout } from "@/contexts/DashboardLayoutContext";
 import { PageSkeleton } from "@/components/skeletons";
 import { api } from "@/lib/api";
@@ -490,8 +491,8 @@ const Support = () => {
                       {(detailTicket.message || "").trim().length > 0 ? (
                         <div>
                           <p className="mb-2 text-xs font-medium text-muted-foreground">Your message</p>
-                          <div className="rounded-2xl rounded-tl-md border border-slate-200/80 bg-slate-50/90 px-4 py-3.5 text-sm dark:border-slate-700/80 dark:bg-slate-900/60">
-                            <p className="whitespace-pre-wrap leading-relaxed">{detailTicket.message}</p>
+                          <div className="rounded-2xl rounded-tl-md border border-slate-200/80 bg-white/90 px-4 py-3.5 text-sm shadow-sm dark:border-slate-700/80 dark:bg-slate-900/70">
+                            <TicketMessageRichBody body={detailTicket.message} className="leading-relaxed" />
                           </div>
                         </div>
                       ) : null}
@@ -520,7 +521,11 @@ const Support = () => {
                                       {fromYou ? "You" : m.author_display || "Support"} · {formatDate(m.created_at)}
                                       {m._legacy ? " · earlier reply" : ""}
                                     </p>
-                                    <p className="whitespace-pre-wrap leading-relaxed">{m.body}</p>
+                                    <TicketMessageRichBody
+                                      body={m.body}
+                                      variant={fromYou ? "default" : "admin"}
+                                      className="leading-relaxed"
+                                    />
                                   </div>
                                 </div>
                               );
