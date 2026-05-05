@@ -1060,6 +1060,20 @@ export const ticketsApi = {
     const response = await apiClient.post(`/tickets/${ticketId}/messages`, { message });
     return response.data;
   },
+
+  uploadTicketMessageImage: async (
+    ticketId: string,
+    file: File
+  ): Promise<ApiResponse<{ url: string }>> => {
+    const formData = new FormData();
+    formData.append("image", file);
+    const response = await apiClient.post(
+      `/upload/tickets/${encodeURIComponent(ticketId)}/message-image`,
+      formData,
+      { timeout: 60000 }
+    );
+    return response.data;
+  },
 };
 
 // Billing API

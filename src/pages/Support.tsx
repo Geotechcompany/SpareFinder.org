@@ -28,7 +28,7 @@ import {
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
-import { Loader2, MessageSquarePlus, Ticket, ChevronRight, ArrowLeft, Send } from "lucide-react";
+import { Loader2, MessageSquarePlus, Ticket, ChevronRight, ArrowLeft, Send, ImagePlus, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ticketPriorityBadgeCn, ticketStatusBadgeCn } from "@/lib/ticketBadgeStyles";
 import DashboardSidebar from "@/components/DashboardSidebar";
@@ -78,6 +78,62 @@ const priorityLabels: Record<TicketPriority, string> = {
   high: "High",
 };
 
+const MAX_REPLY_IMAGES = 6;
+
+type PendingImage = { id: string; publicUrl: string; name: string };
+
+function buildComposedBody(text: string, images: readonly PendingImage[]): string {
+  const chunks: string[] = [];
+  const t = text.trim();
+  if (t) chunks.push(t);
+  for (const img of images) {
+    chunks.push(`![image](${img.publicUrl})`);
+  }
+  return chunks.join("\n\n");
+}
+
+async function fileToCompressedDataUrl(file: File, maxW = 1280, quality = 0.82): Promise<string> {
+  if (!file.type.startsWith("image/")) {
+    throw new Error("Not an image");
+  }
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      let w = img.naturalWidth;
+      let h = img.naturalHeight;
+      if (w > maxW) {
+        h = (h * maxW) / w;
+        w = maxW;
+      }
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.max(1, Math.round(w));
+      canvas.height = Math.max(1, Math.round(h));
+      const ctx = canvas.getContext("2d");
+      if (!ctx) {
+        reject(new Error("Canvas unsupported"));
+        return;
+      }
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      resolve(canvas.toDataURL("image/jpeg", quality));
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error("Could not read image"));
+    };
+    img.src = url;
+  });
+}
+
+async function compressImageToJpegFile(file: File): Promise<File> {
+  const dataUrl = await fileToCompressedDataUrl(file);
+  const res = await fetch(dataUrl);
+  const blob = await res.blob();
+  const base = file.name.replace(/\.[^.]+$/, "") || "image";
+  return new File([blob], `${base}.jpg`, { type: "image/jpeg" });
+}
+
 const Support = () => {
   const { inLayout } = useDashboardLayout();
   const [isCollapsed, setIsCollapsed] = useState(false);
@@ -93,6 +149,9 @@ const Support = () => {
   const [createForm, setCreateForm] = useState({ subject: "", message: "", priority: "medium" as TicketPriority });
   const [followUp, setFollowUp] = useState("");
   const [followUpSending, setFollowUpSending] = useState(false);
+  const [pendingImages, setPendingImages] = useState<PendingImage[]>([]);
+  const [isUploadingTicketImages, setIsUploadingTicketImages] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   const limit = 20;
 
@@ -121,12 +180,14 @@ const Support = () => {
   const closeTicketDetail = useCallback(() => {
     detailFetchGen.current += 1;
     setDetailTicket(null);
+    setPendingImages([]);
   }, []);
 
   const openDetail = async (id: string) => {
     const myGen = ++detailFetchGen.current;
     const row = tickets.find((t) => t.id === id);
     setFollowUp("");
+    setPendingImages([]);
     if (row) {
       setDetailTicket({
         ...row,
@@ -187,9 +248,9 @@ const Support = () => {
 
   const sendFollowUp = async () => {
     if (!detailTicket) return;
-    const text = followUp.trim();
+    const text = buildComposedBody(followUp, pendingImages).trim();
     if (!text) {
-      toast.error("Enter a message");
+      toast.error("Enter a message or attach an image");
       return;
     }
     setFollowUpSending(true);
@@ -198,6 +259,7 @@ const Support = () => {
       if (res?.success) {
         toast.success(res?.message || "Reply sent");
         setFollowUp("");
+        setPendingImages([]);
         const refreshed = await api.tickets.get(detailTicket.id);
         if (refreshed?.success && refreshed?.data) {
           setDetailTicket(refreshed.data as TicketDetail);
@@ -212,6 +274,63 @@ const Support = () => {
       setFollowUpSending(false);
     }
   };
+
+  const attachImages = useCallback(
+    async (files: FileList | null) => {
+      if (!detailTicket) return;
+      if (!files?.length) return;
+      const list = Array.from(files).filter((f) => f.type.startsWith("image/"));
+      if (!list.length) {
+        toast.error("Choose image files only");
+        return;
+      }
+      const room = MAX_REPLY_IMAGES - pendingImages.length;
+      if (room <= 0) {
+        toast.error(`Maximum ${MAX_REPLY_IMAGES} images per reply`);
+        if (fileRef.current) fileRef.current.value = "";
+        return;
+      }
+      const slice = list.slice(0, room);
+      if (slice.length < list.length) {
+        toast.error(`Only ${room} more image slot(s); skipped extra file(s)`);
+      }
+      setIsUploadingTicketImages(true);
+      try {
+        for (const file of slice) {
+          let jpeg: File;
+          try {
+            jpeg = await compressImageToJpegFile(file);
+          } catch {
+            toast.error(`Could not read ${file.name}`);
+            continue;
+          }
+          let res: Awaited<ReturnType<typeof api.tickets.uploadTicketMessageImage>>;
+          try {
+            res = await api.tickets.uploadTicketMessageImage(detailTicket.id, jpeg);
+          } catch {
+            toast.error(`Upload failed for ${file.name}`);
+            continue;
+          }
+          const url =
+            res?.success && res.data && typeof (res.data as { url?: string }).url === "string"
+              ? (res.data as { url: string }).url
+              : null;
+          if (!url) {
+            toast.error(res?.error || res?.message || `Upload failed for ${file.name}`);
+            continue;
+          }
+          setPendingImages((prev) => [
+            ...prev,
+            { id: `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`, publicUrl: url, name: file.name },
+          ]);
+        }
+      } finally {
+        setIsUploadingTicketImages(false);
+        if (fileRef.current) fileRef.current.value = "";
+      }
+    },
+    [detailTicket, pendingImages.length]
+  );
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -541,6 +660,35 @@ const Support = () => {
                   <Label htmlFor="follow-up" className="text-sm font-medium">
                     Your reply
                   </Label>
+                  <input
+                    ref={fileRef}
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    className="hidden"
+                    onChange={(e) => void attachImages(e.target.files)}
+                  />
+                  {pendingImages.length > 0 ? (
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {pendingImages.map((img) => (
+                        <div
+                          key={img.id}
+                          className="group relative h-16 w-16 overflow-hidden rounded-xl border border-border/70 bg-card shadow-sm"
+                        >
+                          <img src={img.publicUrl} alt={img.name} className="h-full w-full object-cover" />
+                          <button
+                            type="button"
+                            className="absolute right-0.5 top-0.5 inline-flex h-5 w-5 items-center justify-center rounded-full bg-black/60 text-white"
+                            onClick={() => setPendingImages((prev) => prev.filter((p) => p.id !== img.id))}
+                            disabled={followUpSending || isUploadingTicketImages}
+                            aria-label={`Remove ${img.name}`}
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
                   <Textarea
                     id="follow-up"
                     value={followUp}
@@ -548,11 +696,31 @@ const Support = () => {
                     placeholder="Add details or ask a follow-up question…"
                     className="mt-2 min-h-[88px] max-h-[min(32vh,220px)] resize-y overflow-y-auto rounded-xl border-border/80 text-base sm:text-sm"
                   />
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-8 rounded-lg"
+                      disabled={followUpSending || isUploadingTicketImages}
+                      onClick={() => fileRef.current?.click()}
+                    >
+                      {isUploadingTicketImages ? (
+                        <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <ImagePlus className="mr-1.5 h-3.5 w-3.5" />
+                      )}
+                      Attach photo
+                    </Button>
+                    <span className="text-xs text-muted-foreground">
+                      {pendingImages.length}/{MAX_REPLY_IMAGES} photos
+                    </span>
+                  </div>
                   <Button
                     type="button"
                     className="mt-3 h-11 w-full rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 text-white shadow-lg shadow-violet-500/25 hover:from-violet-500 hover:to-indigo-500 disabled:opacity-50"
                     onClick={sendFollowUp}
-                    disabled={followUpSending || !followUp.trim()}
+                    disabled={followUpSending || isUploadingTicketImages || !buildComposedBody(followUp, pendingImages).trim()}
                   >
                     {followUpSending ? (
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
