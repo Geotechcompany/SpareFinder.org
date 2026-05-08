@@ -23,6 +23,8 @@ import {
   Search,
   Mail,
   AlertCircle,
+  Trash2,
+  PencilLine,
 } from "lucide-react";
 import { API_BASE_URL } from "@/lib/config";
 
@@ -53,6 +55,7 @@ const MarketingOutbound: React.FC = () => {
   const [aiGoal, setAiGoal] = useState("Reach maintenance and procurement teams that struggle with parts identification and sourcing delays.");
   const [aiAudience, setAiAudience] = useState("Maintenance managers, procurement leads, operations teams");
   const [aiTone, setAiTone] = useState("Professional, concise, problem-solution focused");
+  const [selectedLeadIds, setSelectedLeadIds] = useState<string[]>([]);
   const [isImportingCsv, setIsImportingCsv] = useState(false);
   const [csvImportStatus, setCsvImportStatus] = useState<string | null>(null);
   const [csvRunSanitize, setCsvRunSanitize] = useState(false);
@@ -204,6 +207,64 @@ const MarketingOutbound: React.FC = () => {
     const res = await adminApi.testMarketingEmail({ campaign_id: campaignId, to_email: to });
     if (res.success) toast({ title: "Test email sent" });
     else toast({ variant: "destructive", title: "Send failed", description: res.message });
+  };
+
+  const toggleLeadSelection = (leadId: string) => {
+    setSelectedLeadIds((prev) =>
+      prev.includes(leadId) ? prev.filter((x) => x !== leadId) : [...prev, leadId]
+    );
+  };
+
+  const toggleAllLeadsOnPage = () => {
+    const leadIds = (leads as Record<string, string>[]).map((l) => l.id).filter(Boolean);
+    if (!leadIds.length) return;
+    setSelectedLeadIds((prev) =>
+      leadIds.every((id) => prev.includes(id)) ? prev.filter((id) => !leadIds.includes(id)) : Array.from(new Set([...prev, ...leadIds]))
+    );
+  };
+
+  const runBulkDelete = async () => {
+    if (!selectedLeadIds.length) return;
+    const confirmed = window.confirm(`Delete ${selectedLeadIds.length} selected leads? This cannot be undone.`);
+    if (!confirmed) return;
+    const res = await adminApi.bulkManageMarketingLeads({
+      ids: selectedLeadIds,
+      action: "delete",
+    });
+    if (res.success) {
+      toast({ title: "Leads deleted", description: `${selectedLeadIds.length} lead(s) removed.` });
+      setSelectedLeadIds([]);
+      loadAll();
+    } else {
+      toast({ variant: "destructive", title: "Bulk delete failed", description: res.message || res.error });
+    }
+  };
+
+  const runBulkUpdate = async (field: "sanitization_status" | "lead_status_internal" | "campaign_id") => {
+    if (!selectedLeadIds.length) return;
+    let value = "";
+    if (field === "sanitization_status") {
+      value = window.prompt("Set sanitization status: accepted | review | rejected", "accepted") || "";
+    } else if (field === "lead_status_internal") {
+      value = window.prompt("Set lead status: pending | sent | bounced | opt_out | skipped", "pending") || "";
+    } else {
+      value = window.prompt("Set campaign UUID (leave blank to clear)", "") ?? "";
+    }
+    if (value === "") {
+      if (field !== "campaign_id") return;
+    }
+    const payload: Record<string, unknown> = { [field]: field === "campaign_id" ? value || null : value };
+    const res = await adminApi.bulkManageMarketingLeads({
+      ids: selectedLeadIds,
+      action: "update",
+      payload,
+    });
+    if (res.success) {
+      toast({ title: "Bulk update applied", description: `${selectedLeadIds.length} lead(s) updated.` });
+      loadAll();
+    } else {
+      toast({ variant: "destructive", title: "Bulk update failed", description: res.message || res.error });
+    }
   };
 
   const cronBase = `${String(API_BASE_URL || "").replace(/\/$/, "")}/api`;
@@ -380,9 +441,32 @@ const MarketingOutbound: React.FC = () => {
                     <CardDescription>Latest 50 rows — use filters via API for larger sets.</CardDescription>
                   </CardHeader>
                   <CardContent className="overflow-x-auto">
+                    <div className="mb-3 flex flex-wrap items-center gap-2">
+                      <Button size="sm" variant="outline" onClick={toggleAllLeadsOnPage}>
+                        <PencilLine className="h-4 w-4 mr-1" />
+                        {selectedLeadIds.length ? "Toggle page selection" : "Select page"}
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => runBulkUpdate("sanitization_status")} disabled={!selectedLeadIds.length}>
+                        Bulk sanitize status
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => runBulkUpdate("lead_status_internal")} disabled={!selectedLeadIds.length}>
+                        Bulk lead status
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => runBulkUpdate("campaign_id")} disabled={!selectedLeadIds.length}>
+                        Bulk assign campaign
+                      </Button>
+                      <Button size="sm" variant="destructive" onClick={runBulkDelete} disabled={!selectedLeadIds.length}>
+                        <Trash2 className="h-4 w-4 mr-1" />
+                        Delete selected
+                      </Button>
+                      {!!selectedLeadIds.length && (
+                        <Badge variant="secondary">{selectedLeadIds.length} selected</Badge>
+                      )}
+                    </div>
                     <table className="w-full text-sm">
                       <thead>
                         <tr className="border-b text-left">
+                          <th className="p-2">Select</th>
                           <th className="p-2">Email</th>
                           <th className="p-2">Company</th>
                           <th className="p-2">Source</th>
@@ -393,6 +477,13 @@ const MarketingOutbound: React.FC = () => {
                       <tbody>
                         {(leads as Record<string, string>[]).map((row) => (
                           <tr key={row.id} className="border-b border-border/60">
+                            <td className="p-2">
+                              <input
+                                type="checkbox"
+                                checked={selectedLeadIds.includes(row.id)}
+                                onChange={() => toggleLeadSelection(row.id)}
+                              />
+                            </td>
                             <td className="p-2 font-mono text-xs">{row.email || "—"}</td>
                             <td className="p-2">{row.company_name || row.sanitized_company_name || "—"}</td>
                             <td className="p-2">{row.source}</td>

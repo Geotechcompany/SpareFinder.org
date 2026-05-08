@@ -100,6 +100,18 @@ class DiscoverBody(BaseModel):
 
 class LeadPatchBody(BaseModel):
     sanitization_status: Literal["accepted", "review", "rejected"] | None = None
+    full_name: str | None = None
+    job_title: str | None = None
+    company_name: str | None = None
+    email: str | None = None
+    lead_status_internal: Literal["pending", "sent", "bounced", "opt_out", "skipped"] | None = None
+    campaign_id: str | None = None
+
+
+class BulkLeadActionBody(BaseModel):
+    ids: list[str] = Field(default_factory=list)
+    action: Literal["delete", "update"]
+    payload: dict[str, Any] | None = None
 
 
 class MarketingSettingsBody(BaseModel):
@@ -329,13 +341,79 @@ async def patch_lead(
     patch: dict[str, Any] = {}
     if body.sanitization_status is not None:
         patch["sanitization_status"] = body.sanitization_status
+    if body.full_name is not None:
+        patch["full_name"] = body.full_name.strip() or None
+    if body.job_title is not None:
+        patch["job_title"] = body.job_title.strip() or None
+    if body.company_name is not None:
+        patch["company_name"] = body.company_name.strip() or None
+    if body.email is not None:
+        normalized_email = body.email.strip().lower()
+        if normalized_email and not is_valid_email(normalized_email):
+            raise HTTPException(status_code=400, detail="Invalid email format")
+        patch["email"] = normalized_email or None
+    if body.lead_status_internal is not None:
+        patch["lead_status_internal"] = body.lead_status_internal
+    if body.campaign_id is not None:
+        patch["campaign_id"] = body.campaign_id.strip() or None
     if not patch:
         return api_ok(data={"lead": None})
+    patch["updated_at"] = datetime.now(timezone.utc).isoformat()
     res = supabase.table("marketing_leads").update(patch).eq("id", lead_id).execute()
     rows = res.data or []
     if not rows:
         raise HTTPException(status_code=404, detail="Lead not found")
     return api_ok(data={"lead": rows[0]})
+
+
+@admin_router.post("/leads/bulk")
+async def bulk_manage_leads(
+    body: BulkLeadActionBody,
+    _admin: CurrentUser = Depends(require_roles("admin", "super_admin")),
+):
+    supabase = get_supabase_admin()
+    ids = [str(x).strip() for x in body.ids if str(x).strip()]
+    if not ids:
+        raise HTTPException(status_code=400, detail="ids is required")
+    if len(ids) > 1000:
+        raise HTTPException(status_code=400, detail="Too many ids; max 1000")
+
+    if body.action == "delete":
+        res = supabase.table("marketing_leads").delete().in_("id", ids).execute()
+        count = len(res.data or [])
+        return api_ok(data={"deleted": count, "ids": ids[:20]})
+
+    patch: dict[str, Any] = {}
+    payload = body.payload or {}
+    if "sanitization_status" in payload:
+        s = str(payload.get("sanitization_status") or "").strip().lower()
+        if s not in ("accepted", "review", "rejected"):
+            raise HTTPException(status_code=400, detail="Invalid sanitization_status")
+        patch["sanitization_status"] = s
+    if "lead_status_internal" in payload:
+        ls = str(payload.get("lead_status_internal") or "").strip().lower()
+        if ls not in ("pending", "sent", "bounced", "opt_out", "skipped"):
+            raise HTTPException(status_code=400, detail="Invalid lead_status_internal")
+        patch["lead_status_internal"] = ls
+    if "campaign_id" in payload:
+        patch["campaign_id"] = (str(payload.get("campaign_id") or "").strip() or None)
+
+    for field in ("full_name", "job_title", "company_name"):
+        if field in payload:
+            patch[field] = (str(payload.get(field) or "").strip() or None)
+    if "email" in payload:
+        em = str(payload.get("email") or "").strip().lower()
+        if em and not is_valid_email(em):
+            raise HTTPException(status_code=400, detail="Invalid email format")
+        patch["email"] = em or None
+
+    if not patch:
+        raise HTTPException(status_code=400, detail="No valid payload fields")
+    patch["updated_at"] = datetime.now(timezone.utc).isoformat()
+
+    res = supabase.table("marketing_leads").update(patch).in_("id", ids).execute()
+    updated = len(res.data or [])
+    return api_ok(data={"updated": updated, "ids": ids[:20]})
 
 
 def _upsert_lead(

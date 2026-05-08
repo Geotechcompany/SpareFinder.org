@@ -1084,9 +1084,25 @@ export const adminApi = {
   },
   patchMarketingLead: async (
     leadId: string,
-    payload: { sanitization_status?: "accepted" | "review" | "rejected" }
+    payload: {
+      sanitization_status?: "accepted" | "review" | "rejected";
+      full_name?: string;
+      job_title?: string;
+      company_name?: string;
+      email?: string;
+      lead_status_internal?: "pending" | "sent" | "bounced" | "opt_out" | "skipped";
+      campaign_id?: string | null;
+    }
   ): Promise<ApiResponse> => {
     const response = await apiClient.patch(`/admin/marketing/leads/${leadId}`, payload);
+    return response.data;
+  },
+  bulkManageMarketingLeads: async (payload: {
+    ids: string[];
+    action: "delete" | "update";
+    payload?: Record<string, unknown>;
+  }): Promise<ApiResponse> => {
+    const response = await apiClient.post("/admin/marketing/leads/bulk", payload);
     return response.data;
   },
   importMarketingCsv: async (
