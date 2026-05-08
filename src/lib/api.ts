@@ -1021,6 +1021,143 @@ export const adminApi = {
     );
     return response.data;
   },
+
+  getMarketingDashboard: async (): Promise<ApiResponse> => {
+    const response = await apiClient.get("/admin/marketing/dashboard");
+    return response.data;
+  },
+  getMarketingCampaigns: async (): Promise<ApiResponse> => {
+    const response = await apiClient.get("/admin/marketing/campaigns");
+    return response.data;
+  },
+  createMarketingCampaign: async (payload: Record<string, unknown>): Promise<ApiResponse> => {
+    const response = await apiClient.post("/admin/marketing/campaigns", payload);
+    return response.data;
+  },
+  patchMarketingCampaign: async (
+    campaignId: string,
+    payload: Record<string, unknown>
+  ): Promise<ApiResponse> => {
+    const response = await apiClient.patch(`/admin/marketing/campaigns/${campaignId}`, payload);
+    return response.data;
+  },
+  getMarketingSettings: async (): Promise<ApiResponse> => {
+    const response = await apiClient.get("/admin/marketing/settings");
+    return response.data;
+  },
+  patchMarketingSettings: async (payload: {
+    serp_query_templates?: string[];
+    serp_results_per_query?: number;
+    serpapi_key?: string;
+  }): Promise<ApiResponse> => {
+    const response = await apiClient.patch("/admin/marketing/settings", payload);
+    return response.data;
+  },
+  generateMarketingCampaignWithAi: async (payload: {
+    campaign_goal: string;
+    audience?: string;
+    tone?: string;
+    use_ai?: boolean;
+    use_crew_ai?: boolean;
+  }): Promise<ApiResponse> => {
+    const response = await apiClient.post("/admin/marketing/campaigns/ai-generate", payload);
+    return response.data;
+  },
+  getMarketingLeads: async (params: {
+    page?: number;
+    limit?: number;
+    search?: string;
+    source?: string;
+    sanitization_status?: string;
+    campaign_id?: string;
+  }): Promise<ApiResponse> => {
+    const q = new URLSearchParams();
+    if (params.page) q.append("page", String(params.page));
+    if (params.limit) q.append("limit", String(params.limit));
+    if (params.search?.trim()) q.append("search", params.search.trim());
+    if (params.source && params.source !== "all") q.append("source", params.source);
+    if (params.sanitization_status && params.sanitization_status !== "all")
+      q.append("sanitization_status", params.sanitization_status);
+    if (params.campaign_id) q.append("campaign_id", params.campaign_id);
+    const response = await apiClient.get(`/admin/marketing/leads?${q.toString()}`);
+    return response.data;
+  },
+  patchMarketingLead: async (
+    leadId: string,
+    payload: { sanitization_status?: "accepted" | "review" | "rejected" }
+  ): Promise<ApiResponse> => {
+    const response = await apiClient.patch(`/admin/marketing/leads/${leadId}`, payload);
+    return response.data;
+  },
+  importMarketingCsv: async (
+    file: File,
+    options: { campaign_id?: string; run_sanitize?: boolean }
+  ): Promise<ApiResponse> => {
+    const formData = new FormData();
+    formData.append("file", file);
+    if (options.campaign_id) formData.append("campaign_id", options.campaign_id);
+    formData.append("run_sanitize", String(options.run_sanitize ?? true));
+    const response = await apiClient.post("/admin/marketing/leads/import", formData, {
+      timeout: 120000,
+    });
+    return response.data;
+  },
+  discoverMarketingSerp: async (payload: {
+    queries?: string[];
+    max_queries?: number;
+    campaign_id?: string | null;
+  }): Promise<ApiResponse> => {
+    const response = await apiClient.post("/admin/marketing/discover", payload);
+    return response.data;
+  },
+  getMarketingSends: async (params: {
+    page?: number;
+    limit?: number;
+    from?: string;
+    to?: string;
+    campaign_id?: string;
+    status?: string;
+  }): Promise<ApiResponse> => {
+    const q = new URLSearchParams();
+    if (params.page) q.append("page", String(params.page));
+    if (params.limit) q.append("limit", String(params.limit));
+    if (params.from) q.append("from", params.from);
+    if (params.to) q.append("to", params.to);
+    if (params.campaign_id) q.append("campaign_id", params.campaign_id);
+    if (params.status && params.status !== "all") q.append("status", params.status);
+    const response = await apiClient.get(`/admin/marketing/sends?${q.toString()}`);
+    return response.data;
+  },
+  getMarketingErrors: async (params: {
+    page?: number;
+    limit?: number;
+    from?: string;
+    to?: string;
+    severity?: string;
+  }): Promise<ApiResponse> => {
+    const q = new URLSearchParams();
+    if (params.page) q.append("page", String(params.page));
+    if (params.limit) q.append("limit", String(params.limit));
+    if (params.from) q.append("from", params.from);
+    if (params.to) q.append("to", params.to);
+    if (params.severity && params.severity !== "all") q.append("severity", params.severity);
+    const response = await apiClient.get(`/admin/marketing/errors?${q.toString()}`);
+    return response.data;
+  },
+  previewMarketingEmail: async (payload: {
+    lead_id: string;
+    campaign_id: string;
+  }): Promise<ApiResponse> => {
+    const response = await apiClient.post("/admin/marketing/preview", payload);
+    return response.data;
+  },
+  testMarketingEmail: async (payload: {
+    campaign_id: string;
+    to_email: string;
+  }): Promise<ApiResponse> => {
+    const response = await apiClient.post("/admin/marketing/test-send", payload);
+    return response.data;
+  },
 };
 
 // Tickets API (user support)

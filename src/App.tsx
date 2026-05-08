@@ -40,6 +40,7 @@ const AdminLogin = lazy(() => import("@/pages/admin/AdminLogin"));
 const OnboardingSurveys = lazy(() => import("@/pages/admin/OnboardingSurveys"));
 const PlansManagement = lazy(() => import("@/pages/admin/PlansManagement"));
 const TicketManagement = lazy(() => import("@/pages/admin/TicketManagement"));
+const MarketingOutbound = lazy(() => import("@/pages/admin/MarketingOutbound"));
 
 const Landing = lazy(() => import("@/pages/Landing"));
 const PrivacyPolicy = lazy(() => import("@/pages/PrivacyPolicy"));
@@ -268,6 +269,14 @@ const App = () => (
                     element={
                       <AdminProtectedRoute>
                         <TicketManagement />
+                      </AdminProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/admin/marketing-outbound"
+                    element={
+                      <AdminProtectedRoute>
+                        <MarketingOutbound />
                       </AdminProtectedRoute>
                     }
                   />

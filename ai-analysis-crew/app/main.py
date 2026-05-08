@@ -90,6 +90,8 @@ from .api.routes_tickets import router as tickets_router
 from .api.routes_referrals import router as referrals_router
 from .api.routes_reports import router as reports_router
 from .api.routes_api_keys import router as api_keys_router
+from .api.routes_marketing import admin_router as marketing_admin_router
+from .api.routes_marketing import cron_router as marketing_cron_router
 
 app.include_router(auth_router, prefix="/api")
 app.include_router(billing_router, prefix="/api")
@@ -108,6 +110,8 @@ app.include_router(tickets_router, prefix="/api")
 app.include_router(referrals_router, prefix="/api")
 app.include_router(reports_router, prefix="/api")
 app.include_router(api_keys_router, prefix="/api")
+app.include_router(marketing_admin_router, prefix="/api")
+app.include_router(marketing_cron_router, prefix="/api")
 
 print("All API routers registered successfully")
 logger.info("All API routers registered successfully")
@@ -595,6 +599,52 @@ async def test_reengagement_email(payload: TestReengagementEmailRequest):
             status_code=500,
             detail=f"Error sending test email: {str(e)}"
         )
+
+
+@app.get("/unsubscribe/marketing")
+async def unsubscribe_marketing_cold_email(token: str, reason: str | None = None):
+    """
+    One-click unsubscribe for cold marketing leads (non-user accounts).
+    """
+    try:
+        from .api.supabase_admin import get_supabase_admin
+
+        if not token or len(token) < 8:
+            raise HTTPException(status_code=400, detail="Invalid token")
+        supabase = get_supabase_admin()
+        res = (
+            supabase.table("marketing_leads")
+            .select("id,email")
+            .eq("unsubscribe_token", token)
+            .limit(1)
+            .execute()
+        )
+        rows = res.data or []
+        if not rows:
+            raise HTTPException(status_code=400, detail="Invalid unsubscribe link")
+        email = (rows[0].get("email") or "").strip().lower()
+        if not email or "@" not in email:
+            raise HTTPException(status_code=400, detail="No email for this lead")
+        supabase.table("marketing_unsubscribes").upsert(
+            {"email": email, "source": "link"},
+            on_conflict="email",
+        ).execute()
+        supabase.table("marketing_leads").update(
+            {"lead_status_internal": "opt_out", "updated_at": datetime.utcnow().isoformat()}
+        ).eq("id", rows[0]["id"]).execute()
+        from fastapi.responses import HTMLResponse
+
+        return HTMLResponse(
+            content="""<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Unsubscribed</title></head>
+<body style="font-family:system-ui;max-width:520px;margin:48px auto;padding:24px;">
+<h1>You’re unsubscribed</h1><p>We will not send further marketing messages to this address.</p>
+<p><a href="https://sparefinder.org">Return to SpareFinder</a></p></body></html>"""
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("marketing unsubscribe failed: %s", e)
+        raise HTTPException(status_code=500, detail="Could not process unsubscribe")
 
 
 @app.get("/unsubscribe")

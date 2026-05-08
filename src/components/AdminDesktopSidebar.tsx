@@ -41,6 +41,7 @@ import {
   Eye,
   Tag,
   Ticket,
+  Megaphone,
 } from "lucide-react";
 
 interface AdminSidebarProps {
@@ -222,6 +223,14 @@ const AdminDesktopSidebar: React.FC<AdminSidebarProps> = ({
       label: "Onboarding Surveys",
       icon: FileText,
       description: "Acquisition & interests",
+      badge: null,
+      section: "Core",
+    },
+    {
+      href: "/admin/marketing-outbound",
+      label: "Marketing outbound",
+      icon: Megaphone,
+      description: "Campaigns, leads, SerpAPI, logs",
       badge: null,
       section: "Core",
     },

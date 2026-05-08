@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import os
 import uuid
+import logging
+from datetime import datetime, timedelta
 from typing import Annotated, Any
 
 from fastapi import Depends, Header, HTTPException, status
@@ -11,6 +13,11 @@ from jose import jwt, JWTError
 from pydantic import BaseModel
 
 from .supabase_admin import get_supabase_admin
+
+logger = logging.getLogger(__name__)
+
+# Online notifications are throttled per-user to avoid admin notification spam.
+ONLINE_NOTIFY_TTL_SECONDS = 900
 
 
 class CurrentUser(BaseModel):
@@ -21,6 +28,117 @@ class CurrentUser(BaseModel):
     role: str = "user"
     clerk_user_id: str | None = None
     company: str | None = None
+
+
+def _safe_iso_now() -> str:
+    return datetime.utcnow().isoformat()
+
+
+def _notify_admins(
+    *,
+    supabase: Any,
+    title: str,
+    message: str,
+    ntype: str = "info",
+    action_url: str | None = None,
+) -> None:
+    """Create a notifications row for every admin/super_admin profile."""
+    try:
+        admins_res = (
+            supabase.table("profiles")
+            .select("id")
+            .in_("role", ["admin", "super_admin"])
+            .execute()
+        )
+        admin_rows = admins_res.data or []
+        admin_ids: list[str] = []
+        for row in admin_rows:
+            admin_id = str((row or {}).get("id") or "").strip()
+            if admin_id and admin_id not in admin_ids:
+                admin_ids.append(admin_id)
+        if not admin_ids:
+            return
+
+        rows = [
+            {
+                "user_id": admin_id,
+                "title": title,
+                "message": message,
+                "type": ntype,
+                "action_url": action_url,
+                "read": False,
+            }
+            for admin_id in admin_ids
+        ]
+        supabase.table("notifications").insert(rows).execute()
+    except Exception as exc:
+        logger.warning("Admin notification insert failed: %s", exc)
+
+
+def _notify_new_signup(
+    *,
+    supabase: Any,
+    user_email: str | None,
+    user_name: str | None,
+) -> None:
+    safe_email = (user_email or "unknown email").strip()
+    safe_name = (user_name or "").strip()
+    label = f"{safe_name} ({safe_email})" if safe_name else safe_email
+    _notify_admins(
+        supabase=supabase,
+        title="New user signup",
+        message=f"New account created: {label}",
+        ntype="success",
+        action_url="/admin/users",
+    )
+
+
+def _mark_online_and_notify(
+    *,
+    supabase: Any,
+    current_user: CurrentUser,
+) -> None:
+    """Mark the current user as online and notify admins with per-user throttling."""
+    try:
+        now_iso = _safe_iso_now()
+        # Treat each authenticated request as heartbeat.
+        supabase.table("profiles").update({"updated_at": now_iso}).eq("id", current_user.id).execute()
+
+        throttle_hit = False
+        try:
+            from ..redis_client import cache_get, cache_set, is_redis_configured
+
+            if is_redis_configured():
+                online_key = f"online-notify:{current_user.id}"
+                throttle_hit = bool(cache_get(online_key))
+                if not throttle_hit:
+                    cache_set(online_key, {"seen_at": now_iso}, ttl_seconds=ONLINE_NOTIFY_TTL_SECONDS)
+        except Exception:
+            throttle_hit = False
+
+        if throttle_hit:
+            return
+
+        # Approximate active users as updated in last 5 minutes.
+        active_since = (datetime.utcnow() - timedelta(minutes=5)).isoformat()
+        active_res = (
+            supabase.table("profiles")
+            .select("id", count="exact")
+            .gte("updated_at", active_since)
+            .execute()
+        )
+        active_count = int(getattr(active_res, "count", None) or len(active_res.data or []))
+
+        who = (current_user.full_name or current_user.email or "A user").strip()
+        _notify_admins(
+            supabase=supabase,
+            title="User online",
+            message=f"{who} is online. Active users now: {active_count}",
+            ntype="info",
+            action_url="/admin/users",
+        )
+    except Exception as exc:
+        logger.warning("Online presence notification failed: %s", exc)
 
 
 async def get_current_user(
@@ -225,6 +343,7 @@ async def get_current_user(
                             company=profile.get("company") if isinstance(profile.get("company"), str) else None,
                         )
                         _cache_current_user(u)
+                        _mark_online_and_notify(supabase=supabase, current_user=u)
                         return u
 
                 # No existing profile: create one (profiles.id has NO default; must supply a UUID).
@@ -273,7 +392,13 @@ async def get_current_user(
                     clerk_user_id=clerk_user_id,
                     company=inserted.get("company") if isinstance(inserted.get("company"), str) else None,
                 )
+                _notify_new_signup(
+                    supabase=supabase,
+                    user_email=inserted.get("email"),
+                    user_name=inserted.get("full_name"),
+                )
                 _cache_current_user(u)
+                _mark_online_and_notify(supabase=supabase, current_user=u)
                 return u
 
             profile = result.data[0]
@@ -286,6 +411,7 @@ async def get_current_user(
                 company=profile.get("company") if isinstance(profile.get("company"), str) else None,
             )
             _cache_current_user(u)
+            _mark_online_and_notify(supabase=supabase, current_user=u)
             return u
 
         # ------------------------------------------------------------------
@@ -307,6 +433,7 @@ async def get_current_user(
                     company=profile.get("company") if isinstance(profile.get("company"), str) else None,
                 )
                 _cache_current_user(u)
+                _mark_online_and_notify(supabase=supabase, current_user=u)
                 return u
         except Exception:
             pass
@@ -364,7 +491,13 @@ async def get_current_user(
                         clerk_user_id=inserted.get("clerk_user_id"),
                         company=inserted.get("company") if isinstance(inserted.get("company"), str) else None,
                     )
+                    _notify_new_signup(
+                        supabase=supabase,
+                        user_email=inserted.get("email"),
+                        user_name=inserted.get("full_name"),
+                    )
                     _cache_current_user(u)
+                    _mark_online_and_notify(supabase=supabase, current_user=u)
                     return u
         except Exception:
             # Fall through to generic auth failure below
