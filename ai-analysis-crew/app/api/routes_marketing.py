@@ -497,10 +497,16 @@ async def import_leads_csv(
 ):
     supabase = get_supabase_admin()
     raw_bytes = await file.read()
-    try:
-        text = raw_bytes.decode("utf-8-sig")
-    except Exception:
-        raise HTTPException(status_code=400, detail="File must be UTF-8 CSV")
+    text = ""
+    decode_errors: list[str] = []
+    for enc in ("utf-8-sig", "utf-16", "utf-16le", "utf-16be", "latin-1"):
+        try:
+            text = raw_bytes.decode(enc)
+            break
+        except Exception as e:
+            decode_errors.append(f"{enc}:{e}")
+    if not text:
+        raise HTTPException(status_code=400, detail="Could not decode file. Save as UTF-8/UTF-16 CSV or TSV.")
 
     mapping: dict[str, str] = {}
     if column_map:
@@ -519,6 +525,11 @@ async def import_leads_csv(
     reader = csv.DictReader(io.StringIO(text), delimiter=delimiter)
     if not reader.fieldnames:
         raise HTTPException(status_code=400, detail="CSV has no header row")
+
+    # Remove blank header columns from exports that start with empty tab/commas.
+    reader.fieldnames = [(h or "").strip() for h in reader.fieldnames if (h or "").strip()]
+    if not reader.fieldnames:
+        raise HTTPException(status_code=400, detail="CSV header is empty after normalization")
 
     def _norm_header(v: str) -> str:
         return re.sub(r"[^a-z0-9]+", "", (v or "").strip().lower())
@@ -576,6 +587,13 @@ async def import_leads_csv(
 
     for i, row in enumerate(reader):
         try:
+            # Skip blank rows
+            if not row or all(not str(v or "").strip() for v in row.values()):
+                continue
+
+            # Remove empty-key columns (common in sheet exports with extra separators)
+            row = {str(k or "").strip(): (v or "") for k, v in row.items() if str(k or "").strip()}
+
             out: dict[str, Any] = {}
             em = ""
             if email_c:
