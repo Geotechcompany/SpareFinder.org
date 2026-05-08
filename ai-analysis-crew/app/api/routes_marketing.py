@@ -431,7 +431,14 @@ async def import_leads_csv(
         except Exception:
             raise HTTPException(status_code=400, detail="column_map must be JSON object")
 
-    reader = csv.DictReader(io.StringIO(text))
+    sample = text[:8192]
+    try:
+        dialect = csv.Sniffer().sniff(sample, delimiters=",;\t|")
+        delimiter = dialect.delimiter
+    except Exception:
+        delimiter = ","
+
+    reader = csv.DictReader(io.StringIO(text), delimiter=delimiter)
     if not reader.fieldnames:
         raise HTTPException(status_code=400, detail="CSV has no header row")
 
@@ -486,6 +493,7 @@ async def import_leads_csv(
     plat_c = col("platform", ["platform", "Platform"])
 
     imported = 0
+    skipped_no_email = 0
     errors: list[str] = []
 
     for i, row in enumerate(reader):
@@ -517,6 +525,9 @@ async def import_leads_csv(
                 if not em:
                     em = ai_extracted.email.strip()
             out["email"] = em
+            if not out["email"] or not is_valid_email(out["email"]):
+                skipped_no_email += 1
+                continue
             if fn_c:
                 out["full_name"] = out.get("full_name") or ""
             if not out.get("full_name") and ai_extracted:
@@ -542,7 +553,14 @@ async def import_leads_csv(
     if errors:
         log_error(supabase, severity="warning", message="csv_import partial errors", context={"errors": errors[:50]})
 
-    return api_ok(data={"imported": imported, "errors": errors[:20]})
+    return api_ok(
+        data={
+            "imported": imported,
+            "skipped_no_email": skipped_no_email,
+            "delimiter": delimiter,
+            "errors": errors[:20],
+        }
+    )
 
 
 @admin_router.post("/discover")
