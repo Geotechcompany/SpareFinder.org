@@ -15,7 +15,11 @@ from typing import Any, Literal
 from fastapi import APIRouter, Body, Depends, File, Form, HTTPException, Query, UploadFile
 from pydantic import BaseModel, Field
 
-from ..marketing_crew import generate_email_with_openai, sanitize_lead_with_openai
+from ..marketing_crew import (
+    extract_lead_fields_from_csv_row,
+    generate_email_with_openai,
+    sanitize_lead_with_openai,
+)
 from ..marketing_pipeline import (
     ensure_unsubscribe_token,
     frontend_base_url,
@@ -475,11 +479,6 @@ async def import_leads_csv(
         return None
 
     email_c = col("email", ["EMAIL", "email", "Email"]) or _guess_email_col(list(reader.fieldnames or []))
-    if not email_c:
-        return api_error(
-            "CSV must include an email-like column (e.g. email, email address, work_email) or column_map.email",
-            status_code=400,
-        )
 
     fn_c = col("full_name", ["FULL_NAME", "full_name", "Name"])
     job_c = col("job_title", ["JOB_TITLE", "job_title"])
@@ -492,16 +491,30 @@ async def import_leads_csv(
     for i, row in enumerate(reader):
         try:
             out: dict[str, Any] = {}
-            em = (row.get(email_c) or "").strip()
+            ai_extracted = extract_lead_fields_from_csv_row({k: (v or "") for k, v in row.items()})
+
+            em = ""
+            if email_c:
+                em = (row.get(email_c) or "").strip()
+            if not em:
+                em = ai_extracted.email.strip()
             out["email"] = em
             if fn_c:
                 out["full_name"] = (row.get(fn_c) or "").strip()
+            if not out.get("full_name"):
+                out["full_name"] = ai_extracted.full_name
             if job_c:
                 out["job_title"] = (row.get(job_c) or "").strip()
+            if not out.get("job_title"):
+                out["job_title"] = ai_extracted.job_title
             if co_c:
                 out["company_name"] = (row.get(co_c) or "").strip()
+            if not out.get("company_name"):
+                out["company_name"] = ai_extracted.company_name
             if plat_c:
                 out["platform"] = (row.get(plat_c) or "").strip()
+            if not out.get("platform"):
+                out["platform"] = ai_extracted.platform or "csv_import"
 
             _upsert_lead(supabase, out, campaign_id=campaign_id, source="csv_import", run_sanitize=run_sanitize)
             imported += 1

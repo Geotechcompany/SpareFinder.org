@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Literal
 
@@ -31,11 +32,78 @@ class EmailContent(BaseModel):
     text: str = ""
 
 
+class ExtractedLeadFields(BaseModel):
+    email: str = ""
+    full_name: str = ""
+    job_title: str = ""
+    company_name: str = ""
+    platform: str = ""
+
+
 def _openai_client() -> OpenAI:
     key = (os.getenv("OPENAI_API_KEY") or "").strip()
     if not key:
         raise ValueError("OPENAI_API_KEY not configured")
     return OpenAI(api_key=key)
+
+
+_EMAIL_RE = re.compile(r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}")
+
+
+def _heuristic_email_from_row(row: dict[str, Any]) -> str:
+    for v in row.values():
+        if not isinstance(v, str):
+            continue
+        match = _EMAIL_RE.search(v.strip())
+        if match:
+            return match.group(0).strip().lower()
+    return ""
+
+
+def extract_lead_fields_from_csv_row(raw_row: dict[str, Any]) -> ExtractedLeadFields:
+    """
+    AI extraction for messy CSV rows.
+    Falls back to heuristic email extraction when AI is unavailable or fails.
+    """
+    heuristic_email = _heuristic_email_from_row(raw_row)
+    key = (os.getenv("OPENAI_API_KEY") or "").strip()
+    if not key:
+        return ExtractedLeadFields(email=heuristic_email)
+
+    client = _openai_client()
+    model = os.getenv("MARKETING_SANITIZE_MODEL", "gpt-4o-mini")
+    payload = json.dumps(raw_row, ensure_ascii=False)[:12000]
+    system = (
+        "Extract lead fields from CSV row JSON. "
+        "Return JSON ONLY with keys: email, full_name, job_title, company_name, platform. "
+        "If unknown, return empty string. Never invent an email."
+    )
+    try:
+        resp = client.chat.completions.create(
+            model=model,
+            temperature=0.0,
+            max_tokens=300,
+            messages=[
+                {"role": "system", "content": system},
+                {"role": "user", "content": payload},
+            ],
+            response_format={"type": "json_object"},
+        )
+        raw = resp.choices[0].message.content or "{}"
+        data = json.loads(raw)
+        email = str(data.get("email") or "").strip().lower()
+        if not email:
+            email = heuristic_email
+        return ExtractedLeadFields(
+            email=email,
+            full_name=str(data.get("full_name") or "").strip(),
+            job_title=str(data.get("job_title") or "").strip(),
+            company_name=str(data.get("company_name") or "").strip(),
+            platform=str(data.get("platform") or "").strip(),
+        )
+    except Exception as e:
+        logger.warning("extract_lead_fields_from_csv_row fallback: %s", e)
+        return ExtractedLeadFields(email=heuristic_email)
 
 
 def sanitize_lead_with_openai(raw_payload: dict[str, Any], *, fast_path: bool = True) -> SanitizeResult:
