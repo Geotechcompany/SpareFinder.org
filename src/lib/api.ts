@@ -1098,7 +1098,7 @@ export const adminApi = {
     if (options.campaign_id) formData.append("campaign_id", options.campaign_id);
     formData.append("run_sanitize", String(options.run_sanitize ?? true));
     const response = await apiClient.post("/admin/marketing/leads/import", formData, {
-      timeout: 120000,
+      timeout: 600000,
     });
     return response.data;
   },

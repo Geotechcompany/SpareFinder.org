@@ -52,6 +52,9 @@ const MarketingOutbound: React.FC = () => {
   const [aiGoal, setAiGoal] = useState("Reach maintenance and procurement teams that struggle with parts identification and sourcing delays.");
   const [aiAudience, setAiAudience] = useState("Maintenance managers, procurement leads, operations teams");
   const [aiTone, setAiTone] = useState("Professional, concise, problem-solution focused");
+  const [isImportingCsv, setIsImportingCsv] = useState(false);
+  const [csvImportStatus, setCsvImportStatus] = useState<string | null>(null);
+  const [csvRunSanitize, setCsvRunSanitize] = useState(false);
 
   const loadAll = useCallback(async () => {
     setLoading(true);
@@ -120,16 +123,31 @@ const MarketingOutbound: React.FC = () => {
 
   const handleCsv = async (file: File | null, campaignId?: string) => {
     if (!file) return;
-    const res = await adminApi.importMarketingCsv(file, {
-      campaign_id: campaignId,
-      run_sanitize: true,
-    });
-    if (res.success) {
-      const data = res.data as { imported?: number };
-      toast({ title: "Import complete", description: `Upserted ${data?.imported ?? 0} rows` });
-      loadAll();
-    } else {
-      toast({ variant: "destructive", title: "Import failed", description: res.message || res.error });
+    setIsImportingCsv(true);
+    setCsvImportStatus(`Importing ${file.name}... this can take time for large CSV files.`);
+    try {
+      const res = await adminApi.importMarketingCsv(file, {
+        campaign_id: campaignId,
+        run_sanitize: csvRunSanitize,
+      });
+      if (res.success) {
+        const data = res.data as { imported?: number };
+        setCsvImportStatus(`Import complete. Upserted ${data?.imported ?? 0} rows.`);
+        toast({ title: "Import complete", description: `Upserted ${data?.imported ?? 0} rows` });
+        loadAll();
+      } else {
+        setCsvImportStatus("Import failed.");
+        toast({ variant: "destructive", title: "Import failed", description: res.message || res.error });
+      }
+    } catch (error) {
+      setCsvImportStatus("Import timed out or failed. Try disabling sanitize-on-import for faster import.");
+      toast({
+        variant: "destructive",
+        title: "Import request failed",
+        description: error instanceof Error ? error.message : "Timeout or network error",
+      });
+    } finally {
+      setIsImportingCsv(false);
     }
   };
 
@@ -390,6 +408,26 @@ const MarketingOutbound: React.FC = () => {
                         </label>
                       </Button>
                     </div>
+                    <div className="flex items-center gap-2">
+                      <input
+                        id="csv-sanitize"
+                        type="checkbox"
+                        checked={csvRunSanitize}
+                        onChange={(e) => setCsvRunSanitize(e.target.checked)}
+                      />
+                      <Label htmlFor="csv-sanitize" className="text-sm">
+                        Run AI sanitization during import (slower)
+                      </Label>
+                    </div>
+                    {isImportingCsv && (
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        <span>{csvImportStatus || "Importing CSV..."}</span>
+                      </div>
+                    )}
+                    {!isImportingCsv && csvImportStatus && (
+                      <p className="text-sm text-muted-foreground">{csvImportStatus}</p>
+                    )}
                   </CardContent>
                 </Card>
               </TabsContent>

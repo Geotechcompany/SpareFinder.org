@@ -491,30 +491,48 @@ async def import_leads_csv(
     for i, row in enumerate(reader):
         try:
             out: dict[str, Any] = {}
-            ai_extracted = extract_lead_fields_from_csv_row({k: (v or "") for k, v in row.items()})
-
             em = ""
             if email_c:
                 em = (row.get(email_c) or "").strip()
-            if not em:
-                em = ai_extracted.email.strip()
-            out["email"] = em
             if fn_c:
                 out["full_name"] = (row.get(fn_c) or "").strip()
-            if not out.get("full_name"):
-                out["full_name"] = ai_extracted.full_name
             if job_c:
                 out["job_title"] = (row.get(job_c) or "").strip()
-            if not out.get("job_title"):
-                out["job_title"] = ai_extracted.job_title
             if co_c:
                 out["company_name"] = (row.get(co_c) or "").strip()
-            if not out.get("company_name"):
-                out["company_name"] = ai_extracted.company_name
             if plat_c:
                 out["platform"] = (row.get(plat_c) or "").strip()
+
+            # Only call AI extraction when we actually need it (reduces import latency/timeouts).
+            needs_ai_extract = (
+                not em
+                or not out.get("full_name")
+                or not out.get("job_title")
+                or not out.get("company_name")
+                or not out.get("platform")
+            )
+            ai_extracted = None
+            if needs_ai_extract:
+                ai_extracted = extract_lead_fields_from_csv_row({k: (v or "") for k, v in row.items()})
+                if not em:
+                    em = ai_extracted.email.strip()
+            out["email"] = em
+            if fn_c:
+                out["full_name"] = out.get("full_name") or ""
+            if not out.get("full_name") and ai_extracted:
+                out["full_name"] = ai_extracted.full_name
+            if job_c:
+                out["job_title"] = out.get("job_title") or ""
+            if not out.get("job_title") and ai_extracted:
+                out["job_title"] = ai_extracted.job_title
+            if co_c:
+                out["company_name"] = out.get("company_name") or ""
+            if not out.get("company_name") and ai_extracted:
+                out["company_name"] = ai_extracted.company_name
+            if plat_c:
+                out["platform"] = out.get("platform") or ""
             if not out.get("platform"):
-                out["platform"] = ai_extracted.platform or "csv_import"
+                out["platform"] = (ai_extracted.platform if ai_extracted else "") or "csv_import"
 
             _upsert_lead(supabase, out, campaign_id=campaign_id, source="csv_import", run_sanitize=run_sanitize)
             imported += 1
