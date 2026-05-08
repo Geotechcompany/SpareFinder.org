@@ -24,6 +24,7 @@ import {
   Mail,
   AlertCircle,
 } from "lucide-react";
+import { API_BASE_URL } from "@/lib/config";
 
 type Campaign = {
   id: string;
@@ -205,6 +206,8 @@ const MarketingOutbound: React.FC = () => {
     else toast({ variant: "destructive", title: "Send failed", description: res.message });
   };
 
+  const cronBase = `${String(API_BASE_URL || "").replace(/\/$/, "")}/api`;
+
   return (
     <div className="flex min-h-screen bg-background">
       <AdminDesktopSidebar isCollapsed={isCollapsed} onToggle={() => setIsCollapsed(!isCollapsed)} />
@@ -261,6 +264,39 @@ const MarketingOutbound: React.FC = () => {
                   ))}
                 </div>
                 <p className="text-sm text-muted-foreground mt-4">{String(dashboard?.timezone_note || "")}</p>
+                <Card className="mt-6">
+                  <CardHeader>
+                    <CardTitle>Cron setup guide</CardTitle>
+                    <CardDescription>
+                      Configure these URLs in cron-job.org (or any scheduler). These routes are public by design.
+                      Protect at network edge with IP allowlist/WAF where possible.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-3 text-sm">
+                    <div className="rounded border p-3">
+                      <p className="font-medium">1) Send batch</p>
+                      <p className="text-muted-foreground mb-1">Runs outbound sends for active campaigns.</p>
+                      <code className="block text-xs break-all">{cronBase}/cron/marketing-send?limit=20</code>
+                    </div>
+                    <div className="rounded border p-3">
+                      <p className="font-medium">2) Daily digest</p>
+                      <p className="text-muted-foreground mb-1">Sends yesterday summary to admin emails.</p>
+                      <code className="block text-xs break-all">{cronBase}/cron/marketing-digest</code>
+                    </div>
+                    <div className="rounded border p-3">
+                      <p className="font-medium">3) Discovery (SerpAPI)</p>
+                      <p className="text-muted-foreground mb-1">
+                        Pulls lead candidates from saved query templates.
+                      </p>
+                      <code className="block text-xs break-all">
+                        {cronBase}/cron/marketing-discover?max_queries=3
+                      </code>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Suggested schedule: send every 1-3 hours, digest once daily, discovery once daily.
+                    </p>
+                  </CardContent>
+                </Card>
               </TabsContent>
 
               <TabsContent value="campaigns" className="space-y-4">
