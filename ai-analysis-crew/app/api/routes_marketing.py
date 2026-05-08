@@ -497,6 +497,8 @@ async def import_leads_csv(
 ):
     supabase = get_supabase_admin()
     raw_bytes = await file.read()
+    if not raw_bytes:
+        return api_error("Uploaded file is empty", status_code=400)
     text = ""
     decode_errors: list[str] = []
     for enc in ("utf-8-sig", "utf-16", "utf-16le", "utf-16be", "latin-1"):
@@ -507,13 +509,15 @@ async def import_leads_csv(
             decode_errors.append(f"{enc}:{e}")
     if not text:
         raise HTTPException(status_code=400, detail="Could not decode file. Save as UTF-8/UTF-16 CSV or TSV.")
+    text = text.replace("\r\n", "\n").replace("\r", "\n")
 
     mapping: dict[str, str] = {}
     if column_map:
         try:
             mapping = json.loads(column_map)
         except Exception:
-            raise HTTPException(status_code=400, detail="column_map must be JSON object")
+            # Be permissive: ignore malformed column_map and continue with auto-detect.
+            mapping = {}
 
     sample = text[:8192]
     try:
@@ -524,12 +528,38 @@ async def import_leads_csv(
 
     reader = csv.DictReader(io.StringIO(text), delimiter=delimiter)
     if not reader.fieldnames:
-        raise HTTPException(status_code=400, detail="CSV has no header row")
+        return api_error(
+            "CSV has no header row. Ensure first row contains column names (e.g. EMAIL, FULL_NAME, COMPANY_NAME).",
+            status_code=400,
+        )
+
+    # Some ".csv" exports still use tabs/semicolons. Recover if header parsed as one giant column.
+    if len(reader.fieldnames) == 1:
+        single = (reader.fieldnames[0] or "")
+        fallback_delim = None
+        if "\t" in single:
+            fallback_delim = "\t"
+        elif ";" in single:
+            fallback_delim = ";"
+        elif "|" in single:
+            fallback_delim = "|"
+        if fallback_delim:
+            delimiter = fallback_delim
+            reader = csv.DictReader(io.StringIO(text), delimiter=delimiter)
+            if not reader.fieldnames:
+                return api_error("CSV header could not be parsed", status_code=400)
 
     # Remove blank header columns from exports that start with empty tab/commas.
     reader.fieldnames = [(h or "").strip() for h in reader.fieldnames if (h or "").strip()]
     if not reader.fieldnames:
-        raise HTTPException(status_code=400, detail="CSV header is empty after normalization")
+        return api_error("CSV header is empty after normalization", status_code=400)
+
+    logger.info(
+        "marketing import: filename=%s delimiter=%r headers=%s",
+        getattr(file, "filename", "unknown"),
+        delimiter,
+        reader.fieldnames[:20],
+    )
 
     def _norm_header(v: str) -> str:
         return re.sub(r"[^a-z0-9]+", "", (v or "").strip().lower())
