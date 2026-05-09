@@ -32,6 +32,14 @@ def _env_truthy(name: str) -> bool:
     return (os.getenv(name) or "").strip().lower() in ("1", "true", "yes", "on")
 
 
+def _email_scrape_from_pages_enabled() -> bool:
+    """Whether to HTTP-fetch result/contact pages for regex email extraction (default: yes)."""
+    v = (os.getenv("MARKETING_SERP_EMAIL_SCRAPE") or "").strip().lower()
+    if v in ("0", "false", "no", "off"):
+        return False
+    return True
+
+
 def _host_from_url(url: str) -> str:
     try:
         h = (urlparse(url).hostname or "").lower()
@@ -127,10 +135,58 @@ _SCRAPE_UA = (
 )
 
 
+def _contact_fallback_urls(seed_url: str) -> list[str]:
+    """Same-origin paths often used for mail / forms (tried only when email scrape is enabled)."""
+    try:
+        p = urlparse(seed_url)
+        if p.scheme not in ("http", "https") or not p.netloc:
+            return []
+        root = f"{p.scheme}://{p.netloc}".rstrip("/")
+        seed_norm = seed_url.split("#", 1)[0].rstrip("/")
+        out: list[str] = []
+        for path in ("/contact", "/contact-us", "/about", "/about-us"):
+            u = f"{root}{path}"
+            if u.rstrip("/") == seed_norm.rstrip("/") or u in out:
+                continue
+            out.append(u)
+        return out
+    except Exception:
+        return []
+
+
+def _email_domain_on_host(email: str, host: str) -> bool:
+    if not host or "@" not in email:
+        return False
+    dom = email.rsplit("@", 1)[-1].lower()
+    if dom.startswith("www."):
+        dom = dom[4:]
+    h = host.lower()
+    if h.startswith("www."):
+        h = h[4:]
+    return dom == h or dom.endswith("." + h)
+
+
+def _scrape_emails_chain(seed_url: str, host: str) -> str | None:
+    """Fetch ranking URL then a few same-site contact paths; stop early on a host-matched address."""
+    urls = [seed_url]
+    for u in _contact_fallback_urls(seed_url):
+        if u not in urls:
+            urls.append(u)
+        if len(urls) >= 4:
+            break
+    accumulated: list[str] = []
+    for u in urls:
+        accumulated.extend(_try_emails_from_result_url(u))
+        best = _pick_best_email(accumulated, host)
+        if best and _email_domain_on_host(best, host):
+            return best
+    return _pick_best_email(accumulated, host)
+
+
 def _try_emails_from_result_url(url: str) -> list[str]:
     """
-    Optional slow path: fetch the ranking URL and regex-scan HTML for addresses.
-    Enable with env MARKETING_SERP_EMAIL_SCRAPE=1 — respect robots/terms of target sites.
+    Fetch one URL and regex-scan HTML for addresses (used when page scraping is enabled).
+    Respect robots/terms of target sites. Disable all scraping with MARKETING_SERP_EMAIL_SCRAPE=0.
     """
     if not url.startswith(("http://", "https://")):
         return []
@@ -156,10 +212,10 @@ def _try_emails_from_result_url(url: str) -> list[str]:
 
 
 def _resolve_search_provider(explicit: str | None) -> str:
-    p = (explicit or os.getenv("MARKETING_GOOGLE_SEARCH_PROVIDER") or "serpapi").strip().lower()
-    if p in ("serper", "serper.dev", "google.serper"):
-        return "serper"
-    return "serpapi"
+    p = (explicit or os.getenv("MARKETING_GOOGLE_SEARCH_PROVIDER") or "serper").strip().lower()
+    if p in ("serpapi", "serpapi.com"):
+        return "serpapi"
+    return "serper"
 
 
 def _search_serpapi(
@@ -245,7 +301,7 @@ def search_google(
     """
     Google web results via SerpAPI (serpapi.com) or Serper.dev (google.serper.dev).
 
-    Provider: `serpapi` (default) or `serper` — from arg, env MARKETING_GOOGLE_SEARCH_PROVIDER,
+    Provider: `serper` (default) or `serpapi` — from arg, env MARKETING_GOOGLE_SEARCH_PROVIDER,
     or marketing settings `google_search_provider`.
 
     Key: dashboard `serpapi_key` or env SERPAPI_KEY (same field stores either vendor's key).
@@ -266,10 +322,11 @@ def organic_results_to_lead_candidates(resp: dict[str, Any], *, query: str) -> l
 
     Google titles/snippets usually do **not** contain email addresses; we still regex-scan
     all available SERP text (including sitelinks / mailto). Optional env
-    ``MARKETING_SERP_EMAIL_SCRAPE=1`` fetches each result URL and scans HTML (slower; use responsibly).
+    By default fetches each result URL plus common ``/contact``-style paths on the same host and scans HTML
+    (slower; use responsibly). Set ``MARKETING_SERP_EMAIL_SCRAPE=0`` to disable.
     """
     organic = resp.get("organic_results") or resp.get("organic") or []
-    scrape_pages = _env_truthy("MARKETING_SERP_EMAIL_SCRAPE")
+    scrape_pages = _email_scrape_from_pages_enabled()
     candidates: list[dict[str, Any]] = []
     for item in organic:
         if not isinstance(item, dict):
@@ -282,7 +339,7 @@ def organic_results_to_lead_candidates(resp: dict[str, Any], *, query: str) -> l
         emails = _extract_emails(combined)
         email = _pick_best_email(emails, host)
         if not email and scrape_pages and link:
-            email = _pick_best_email(_try_emails_from_result_url(link), host)
+            email = _scrape_emails_chain(link, host)
         company_guess = title.split("|")[0].split("-")[0].strip() if title else ""
 
         candidates.append(

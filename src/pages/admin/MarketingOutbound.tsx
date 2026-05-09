@@ -22,7 +22,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { adminApi } from "@/lib/api";
 import { MARKETING_SERP_COUNTRIES, marketingCountryLabel } from "@/lib/marketingCountries";
 import { useToast } from "@/components/ui/use-toast";
@@ -66,7 +65,6 @@ const MarketingOutbound: React.FC = () => {
   const [serpApiKey, setSerpApiKey] = useState("");
   const [serpCountryCode, setSerpCountryCode] = useState("");
   const [serpHl, setSerpHl] = useState("en");
-  const [googleSearchProvider, setGoogleSearchProvider] = useState<"serpapi" | "serper">("serpapi");
   const [leadCountryFilter, setLeadCountryFilter] = useState<string>("all");
   const [aiQueriesLoading, setAiQueriesLoading] = useState(false);
   const [newCampaignName, setNewCampaignName] = useState("Outbound — industrial buyers");
@@ -108,7 +106,6 @@ const MarketingOutbound: React.FC = () => {
           serpapi_key?: string;
           serp_target_country_code?: string;
           serp_target_hl?: string;
-          google_search_provider?: string;
         };
       })?.settings;
       const templates = st?.serp_query_templates;
@@ -116,8 +113,6 @@ const MarketingOutbound: React.FC = () => {
       setSerpApiKey(st?.serpapi_key || "");
       setSerpCountryCode((st?.serp_target_country_code || "").toLowerCase());
       setSerpHl((st?.serp_target_hl || "en").toLowerCase() || "en");
-      const gp = (st?.google_search_provider || "serpapi").toLowerCase();
-      setGoogleSearchProvider(gp === "serper" ? "serper" : "serpapi");
     } catch (e) {
       console.error(e);
       toast({
@@ -200,7 +195,7 @@ const MarketingOutbound: React.FC = () => {
       serpapi_key: serpApiKey.trim(),
       serp_target_country_code: serpCountryCode.trim().toLowerCase(),
       serp_target_hl: serpHl.trim().toLowerCase() || "en",
-      google_search_provider: googleSearchProvider,
+      google_search_provider: "serper",
     });
     if (res.success) toast({ title: "Discovery settings saved" });
     else toast({ variant: "destructive", title: "Save failed" });
@@ -283,7 +278,7 @@ const MarketingOutbound: React.FC = () => {
       queries: lines.length ? lines : undefined,
       gl: gl || null,
       hl: hl || null,
-      google_search_provider: googleSearchProvider,
+      google_search_provider: "serper",
       ...(keyTrim ? { serpapi_key: keyTrim } : {}),
     });
     if (res.success) {
@@ -393,7 +388,7 @@ const MarketingOutbound: React.FC = () => {
                 Marketing outbound
               </h1>
               <p className="text-muted-foreground mt-1 text-sm sm:text-base break-words">
-                Campaigns, leads, SerpAPI discovery, send logs. Cron URLs are documented in{" "}
+                Campaigns, leads, Google discovery (Serper), send logs. Cron URLs are documented in{" "}
                 <code className="text-xs bg-muted px-1 rounded break-all">docs/MARKETING_CRON.md</code>.
               </p>
             </div>
@@ -459,7 +454,7 @@ const MarketingOutbound: React.FC = () => {
                       <code className="block text-xs break-all">{cronBase}/cron/marketing-digest</code>
                     </div>
                     <div className="rounded border p-3">
-                      <p className="font-medium">3) Discovery (SerpAPI)</p>
+                      <p className="font-medium">3) Discovery (Serper.dev)</p>
                       <p className="text-muted-foreground mb-1">
                         Pulls lead candidates from saved query templates.
                       </p>
@@ -554,7 +549,7 @@ const MarketingOutbound: React.FC = () => {
                     <CardTitle>Lead library</CardTitle>
                     <CardDescription>
                       Latest 50 rows. Serp discovery leads are tagged with a target country when you set one on
-                      the SerpAPI tab — filter below applies to those tags (CSV imports have no country until you
+                      the Google discovery tab — filter below applies to those tags (CSV imports have no country until you
                       extend the pipeline).
                     </CardDescription>
                   </CardHeader>
@@ -718,51 +713,35 @@ const MarketingOutbound: React.FC = () => {
                       first). Save to persist the same settings for{" "}
                       <code className="text-xs">/api/cron/marketing-discover</code>. Google result titles/snippets rarely
                       include email addresses — rows are often “review” with company + link until you add
-                      contacts manually, import CSV, or enable API env{" "}
-                      <code className="text-xs">MARKETING_SERP_EMAIL_SCRAPE=1</code> (fetches each result page; slower,
-                      respect site terms).
+                      contacts manually or import CSV. By default the API also fetches each result URL and
+                      same-site /contact-style pages to regex-scan for addresses (slower; respect site terms). Set{" "}
+                      <code className="text-xs">MARKETING_SERP_EMAIL_SCRAPE=0</code> on the server to turn that off.
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-3">
-                      <Label className="text-base">Search API vendor</Label>
-                      <RadioGroup
-                        className="flex flex-col gap-3 sm:flex-row sm:gap-8"
-                        value={googleSearchProvider}
-                        onValueChange={(v) => setGoogleSearchProvider(v === "serper" ? "serper" : "serpapi")}
-                      >
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="serpapi" id="vendor-serpapi" />
-                          <Label htmlFor="vendor-serpapi" className="font-normal cursor-pointer">
-                            SerpAPI (GET serpapi.com)
-                          </Label>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="serper" id="vendor-serper" />
-                          <Label htmlFor="vendor-serper" className="font-normal cursor-pointer">
-                            Serper.dev (POST google.serper.dev, header X-API-KEY)
-                          </Label>
-                        </div>
-                      </RadioGroup>
+                    <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-2">
+                      <p className="text-sm font-medium">Search API: Serper.dev only</p>
                       <p className="text-xs text-muted-foreground">
-                        Serper keys return 401 from SerpAPI — select Serper here (same behavior as your Serper playground
-                        snippet).
+                        Google results via POST <code className="text-[11px]">google.serper.dev/search</code> with header{" "}
+                        <code className="text-[11px]">X-API-KEY</code>. Advanced deployments can still set{" "}
+                        <code className="text-[11px]">MARKETING_GOOGLE_SEARCH_PROVIDER=serpapi</code> on the server or patch
+                        settings to <code className="text-[11px]">serpapi</code>.
                       </p>
                     </div>
                     <div>
-                      <Label>API key (paste from the vendor you selected)</Label>
+                      <Label>Serper API key</Label>
                       <Input
                         type="password"
                         value={serpApiKey}
                         onChange={(e) => setSerpApiKey(e.target.value)}
-                        placeholder="SerpAPI or Serper dashboard → API keys"
+                        placeholder="serper.dev → API keys"
                       />
                     </div>
                     <div className="grid gap-4 sm:grid-cols-2">
                       <div>
                         <Label>Target country (manual)</Label>
                         <p className="text-xs text-muted-foreground mb-2">
-                          Sets SerpAPI <code className="text-[11px]">gl</code> bias, tags new discovery leads, and
+                          Sets Google <code className="text-[11px]">gl</code> bias, tags new discovery leads, and
                           steers AI query generation. Save after changing.
                         </p>
                         <Select value={serpCountryCode || "none"} onValueChange={(v) => setSerpCountryCode(v === "none" ? "" : v)}>

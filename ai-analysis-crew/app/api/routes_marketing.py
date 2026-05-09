@@ -230,7 +230,14 @@ def _get_settings_row(supabase: Any) -> dict[str, Any]:
     if r.data:
         return r.data[0]
     supabase.table("marketing_settings").insert(
-        {"setting_key": "defaults", "setting_value": {"serp_query_templates": [], "serp_results_per_query": 10}}
+        {
+            "setting_key": "defaults",
+            "setting_value": {
+                "serp_query_templates": [],
+                "serp_results_per_query": 10,
+                "google_search_provider": "serper",
+            },
+        }
     ).execute()
     r2 = supabase.table("marketing_settings").select("*").eq("setting_key", "defaults").execute()
     return (r2.data or [{}])[0]
@@ -265,12 +272,12 @@ async def patch_marketing_settings(
         val["serp_target_hl"] = hl
     if body.google_search_provider is not None:
         gp = body.google_search_provider.strip().lower()
-        if gp in ("serper", "serper.dev", "google.serper"):
+        if gp in ("serper", "serper.dev", "google.serper", ""):
             val["google_search_provider"] = "serper"
-        elif gp in ("serpapi", "serpapi.com", ""):
+        elif gp in ("serpapi", "serpapi.com"):
             val["google_search_provider"] = "serpapi"
         else:
-            val["google_search_provider"] = "serpapi"
+            val["google_search_provider"] = "serper"
     supabase.table("marketing_settings").update(
         {"setting_value": val, "updated_at": datetime.now(timezone.utc).isoformat()}
     ).eq("setting_key", "defaults").execute()
@@ -282,7 +289,7 @@ async def ai_generate_serp_queries(
     body: GenerateSerpQueriesBody,
     _admin: CurrentUser = Depends(require_roles("admin", "super_admin")),
 ):
-    """Return AI-suggested Google queries for SerpAPI discovery (does not persist until you Save)."""
+    """Return AI-suggested Google queries for discovery (does not persist until you Save)."""
     try:
         queries = generate_serp_discovery_queries(
             country_code=body.country_code or "",
@@ -778,7 +785,7 @@ async def discover_serpapi(
     if body.google_search_provider is not None and str(body.google_search_provider).strip():
         prov_raw = str(body.google_search_provider).strip().lower()
     else:
-        prov_raw = str(val.get("google_search_provider") or os.getenv("MARKETING_GOOGLE_SEARCH_PROVIDER") or "serpapi").strip().lower()
+        prov_raw = str(val.get("google_search_provider") or os.getenv("MARKETING_GOOGLE_SEARCH_PROVIDER") or "serper").strip().lower()
     search_provider = "serper" if prov_raw in ("serper", "serper.dev", "google.serper") else "serpapi"
     lead_source = "serper_google" if search_provider == "serper" else "serpapi_google"
 
@@ -1029,7 +1036,7 @@ async def cron_marketing_digest():
 
 @cron_router.get("/cron/marketing-discover")
 async def cron_marketing_discover(max_queries: int = Query(default=2, ge=1, le=10)):
-    """Scheduled SerpAPI ingestion using saved query templates."""
+    """Scheduled Google discovery using saved query templates (Serper.dev by default)."""
     supabase = get_supabase_admin()
     settings = _get_settings_row(supabase)
     val = settings.get("setting_value") or {}
@@ -1041,7 +1048,7 @@ async def cron_marketing_discover(max_queries: int = Query(default=2, ge=1, le=1
     gl_use = (str(val.get("serp_target_country_code") or "").strip() or None)
     hl_use = (str(val.get("serp_target_hl") or "").strip() or None)
     tag_cc = gl_use.lower()[:4] if gl_use else ""
-    prov_raw = str(val.get("google_search_provider") or os.getenv("MARKETING_GOOGLE_SEARCH_PROVIDER") or "serpapi").strip().lower()
+    prov_raw = str(val.get("google_search_provider") or os.getenv("MARKETING_GOOGLE_SEARCH_PROVIDER") or "serper").strip().lower()
     search_provider = "serper" if prov_raw in ("serper", "serper.dev", "google.serper") else "serpapi"
     lead_source = "serper_google" if search_provider == "serper" else "serpapi_google"
     created = 0
