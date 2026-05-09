@@ -60,18 +60,11 @@ import {
   Cell,
 } from "recharts";
 import {
-  Breadcrumb,
-  BreadcrumbList,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
-} from "@/components/ui/breadcrumb";
-import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { AdminPageHeader, AdminPageHeaderToolbar } from "@/components/admin/AdminPageHeader";
 
 interface AdminStats {
   total_users: number;
@@ -576,107 +569,66 @@ const AdminDashboardLayout = () => {
           transition={{ duration: 0.5 }}
           className="space-y-4 sm:space-y-6 lg:space-y-8 max-w-7xl mx-auto"
         >
-          {/* Header */}
-          <header className="relative overflow-hidden rounded-2xl border border-border/50 bg-gradient-to-br from-card via-card to-muted/25 p-5 shadow-sm ring-1 ring-black/[0.04] dark:from-zinc-950 dark:via-zinc-950 dark:to-zinc-900/60 dark:ring-white/[0.06] sm:p-6">
-            <div
-              className="pointer-events-none absolute -right-24 -top-24 h-48 w-48 rounded-full bg-primary/[0.08] blur-3xl dark:bg-primary/[0.12]"
-              aria-hidden
-            />
-            <div
-              className="pointer-events-none absolute -bottom-20 left-0 h-36 w-36 rounded-full bg-violet-500/[0.06] blur-3xl dark:bg-violet-500/[0.1]"
-              aria-hidden
-            />
-            <div className="relative flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between lg:gap-8">
-              <div className="min-w-0 flex-1 space-y-3">
-                <Breadcrumb>
-                  <BreadcrumbList className="text-xs text-muted-foreground sm:text-sm">
-                    <BreadcrumbItem>
-                      <BreadcrumbLink
-                        href="/"
-                        className="rounded-md px-1.5 py-0.5 transition-colors hover:bg-muted/70 hover:text-foreground"
-                      >
-                        Public site
-                      </BreadcrumbLink>
-                    </BreadcrumbItem>
-                    <BreadcrumbSeparator className="text-muted-foreground/50 [&>svg]:size-3.5" />
-                    <BreadcrumbItem>
-                      <BreadcrumbLink
-                        href="/admin/dashboard"
-                        className="rounded-md px-1.5 py-0.5 transition-colors hover:bg-muted/70 hover:text-foreground"
-                      >
-                        Admin
-                      </BreadcrumbLink>
-                    </BreadcrumbItem>
-                    <BreadcrumbSeparator className="text-muted-foreground/50 [&>svg]:size-3.5" />
-                    <BreadcrumbItem>
-                      <BreadcrumbPage className="rounded-md bg-muted/50 px-2 py-0.5 font-medium text-foreground dark:bg-white/5">
-                        Overview
-                      </BreadcrumbPage>
-                    </BreadcrumbItem>
-                  </BreadcrumbList>
-                </Breadcrumb>
-                <div>
-                  <h1 className="text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
-                    Your dashboard
-                  </h1>
-                  <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted-foreground sm:text-[15px]">
-                    Hi,{" "}
-                    {(adminUser?.full_name?.trim() && adminUser.full_name.trim().split(/\s+/)[0]) || "there"} — here&apos;s
-                    a quick snapshot of how SpareFinder is doing.
-                  </p>
-                </div>
-              </div>
-              <div className="flex flex-shrink-0 flex-wrap items-center gap-2 sm:justify-end">
-                <div className="flex flex-wrap items-center gap-1.5 rounded-2xl border border-border/60 bg-background/80 p-1.5 shadow-inner backdrop-blur-md dark:border-white/10 dark:bg-zinc-950/75">
-                  <Badge
-                    variant="secondary"
-                    className="h-9 shrink-0 rounded-full border border-primary/20 bg-primary/10 px-3 text-xs font-medium text-primary shadow-none dark:border-primary/25 dark:bg-primary/15"
-                  >
-                    <Shield className="mr-1.5 h-3.5 w-3.5 opacity-90" aria-hidden />
-                    {adminUser?.role === "super_admin" ? "Super admin" : "Admin"}
-                  </Badge>
-                  <div className="mx-0.5 hidden h-7 w-px bg-border/70 sm:block" aria-hidden />
-                  <ThemeToggle />
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        type="button"
-                        onClick={handleRefresh}
-                        variant="ghost"
-                        size="sm"
-                        className="h-9 gap-2 rounded-xl px-3 text-muted-foreground hover:bg-muted/80 hover:text-foreground"
-                        aria-label="Update dashboard numbers"
-                      >
-                        <RefreshCw className="h-4 w-4 shrink-0" />
-                        <span className="hidden sm:inline">Update</span>
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent side="bottom" className="rounded-lg border-border/60 text-xs">
-                      Load the latest numbers
-                    </TooltipContent>
-                  </Tooltip>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        type="button"
-                        onClick={handleLogout}
-                        variant="ghost"
-                        size="sm"
-                        className="h-9 gap-2 rounded-xl px-3 text-muted-foreground hover:bg-muted/80 hover:text-foreground"
-                        aria-label="Sign out of admin"
-                      >
-                        <LogOut className="h-4 w-4 shrink-0 opacity-80" aria-hidden />
-                        <span className="hidden sm:inline">Sign out</span>
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent side="bottom" className="rounded-lg border-border/60 text-xs">
-                      Sign out of admin
-                    </TooltipContent>
-                  </Tooltip>
-                </div>
-              </div>
-            </div>
-          </header>
+          <AdminPageHeader
+            breadcrumbPage="Overview"
+            title="Your dashboard"
+            description={
+              <>
+                Hi,{" "}
+                {(adminUser?.full_name?.trim() && adminUser.full_name.trim().split(/\s+/)[0]) || "there"} — here&apos;s a
+                quick snapshot of how SpareFinder is doing.
+              </>
+            }
+            actions={
+              <AdminPageHeaderToolbar>
+                <Badge
+                  variant="secondary"
+                  className="h-9 shrink-0 rounded-full border border-primary/20 bg-primary/10 px-3 text-xs font-medium text-primary shadow-none dark:border-primary/25 dark:bg-primary/15"
+                >
+                  <Shield className="mr-1.5 h-3.5 w-3.5 opacity-90" aria-hidden />
+                  {adminUser?.role === "super_admin" ? "Super admin" : "Admin"}
+                </Badge>
+                <div className="mx-0.5 hidden h-7 w-px bg-border/70 sm:block" aria-hidden />
+                <ThemeToggle />
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      type="button"
+                      onClick={handleRefresh}
+                      variant="ghost"
+                      size="sm"
+                      className="h-9 gap-2 rounded-xl px-3 text-muted-foreground hover:bg-muted/80 hover:text-foreground"
+                      aria-label="Update dashboard numbers"
+                    >
+                      <RefreshCw className="h-4 w-4 shrink-0" />
+                      <span className="hidden sm:inline">Update</span>
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" className="rounded-lg border-border/60 text-xs">
+                    Load the latest numbers
+                  </TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      type="button"
+                      onClick={handleLogout}
+                      variant="ghost"
+                      size="sm"
+                      className="h-9 gap-2 rounded-xl px-3 text-muted-foreground hover:bg-muted/80 hover:text-foreground"
+                      aria-label="Sign out of admin"
+                    >
+                      <LogOut className="h-4 w-4 shrink-0 opacity-80" aria-hidden />
+                      <span className="hidden sm:inline">Sign out</span>
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" className="rounded-lg border-border/60 text-xs">
+                    Sign out of admin
+                  </TooltipContent>
+                </Tooltip>
+              </AdminPageHeaderToolbar>
+            }
+          />
 
           {/* Quick Stats */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-6">

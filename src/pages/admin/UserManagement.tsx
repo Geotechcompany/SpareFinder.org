@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input";
 import { useToast } from "@/components/ui/use-toast";
 import { api } from "@/lib/api";
 import AdminDesktopSidebar from "@/components/AdminDesktopSidebar";
+import { AdminPageHeader, AdminPageHeaderToolbar } from "@/components/admin/AdminPageHeader";
 import { ADMIN_MOBILE_TOP_PADDING, useAdminMainMotion } from "@/lib/admin-layout";
 import { TableSkeleton } from "@/components/skeletons";
 import {
@@ -492,26 +493,22 @@ const UserManagement = () => {
           transition={{ duration: 0.5 }}
           className="space-y-4 sm:space-y-6 lg:space-y-8 max-w-7xl mx-auto"
         >
-          {/* Header */}
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div>
-              <h1 className="text-3xl lg:text-4xl font-bold tracking-tight text-foreground dark:bg-gradient-to-r dark:from-purple-200 dark:to-blue-200 dark:bg-clip-text dark:text-transparent">
-                User Management
-              </h1>
-              <p className="mt-2 text-sm text-muted-foreground">
-                Manage system users and their permissions
-              </p>
-            </div>
-            <div className="flex items-center space-x-2">
-              <Badge
-                variant="secondary"
-                className="bg-purple-600/20 text-purple-400 border-purple-500/30"
-              >
-                <Users className="w-3 h-3 mr-1" />
-                {pagination.total} Total Users
-              </Badge>
-            </div>
-          </div>
+          <AdminPageHeader
+            breadcrumbPage="People & roles"
+            title="User accounts"
+            description="Look up members, adjust roles, and keep access under control."
+            actions={
+              <AdminPageHeaderToolbar>
+                <Badge
+                  variant="secondary"
+                  className="h-9 shrink-0 rounded-full border border-primary/20 bg-primary/10 px-3 text-xs font-medium text-primary dark:border-primary/25 dark:bg-primary/15"
+                >
+                  <Users className="mr-1.5 h-3.5 w-3.5" aria-hidden />
+                  {pagination.total.toLocaleString()} accounts
+                </Badge>
+              </AdminPageHeaderToolbar>
+            }
+          />
 
           {/* Filters */}
           <Card className="bg-card/95 backdrop-blur-xl border-border shadow-soft-elevated dark:bg-black/20 dark:border-white/10">
