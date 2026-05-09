@@ -173,6 +173,9 @@ const MarketingOutbound: React.FC = () => {
       setSerpApiKey(st?.serpapi_key || "");
       setSerpCountryCode((st?.serp_target_country_code || "").toLowerCase());
       setSerpHl((st?.serp_target_hl || "en").toLowerCase() || "en");
+      setDefaultOutboundCampaignId(
+        typeof st?.default_outbound_campaign_id === "string" ? st.default_outbound_campaign_id.trim() : ""
+      );
     } catch (e) {
       console.error(e);
       toast({
@@ -256,6 +259,7 @@ const MarketingOutbound: React.FC = () => {
       serp_target_country_code: serpCountryCode.trim().toLowerCase(),
       serp_target_hl: serpHl.trim().toLowerCase() || "en",
       google_search_provider: "serper",
+      default_outbound_campaign_id: defaultOutboundCampaignId.trim() || "",
     });
     if (res.success) toast({ title: "Discovery settings saved" });
     else toast({ variant: "destructive", title: "Save failed" });
@@ -678,7 +682,8 @@ const MarketingOutbound: React.FC = () => {
                 </Card>
                 <p className="text-sm text-muted-foreground">
                   <strong>Active</strong> only means the campaign is turned on. The automatic sender still needs contacts on
-                  the <strong>Leads</strong> tab with this campaign&apos;s ID, status <strong>Pending</strong>, and review{" "}
+                  the <strong>Leads</strong> tab tied to this campaign (new imports and Google discovery auto-assign a
+                  campaign from <strong>Find on Google</strong> settings), status <strong>Pending</strong>, and review{" "}
                   <strong>Accepted</strong> — otherwise nothing goes out even when the campaign is active.
                 </p>
                 <div className="space-y-3">
@@ -831,15 +836,15 @@ const MarketingOutbound: React.FC = () => {
                     <CardTitle>Import contacts from a spreadsheet</CardTitle>
                     <CardDescription>
                       Use a UTF-8 CSV with a header row. We look for an email column under common names (Email, Work
-                      email, and so on). You can also include name, job title, company, and platform columns. To send
-                      mail to these people, paste the <strong>campaign ID</strong> from the Campaigns tab (or add it
-                      later).
+                      email, and so on). You can also include name, job title, company, and platform columns. New rows
+                      get a campaign automatically (pinned default or highest-priority active campaign from{" "}
+                      <strong>Find on Google</strong>); optionally override per import with a campaign ID below.
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <div>
-                      <Label>Optional campaign ID</Label>
-                      <Input id="csv-campaign" placeholder="Paste the campaign ID from the Campaigns tab" />
+                      <Label>Optional campaign ID (override auto-assign)</Label>
+                      <Input id="csv-campaign" placeholder="Leave blank to use default from Find on Google tab" />
                     </div>
                     <div className="flex items-center gap-2">
                       <Button variant="outline" asChild>
@@ -893,6 +898,7 @@ const MarketingOutbound: React.FC = () => {
                     <CardDescription>
                       <strong>Run discovery now</strong> uses the key and country settings on this page (saving first is
                       optional). Click <strong>Save discovery settings</strong> so overnight jobs use the same choices.
+                      New contacts are assigned the default campaign below (or the highest-priority active campaign).
                       Google previews rarely show email addresses, so the server may open each result page (and common
                       “Contact” pages) to look for an address — that is slower; your hosting team can turn it off with env{" "}
                       <code className="text-xs">MARKETING_SERP_EMAIL_SCRAPE=0</code>.
@@ -946,6 +952,30 @@ const MarketingOutbound: React.FC = () => {
                         />
                         <p className="text-xs text-muted-foreground mt-1">e.g. en, fr, de</p>
                       </div>
+                    </div>
+                    <div>
+                      <Label>Default campaign for new contacts</Label>
+                      <p className="text-xs text-muted-foreground mb-2">
+                        Applies to CSV import (when no override), Google discovery, and cron discovery.{" "}
+                        <strong>Auto</strong> picks the highest-priority campaign that is not paused.
+                      </p>
+                      <Select
+                        value={defaultOutboundCampaignId || "__auto__"}
+                        onValueChange={(v) => setDefaultOutboundCampaignId(v === "__auto__" ? "" : v)}
+                      >
+                        <SelectTrigger className="max-w-md">
+                          <SelectValue placeholder="Campaign" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="__auto__">Auto (highest-priority active)</SelectItem>
+                          {campaigns.map((c) => (
+                            <SelectItem key={c.id} value={c.id}>
+                              {c.name}
+                              {c.is_paused ? " (paused)" : ""}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
                       <Button type="button" variant="outline" onClick={handleAiGenerateSerpQueries} disabled={aiQueriesLoading}>
