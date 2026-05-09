@@ -125,6 +125,15 @@ class LeadPatchBody(BaseModel):
     campaign_id: str | None = None
 
 
+class ManualLeadCreateBody(BaseModel):
+    email: str = Field(min_length=3, max_length=320)
+    full_name: str | None = Field(default=None, max_length=500)
+    job_title: str | None = Field(default=None, max_length=300)
+    company_name: str | None = Field(default=None, max_length=500)
+    campaign_id: str | None = Field(default=None, max_length=64)
+    run_sanitize: bool = True
+
+
 class BulkLeadActionBody(BaseModel):
     ids: list[str] = Field(default_factory=list)
     action: Literal["delete", "update"]
@@ -398,6 +407,39 @@ async def list_leads(
             "pagination": {"page": page, "limit": limit, "total": total},
         }
     )
+
+
+@admin_router.post("/leads")
+async def create_lead_manual(
+    body: ManualLeadCreateBody,
+    _admin: CurrentUser = Depends(require_roles("admin", "super_admin")),
+):
+    """Create or update (by email) a single marketing lead from the admin UI."""
+    em = body.email.strip().lower()
+    if not is_valid_email(em):
+        raise HTTPException(status_code=400, detail="Invalid email format")
+    if is_disposable_domain(em):
+        raise HTTPException(status_code=400, detail="Disposable email domains are not allowed")
+
+    supabase = get_supabase_admin()
+    cid = (body.campaign_id or "").strip() or None
+    row = {
+        "email": em,
+        "full_name": (body.full_name or "").strip(),
+        "job_title": (body.job_title or "").strip(),
+        "company_name": (body.company_name or "").strip(),
+        "platform": "manual_admin",
+    }
+    out = _upsert_lead(
+        supabase,
+        row,
+        campaign_id=cid or None,
+        source="manual_admin",
+        run_sanitize=body.run_sanitize,
+    )
+    if not out:
+        return api_error("Could not save lead", status_code=500)
+    return api_ok(data={"lead": out}, message="Lead saved")
 
 
 @admin_router.patch("/leads/{lead_id}")

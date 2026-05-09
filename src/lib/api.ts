@@ -1090,6 +1090,17 @@ export const adminApi = {
     const response = await apiClient.get(`/admin/marketing/leads?${q.toString()}`);
     return response.data;
   },
+  createMarketingLead: async (payload: {
+    email: string;
+    full_name?: string;
+    job_title?: string;
+    company_name?: string;
+    campaign_id?: string | null;
+    run_sanitize?: boolean;
+  }): Promise<ApiResponse> => {
+    const response = await apiClient.post("/admin/marketing/leads", payload);
+    return response.data;
+  },
   patchMarketingLead: async (
     leadId: string,
     payload: {

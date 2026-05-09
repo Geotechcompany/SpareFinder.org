@@ -50,6 +50,7 @@ import {
   Trash2,
   PencilLine,
   Sparkles,
+  UserPlus,
 } from "lucide-react";
 import { API_BASE_URL } from "@/lib/config";
 
@@ -139,6 +140,14 @@ const MarketingOutbound: React.FC = () => {
   const [bulkLeadDialog, setBulkLeadDialog] = useState<{ field: BulkLeadUpdateField; ids: string[] } | null>(null);
   const [bulkLeadSelectValue, setBulkLeadSelectValue] = useState("");
   const [bulkLeadSubmitting, setBulkLeadSubmitting] = useState(false);
+  const [manualLeadOpen, setManualLeadOpen] = useState(false);
+  const [manualLeadEmail, setManualLeadEmail] = useState("");
+  const [manualLeadFullName, setManualLeadFullName] = useState("");
+  const [manualLeadJobTitle, setManualLeadJobTitle] = useState("");
+  const [manualLeadCompany, setManualLeadCompany] = useState("");
+  const [manualLeadCampaignId, setManualLeadCampaignId] = useState("__auto__");
+  const [manualLeadSanitize, setManualLeadSanitize] = useState(false);
+  const [manualLeadSaving, setManualLeadSaving] = useState(false);
 
   const loadAll = useCallback(async () => {
     setLoading(true);
@@ -543,6 +552,62 @@ const MarketingOutbound: React.FC = () => {
     }
   };
 
+  const openManualLeadDialog = () => {
+    setManualLeadEmail("");
+    setManualLeadFullName("");
+    setManualLeadJobTitle("");
+    setManualLeadCompany("");
+    setManualLeadCampaignId("__auto__");
+    setManualLeadSanitize(false);
+    setManualLeadOpen(true);
+  };
+
+  const submitManualLead = async () => {
+    const email = manualLeadEmail.trim().toLowerCase();
+    if (!email) {
+      toast({ variant: "destructive", title: "Email required", description: "Enter a work email address." });
+      return;
+    }
+    if (!MARKETING_LEAD_EMAIL_RE.test(email)) {
+      toast({ variant: "destructive", title: "Invalid email", description: "Check the address format." });
+      return;
+    }
+    if (!leadRowHasUsableEmail(email)) {
+      toast({
+        variant: "destructive",
+        title: "Email not allowed",
+        description: "Use a non-disposable business email.",
+      });
+      return;
+    }
+    setManualLeadSaving(true);
+    try {
+      const res = await adminApi.createMarketingLead({
+        email,
+        full_name: manualLeadFullName.trim() || undefined,
+        job_title: manualLeadJobTitle.trim() || undefined,
+        company_name: manualLeadCompany.trim() || undefined,
+        campaign_id: manualLeadCampaignId === "__auto__" ? null : manualLeadCampaignId,
+        run_sanitize: manualLeadSanitize,
+      });
+      if (res.success) {
+        toast({ title: "Contact saved", description: "The lead was added or updated if the email already existed." });
+        setManualLeadOpen(false);
+        loadAll();
+      } else {
+        toast({
+          variant: "destructive",
+          title: "Could not save contact",
+          description: (res as { message?: string }).message || res.error || "Request failed",
+        });
+      }
+    } catch (e) {
+      toast({ variant: "destructive", title: "Request failed", description: formatMarketingApiError(e) });
+    } finally {
+      setManualLeadSaving(false);
+    }
+  };
+
   const cronBase = `${String(API_BASE_URL || "").replace(/\/$/, "")}/api`;
 
   return (
@@ -788,6 +853,10 @@ const MarketingOutbound: React.FC = () => {
                       </div>
                     </div>
                     <div className="mb-3 flex flex-wrap items-center gap-2">
+                      <Button size="sm" onClick={openManualLeadDialog}>
+                        <UserPlus className="h-4 w-4 mr-1" />
+                        Add contact
+                      </Button>
                       <Button size="sm" variant="outline" onClick={toggleAllLeadsOnPage}>
                         <PencilLine className="h-4 w-4 mr-1" />
                         {selectedLeadIds.length ? "Toggle page selection" : "Select page"}
@@ -1247,6 +1316,104 @@ const MarketingOutbound: React.FC = () => {
             <Button type="button" onClick={() => void submitBulkLeadDialog()} disabled={bulkLeadSubmitting}>
               {bulkLeadSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-2 inline" /> : null}
               Apply to selected
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={manualLeadOpen}
+        onOpenChange={(open) => {
+          setManualLeadOpen(open);
+          if (!open) setManualLeadSaving(false);
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Add contact</DialogTitle>
+            <DialogDescription>
+              Creates a marketing lead (or updates the existing row if this email is already in the list). Campaign
+              defaults match your Find on Google settings when you choose &quot;Default&quot;.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-1">
+            <div>
+              <Label htmlFor="manual-lead-email">Email</Label>
+              <Input
+                id="manual-lead-email"
+                type="email"
+                autoComplete="email"
+                placeholder="name@company.com"
+                value={manualLeadEmail}
+                onChange={(e) => setManualLeadEmail(e.target.value)}
+                disabled={manualLeadSaving}
+              />
+            </div>
+            <div>
+              <Label htmlFor="manual-lead-name">Full name (optional)</Label>
+              <Input
+                id="manual-lead-name"
+                value={manualLeadFullName}
+                onChange={(e) => setManualLeadFullName(e.target.value)}
+                disabled={manualLeadSaving}
+                placeholder="Jane Doe"
+              />
+            </div>
+            <div>
+              <Label htmlFor="manual-lead-company">Company (optional)</Label>
+              <Input
+                id="manual-lead-company"
+                value={manualLeadCompany}
+                onChange={(e) => setManualLeadCompany(e.target.value)}
+                disabled={manualLeadSaving}
+              />
+            </div>
+            <div>
+              <Label htmlFor="manual-lead-title">Job title (optional)</Label>
+              <Input
+                id="manual-lead-title"
+                value={manualLeadJobTitle}
+                onChange={(e) => setManualLeadJobTitle(e.target.value)}
+                disabled={manualLeadSaving}
+              />
+            </div>
+            <div>
+              <Label htmlFor="manual-lead-campaign">Campaign</Label>
+              <Select value={manualLeadCampaignId} onValueChange={setManualLeadCampaignId} disabled={manualLeadSaving}>
+                <SelectTrigger id="manual-lead-campaign">
+                  <SelectValue placeholder="Campaign" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__auto__">Default (settings / active campaign)</SelectItem>
+                  {campaigns.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.name}
+                      {c.is_paused ? " (paused)" : ""}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                id="manual-lead-sanitize"
+                type="checkbox"
+                checked={manualLeadSanitize}
+                onChange={(e) => setManualLeadSanitize(e.target.checked)}
+                disabled={manualLeadSaving}
+              />
+              <Label htmlFor="manual-lead-sanitize" className="text-sm font-normal cursor-pointer">
+                Run AI sanitization (slower; otherwise review status is accepted if the email is valid)
+              </Label>
+            </div>
+          </div>
+          <DialogFooter className="gap-2 sm:justify-end">
+            <Button type="button" variant="outline" onClick={() => setManualLeadOpen(false)} disabled={manualLeadSaving}>
+              Cancel
+            </Button>
+            <Button type="button" onClick={() => void submitManualLead()} disabled={manualLeadSaving}>
+              {manualLeadSaving ? <Loader2 className="h-4 w-4 animate-spin mr-2 inline" /> : null}
+              Save contact
             </Button>
           </DialogFooter>
         </DialogContent>
