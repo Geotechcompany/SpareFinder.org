@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import AdminDesktopSidebar from '@/components/AdminDesktopSidebar';
+import { AdminPageHeader, AdminPageHeaderToolbar } from '@/components/admin/AdminPageHeader';
 import { ADMIN_MOBILE_TOP_PADDING, useAdminMainMotion } from '@/lib/admin-layout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';

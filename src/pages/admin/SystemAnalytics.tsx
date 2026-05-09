@@ -418,101 +418,54 @@ const SystemAnalytics = () => {
           transition={{ duration: 0.5 }}
           className="space-y-6 lg:space-y-8 max-w-7xl mx-auto"
         >
-          {/* Header */}
-          <div className="relative">
-            <div className="absolute inset-0 rounded-3xl bg-gradient-to-r from-blue-500/5 to-purple-500/5 blur-xl opacity-70 dark:from-blue-600/10 dark:to-purple-600/10" />
-            <div className="relative rounded-3xl border border-border bg-card/95 backdrop-blur-xl shadow-soft-elevated px-4 py-4 sm:px-6 sm:py-6 dark:bg-black/20 dark:border-white/10">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                <div>
-                  <motion.div
-                    initial={{ opacity: 0, scale: 0.8 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    transition={{ delay: 0.2 }}
-                    className="inline-flex items-center px-4 py-2 bg-gradient-to-r from-blue-500/10 to-purple-500/10 rounded-full border border-blue-200 text-blue-700 backdrop-blur-xl mb-4 dark:border-blue-500/30 dark:text-blue-300"
-                  >
-                    <motion.div
-                      animate={{ rotate: [0, 360] }}
-                      transition={{
-                        duration: 3,
-                        repeat: Infinity,
-                        ease: "linear",
-                      }}
-                      className="mr-2"
-                    >
-                      <BarChart3 className="w-4 h-4 text-blue-500 dark:text-blue-400" />
-                    </motion.div>
-                    <span className="text-sm font-semibold">
-                      System Analytics
-                    </span>
-                  </motion.div>
-                  <motion.h1
-                    className="text-3xl lg:text-4xl font-bold tracking-tight text-foreground dark:bg-gradient-to-r dark:from-purple-200 dark:to-blue-200 dark:bg-clip-text dark:text-transparent mb-3"
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: 0.3 }}
-                  >
-                    System Analytics
-                  </motion.h1>
-                  <motion.p
-                    className="text-muted-foreground text-lg"
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: 0.4 }}
-                  >
-                    Real-time system performance monitoring
-                  </motion.p>
-                  <motion.p
-                    className="text-muted-foreground text-sm"
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: 0.5 }}
-                  >
-                    Last updated: {formatLastUpdated()}
-                  </motion.p>
-                </div>
-                <motion.div
-                  initial={{ opacity: 0, scale: 0.8 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={{ delay: 0.5 }}
-                  className="flex items-center space-x-3"
+          <AdminPageHeader
+            breadcrumbPage="Usage & traffic"
+            title="How the site is used"
+            description={
+              <>
+                Traffic, sign-ups, and health at a glance. Last updated: {formatLastUpdated()}.
+              </>
+            }
+            actions={
+              <AdminPageHeaderToolbar className="max-w-full">
+                <Badge className="h-9 shrink-0 rounded-full border border-emerald-500/25 bg-emerald-500/10 px-3 text-xs font-medium text-emerald-800 dark:border-emerald-400/30 dark:bg-emerald-500/15 dark:text-emerald-100">
+                  <Activity className="mr-1.5 h-3.5 w-3.5" aria-hidden />
+                  Online
+                </Badge>
+                <Badge className="h-9 max-w-[10rem] shrink-0 truncate rounded-full border border-blue-500/20 bg-blue-500/10 px-3 text-xs font-medium text-blue-900 dark:border-blue-400/25 dark:bg-blue-500/15 dark:text-blue-100">
+                  <Clock className="mr-1.5 inline h-3.5 w-3.5 align-middle" aria-hidden />
+                  <span className="truncate">{systemMetrics.uptime}</span>
+                </Badge>
+                <div className="hidden h-7 w-px bg-border/70 sm:block" aria-hidden />
+                <ThemeToggle />
+                <Button
+                  type="button"
+                  onClick={fetchSystemData}
+                  disabled={isLoading}
+                  variant="ghost"
+                  size="sm"
+                  className="h-9 gap-2 rounded-xl px-3 text-muted-foreground hover:bg-muted/80 hover:text-foreground"
                 >
-                  <Badge className="px-3 py-1 bg-emerald-100 text-emerald-700 border border-emerald-200 dark:bg-green-600/20 dark:text-green-300 dark:border-green-500/30">
-                    <Activity className="w-4 h-4 mr-2" />
-                    System Online
-                  </Badge>
-                  <Badge className="px-3 py-1 bg-blue-100 text-blue-700 border border-blue-200 dark:bg-blue-600/20 dark:text-blue-300 dark:border-blue-500/30">
-                    <Clock className="w-4 h-4 mr-2" />
-                    {systemMetrics.uptime}
-                  </Badge>
-                  <ThemeToggle />
-                  <Button
-                    onClick={fetchSystemData}
-                    disabled={isLoading}
-                    variant="outline"
-                    size="sm"
-                    className="border-border bg-background/80 text-foreground hover:bg-accent hover:text-accent-foreground dark:bg-white/5 dark:text-white dark:border-white/20 dark:hover:bg-white/10"
-                  >
-                    {isLoading ? (
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    ) : (
-                      <RefreshCw className="w-4 h-4 mr-2" />
-                    )}
-                    Refresh Data
-                  </Button>
-                  <Select value={timeRange} onValueChange={setTimeRange}>
-                    <SelectTrigger className="w-32 border-border bg-card/80 text-foreground hover:bg-muted dark:border-white/20 dark:text-white dark:bg-white/5">
-                      <SelectValue placeholder="Time Range" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="7d">Last 7 Days</SelectItem>
-                      <SelectItem value="30d">Last 30 Days</SelectItem>
-                      <SelectItem value="90d">Last 90 Days</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </motion.div>
-              </div>
-            </div>
-          </div>
+                  {isLoading ? (
+                    <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
+                  ) : (
+                    <RefreshCw className="h-4 w-4 shrink-0" />
+                  )}
+                  <span className="hidden sm:inline">Update</span>
+                </Button>
+                <Select value={timeRange} onValueChange={setTimeRange}>
+                  <SelectTrigger className="h-9 w-[7.5rem] shrink-0 rounded-xl border-border/80 bg-background/80 text-xs sm:w-32 sm:text-sm">
+                    <SelectValue placeholder="Range" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="7d">Last 7 days</SelectItem>
+                    <SelectItem value="30d">Last 30 days</SelectItem>
+                    <SelectItem value="90d">Last 90 days</SelectItem>
+                  </SelectContent>
+                </Select>
+              </AdminPageHeaderToolbar>
+            }
+          />
 
           {/* Error State */}
           {error && (
