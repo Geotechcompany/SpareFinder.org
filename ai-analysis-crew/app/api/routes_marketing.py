@@ -139,6 +139,8 @@ class MarketingSettingsBody(BaseModel):
     serp_target_hl: str | None = Field(default=None, max_length=12)
     # serpapi = serpapi.com ; serper = serper.dev (same key field, different vendor)
     google_search_provider: str | None = Field(default=None, max_length=32)
+    # When set, new leads (discover/CSV with no campaign) attach here; unset = highest-priority unpaused campaign.
+    default_outbound_campaign_id: str | None = Field(default=None, max_length=64)
 
 
 class GenerateCampaignBody(BaseModel):
@@ -280,6 +282,12 @@ async def patch_marketing_settings(
             val["google_search_provider"] = "serpapi"
         else:
             val["google_search_provider"] = "serper"
+    if body.default_outbound_campaign_id is not None:
+        dcid = str(body.default_outbound_campaign_id).strip()
+        if dcid:
+            val["default_outbound_campaign_id"] = dcid
+        else:
+            val.pop("default_outbound_campaign_id", None)
     supabase.table("marketing_settings").update(
         {"setting_value": val, "updated_at": datetime.now(timezone.utc).isoformat()}
     ).eq("setting_key", "defaults").execute()
@@ -494,6 +502,32 @@ async def bulk_manage_leads(
     return api_ok(data={"updated": updated, "ids": ids[:20]})
 
 
+def _default_campaign_id_for_new_leads(supabase: Any) -> str | None:
+    """
+    Campaign to attach when caller passes no campaign_id (CSV import, Google discover, cron discover).
+    Uses default_outbound_campaign_id from marketing settings if that campaign exists; otherwise the
+    highest-priority unpaused campaign (newest first when priorities tie).
+    """
+    row = _get_settings_row(supabase)
+    val = row.get("setting_value") or {}
+    explicit = str(val.get("default_outbound_campaign_id") or "").strip()
+    if explicit:
+        chk = supabase.table("marketing_campaigns").select("id").eq("id", explicit).limit(1).execute()
+        if chk.data:
+            return explicit
+    r = (
+        supabase.table("marketing_campaigns")
+        .select("id")
+        .eq("is_paused", False)
+        .order("priority", desc=True)
+        .order("created_at", desc=True)
+        .limit(1)
+        .execute()
+    )
+    rows = r.data or []
+    return str(rows[0]["id"]) if rows else None
+
+
 def _discovery_candidate_has_usable_email(candidate: dict[str, Any]) -> bool:
     """Discovery only persists rows with a syntactically valid, non-disposable mailbox."""
     em = str(candidate.get("email") or "").strip().lower()
@@ -522,6 +556,10 @@ def _upsert_lead(
     company = raw.get("company_name") or raw.get("COMPANY_NAME") or ""
     platform = raw.get("platform") or ""
 
+    effective_campaign = (str(campaign_id).strip() if campaign_id else "") or None
+    if not effective_campaign:
+        effective_campaign = _default_campaign_id_for_new_leads(supabase)
+
     payload = {
         "full_name": str(full_name).strip() or None,
         "job_title": str(job_title).strip() or None,
@@ -529,7 +567,7 @@ def _upsert_lead(
         "platform": str(platform).strip() or None,
         "email": email,
         "source": source,
-        "campaign_id": campaign_id,
+        "campaign_id": effective_campaign,
         "raw_payload": raw,
         "lead_status_internal": "pending",
     }
