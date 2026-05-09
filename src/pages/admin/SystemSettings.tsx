@@ -191,58 +191,19 @@ const SystemSettings = () => {
           transition={{ duration: 0.5 }}
           className="space-y-6 lg:space-y-8 max-w-7xl mx-auto"
         >
-          {/* Header */}
-          <div className="relative">
-            <div className="absolute inset-0 rounded-3xl bg-gradient-to-r from-blue-500/5 to-purple-500/5 blur-xl opacity-70 dark:from-blue-600/10 dark:to-purple-600/10" />
-            <div className="relative rounded-3xl border border-border bg-card/95 backdrop-blur-xl shadow-soft-elevated px-4 py-4 sm:px-6 sm:py-6 dark:bg-black/20 dark:border-white/10">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                <div>
-                  <motion.div
-                    initial={{ opacity: 0, scale: 0.8 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    transition={{ delay: 0.2 }}
-                    className="inline-flex items-center px-4 py-2 bg-gradient-to-r from-blue-500/10 to-purple-500/10 rounded-full border border-blue-200 text-blue-700 backdrop-blur-xl mb-4 dark:border-blue-500/30 dark:text-blue-300"
-                  >
-                    <motion.div
-                      animate={{ rotate: [0, 360] }}
-                      transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
-                      className="mr-2"
-                    >
-                      <Settings className="w-4 h-4 text-blue-500 dark:text-blue-400" />
-                    </motion.div>
-                    <span className="text-sm font-semibold">System Configuration</span>
-                  </motion.div>
-                  <motion.h1 
-                    className="text-3xl lg:text-4xl font-bold tracking-tight text-foreground dark:bg-gradient-to-r dark:from-blue-100 dark:to-purple-200 dark:bg-clip-text dark:text-transparent mb-3"
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: 0.3 }}
-                  >
-                    System Settings
-                  </motion.h1>
-                  <motion.p 
-                    className="text-lg text-muted-foreground"
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: 0.4 }}
-                  >
-                    Configure system-wide settings and preferences
-                  </motion.p>
-                </div>
-                <motion.div
-                  initial={{ opacity: 0, scale: 0.8 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={{ delay: 0.5 }}
-                  className="flex items-center space-x-3"
-                >
-                  <Badge className="px-3 py-1 bg-emerald-100 text-emerald-700 border border-emerald-200 dark:bg-green-600/20 dark:text-green-300 dark:border-green-500/30">
-                    <Server className="w-4 h-4 mr-2" />
-                    System Online
-                  </Badge>
-                </motion.div>
-              </div>
-            </div>
-          </div>
+          <AdminPageHeader
+            breadcrumbPage="Site settings"
+            title="Settings"
+            description="Security, email, and other options that apply across SpareFinder."
+            actions={
+              <AdminPageHeaderToolbar>
+                <Badge className="h-9 shrink-0 rounded-full border border-emerald-500/25 bg-emerald-500/10 px-3 text-xs font-medium text-emerald-800 dark:border-emerald-400/30 dark:bg-emerald-500/15 dark:text-emerald-100">
+                  <Server className="mr-1.5 h-3.5 w-3.5" aria-hidden />
+                  Online
+                </Badge>
+              </AdminPageHeaderToolbar>
+            }
+          />
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Security Settings */}

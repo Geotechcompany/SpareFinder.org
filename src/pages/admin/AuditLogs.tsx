@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import AdminDesktopSidebar from '@/components/AdminDesktopSidebar';
+import { AdminPageHeader, AdminPageHeaderToolbar } from '@/components/admin/AdminPageHeader';
 import { ADMIN_MOBILE_TOP_PADDING, useAdminMainMotion } from '@/lib/admin-layout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -280,29 +281,25 @@ const AuditLogs = () => {
           transition={{ duration: 0.5 }}
           className="space-y-8 max-w-7xl mx-auto"
         >
-          {/* Header */}
-          <div className="relative">
-            <div className="absolute inset-0 rounded-3xl bg-gradient-to-r from-blue-500/5 to-purple-500/5 blur-xl opacity-70 dark:from-blue-600/10 dark:to-purple-600/10" />
-            <div className="relative rounded-3xl border border-border bg-card/95 backdrop-blur-xl shadow-soft-elevated px-4 py-4 sm:px-6 sm:py-6 dark:bg-black/20 dark:border-white/10">
-              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <h1 className="text-3xl lg:text-4xl font-bold tracking-tight text-foreground dark:bg-gradient-to-r dark:from-purple-200 dark:to-blue-200 dark:bg-clip-text dark:text-transparent">
-                    Audit Logs
-                  </h1>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    Monitor system activities and security events
-                  </p>
-                </div>
-                <div className="flex items-center space-x-3">
-                  <ThemeToggle />
-                  <Button className="bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-soft-elevated hover:from-blue-700 hover:to-purple-700">
-                    <Download className="w-4 h-4 mr-2" />
-                    Export Logs
-                  </Button>
-                </div>
-              </div>
-            </div>
-          </div>
+          <AdminPageHeader
+            breadcrumbPage="Activity log"
+            title="Audit log"
+            description="See important actions and changes for security and troubleshooting."
+            actions={
+              <AdminPageHeaderToolbar>
+                <ThemeToggle />
+                <div className="hidden h-7 w-px bg-border/70 sm:block" aria-hidden />
+                <Button
+                  type="button"
+                  size="sm"
+                  className="h-9 gap-2 rounded-xl bg-primary px-3 text-primary-foreground hover:bg-primary/90"
+                >
+                  <Download className="h-4 w-4 shrink-0" aria-hidden />
+                  <span className="hidden sm:inline">Download</span>
+                </Button>
+              </AdminPageHeaderToolbar>
+            }
+          />
 
           {/* Stats Overview */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
