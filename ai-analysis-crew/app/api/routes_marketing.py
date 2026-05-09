@@ -506,7 +506,8 @@ def _default_campaign_id_for_new_leads(supabase: Any) -> str | None:
     """
     Campaign to attach when caller passes no campaign_id (CSV import, Google discover, cron discover).
     Uses default_outbound_campaign_id from marketing settings if that campaign exists; otherwise the
-    highest-priority unpaused campaign (newest first when priorities tie).
+    highest-priority unpaused campaign (newest first when priorities tie). If none are unpaused,
+    falls back to the highest-priority campaign overall so scheduled discovery still assigns a campaign.
     """
     row = _get_settings_row(supabase)
     val = row.get("setting_value") or {}
@@ -525,7 +526,19 @@ def _default_campaign_id_for_new_leads(supabase: Any) -> str | None:
         .execute()
     )
     rows = r.data or []
-    return str(rows[0]["id"]) if rows else None
+    if rows:
+        return str(rows[0]["id"])
+    # No unpaused campaigns: still attach leads to the highest-priority row so cron/discover imports are not orphaned.
+    r_any = (
+        supabase.table("marketing_campaigns")
+        .select("id")
+        .order("priority", desc=True)
+        .order("created_at", desc=True)
+        .limit(1)
+        .execute()
+    )
+    rows_any = r_any.data or []
+    return str(rows_any[0]["id"]) if rows_any else None
 
 
 def _discovery_candidate_has_usable_email(candidate: dict[str, Any]) -> bool:
@@ -816,40 +829,32 @@ async def import_leads_csv(
     )
 
 
-@admin_router.post("/discover")
-async def discover_serpapi(
-    body: DiscoverBody,
-    _admin: CurrentUser = Depends(require_roles("admin", "super_admin")),
-):
-    supabase = get_supabase_admin()
-    settings = _get_settings_row(supabase)
-    val = settings.get("setting_value") or {}
-    key_override = (
-        str(body.serpapi_key or "").strip()
-        or str(val.get("serpapi_key") or "").strip()
-        or None
-    )
-    templates = body.queries if body.queries else (val.get("serp_query_templates") or [])
-    if not templates:
-        return api_error("No queries configured — add serp_query_templates in settings or pass queries[]", status_code=400)
-
-    max_q = max(1, min(body.max_queries, 10))
-    per_q = max(1, min(int(val.get("serp_results_per_query") or 10), 20))
-    gl_use = (str(body.gl or val.get("serp_target_country_code") or "").strip() or None)
-    hl_use = (str(body.hl or val.get("serp_target_hl") or "").strip() or None)
-    tag_cc = gl_use.lower()[:4] if gl_use else ""
-    if body.google_search_provider is not None and str(body.google_search_provider).strip():
-        prov_raw = str(body.google_search_provider).strip().lower()
-    else:
-        prov_raw = str(val.get("google_search_provider") or os.getenv("MARKETING_GOOGLE_SEARCH_PROVIDER") or "serper").strip().lower()
-    search_provider = "serper" if prov_raw in ("serper", "serper.dev", "google.serper") else "serpapi"
+def _run_google_serp_discovery(
+    supabase: Any,
+    *,
+    templates: list[str],
+    max_queries: int,
+    key_override: str | None,
+    per_q: int,
+    gl_use: str | None,
+    hl_use: str | None,
+    search_provider: str,
+    campaign_id: str | None,
+    cron_style_organic_errors: bool = False,
+) -> dict[str, Any]:
+    """
+    Shared Google SERP → lead upsert path for admin /discover and GET /cron/marketing-discover.
+    When campaign_id is empty, _upsert_lead assigns marketing default or highest-priority campaign.
+    """
     lead_source = "serper_google" if search_provider == "serper" else "serpapi_google"
-
+    tag_cc = gl_use.lower()[:4] if gl_use else ""
     created = 0
     errs: list[str] = []
     per_query: list[dict[str, Any]] = []
+    max_q = max(1, min(max_queries, 10))
+    slice_templates = templates[:max_q]
 
-    for q in templates[:max_q]:
+    for q in slice_templates:
         try:
             resp = search_google(
                 query=q,
@@ -862,11 +867,19 @@ async def discover_serpapi(
             organic = resp.get("organic_results") or []
             if not organic:
                 msg = (
-                    "Search API returned no organic results for this query (layout may be local pack, "
-                    "news, or zero web matches). Try a broader query or set country / hl for your market."
+                    "no organic_results (try broader query or SERPAPI_GL / SERPAPI_HL for regional SERPs)"
+                    if cron_style_organic_errors
+                    else (
+                        "Search API returned no organic results for this query (layout may be local pack, "
+                        "news, or zero web matches). Try a broader query or set country / hl for your market."
+                    )
                 )
                 errs.append(f"{q}: {msg}")
-                logger.warning("marketing discover: zero organic_results query=%r keys=%s", q, list(resp.keys())[:20])
+                logger.warning(
+                    "marketing serp discover: zero organic_results query=%r keys=%s",
+                    q,
+                    list(resp.keys())[:20],
+                )
             candidates = organic_results_to_lead_candidates(resp, query=q)
             stored_q = 0
             for c in candidates:
@@ -877,7 +890,7 @@ async def discover_serpapi(
                 _upsert_lead(
                     supabase,
                     c,
-                    campaign_id=body.campaign_id,
+                    campaign_id=campaign_id,
                     source=lead_source,
                     run_sanitize=True,
                 )
@@ -899,14 +912,57 @@ async def discover_serpapi(
             errs.append(f"{q}: {e}")
             log_error(supabase, severity="error", message=f"serp discover: {e}", context={"query": q})
 
-    return api_ok(
-        data={
-            "candidates_upserted": created,
-            "errors": errs,
-            "queries_run": templates[:max_q],
-            "per_query": per_query,
-        }
+    explicit = (str(campaign_id).strip() if campaign_id else "") or None
+    resolved_campaign_id = explicit or _default_campaign_id_for_new_leads(supabase)
+    return {
+        "candidates_upserted": created,
+        "errors": errs,
+        "queries_run": slice_templates,
+        "per_query": per_query,
+        "resolved_campaign_id": resolved_campaign_id,
+    }
+
+
+@admin_router.post("/discover")
+async def discover_serpapi(
+    body: DiscoverBody,
+    _admin: CurrentUser = Depends(require_roles("admin", "super_admin")),
+):
+    supabase = get_supabase_admin()
+    settings = _get_settings_row(supabase)
+    val = settings.get("setting_value") or {}
+    key_override = (
+        str(body.serpapi_key or "").strip()
+        or str(val.get("serpapi_key") or "").strip()
+        or None
     )
+    templates = body.queries if body.queries else (val.get("serp_query_templates") or [])
+    if not templates:
+        return api_error("No queries configured — add serp_query_templates in settings or pass queries[]", status_code=400)
+
+    max_q = max(1, min(body.max_queries, 10))
+    per_q = max(1, min(int(val.get("serp_results_per_query") or 10), 20))
+    gl_use = (str(body.gl or val.get("serp_target_country_code") or "").strip() or None)
+    hl_use = (str(body.hl or val.get("serp_target_hl") or "").strip() or None)
+    if body.google_search_provider is not None and str(body.google_search_provider).strip():
+        prov_raw = str(body.google_search_provider).strip().lower()
+    else:
+        prov_raw = str(val.get("google_search_provider") or os.getenv("MARKETING_GOOGLE_SEARCH_PROVIDER") or "serper").strip().lower()
+    search_provider = "serper" if prov_raw in ("serper", "serper.dev", "google.serper") else "serpapi"
+
+    data = _run_google_serp_discovery(
+        supabase,
+        templates=templates,
+        max_queries=max_q,
+        key_override=key_override,
+        per_q=per_q,
+        gl_use=gl_use,
+        hl_use=hl_use,
+        search_provider=search_provider,
+        campaign_id=body.campaign_id,
+        cron_style_organic_errors=False,
+    )
+    return api_ok(data=data)
 
 
 # ---------- Admin: logs & dashboard ----------
@@ -1160,54 +1216,29 @@ async def cron_marketing_discover(max_queries: int = Query(default=2, ge=1, le=1
     per_q = max(1, min(int(val.get("serp_results_per_query") or 10), 20))
     gl_use = (str(val.get("serp_target_country_code") or "").strip() or None)
     hl_use = (str(val.get("serp_target_hl") or "").strip() or None)
-    tag_cc = gl_use.lower()[:4] if gl_use else ""
     prov_raw = str(val.get("google_search_provider") or os.getenv("MARKETING_GOOGLE_SEARCH_PROVIDER") or "serper").strip().lower()
     search_provider = "serper" if prov_raw in ("serper", "serper.dev", "google.serper") else "serpapi"
-    lead_source = "serper_google" if search_provider == "serper" else "serpapi_google"
-    created = 0
-    errs: list[str] = []
-    per_query: list[dict[str, Any]] = []
-    for q in templates[:max_queries]:
-        try:
-            resp = search_google(
-                query=q,
-                num=per_q,
-                api_key=key_override,
-                gl=gl_use,
-                hl=hl_use,
-                provider=search_provider,
-            )
-            organic = resp.get("organic_results") or []
-            if not organic:
-                errs.append(
-                    f"{q}: no organic_results (try broader query or SERPAPI_GL / SERPAPI_HL for regional SERPs)"
-                )
-                logger.warning("cron marketing-discover: zero organic_results query=%r", q)
-            candidates = organic_results_to_lead_candidates(resp, query=q)
-            stored_q = 0
-            for c in candidates:
-                if tag_cc:
-                    c["target_country_code"] = tag_cc
-                if not _discovery_candidate_has_usable_email(c):
-                    continue
-                _upsert_lead(supabase, c, campaign_id=None, source=lead_source, run_sanitize=True)
-                created += 1
-                stored_q += 1
-            per_query.append(
-                {
-                    "query": q,
-                    "organic_count": len(organic),
-                    "candidates_seen": len(candidates),
-                    "candidates_stored": stored_q,
-                }
-            )
-            if organic and candidates and stored_q == 0:
-                errs.append(
-                    f"{q}: skipped {len(candidates)} organic row(s) — no valid non-disposable email in SERP/snippet scrape"
-                )
-        except Exception as e:
-            errs.append(str(e))
-    return {"ok": True, "candidates_upserted": created, "errors": errs, "per_query": per_query}
+
+    data = _run_google_serp_discovery(
+        supabase,
+        templates=[str(t).strip() for t in templates if str(t).strip()],
+        max_queries=max_queries,
+        key_override=key_override,
+        per_q=per_q,
+        gl_use=gl_use,
+        hl_use=hl_use,
+        search_provider=search_provider,
+        campaign_id=None,
+        cron_style_organic_errors=True,
+    )
+    return {
+        "ok": True,
+        "candidates_upserted": data["candidates_upserted"],
+        "errors": data["errors"],
+        "per_query": data["per_query"],
+        "resolved_campaign_id": data.get("resolved_campaign_id"),
+        "note": "Leads use default_outbound_campaign_id from settings, else highest-priority unpaused campaign (else any campaign).",
+    }
 
 
 class EspWebhookBody(BaseModel):
