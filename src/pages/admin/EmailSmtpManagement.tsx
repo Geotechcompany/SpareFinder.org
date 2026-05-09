@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import AdminDesktopSidebar from "@/components/AdminDesktopSidebar";
+import { AdminPageHeader, AdminPageHeaderToolbar } from "@/components/admin/AdminPageHeader";
 import { ADMIN_MOBILE_TOP_PADDING, useAdminMainMotion } from "@/lib/admin-layout";
 import {
   Card,
@@ -497,64 +498,19 @@ const EmailSmtpManagement = () => {
           transition={{ duration: 0.5 }}
           className="space-y-6 lg:space-y-8 max-w-6xl mx-auto"
         >
-          {/* Header */}
-          <div className="relative">
-            <div className="absolute inset-0 bg-gradient-to-r from-blue-600/10 to-purple-600/10 rounded-3xl blur-xl opacity-60" />
-            <div className="relative bg-black/20 backdrop-blur-xl rounded-3xl p-6 border border-white/10">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                <div>
-                  <motion.div
-                    initial={{ opacity: 0, scale: 0.8 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    transition={{ delay: 0.2 }}
-                    className="inline-flex items-center px-4 py-2 bg-gradient-to-r from-blue-600/20 to-purple-600/20 rounded-full border border-blue-500/30 backdrop-blur-xl mb-4"
-                  >
-                    <motion.div
-                      animate={{ rotate: [0, 360] }}
-                      transition={{
-                        duration: 3,
-                        repeat: Infinity,
-                        ease: "linear",
-                      }}
-                      className="mr-2"
-                    >
-                      <Mail className="w-4 h-4 text-blue-400" />
-                    </motion.div>
-                    <span className="text-blue-300 text-sm font-semibold">
-                      Email Configuration
-                    </span>
-                  </motion.div>
-                  <motion.h1
-                    className="text-3xl lg:text-4xl font-bold bg-gradient-to-r from-white via-blue-100 to-purple-100 bg-clip-text text-transparent mb-3"
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: 0.3 }}
-                  >
-                    Email SMTP Management
-                  </motion.h1>
-                  <motion.p
-                    className="text-gray-400 text-lg"
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: 0.4 }}
-                  >
-                    Configure email server settings and templates
-                  </motion.p>
-                </div>
-                <motion.div
-                  initial={{ opacity: 0, scale: 0.8 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={{ delay: 0.5 }}
-                  className="flex items-center space-x-3"
-                >
-                  <Badge className="bg-green-600/20 text-green-300 border-green-500/30 px-3 py-1">
-                    <CheckCircle className="w-4 h-4 mr-2" />
-                    SMTP Active
-                  </Badge>
-                </motion.div>
-              </div>
-            </div>
-          </div>
+          <AdminPageHeader
+            breadcrumbPage="Email & delivery"
+            title="Email & SMTP"
+            description="Outgoing mail server, templates, and test sends — what members see in their inbox."
+            actions={
+              <AdminPageHeaderToolbar>
+                <Badge className="h-9 shrink-0 rounded-full border border-emerald-500/25 bg-emerald-500/10 px-3 text-xs font-medium text-emerald-800 dark:border-emerald-400/30 dark:bg-emerald-500/15 dark:text-emerald-100">
+                  <CheckCircle className="mr-1.5 h-3.5 w-3.5" aria-hidden />
+                  SMTP on
+                </Badge>
+              </AdminPageHeaderToolbar>
+            }
+          />
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
             {/* SMTP Configuration */}

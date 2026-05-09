@@ -319,8 +319,10 @@ async def ai_generate_campaign(
         f"Tone: {body.tone or 'professional and concise'}\n"
         "Generate one outbound email: subject line, HTML fragment (no full document), and plain-text body.\n"
         "Use merge placeholders exactly (double curly braces) — do not hard-code example names or companies. "
-        "Allowed tokens: {{first_name}}, {{full_name}}, {{company}}, {{job_title}}, {{email}}, {{platform}}. "
+        "Allowed tokens: {{first_name}}, {{full_name}}, {{company}}, {{job_title}}, {{email}}, {{platform}}, {{frontend_url}} for the main CTA link. "
         "You may use {{unsubscribe_url}} in HTML if needed.\n"
+        "Sign the email as The SpareFinder team (literal text), not [Your Name]. Use correct grammar, e.g. "
+        "'about how SpareFinder can support', not 'about SpareFinder can support'.\n"
         "Do not add a legal footer or unsubscribe block; the sending system appends compliance automatically."
     )
     content = generate_email_with_openai(

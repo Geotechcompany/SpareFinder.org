@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import AdminDesktopSidebar from "@/components/AdminDesktopSidebar";
+import { AdminPageHeader, AdminPageHeaderToolbar } from "@/components/admin/AdminPageHeader";
 import { ADMIN_MOBILE_TOP_PADDING, useAdminMainMotion } from "@/lib/admin-layout";
 import { Button } from "@/components/ui/button";
 import {
@@ -33,6 +34,11 @@ import {
 import { adminApi } from "@/lib/api";
 import { MARKETING_SERP_COUNTRIES, marketingCountryLabel } from "@/lib/marketingCountries";
 import { useToast } from "@/components/ui/use-toast";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import {
   Loader2,
   Megaphone,
@@ -512,22 +518,49 @@ const MarketingOutbound: React.FC = () => {
         className={`flex-1 overflow-auto p-4 sm:p-6 md:p-10 ${ADMIN_MOBILE_TOP_PADDING}`}
       >
         <div className="mx-auto max-w-6xl space-y-6 sm:space-y-8">
-          <div className="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
-            <div className="min-w-0">
-              <h1 className="text-2xl font-bold tracking-tight flex flex-wrap items-center gap-2 sm:text-3xl">
-                <Megaphone className="h-8 w-8 text-primary" />
+          <AdminPageHeader
+            breadcrumbPage="Email campaigns"
+            title={
+              <h1 className="flex flex-wrap items-center gap-2 text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
+                <Megaphone className="h-8 w-8 shrink-0 text-primary" aria-hidden />
                 Email campaigns
               </h1>
-              <p className="text-muted-foreground mt-1 text-sm sm:text-base break-words">
-                Build campaigns, manage contacts, find leads on Google, and see what was sent. For timed jobs, see{" "}
-                <code className="text-xs bg-muted px-1 rounded break-all">docs/MARKETING_CRON.md</code>.
-              </p>
-            </div>
-            <Button variant="outline" size="sm" className="shrink-0 self-start sm:self-auto" onClick={() => loadAll()} disabled={loading}>
-              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-              <span className="ml-2">Refresh</span>
-            </Button>
-          </div>
+            }
+            description={
+              <>
+                Build campaigns, manage contacts, find people on Google, and review what was sent. Scheduled sends are
+                documented in{" "}
+                <code className="rounded bg-muted px-1.5 py-0.5 text-xs break-all">docs/MARKETING_CRON.md</code>.
+              </>
+            }
+            actions={
+              <AdminPageHeaderToolbar>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-9 gap-2 rounded-xl px-3 text-muted-foreground hover:bg-muted/80 hover:text-foreground"
+                      onClick={() => loadAll()}
+                      disabled={loading}
+                      aria-label="Refresh marketing data"
+                    >
+                      {loading ? (
+                        <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
+                      ) : (
+                        <RefreshCw className="h-4 w-4 shrink-0" />
+                      )}
+                      <span className="hidden sm:inline">Update</span>
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" className="text-xs">
+                    Reload lists and stats
+                  </TooltipContent>
+                </Tooltip>
+              </AdminPageHeaderToolbar>
+            }
+          />
 
           {loading && !dashboard ? (
             <div className="flex justify-center py-24">

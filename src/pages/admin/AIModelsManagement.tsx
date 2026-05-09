@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import AdminDesktopSidebar from '@/components/AdminDesktopSidebar';
+import { AdminPageHeader, AdminPageHeaderToolbar } from '@/components/admin/AdminPageHeader';
 import { ADMIN_MOBILE_TOP_PADDING, useAdminMainMotion } from '@/lib/admin-layout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -12,7 +13,6 @@ import { useToast } from '@/components/ui/use-toast';
 import { api } from '@/lib/api';
 import { SpinningLogoLoader } from '@/components/brand/spinning-logo-loader';
 import { 
-  BrainCircuit, 
   Plus, 
   Key, 
   Cpu,
@@ -223,62 +223,23 @@ const AIModelsManagement = () => {
           transition={{ duration: 0.5 }}
           className="space-y-6 lg:space-y-8 max-w-7xl mx-auto"
         >
-          {/* Header */}
-          <div className="relative">
-            <div className="absolute inset-0 bg-gradient-to-r from-blue-600/10 to-purple-600/10 rounded-3xl blur-xl opacity-60" />
-            <div className="relative bg-black/20 backdrop-blur-xl rounded-3xl p-6 border border-white/10">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                <div>
-                  <motion.div
-                    initial={{ opacity: 0, scale: 0.8 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    transition={{ delay: 0.2 }}
-                    className="inline-flex items-center px-4 py-2 bg-gradient-to-r from-blue-600/20 to-purple-600/20 rounded-full border border-blue-500/30 backdrop-blur-xl mb-4"
-                  >
-                    <motion.div
-                      animate={{ rotate: [0, 360] }}
-                      transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
-                      className="mr-2"
-                    >
-                      <BrainCircuit className="w-4 h-4 text-blue-400" />
-                    </motion.div>
-                    <span className="text-blue-300 text-sm font-semibold">AI Models</span>
-                  </motion.div>
-                  <motion.h1 
-                    className="text-3xl lg:text-4xl font-bold bg-gradient-to-r from-white via-blue-100 to-purple-100 bg-clip-text text-transparent mb-3"
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: 0.3 }}
-                  >
-                    AI Models Management
-                  </motion.h1>
-                  <motion.p 
-                    className="text-gray-400 text-lg"
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: 0.4 }}
-                  >
-                    Configure and monitor AI model integrations
-                  </motion.p>
-                </div>
-                <motion.div
-                  initial={{ opacity: 0, scale: 0.8 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={{ delay: 0.5 }}
+          <AdminPageHeader
+            breadcrumbPage="AI models"
+            title="AI models"
+            description="See usage, costs, and keys for the assistants that power searches and tools."
+            actions={
+              <AdminPageHeaderToolbar>
+                <Button
+                  type="button"
+                  size="sm"
+                  className="h-9 gap-2 rounded-xl bg-primary px-3 text-primary-foreground hover:bg-primary/90"
                 >
-                  <motion.div
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                  >
-                    <Button className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 shadow-lg shadow-blue-500/25 h-12 px-6">
-                      <Plus className="w-4 h-4 mr-2" />
-                      Add AI Model
-                    </Button>
-                  </motion.div>
-                </motion.div>
-              </div>
-            </div>
-          </div>
+                  <Plus className="h-4 w-4 shrink-0" aria-hidden />
+                  <span className="hidden sm:inline">Add model</span>
+                </Button>
+              </AdminPageHeaderToolbar>
+            }
+          />
 
           {/* AI Model Stats */}
           <motion.div

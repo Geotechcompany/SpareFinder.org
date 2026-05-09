@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { format } from "date-fns";
 import AdminDesktopSidebar from "@/components/AdminDesktopSidebar";
+import { AdminPageHeader, AdminPageHeaderToolbar } from "@/components/admin/AdminPageHeader";
 import { ADMIN_MOBILE_TOP_PADDING, useAdminMainMotion } from "@/lib/admin-layout";
 import {
   Card,
@@ -550,68 +551,28 @@ const PaymentManagement = () => {
           transition={{ duration: 0.5 }}
           className="space-y-6 lg:space-y-8 max-w-7xl mx-auto"
         >
-          {/* Header + Add Payment Method Modal */}
           <Dialog>
-            <div className="relative">
-              <div className="absolute inset-0 rounded-3xl bg-gradient-to-r from-emerald-500/5 to-green-500/5 blur-xl opacity-70 dark:from-green-600/10 dark:to-emerald-600/10" />
-              <div className="relative rounded-3xl border border-border bg-card/95 backdrop-blur-xl shadow-soft-elevated px-4 py-4 sm:px-6 sm:py-6 dark:bg-black/20 dark:border-white/10">
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                  <div>
-                    <motion.div
-                      initial={{ opacity: 0, scale: 0.8 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      transition={{ delay: 0.2 }}
-                      className="inline-flex items-center px-4 py-2 bg-gradient-to-r from-green-500/10 to-emerald-500/10 rounded-full border border-emerald-200 text-emerald-700 backdrop-blur-xl mb-4 dark:border-green-500/30 dark:text-green-300"
-                    >
-                      <motion.div
-                        animate={{ rotate: [0, 360] }}
-                        transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
-                        className="mr-2"
+            <>
+              <AdminPageHeader
+                breadcrumbPage="Payments"
+                title="Payments & checkout"
+                description="Connect card processors and keep an eye on how money moves through SpareFinder."
+                actions={
+                  <AdminPageHeaderToolbar>
+                    <DialogTrigger asChild>
+                      <Button
+                        type="button"
+                        size="sm"
+                        className="h-9 gap-2 rounded-xl bg-primary px-3 text-primary-foreground hover:bg-primary/90"
                       >
-                        <CreditCard className="w-4 h-4 text-emerald-500 dark:text-green-400" />
-                      </motion.div>
-                      <span className="text-sm font-semibold">Payments</span>
-                    </motion.div>
-                    <motion.h1 
-                      className="text-3xl lg:text-4xl font-bold tracking-tight text-foreground dark:bg-gradient-to-r dark:from-green-100 dark:to-emerald-200 dark:bg-clip-text dark:text-transparent mb-3"
-                      initial={{ opacity: 0, x: -20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: 0.3 }}
-                    >
-                      Payment Management
-                    </motion.h1>
-                    <motion.p 
-                      className="text-muted-foreground text-lg"
-                      initial={{ opacity: 0, x: -20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: 0.4 }}
-                    >
-                      Manage payment gateways and transaction processing
-                    </motion.p>
-                  </div>
-                  <motion.div
-                    initial={{ opacity: 0, scale: 0.8 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    transition={{ delay: 0.5 }}
-                  >
-                    <motion.div
-                      whileHover={{ scale: 1.05 }}
-                      whileTap={{ scale: 0.95 }}
-                    >
-                      <DialogTrigger asChild>
-                        <Button className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 shadow-lg shadow-green-500/25 h-12 px-6">
-                          <Plus className="w-4 h-4 mr-2" />
-                          Add Payment Method
-                        </Button>
-                      </DialogTrigger>
-                    </motion.div>
-                  </motion.div>
-                </div>
-              </div>
-            </div>
-
-            {/* Add Payment Method Modal */}
-            <DialogContent>
+                        <Plus className="h-4 w-4 shrink-0" aria-hidden />
+                        <span className="hidden sm:inline">Add method</span>
+                      </Button>
+                    </DialogTrigger>
+                  </AdminPageHeaderToolbar>
+                }
+              />
+              <DialogContent>
               <DialogHeader>
                 <DialogTitle>Add Payment Method</DialogTitle>
                 <DialogDescription>
@@ -735,6 +696,7 @@ const PaymentManagement = () => {
               </div>
               <DialogFooter />
             </DialogContent>
+            </>
           </Dialog>
 
           {/* Payment Stats */}

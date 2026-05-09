@@ -32,6 +32,41 @@ class EmailContent(BaseModel):
     text: str = ""
 
 
+def _polish_generated_email_copy(subject: str, html: str, text: str) -> tuple[str, str, str]:
+    """Fix common model slip-ups before merge or send."""
+
+    def _one(s: str) -> str:
+        if not s:
+            return s
+        s = re.sub(
+            r"\babout\s+SpareFinder\s+can\s+support\b",
+            "about how SpareFinder can support",
+            s,
+            flags=re.IGNORECASE,
+        )
+        s = re.sub(
+            r"\bdiscussion\s+about\s+SpareFinder\s+can\b",
+            "discussion about how SpareFinder can",
+            s,
+            flags=re.IGNORECASE,
+        )
+        for old, new in (
+            ("[Your Name]", "The SpareFinder team"),
+            ("[your name]", "The SpareFinder team"),
+            ("[Your Position]", ""),
+            ("[your position]", ""),
+            ("[Your Title]", ""),
+            ("[your title]", ""),
+        ):
+            s = s.replace(old, new)
+        s = s.replace("Example Corp", "{{company}}")
+        s = re.sub(r"\bExample\s+Corp\b", "{{company}}", s, flags=re.IGNORECASE)
+        s = re.sub(r"\n{3,}", "\n\n", s)
+        return s.strip()
+
+    return _one(subject), _one(html), _one(text)
+
+
 class ExtractedLeadFields(BaseModel):
     email: str = ""
     full_name: str = ""
@@ -186,11 +221,22 @@ def generate_email_with_openai(
     ctx = json.dumps(lead_context, ensure_ascii=False)[:8000]
 
     system = (
-        "You write concise B2B cold outreach for SpareFinder. "
-        "Rules: no false financial incentives, no fake payouts, no government/bank impersonation. "
-        "Include a professional tone. Output JSON with keys subject, html, text. "
-        "HTML must be a simple fragment (no full document). "
-        "The compliance footer HTML will be appended by the system — you may reference that an unsubscribe link exists."
+        "You write concise B2B cold outreach for SpareFinder (industrial spare parts: identify parts from photos, find suppliers). "
+        "Rules: no false financial incentives, no fake payouts, no government/bank impersonation. Honest, professional tone. "
+        "Output JSON only with keys subject, html, text. "
+        "HTML: body fragment only (no <html> document). Wrap the letter in ONE outer "
+        '<div style="font-family:system-ui,-apple-system,Segoe UI,sans-serif;font-size:16px;line-height:1.55;'
+        'color:#0f172a;max-width:560px">…</div>. '
+        'Use <p style="margin:0 0 14px"> for paragraphs. '
+        "Include one clear call-to-action as a single rounded button-style link, e.g. "
+        '<a href="{{frontend_url}}" style="display:inline-block;background:#4f46e5;color:#fff;padding:12px 20px;'
+        'border-radius:999px;text-decoration:none;font-weight:600;font-size:15px">See how SpareFinder works</a> '
+        "(label may vary but must stay truthful). "
+        "For the reader's company and name use merge tokens {{company}}, {{first_name}}, {{job_title}} where appropriate — "
+        "never hard-code fake companies like Example Corp or Acme. "
+        "Signature: end with Best regards, then a line The SpareFinder team — do NOT use [Your Name], [Your Position], or any bracket placeholders. "
+        "Grammar must be correct, e.g. write 'about how SpareFinder can support…', never 'about SpareFinder can support…'. "
+        "A short compliance footer is appended by the system; do not add long legal blocks."
     )
     user = {
         "campaign_brief": campaign_brief,
@@ -215,11 +261,12 @@ def generate_email_with_openai(
     except json.JSONDecodeError:
         return EmailContent(subject="SpareFinder for your spare parts workflow", html="<p></p>", text="")
 
-    return EmailContent(
-        subject=str(data.get("subject") or "")[:300],
-        html=str(data.get("html") or "")[:50000],
-        text=str(data.get("text") or "")[:20000],
+    subj, html_out, txt = _polish_generated_email_copy(
+        str(data.get("subject") or ""),
+        str(data.get("html") or ""),
+        str(data.get("text") or ""),
     )
+    return EmailContent(subject=subj[:300], html=html_out[:50000], text=txt[:20000])
 
 
 def generate_email_with_crew(
@@ -264,7 +311,8 @@ def generate_email_with_crew(
         description="Using the strategist output and this merge-resolved HTML preview (for tone only):\n"
         f"{merge_preview[:4000]}\n\n"
         'Return a single JSON object (and nothing else) with keys: "subject", "html", "text". '
-        "HTML is a simple fragment. No false financial claims.",
+        "HTML is a styled fragment (outer div, paragraphs, one CTA button-link). Use {{company}} and {{first_name}}; "
+        "no [Your Name] or Example Corp. Sign off as The SpareFinder team. No false financial claims.",
         agent=copywriter,
         expected_output='JSON: {"subject":"...","html":"...","text":"..."}',
         context=[task1],
@@ -284,11 +332,12 @@ def generate_email_with_crew(
         end = result_text.rfind("}")
         if start >= 0 and end > start:
             data = json.loads(result_text[start : end + 1])
-            return EmailContent(
-                subject=str(data.get("subject") or "")[:300],
-                html=str(data.get("html") or "")[:50000],
-                text=str(data.get("text") or "")[:20000],
+            subj, html_out, txt = _polish_generated_email_copy(
+                str(data.get("subject") or ""),
+                str(data.get("html") or ""),
+                str(data.get("text") or ""),
             )
+            return EmailContent(subject=subj[:300], html=html_out[:50000], text=txt[:20000])
     except Exception as e:
         logger.warning("Crew outbound JSON parse failed: %s", e)
 

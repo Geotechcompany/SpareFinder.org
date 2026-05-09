@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { adminApi } from "../../lib/api";
 import AdminDesktopSidebar from "../AdminDesktopSidebar";
+import { AdminPageHeader, AdminPageHeaderToolbar } from "@/components/admin/AdminPageHeader";
 import { ADMIN_MOBILE_TOP_PADDING, useAdminMainMotion } from "@/lib/admin-layout";
 import {
   Card,
@@ -213,21 +214,27 @@ const SubscribersManagement: React.FC = () => {
           animate={mainMotion}
           transition={{ duration: 0.3, ease: "easeInOut" }}
         >
-          <div className="border-b border-border bg-card px-4 py-4 shadow-sm dark:border-gray-700 dark:bg-gray-800 sm:px-6">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <h1 className="text-xl font-bold text-foreground dark:text-white sm:text-2xl">
-                  Subscribers Management
-                </h1>
-                <p className="text-sm text-muted-foreground dark:text-gray-300">
-                  Manage user subscriptions and billing
-                </p>
-              </div>
-              <Button onClick={fetchSubscribers} disabled={loading} className="shrink-0 self-start sm:self-auto">
-                <RefreshCw className="mr-2 h-4 w-4" />
-                Refresh
-              </Button>
-            </div>
+          <div className="p-4 sm:p-6">
+            <AdminPageHeader
+              breadcrumbPage="Subscribers"
+              title="Subscriptions & billing"
+              description="Plans, renewals, and subscriber activity in one place."
+              actions={
+                <AdminPageHeaderToolbar>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-9 gap-2 rounded-xl px-3 text-muted-foreground hover:bg-muted/80 hover:text-foreground"
+                    onClick={fetchSubscribers}
+                    disabled={loading}
+                  >
+                    <RefreshCw className={`h-4 w-4 shrink-0 ${loading ? "animate-spin" : ""}`} />
+                    <span className="hidden sm:inline">Update</span>
+                  </Button>
+                </AdminPageHeaderToolbar>
+              }
+            />
           </div>
 
           <div className="flex-1 space-y-6 p-4 sm:p-6">
@@ -258,21 +265,27 @@ const SubscribersManagement: React.FC = () => {
         transition={{ duration: 0.3, ease: "easeInOut" }}
         className={`flex flex-1 flex-col ${ADMIN_MOBILE_TOP_PADDING}`}
       >
-        <div className="border-b border-border bg-card px-4 py-4 shadow-sm dark:border-gray-700 dark:bg-gray-800 sm:px-6">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h1 className="text-xl font-bold text-foreground dark:text-white sm:text-2xl">
-                Subscribers Management
-              </h1>
-              <p className="text-sm text-muted-foreground dark:text-gray-300">
-                Manage user subscriptions and billing
-              </p>
-            </div>
-            <Button onClick={fetchSubscribers} disabled={loading} className="shrink-0 self-start sm:self-auto">
-              <RefreshCw className={`mr-2 h-4 w-4 ${loading ? "animate-spin" : ""}`} />
-              Refresh
-            </Button>
-          </div>
+        <div className="p-4 sm:p-6">
+          <AdminPageHeader
+            breadcrumbPage="Subscribers"
+            title="Subscriptions & billing"
+            description="Plans, renewals, and subscriber activity in one place."
+            actions={
+              <AdminPageHeaderToolbar>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-9 gap-2 rounded-xl px-3 text-muted-foreground hover:bg-muted/80 hover:text-foreground"
+                  onClick={fetchSubscribers}
+                  disabled={loading}
+                >
+                  <RefreshCw className={`h-4 w-4 shrink-0 ${loading ? "animate-spin" : ""}`} />
+                  <span className="hidden sm:inline">Update</span>
+                </Button>
+              </AdminPageHeaderToolbar>
+            }
+          />
         </div>
 
         <div className="flex-1 space-y-6 p-4 sm:p-6">

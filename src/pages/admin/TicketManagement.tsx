@@ -37,6 +37,7 @@ import { api } from "@/lib/api";
 import { AdminTicketReplyComposer } from "@/components/admin/AdminTicketReplyComposer";
 import { TicketMessageRichBody } from "@/components/admin/ticketMessageRichBody";
 import AdminDesktopSidebar from "@/components/AdminDesktopSidebar";
+import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { ADMIN_MOBILE_TOP_PADDING, useAdminMainMotion } from "@/lib/admin-layout";
 import { TableSkeleton } from "@/components/skeletons";
 import { Ticket, Mail, User, Lock } from "lucide-react";
@@ -306,18 +307,18 @@ const TicketManagement = () => {
         className={`flex-1 overflow-x-auto bg-gradient-to-b from-background via-violet-50/30 to-sky-50/20 pb-10 dark:via-violet-950/20 dark:to-slate-950/40 ${ADMIN_MOBILE_TOP_PADDING}`}
       >
         <div className="mx-auto max-w-6xl space-y-6 p-3 sm:p-6 lg:p-8">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-            <div className="min-w-0">
-              <div className="flex items-center gap-3">
-                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-600 to-indigo-600 text-white shadow-lg shadow-violet-500/30">
-                  <Ticket className="h-5 w-5" />
-                </div>
-                <div>
-                  <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">Support tickets</h1>
-                </div>
-              </div>
-            </div>
-          </div>
+          <AdminPageHeader
+            breadcrumbPage="Support"
+            title={
+              <h1 className="flex items-center gap-3 text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-violet-600 to-indigo-600 text-white shadow-md shadow-violet-500/25">
+                  <Ticket className="h-5 w-5" aria-hidden />
+                </span>
+                Support tickets
+              </h1>
+            }
+            description={`${pagination.total} conversation${pagination.total !== 1 ? "s" : ""} — reply, change status, or close from the list below.`}
+          />
 
           <Card className="overflow-hidden rounded-2xl border-border/60 shadow-md shadow-black/[0.04] dark:border-border/80 dark:shadow-black/30">
             <CardHeader className="space-y-4 border-b border-border/50 bg-card/80 pb-4 pt-5 sm:flex-row sm:items-center sm:justify-between sm:space-y-0">

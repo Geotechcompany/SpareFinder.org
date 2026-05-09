@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import AdminDesktopSidebar from "@/components/AdminDesktopSidebar";
+import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { ADMIN_MOBILE_TOP_PADDING, useAdminMainMotion } from "@/lib/admin-layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -153,12 +154,11 @@ const PlansManagement = () => {
         className={`flex-1 overflow-x-auto p-4 md:p-6 lg:p-8 ${ADMIN_MOBILE_TOP_PADDING}`}
       >
         <div className="mx-auto max-w-5xl space-y-6">
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight">Pricing plans</h1>
-            <p className="text-muted-foreground">
-              Edit plan names, prices, features, and limits. Changes appear on the landing and billing pages.
-            </p>
-          </div>
+          <AdminPageHeader
+            breadcrumbPage="Pricing plans"
+            title="Pricing plans"
+            description="Names, prices, features, and limits shown on the marketing site and billing."
+          />
 
           <Card>
             <CardHeader>

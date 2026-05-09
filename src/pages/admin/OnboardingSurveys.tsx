@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import AdminDesktopSidebar from "@/components/AdminDesktopSidebar";
+import { AdminPageHeader, AdminPageHeaderToolbar } from "@/components/admin/AdminPageHeader";
 import { ADMIN_MOBILE_TOP_PADDING } from "@/lib/admin-layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -151,47 +152,51 @@ const OnboardingSurveys = () => {
           transition={{ duration: 0.35 }}
           className="space-y-6 max-w-7xl mx-auto"
         >
-              <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <FileText className="h-5 w-5 text-primary" />
-                    <h1 className="text-xl font-semibold">Onboarding Surveys</h1>
-                    <Badge variant="secondary">
+              <AdminPageHeader
+                breadcrumbPage="Welcome survey"
+                title={
+                  <h1 className="flex flex-wrap items-center gap-2 text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
+                    <FileText className="h-7 w-7 shrink-0 text-primary" aria-hidden />
+                    New member survey
+                  </h1>
+                }
+                description="How people heard about SpareFinder and what they want to do first."
+                actions={
+                  <AdminPageHeaderToolbar className="max-w-full">
+                    <Badge variant="secondary" className="h-9 shrink-0 rounded-full px-3 text-xs font-medium">
                       {summary ? `${summary.total} in ${summary.range}` : "Loading…"}
                     </Badge>
-                  </div>
-                  <p className="text-sm text-muted-foreground">
-                    See how new users discovered SpareFinder and what they’re trying to achieve.
-                  </p>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <ThemeToggle />
-                  <Select value={range} onValueChange={(v) => setRange(v as any)}>
-                    <SelectTrigger className="w-[160px]">
-                      <SelectValue placeholder="Range" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="7d">Last 7 days</SelectItem>
-                      <SelectItem value="30d">Last 30 days</SelectItem>
-                      <SelectItem value="90d">Last 90 days</SelectItem>
-                      <SelectItem value="365d">Last 365 days</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <Button
-                    variant="outline"
-                    onClick={() => fetchAll({ silent: true })}
-                    disabled={isRefreshing}
-                  >
-                    {isRefreshing ? (
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    ) : (
-                      <RefreshCw className="mr-2 h-4 w-4" />
-                    )}
-                    Refresh
-                  </Button>
-                </div>
-              </div>
+                    <div className="hidden h-7 w-px bg-border/70 sm:block" aria-hidden />
+                    <ThemeToggle />
+                    <Select value={range} onValueChange={(v) => setRange(v as any)}>
+                      <SelectTrigger className="h-9 w-[9.5rem] shrink-0 rounded-xl text-xs sm:text-sm">
+                        <SelectValue placeholder="Range" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="7d">Last 7 days</SelectItem>
+                        <SelectItem value="30d">Last 30 days</SelectItem>
+                        <SelectItem value="90d">Last 90 days</SelectItem>
+                        <SelectItem value="365d">Last 365 days</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-9 gap-2 rounded-xl px-3 text-muted-foreground hover:bg-muted/80 hover:text-foreground"
+                      onClick={() => fetchAll({ silent: true })}
+                      disabled={isRefreshing}
+                    >
+                      {isRefreshing ? (
+                        <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
+                      ) : (
+                        <RefreshCw className="h-4 w-4 shrink-0" />
+                      )}
+                      <span className="hidden sm:inline">Update</span>
+                    </Button>
+                  </AdminPageHeaderToolbar>
+                }
+              />
 
               {/* Summary */}
               <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
