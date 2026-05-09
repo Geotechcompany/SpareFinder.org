@@ -286,7 +286,7 @@ const AdminDashboardLayout = () => {
       setError(errorMessage);
       toast({
         variant: "destructive",
-        title: "Error",
+        title: "Could not load dashboard",
         description: errorMessage,
       });
     } finally {
@@ -303,8 +303,8 @@ const AdminDashboardLayout = () => {
     if (!isAuthenticated) {
       toast({
         variant: "destructive",
-        title: "Authentication Required",
-        description: "Please log in to refresh admin data.",
+        title: "Please sign in",
+        description: "You need to be logged in to refresh this page.",
       });
       navigate("/admin/login");
       return;
@@ -312,8 +312,8 @@ const AdminDashboardLayout = () => {
 
     fetchAdminData();
     toast({
-      title: "Data Refreshed",
-      description: "Admin dashboard data has been updated.",
+      title: "Updated",
+      description: "The latest numbers are on screen.",
     });
   };
 
@@ -374,33 +374,33 @@ const AdminDashboardLayout = () => {
   console.log("📊 Rendering admin dashboard main content");
   const quickStats = [
     {
-      title: "Total Users",
+      title: "Signed-up users",
       value: stats?.total_users?.toLocaleString() || "0",
-      change: `+${stats?.new_users_today || 0} today`,
+      change: `+${stats?.new_users_today || 0} joined today`,
       icon: Users,
       color: "bg-accent/20 text-accent",
       trend: "up",
     },
     {
-      title: "Total Searches",
+      title: "Part lookups",
       value: stats?.total_searches?.toLocaleString() || "0",
-      change: `+${stats?.searches_today || 0} today`,
+      change: `+${stats?.searches_today || 0} run today`,
       icon: Search,
       color: "bg-emerald-500/20 text-emerald-500",
       trend: "up",
     },
     {
-      title: "Active Users",
+      title: "Recently active users",
       value: stats?.active_users?.toLocaleString() || "0",
-      change: "Last 30 days",
+      change: "Used the app in the last 30 days",
       icon: Activity,
       color: "bg-primary/20 text-primary",
       trend: "up",
     },
     {
-      title: "Success Rate",
+      title: "Successful AI matches",
       value: `${stats?.success_rate?.toFixed(1) || "0"}%`,
-      change: "AI Accuracy",
+      change: "Lookups that ended with a strong match",
       icon: TrendingUp,
       color: "bg-amber-500/20 text-amber-500",
       trend: "up",
@@ -409,25 +409,25 @@ const AdminDashboardLayout = () => {
 
   const systemMetrics = [
     {
-      title: "Response Time",
+      title: "Typical response time",
       value: `${stats?.avg_response_time || 0}ms`,
       icon: Zap,
       color: "text-yellow-400",
     },
     {
-      title: "CPU Usage",
+      title: "Server processing",
       value: `${stats?.cpu_usage || 0}%`,
       icon: Server,
       color: "text-blue-400",
     },
     {
-      title: "Memory Usage",
+      title: "Server memory in use",
       value: `${stats?.memory_usage || 0}%`,
       icon: Database,
       color: "text-green-400",
     },
     {
-      title: "Disk Usage",
+      title: "Disk space used",
       value: `${stats?.disk_usage || 0}%`,
       icon: Database,
       color: "text-purple-400",
@@ -436,42 +436,42 @@ const AdminDashboardLayout = () => {
 
   const revenueStats = [
     {
-      title: "Estimated Monthly Revenue",
+      title: "Rough monthly income",
       value:
         estimatedRevenue !== null
           ? `£${estimatedRevenue.toLocaleString()}`
           : "£0",
-      change: "Based on current subscriptions",
+      change: "From listed plan prices (estimate only)",
       icon: DollarSign,
       color: "from-emerald-600 to-green-600",
     },
     {
-      title: "Total Subscribers",
+      title: "People on a plan",
       value:
         subscriptionStats?.total !== undefined
           ? subscriptionStats.total.toLocaleString()
           : "0",
-      change: "All plans",
+      change: "Free and paid plans combined",
       icon: Users,
       color: "bg-accent/20 text-accent",
     },
     {
-      title: "Active Subscriptions",
+      title: "Paying subscriptions",
       value:
         subscriptionStats?.by_status?.active !== undefined
           ? subscriptionStats.by_status.active.toLocaleString()
           : "0",
-      change: "Currently billed",
+      change: "Currently in good standing",
       icon: CreditCard,
       color: "bg-primary/20 text-primary",
     },
     {
-      title: "Canceled / Churned",
+      title: "Canceled plans",
       value:
         subscriptionStats?.by_status?.canceled !== undefined
           ? subscriptionStats.by_status.canceled.toLocaleString()
           : "0",
-      change: "Total cancellations",
+      change: "All-time cancellations",
       icon: TrendingUp,
       color: "bg-amber-500/20 text-amber-500",
     },
@@ -586,16 +586,16 @@ const AdminDashboardLayout = () => {
                   </BreadcrumbItem>
                   <BreadcrumbSeparator />
                   <BreadcrumbItem>
-                    <BreadcrumbPage>Overview</BreadcrumbPage>
+                    <BreadcrumbPage>Home</BreadcrumbPage>
                   </BreadcrumbItem>
                 </BreadcrumbList>
               </Breadcrumb>
               <div>
                 <h1 className="text-3xl lg:text-4xl font-bold tracking-tight text-foreground tracking-[-0.02em]">
-                  Admin Dashboard
+                  Your dashboard
                 </h1>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  Welcome back, {adminUser?.full_name || "Administrator"}
+                  Hello, {adminUser?.full_name || "Administrator"} — here is how SpareFinder is doing.
                 </p>
               </div>
             </div>
@@ -740,10 +740,10 @@ const AdminDashboardLayout = () => {
                     <div>
                       <CardTitle className="flex items-center gap-2 text-foreground">
                         <TrendingUp className="h-5 w-5 text-purple-500 dark:text-purple-400" />
-                        Growth (last 30 days)
+                        Growth — last 30 days
                       </CardTitle>
                       <CardDescription className="text-muted-foreground">
-                        Searches and new registrations over time
+                        Daily part lookups and new sign-ups
                       </CardDescription>
                     </div>
                     <Badge
@@ -787,7 +787,7 @@ const AdminDashboardLayout = () => {
                             stroke="#8b5cf6"
                             strokeWidth={2}
                             fill="url(#gradSearches)"
-                            name="Searches"
+                            name="Lookups"
                           />
                           <Area
                             type="monotone"
@@ -795,14 +795,14 @@ const AdminDashboardLayout = () => {
                             stroke="#60a5fa"
                             strokeWidth={2}
                             fill="url(#gradRegs)"
-                            name="Registrations"
+                            name="New sign-ups"
                           />
                         </AreaChart>
                       </ResponsiveContainer>
                     </div>
                   ) : (
                     <div className="h-[280px] flex items-center justify-center text-muted-foreground">
-                      No chart data yet.
+                      No data for this chart yet.
                     </div>
                   )}
                 </CardContent>
@@ -821,10 +821,10 @@ const AdminDashboardLayout = () => {
                 <CardHeader className="pb-2">
                   <CardTitle className="flex items-center gap-2 text-foreground">
                     <CreditCard className="h-5 w-5 text-emerald-500 dark:text-emerald-400" />
-                    Subscription mix
+                    Plans people are on
                   </CardTitle>
                   <CardDescription className="text-muted-foreground">
-                    Tier distribution
+                    Free, Pro, and Enterprise breakdown
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="pt-2">
@@ -857,7 +857,7 @@ const AdminDashboardLayout = () => {
                     </div>
                   ) : (
                     <div className="h-[280px] flex items-center justify-center text-muted-foreground">
-                      No subscription data yet.
+                      No subscription breakdown yet.
                     </div>
                   )}
                 </CardContent>
@@ -879,10 +879,10 @@ const AdminDashboardLayout = () => {
                   <div>
                     <CardTitle className="flex items-center gap-2 text-foreground">
                       <FileText className="h-5 w-5 text-blue-500 dark:text-blue-400" />
-                      Acquisition sources
+                      Where people heard about you
                     </CardTitle>
                     <CardDescription className="text-muted-foreground">
-                      From onboarding survey (top sources)
+                      Top answers from the welcome survey
                     </CardDescription>
                   </div>
                   <Badge
@@ -915,7 +915,7 @@ const AdminDashboardLayout = () => {
                   </div>
                 ) : (
                   <div className="h-[260px] flex items-center justify-center text-muted-foreground">
-                    No onboarding survey data yet.
+                    No survey answers to show yet.
                   </div>
                 )}
               </CardContent>
@@ -936,10 +936,10 @@ const AdminDashboardLayout = () => {
                 <CardHeader>
                   <CardTitle className="flex items-center space-x-2 text-foreground">
                     <Server className="w-5 h-5 text-purple-500 dark:text-purple-400" />
-                    <span>System Performance</span>
+                    <span>How the servers are doing</span>
                   </CardTitle>
                   <CardDescription className="text-muted-foreground">
-                    Real-time system metrics
+                    Live readings (may be a minute behind)
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -975,10 +975,10 @@ const AdminDashboardLayout = () => {
                 <CardHeader>
                   <CardTitle className="flex items-center space-x-2 text-foreground">
                     <Activity className="w-5 h-5 text-purple-500 dark:text-purple-400" />
-                    <span>Recent Activity</span>
+                    <span>Latest part lookups</span>
                   </CardTitle>
                   <CardDescription className="text-muted-foreground">
-                    Latest system activity
+                    The five most recent searches
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -993,7 +993,7 @@ const AdminDashboardLayout = () => {
                           <div className="flex items-center space-x-3">
                             <Search className="w-4 h-4 text-blue-400" />
                             <div>
-                              <p className="text-foreground text-sm">Part Search</p>
+                              <p className="text-foreground text-sm">Part lookup</p>
                               <p className="text-muted-foreground text-xs">
                                 {search.profiles?.email || "Unknown user"}
                               </p>
@@ -1014,7 +1014,7 @@ const AdminDashboardLayout = () => {
                       )) || (
                       <div className="text-center py-8 text-muted-foreground">
                         <Search className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                        <p>No recent activity</p>
+                        <p>No recent lookups yet</p>
                       </div>
                     )}
                   </div>

@@ -1001,34 +1001,57 @@ async def test_send(
     _admin: CurrentUser = Depends(require_roles("admin", "super_admin")),
 ):
     supabase = get_supabase_admin()
+    to_email = body.to_email.strip().lower()
+    if not is_valid_email(to_email):
+        raise HTTPException(status_code=400, detail="Invalid recipient email address")
     cr = supabase.table("marketing_campaigns").select("*").eq("id", body.campaign_id).single().execute()
     campaign = cr.data
     if not campaign:
         raise HTTPException(status_code=404, detail="Campaign not found")
 
-    fe = frontend_base_url()
     token = secrets.token_urlsafe(32)
-    fake_lead = {
-        "email": body.to_email.strip().lower(),
+    fake_lead: dict[str, Any] = {
+        "email": to_email,
         "full_name": _admin.full_name or "Test User",
         "company_name": "Example Corp",
         "job_title": "Procurement",
         "sanitized_full_name": _admin.full_name,
         "sanitized_company_name": "Example Corp",
         "sanitized_job_title": "Procurement",
+        "platform": "test_send",
         "raw_payload": {},
         "unsubscribe_token": token,
     }
 
-    subj, html, text = render_message_for_lead(
-        lead=fake_lead,
-        campaign=campaign,
-        use_ai=bool(campaign.get("use_ai")),
-        use_crew_ai=bool(campaign.get("use_crew_ai")),
-    )
-    ok = send_marketing_email(to_email=body.to_email.strip(), subject=subj, html=html, text=text)
+    try:
+        subj, html, text = render_message_for_lead(
+            lead=fake_lead,
+            campaign=campaign,
+            use_ai=bool(campaign.get("use_ai")),
+            use_crew_ai=bool(campaign.get("use_crew_ai")),
+        )
+    except Exception as e:
+        logger.exception("marketing test_send render")
+        log_error(
+            supabase,
+            severity="error",
+            message=f"test_send render failed: {e}",
+            context={"campaign_id": body.campaign_id},
+        )
+        raise HTTPException(status_code=500, detail=f"Failed to build message: {e}") from e
+
+    ok = send_marketing_email(to_email=to_email, subject=subj, html=html, text=text)
     if not ok:
-        raise HTTPException(status_code=502, detail="Email send failed (check SMTP / email service)")
+        log_error(
+            supabase,
+            severity="error",
+            message="test_send: SMTP and email service both failed",
+            context={"campaign_id": body.campaign_id, "to": to_email},
+        )
+        raise HTTPException(
+            status_code=502,
+            detail="Email send failed — configure SMTP (e.g. SMTP_HOST, SMTP_USER) or email service env vars on the API server.",
+        )
     return api_ok(message="Test email sent", data={"subject": subj})
 
 

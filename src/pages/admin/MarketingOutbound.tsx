@@ -22,6 +22,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { adminApi } from "@/lib/api";
 import { MARKETING_SERP_COUNTRIES, marketingCountryLabel } from "@/lib/marketingCountries";
 import { useToast } from "@/components/ui/use-toast";
@@ -56,6 +64,26 @@ function leadRowHasUsableEmail(email: unknown): boolean {
   if (!e || !MARKETING_LEAD_EMAIL_RE.test(e)) return false;
   const domain = e.split("@").pop() || "";
   return !DISPOSABLE_MARKETING_EMAIL_DOMAINS.has(domain);
+}
+
+function formatMarketingApiError(err: unknown): string {
+  if (err && typeof err === "object" && "response" in err) {
+    const r = (err as { response?: { data?: { detail?: unknown; message?: string } } }).response;
+    const detail = r?.data?.detail;
+    if (typeof detail === "string") return detail;
+    if (Array.isArray(detail)) {
+      return detail
+        .map((item) =>
+          typeof item === "object" && item !== null && "msg" in item
+            ? String((item as { msg?: string }).msg)
+            : JSON.stringify(item)
+        )
+        .join("; ");
+    }
+    if (typeof r?.data?.message === "string") return r.data.message;
+  }
+  if (err instanceof Error) return err.message;
+  return "Request failed";
 }
 
 type Campaign = {
@@ -94,6 +122,10 @@ const MarketingOutbound: React.FC = () => {
   const [isImportingCsv, setIsImportingCsv] = useState(false);
   const [csvImportStatus, setCsvImportStatus] = useState<string | null>(null);
   const [csvRunSanitize, setCsvRunSanitize] = useState(false);
+  const [testSendOpen, setTestSendOpen] = useState(false);
+  const [testSendCampaign, setTestSendCampaign] = useState<Campaign | null>(null);
+  const [testSendTo, setTestSendTo] = useState("");
+  const [testSendLoading, setTestSendLoading] = useState(false);
 
   const loadAll = useCallback(async () => {
     setLoading(true);
@@ -337,10 +369,37 @@ const MarketingOutbound: React.FC = () => {
     }
   };
 
-  const handleTestSend = async (campaignId: string, to: string) => {
-    const res = await adminApi.testMarketingEmail({ campaign_id: campaignId, to_email: to });
-    if (res.success) toast({ title: "Test email sent" });
-    else toast({ variant: "destructive", title: "Send failed", description: res.message });
+  const submitTestSend = async () => {
+    if (!testSendCampaign) return;
+    const to = testSendTo.trim().toLowerCase();
+    if (!MARKETING_LEAD_EMAIL_RE.test(to)) {
+      toast({ variant: "destructive", title: "Invalid email", description: "Enter a valid recipient address." });
+      return;
+    }
+    setTestSendLoading(true);
+    try {
+      const res = await adminApi.testMarketingEmail({ campaign_id: testSendCampaign.id, to_email: to });
+      if (res.success) {
+        const subj = (res.data as { subject?: string } | undefined)?.subject;
+        toast({
+          title: "Test email sent",
+          description: subj ? `Subject: ${subj}` : "Check the recipient inbox (and spam folder).",
+        });
+        setTestSendOpen(false);
+        setTestSendCampaign(null);
+        setTestSendTo("");
+      } else {
+        toast({
+          variant: "destructive",
+          title: "Send failed",
+          description: res.message || res.error || "Unknown error",
+        });
+      }
+    } catch (e) {
+      toast({ variant: "destructive", title: "Send failed", description: formatMarketingApiError(e) });
+    } finally {
+      setTestSendLoading(false);
+    }
   };
 
   const toggleLeadSelection = (leadId: string) => {
@@ -409,11 +468,16 @@ const MarketingOutbound: React.FC = () => {
 
     let value = "";
     if (field === "sanitization_status") {
-      value = window.prompt("Set sanitization status: accepted | review | rejected", "accepted") || "";
+      value =
+        window.prompt("Review status — type one word: accepted, review, or rejected", "accepted") || "";
     } else if (field === "lead_status_internal") {
-      value = window.prompt("Set lead status: pending | sent | bounced | opt_out | skipped", "pending") || "";
+      value =
+        window.prompt(
+          "Email send status — type one word: pending, sent, bounced, opt_out, or skipped",
+          "pending"
+        ) || "";
     } else {
-      value = window.prompt("Set campaign UUID (leave blank to clear)", "") ?? "";
+      value = window.prompt("Campaign ID (paste UUID, or leave blank to clear)", "") ?? "";
     }
     if (value === "") {
       if (field !== "campaign_id") {
@@ -451,10 +515,10 @@ const MarketingOutbound: React.FC = () => {
             <div className="min-w-0">
               <h1 className="text-2xl font-bold tracking-tight flex flex-wrap items-center gap-2 sm:text-3xl">
                 <Megaphone className="h-8 w-8 text-primary" />
-                Marketing outbound
+                Email campaigns
               </h1>
               <p className="text-muted-foreground mt-1 text-sm sm:text-base break-words">
-                Campaigns, leads, Google discovery (Serper), send logs. Cron URLs are documented in{" "}
+                Build campaigns, manage contacts, find leads on Google, and see what was sent. For timed jobs, see{" "}
                 <code className="text-xs bg-muted px-1 rounded break-all">docs/MARKETING_CRON.md</code>.
               </p>
             </div>
@@ -474,21 +538,21 @@ const MarketingOutbound: React.FC = () => {
                 <TabsTrigger value="overview">Overview</TabsTrigger>
                 <TabsTrigger value="campaigns">Campaigns</TabsTrigger>
                 <TabsTrigger value="leads">Leads</TabsTrigger>
-                <TabsTrigger value="import">CSV import</TabsTrigger>
-                <TabsTrigger value="serp">Google discovery</TabsTrigger>
-                <TabsTrigger value="logs">Send log</TabsTrigger>
-                <TabsTrigger value="errors">Errors</TabsTrigger>
+                <TabsTrigger value="import">Import spreadsheet</TabsTrigger>
+                <TabsTrigger value="serp">Find on Google</TabsTrigger>
+                <TabsTrigger value="logs">Sent emails</TabsTrigger>
+                <TabsTrigger value="errors">Issues</TabsTrigger>
               </TabsList>
 
               <TabsContent value="overview">
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                   {(
                     [
-                      ["Leads (total)", dashboard?.leads_total],
-                      ["Pending send", dashboard?.leads_pending_send],
-                      ["Needs review", dashboard?.leads_needs_review],
-                      ["Sends today (UTC)", dashboard?.sends_today],
-                      ["Failed today", dashboard?.failed_today],
+                      ["All contacts", dashboard?.leads_total],
+                      ["Waiting to email", dashboard?.leads_pending_send],
+                      ["Needs your review", dashboard?.leads_needs_review],
+                      ["Emails sent today (UTC)", dashboard?.sends_today],
+                      ["Failed sends today", dashboard?.failed_today],
                     ] as [string, unknown][]
                   ).map(([label, val]) => (
                     <Card key={label}>
@@ -502,34 +566,34 @@ const MarketingOutbound: React.FC = () => {
                 <p className="text-sm text-muted-foreground mt-4">{String(dashboard?.timezone_note || "")}</p>
                 <Card className="mt-6">
                   <CardHeader>
-                    <CardTitle>Cron setup guide</CardTitle>
+                    <CardTitle>Automatic sending (for IT / hosting)</CardTitle>
                     <CardDescription>
-                      Configure these URLs in cron-job.org (or any scheduler). These routes are public by design.
-                      Protect at network edge with IP allowlist/WAF where possible.
+                      Your team can plug these web addresses into a scheduler (for example cron-job.org). They are open
+                      links — protect them with your firewall or IP allow list if you can.
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-3 text-sm">
                     <div className="rounded border p-3">
-                      <p className="font-medium">1) Send batch</p>
-                      <p className="text-muted-foreground mb-1">Runs outbound sends for active campaigns.</p>
+                      <p className="font-medium">1) Send emails in batches</p>
+                      <p className="text-muted-foreground mb-1">Sends the next batch for campaigns that are turned on.</p>
                       <code className="block text-xs break-all">{cronBase}/cron/marketing-send?limit=20</code>
                     </div>
                     <div className="rounded border p-3">
-                      <p className="font-medium">2) Daily digest</p>
-                      <p className="text-muted-foreground mb-1">Sends yesterday summary to admin emails.</p>
+                      <p className="font-medium">2) Daily summary email</p>
+                      <p className="text-muted-foreground mb-1">Emails admins a short recap of yesterday.</p>
                       <code className="block text-xs break-all">{cronBase}/cron/marketing-digest</code>
                     </div>
                     <div className="rounded border p-3">
-                      <p className="font-medium">3) Discovery (Serper.dev)</p>
+                      <p className="font-medium">3) Find new contacts on Google</p>
                       <p className="text-muted-foreground mb-1">
-                        Pulls lead candidates from saved query templates.
+                        Runs your saved Google searches and adds people with valid email addresses.
                       </p>
                       <code className="block text-xs break-all">
                         {cronBase}/cron/marketing-discover?max_queries=3
                       </code>
                     </div>
                     <p className="text-xs text-muted-foreground">
-                      Suggested schedule: send every 1-3 hours, digest once daily, discovery once daily.
+                      Suggested timing: send mail every 1–3 hours, summary once a day, Google search once a day.
                     </p>
                   </CardContent>
                 </Card>
@@ -539,7 +603,7 @@ const MarketingOutbound: React.FC = () => {
                 <Card>
                   <CardHeader>
                     <CardTitle>Manual campaign</CardTitle>
-                    <CardDescription>Starts paused. Configure templates & limits before unpausing.</CardDescription>
+                    <CardDescription>Starts turned off. Edit the email and limits before you turn it on.</CardDescription>
                   </CardHeader>
                   <CardContent className="flex flex-wrap gap-2 items-end">
                     <div className="flex-1 min-w-[200px]">
@@ -552,7 +616,7 @@ const MarketingOutbound: React.FC = () => {
                 <Card>
                   <CardHeader>
                     <CardTitle>AI-generated campaign</CardTitle>
-                    <CardDescription>Generate a campaign draft with AI, then review and activate manually.</CardDescription>
+                    <CardDescription>Let AI write a first draft, then edit it and turn the campaign on when ready.</CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-3">
                     <div>
@@ -593,8 +657,9 @@ const MarketingOutbound: React.FC = () => {
                             size="sm"
                             variant="secondary"
                             onClick={() => {
-                              const to = window.prompt("Send test email to:");
-                              if (to) handleTestSend(c.id, to);
+                              setTestSendCampaign(c);
+                              setTestSendTo("");
+                              setTestSendOpen(true);
                             }}
                           >
                             <Mail className="h-4 w-4 mr-1" /> Test send
@@ -612,12 +677,12 @@ const MarketingOutbound: React.FC = () => {
               <TabsContent value="leads">
                 <Card>
                   <CardHeader>
-                    <CardTitle>Lead library</CardTitle>
+                    <CardTitle>Contacts</CardTitle>
                     <CardDescription>
-                      Latest 50 rows. Serp discovery leads are tagged with a target country when you set one on
-                      the Google discovery tab — filter below applies to those tags (CSV imports have no country until you
-                      extend the pipeline). <strong>Bulk sanitize status</strong> first deletes selected leads with no
-                      valid email (or a disposable domain), then asks for the new status for the rest.
+                      Showing the latest 50 rows. Contacts found on Google pick up the country you set under Find on
+                      Google — use the filter below to narrow them (spreadsheet imports do not set a country yet).{" "}
+                      <strong>Bulk review status</strong> first removes selected rows that have no real email (or use a
+                      throwaway inbox), then asks what status to give the rest.
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="overflow-x-auto">
@@ -652,15 +717,15 @@ const MarketingOutbound: React.FC = () => {
                         variant="outline"
                         onClick={() => runBulkUpdate("sanitization_status")}
                         disabled={!selectedLeadIds.length}
-                        title="Removes selected rows with no valid email first, then prompts for accepted | review | rejected"
+                        title="Removes rows with no real email first, then asks for accepted, needs review, or rejected"
                       >
-                        Bulk sanitize status
+                        Bulk review status
                       </Button>
                       <Button size="sm" variant="outline" onClick={() => runBulkUpdate("lead_status_internal")} disabled={!selectedLeadIds.length}>
-                        Bulk lead status
+                        Bulk email send status
                       </Button>
                       <Button size="sm" variant="outline" onClick={() => runBulkUpdate("campaign_id")} disabled={!selectedLeadIds.length}>
-                        Bulk assign campaign
+                        Bulk set campaign
                       </Button>
                       <Button size="sm" variant="destructive" onClick={runBulkDelete} disabled={!selectedLeadIds.length}>
                         <Trash2 className="h-4 w-4 mr-1" />
@@ -678,7 +743,7 @@ const MarketingOutbound: React.FC = () => {
                           <th className="p-2">Company</th>
                           <th className="p-2">Country</th>
                           <th className="p-2">Source</th>
-                          <th className="p-2">Sanitize</th>
+                          <th className="p-2">Review</th>
                           <th className="p-2">Status</th>
                         </tr>
                       </thead>
@@ -718,19 +783,18 @@ const MarketingOutbound: React.FC = () => {
               <TabsContent value="import">
                 <Card>
                   <CardHeader>
-                    <CardTitle>CSV import</CardTitle>
+                    <CardTitle>Import contacts from a spreadsheet</CardTitle>
                     <CardDescription>
-                      UTF-8 CSV with header row. Email column is auto-detected from common names (email,
-                      email address, work_email, business email). Optional: FULL_NAME, JOB_TITLE,
-                      COMPANY_NAME, platform. Leads must have a{" "}
-                      <strong>campaign UUID</strong> to be picked up by the send cron — paste it below or
-                      assign later in the database.
+                      Use a UTF-8 CSV with a header row. We look for an email column under common names (Email, Work
+                      email, and so on). You can also include name, job title, company, and platform columns. To send
+                      mail to these people, paste the <strong>campaign ID</strong> from the Campaigns tab (or add it
+                      later).
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <div>
-                      <Label>Optional campaign ID (UUID)</Label>
-                      <Input id="csv-campaign" placeholder="Paste campaign UUID to attach leads" />
+                      <Label>Optional campaign ID</Label>
+                      <Input id="csv-campaign" placeholder="Paste the campaign ID from the Campaigns tab" />
                     </div>
                     <div className="flex items-center gap-2">
                       <Button variant="outline" asChild>
@@ -759,7 +823,7 @@ const MarketingOutbound: React.FC = () => {
                         onChange={(e) => setCsvRunSanitize(e.target.checked)}
                       />
                       <Label htmlFor="csv-sanitize" className="text-sm">
-                        Run AI sanitization during import (slower)
+                        Let AI clean up each row during import (slower)
                       </Label>
                     </div>
                     {isImportingCsv && (
@@ -779,26 +843,22 @@ const MarketingOutbound: React.FC = () => {
                 <Card>
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
-                      <Search className="h-5 w-5" /> Google discovery
+                      <Search className="h-5 w-5" /> Find on Google
                     </CardTitle>
                     <CardDescription>
-                      <strong>Run discovery now</strong> uses the vendor and key on this screen (you do not have to Save
-                      first). Save to persist the same settings for{" "}
-                      <code className="text-xs">/api/cron/marketing-discover</code>. Google result titles/snippets rarely
-                      include email addresses — rows are often “review” with company + link until you add
-                      contacts manually or import CSV. By default the API also fetches each result URL and
-                      same-site /contact-style pages to regex-scan for addresses (slower; respect site terms). Set{" "}
-                      <code className="text-xs">MARKETING_SERP_EMAIL_SCRAPE=0</code> on the server to turn that off.
+                      <strong>Run discovery now</strong> uses the key and country settings on this page (saving first is
+                      optional). Click <strong>Save discovery settings</strong> so overnight jobs use the same choices.
+                      Google previews rarely show email addresses, so the server may open each result page (and common
+                      “Contact” pages) to look for an address — that is slower; your hosting team can turn it off with env{" "}
+                      <code className="text-xs">MARKETING_SERP_EMAIL_SCRAPE=0</code>.
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-2">
-                      <p className="text-sm font-medium">Search API: Serper.dev only</p>
+                      <p className="text-sm font-medium">Powered by Serper (Google search partner)</p>
                       <p className="text-xs text-muted-foreground">
-                        Google results via POST <code className="text-[11px]">google.serper.dev/search</code> with header{" "}
-                        <code className="text-[11px]">X-API-KEY</code>. Advanced deployments can still set{" "}
-                        <code className="text-[11px]">MARKETING_GOOGLE_SEARCH_PROVIDER=serpapi</code> on the server or patch
-                        settings to <code className="text-[11px]">serpapi</code>.
+                        Uses your Serper API key. If you ever need the older SerpAPI vendor instead, your hosting team
+                        can set <code className="text-[11px]">MARKETING_GOOGLE_SEARCH_PROVIDER=serpapi</code> on the server.
                       </p>
                     </div>
                     <div>
@@ -874,7 +934,7 @@ const MarketingOutbound: React.FC = () => {
               <TabsContent value="logs">
                 <Card>
                   <CardHeader>
-                    <CardTitle>Send log</CardTitle>
+                    <CardTitle>Sent emails log</CardTitle>
                   </CardHeader>
                   <CardContent className="overflow-x-auto">
                     <table className="w-full text-sm">
@@ -905,7 +965,7 @@ const MarketingOutbound: React.FC = () => {
                 <Card>
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
-                      <AlertCircle className="h-5 w-5" /> Pipeline errors
+                      <AlertCircle className="h-5 w-5" /> Problems log
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-2">
@@ -928,6 +988,52 @@ const MarketingOutbound: React.FC = () => {
           )}
         </div>
       </motion.main>
+
+      <Dialog
+        open={testSendOpen}
+        onOpenChange={(open) => {
+          setTestSendOpen(open);
+          if (!open) {
+            setTestSendCampaign(null);
+            setTestSendLoading(false);
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Send test email</DialogTitle>
+            <DialogDescription>
+              {testSendCampaign
+                ? `Campaign “${testSendCampaign.name}”. Uses the API server’s SMTP or email-service configuration.`
+                : ""}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2 py-1">
+            <Label htmlFor="test-send-to">Recipient</Label>
+            <Input
+              id="test-send-to"
+              type="email"
+              autoComplete="email"
+              placeholder="you@company.com"
+              value={testSendTo}
+              onChange={(e) => setTestSendTo(e.target.value)}
+              disabled={testSendLoading}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") void submitTestSend();
+              }}
+            />
+          </div>
+          <DialogFooter className="gap-2 sm:justify-end">
+            <Button type="button" variant="outline" onClick={() => setTestSendOpen(false)} disabled={testSendLoading}>
+              Cancel
+            </Button>
+            <Button type="button" onClick={() => void submitTestSend()} disabled={testSendLoading || !testSendCampaign}>
+              {testSendLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2 inline" /> : null}
+              Send test
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
