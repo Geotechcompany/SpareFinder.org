@@ -6,7 +6,7 @@
  * All API calls go to http://localhost:8000 (dev) or production URL
  */
 
-// Backend API Base URL - ai-analysis-crew (Python FastAPI)
+// Backend API Base URL — ai-analysis-crew (Python FastAPI). VITE_API_URL must match the uvicorn port (8000 by default).
 export const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL ||
   import.meta.env.VITE_API_URL ||
