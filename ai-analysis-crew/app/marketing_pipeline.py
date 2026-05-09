@@ -230,6 +230,8 @@ def run_marketing_send_cron(
     failed = 0
     skipped = 0
     remaining_global = max(1, min(max_batch, 500))
+    campaigns_with_budget = 0
+    candidates_considered = 0
 
     try:
         camp_res = (
@@ -274,6 +276,9 @@ def run_marketing_send_cron(
         except Exception as e:
             log_error(supabase, severity="error", message=f"load leads: {e}", context={"campaign_id": cid})
             continue
+
+        campaigns_with_budget += 1
+        candidates_considered += len(candidates)
 
         for lead in candidates:
             if remaining_global <= 0:
@@ -382,11 +387,42 @@ def run_marketing_send_cron(
             if delay_sec > 0:
                 time.sleep(min(delay_sec, 60))
 
+    hints: list[str] = []
+    n_camp = len(campaigns)
+    if n_camp == 0:
+        hints.append(
+            "No sendable campaigns: every row in marketing_campaigns has is_paused=true — activate one in admin."
+        )
+    elif campaigns_with_budget == 0:
+        hints.append(
+            "Active campaigns hit zero send budget today (max_per_day already reached for each) or limits are 0."
+        )
+    elif candidates_considered == 0:
+        hints.append(
+            "No matching leads: for each active campaign, leads need campaign_id set to that campaign, "
+            "lead_status_internal=pending, sanitization_status=accepted, and a non-empty email."
+        )
+    if sent == 0 and failed > 0:
+        hints.append(
+            "SMTP or fallback email service rejected sends — set SMTP_HOST/SMTP_USER/SMTP_PASSWORD (or email-service env) "
+            "and check marketing_sends + marketing_errors."
+        )
+    if sent == 0 and skipped > 0 and failed == 0 and candidates_considered > 0:
+        hints.append(
+            "Every candidate was skipped (unsubscribed / marketing suppression) — check marketing_unsubscribes."
+        )
+
     summary = {
         "sent": sent,
         "failed": failed,
         "skipped": skipped,
         "cron_run_id": run_id,
+        "diagnostics": {
+            "unpaused_campaigns": n_camp,
+            "campaigns_with_send_budget": campaigns_with_budget,
+            "pending_accepted_candidates_seen": candidates_considered,
+            "hints": hints,
+        },
     }
     if run_id:
         try:
