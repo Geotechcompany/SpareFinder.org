@@ -928,7 +928,24 @@ async def marketing_dashboard(_admin: CurrentUser = Depends(require_roles("admin
     supabase = get_supabase_admin()
     try:
         leads_total = supabase.table("marketing_leads").select("id", count="exact").execute()
-        pending = (
+        # Match cron send rules: pending + accepted + tied to an unpaused campaign (not global "pending" only).
+        camp_ids = (
+            supabase.table("marketing_campaigns").select("id").eq("is_paused", False).execute().data or []
+        )
+        active_cids = [str(r["id"]) for r in camp_ids if r.get("id")]
+        if active_cids:
+            pending_res = (
+                supabase.table("marketing_leads")
+                .select("id", count="exact")
+                .eq("lead_status_internal", "pending")
+                .eq("sanitization_status", "accepted")
+                .in_("campaign_id", active_cids)
+                .execute()
+            )
+            leads_ready_for_cron = int(getattr(pending_res, "count", None) or 0)
+        else:
+            leads_ready_for_cron = 0
+        pending_any_campaign = (
             supabase.table("marketing_leads")
             .select("id", count="exact")
             .eq("lead_status_internal", "pending")
@@ -963,11 +980,13 @@ async def marketing_dashboard(_admin: CurrentUser = Depends(require_roles("admin
         return api_ok(
             data={
                 "leads_total": int(getattr(leads_total, "count", None) or 0),
-                "leads_pending_send": int(getattr(pending, "count", None) or 0),
+                "leads_pending_send": leads_ready_for_cron,
+                "leads_pending_any_campaign": int(getattr(pending_any_campaign, "count", None) or 0),
+                "active_unpaused_campaigns": len(active_cids),
                 "leads_needs_review": int(getattr(review, "count", None) or 0),
                 "sends_today": int(getattr(sends_today, "count", None) or 0),
                 "failed_today": int(getattr(failed_today, "count", None) or 0),
-                "timezone_note": "Counts use UTC day boundary for today.",
+                "timezone_note": "Counts use UTC day boundary for today. “Waiting to email” counts only contacts ready for the automatic sender (active campaign, pending, accepted).",
             }
         )
     except Exception as e:

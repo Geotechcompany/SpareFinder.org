@@ -583,7 +583,7 @@ const MarketingOutbound: React.FC = () => {
                   {(
                     [
                       ["All contacts", dashboard?.leads_total],
-                      ["Waiting to email", dashboard?.leads_pending_send],
+                      ["Ready for auto-send", dashboard?.leads_pending_send],
                       ["Needs your review", dashboard?.leads_needs_review],
                       ["Emails sent today (UTC)", dashboard?.sends_today],
                       ["Failed sends today", dashboard?.failed_today],
@@ -673,6 +673,11 @@ const MarketingOutbound: React.FC = () => {
                     <Button onClick={handleAiCampaignCreate}>Auto-generate campaign with AI</Button>
                   </CardContent>
                 </Card>
+                <p className="text-sm text-muted-foreground">
+                  <strong>Active</strong> only means the campaign is turned on. The automatic sender still needs contacts on
+                  the <strong>Leads</strong> tab with this campaign&apos;s ID, status <strong>Pending</strong>, and review{" "}
+                  <strong>Accepted</strong> — otherwise nothing goes out even when the campaign is active.
+                </p>
                 <div className="space-y-3">
                   {campaigns.map((c) => (
                     <Card key={c.id}>
