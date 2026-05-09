@@ -145,7 +145,9 @@ class GenerateCampaignBody(BaseModel):
     campaign_goal: str = Field(min_length=8, max_length=2000)
     audience: str | None = None
     tone: str | None = None
-    use_ai: bool = True
+    # False = send the saved subject/HTML/text with merge fields per recipient (default).
+    # True = call the model again on every send (higher cost; can drift from the saved draft).
+    use_ai: bool = False
     use_crew_ai: bool = False
 
 
@@ -315,7 +317,11 @@ async def ai_generate_campaign(
         f"Goal: {body.campaign_goal}\n"
         f"Audience: {body.audience or 'Industrial procurement and maintenance teams'}\n"
         f"Tone: {body.tone or 'professional and concise'}\n"
-        "Generate campaign subject, html email fragment, and text variant."
+        "Generate one outbound email: subject line, HTML fragment (no full document), and plain-text body.\n"
+        "Use merge placeholders exactly (double curly braces) — do not hard-code example names or companies. "
+        "Allowed tokens: {{first_name}}, {{full_name}}, {{company}}, {{job_title}}, {{email}}, {{platform}}. "
+        "You may use {{unsubscribe_url}} in HTML if needed.\n"
+        "Do not add a legal footer or unsubscribe block; the sending system appends compliance automatically."
     )
     content = generate_email_with_openai(
         lead_context={

@@ -300,7 +300,8 @@ const MarketingOutbound: React.FC = () => {
       campaign_goal: aiGoal.trim(),
       audience: aiAudience.trim(),
       tone: aiTone.trim(),
-      use_ai: true,
+      // Saved subject/body are what actually send (names filled per person). Set use_ai true on the campaign in the DB only if you want a brand-new AI email on every send.
+      use_ai: false,
       use_crew_ai: false,
     });
     if (res.success) {
@@ -616,7 +617,10 @@ const MarketingOutbound: React.FC = () => {
                 <Card>
                   <CardHeader>
                     <CardTitle>AI-generated campaign</CardTitle>
-                    <CardDescription>Let AI write a first draft, then edit it and turn the campaign on when ready.</CardDescription>
+                    <CardDescription>
+                      AI writes one email draft (with name and company placeholders). When you send or run the
+                      automatic sender, that same draft goes out — each person gets their own name and company filled in.
+                    </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-3">
                     <div>
