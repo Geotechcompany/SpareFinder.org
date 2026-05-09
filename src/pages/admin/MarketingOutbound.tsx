@@ -104,6 +104,8 @@ type Campaign = {
   use_crew_ai?: boolean;
 };
 
+type BulkLeadUpdateField = "sanitization_status" | "lead_status_internal" | "campaign_id";
+
 const MarketingOutbound: React.FC = () => {
   const { toast } = useToast();
   const [isCollapsed, setIsCollapsed] = useState(false);
@@ -134,6 +136,9 @@ const MarketingOutbound: React.FC = () => {
   const [testSendCampaign, setTestSendCampaign] = useState<Campaign | null>(null);
   const [testSendTo, setTestSendTo] = useState("");
   const [testSendLoading, setTestSendLoading] = useState(false);
+  const [bulkLeadDialog, setBulkLeadDialog] = useState<{ field: BulkLeadUpdateField; ids: string[] } | null>(null);
+  const [bulkLeadSelectValue, setBulkLeadSelectValue] = useState("");
+  const [bulkLeadSubmitting, setBulkLeadSubmitting] = useState(false);
 
   const loadAll = useCallback(async () => {
     setLoading(true);
@@ -447,10 +452,9 @@ const MarketingOutbound: React.FC = () => {
     }
   };
 
-  const runBulkUpdate = async (field: "sanitization_status" | "lead_status_internal" | "campaign_id") => {
+  const openBulkLeadDialog = async (field: BulkLeadUpdateField) => {
     if (!selectedLeadIds.length) return;
     let idsForUpdate = [...selectedLeadIds];
-    let didPruneNoEmailForSanitize = false;
 
     if (field === "sanitization_status") {
       const rows = (leads as Record<string, unknown>[]).filter((r) => idsForUpdate.includes(String(r.id)));
@@ -469,7 +473,6 @@ const MarketingOutbound: React.FC = () => {
           });
           return;
         }
-        didPruneNoEmailForSanitize = true;
         idsForUpdate = idsForUpdate.filter((id) => !noEmailIds.includes(id));
         setSelectedLeadIds(idsForUpdate);
         toast({ title: "Removed no-email leads", description: `${noEmailIds.length} deleted from selection.` });
@@ -480,36 +483,63 @@ const MarketingOutbound: React.FC = () => {
       }
     }
 
-    let value = "";
     if (field === "sanitization_status") {
-      value =
-        window.prompt("Review status — type one word: accepted, review, or rejected", "accepted") || "";
+      setBulkLeadSelectValue("accepted");
     } else if (field === "lead_status_internal") {
-      value =
-        window.prompt(
-          "Email send status — type one word: pending, sent, bounced, opt_out, or skipped",
-          "pending"
-        ) || "";
+      setBulkLeadSelectValue("pending");
     } else {
-      value = window.prompt("Campaign ID (paste UUID, or leave blank to clear)", "") ?? "";
+      const firstActive = campaigns.find((c) => !c.is_paused);
+      setBulkLeadSelectValue(firstActive?.id ?? campaigns[0]?.id ?? "__none__");
     }
-    if (value === "") {
-      if (field !== "campaign_id") {
-        if (didPruneNoEmailForSanitize) loadAll();
-        return;
+
+    setBulkLeadDialog({ field, ids: idsForUpdate });
+  };
+
+  const submitBulkLeadDialog = async () => {
+    if (!bulkLeadDialog) return;
+    const { field, ids } = bulkLeadDialog;
+
+    let payload: Record<string, unknown>;
+    if (field === "campaign_id") {
+      const cid =
+        bulkLeadSelectValue === "__none__" || !String(bulkLeadSelectValue).trim()
+          ? null
+          : String(bulkLeadSelectValue).trim();
+      payload = { campaign_id: cid };
+    } else {
+      const v = bulkLeadSelectValue.trim().toLowerCase();
+      if (field === "sanitization_status") {
+        if (!["accepted", "review", "rejected"].includes(v)) {
+          toast({ variant: "destructive", title: "Invalid review status", description: "Choose a value from the list." });
+          return;
+        }
+        payload = { sanitization_status: v };
+      } else {
+        if (!["pending", "sent", "bounced", "opt_out", "skipped"].includes(v)) {
+          toast({ variant: "destructive", title: "Invalid send status", description: "Choose a value from the list." });
+          return;
+        }
+        payload = { lead_status_internal: v };
       }
     }
-    const payload: Record<string, unknown> = { [field]: field === "campaign_id" ? value || null : value };
-    const res = await adminApi.bulkManageMarketingLeads({
-      ids: idsForUpdate,
-      action: "update",
-      payload,
-    });
-    if (res.success) {
-      toast({ title: "Bulk update applied", description: `${idsForUpdate.length} lead(s) updated.` });
-      loadAll();
-    } else {
-      toast({ variant: "destructive", title: "Bulk update failed", description: res.message || res.error });
+
+    setBulkLeadSubmitting(true);
+    try {
+      const res = await adminApi.bulkManageMarketingLeads({
+        ids,
+        action: "update",
+        payload,
+      });
+      if (res.success) {
+        toast({ title: "Bulk update applied", description: `${ids.length} lead(s) updated.` });
+        setBulkLeadDialog(null);
+        setBulkLeadSelectValue("");
+        loadAll();
+      } else {
+        toast({ variant: "destructive", title: "Bulk update failed", description: res.message || res.error });
+      }
+    } finally {
+      setBulkLeadSubmitting(false);
     }
   };
 
@@ -732,7 +762,7 @@ const MarketingOutbound: React.FC = () => {
                       Showing the latest 50 rows. Contacts found on Google pick up the country you set under Find on
                       Google — use the filter below to narrow them (spreadsheet imports do not set a country yet).{" "}
                       <strong>Bulk review status</strong> first removes selected rows that have no real email (or use a
-                      throwaway inbox), then asks what status to give the rest.
+                      throwaway inbox), then opens a dialog to set the status for the rest.
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="overflow-x-auto">
@@ -765,16 +795,21 @@ const MarketingOutbound: React.FC = () => {
                       <Button
                         size="sm"
                         variant="outline"
-                        onClick={() => runBulkUpdate("sanitization_status")}
+                        onClick={() => void openBulkLeadDialog("sanitization_status")}
                         disabled={!selectedLeadIds.length}
-                        title="Removes rows with no real email first, then asks for accepted, needs review, or rejected"
+                        title="Removes rows with no real email first, then choose accepted, review, or rejected"
                       >
                         Bulk review status
                       </Button>
-                      <Button size="sm" variant="outline" onClick={() => runBulkUpdate("lead_status_internal")} disabled={!selectedLeadIds.length}>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => void openBulkLeadDialog("lead_status_internal")}
+                        disabled={!selectedLeadIds.length}
+                      >
                         Bulk email send status
                       </Button>
-                      <Button size="sm" variant="outline" onClick={() => runBulkUpdate("campaign_id")} disabled={!selectedLeadIds.length}>
+                      <Button size="sm" variant="outline" onClick={() => void openBulkLeadDialog("campaign_id")} disabled={!selectedLeadIds.length}>
                         Bulk set campaign
                       </Button>
                       <Button size="sm" variant="destructive" onClick={runBulkDelete} disabled={!selectedLeadIds.length}>
@@ -1105,6 +1140,113 @@ const MarketingOutbound: React.FC = () => {
             <Button type="button" onClick={() => void submitTestSend()} disabled={testSendLoading || !testSendCampaign}>
               {testSendLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2 inline" /> : null}
               Send test
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={!!bulkLeadDialog}
+        onOpenChange={(open) => {
+          if (!open) {
+            setBulkLeadDialog(null);
+            setBulkLeadSelectValue("");
+            setBulkLeadSubmitting(false);
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>
+              {bulkLeadDialog?.field === "campaign_id"
+                ? "Set campaign for selected leads"
+                : bulkLeadDialog?.field === "sanitization_status"
+                  ? "Set review status"
+                  : "Set email send status"}
+            </DialogTitle>
+            <DialogDescription>
+              {bulkLeadDialog
+                ? `Applies to ${bulkLeadDialog.ids.length} selected contact(s).`
+                : ""}
+              {bulkLeadDialog?.field === "campaign_id" && !campaigns.length ? (
+                <span className="block mt-2 text-amber-600 dark:text-amber-500">
+                  Create a campaign on the Campaigns tab before assigning contacts.
+                </span>
+              ) : null}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-1">
+            {bulkLeadDialog?.field === "campaign_id" ? (
+              <>
+                <Label htmlFor="bulk-campaign">Campaign</Label>
+                <Select value={bulkLeadSelectValue} onValueChange={setBulkLeadSelectValue}>
+                  <SelectTrigger id="bulk-campaign">
+                    <SelectValue placeholder="Choose campaign" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">No campaign (clear)</SelectItem>
+                    {campaigns.map((c) => (
+                      <SelectItem key={c.id} value={c.id}>
+                        {c.name}
+                        {c.is_paused ? " (paused)" : ""}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Paused campaigns can be assigned for organization; the send cron only emails contacts on active
+                  campaigns.
+                </p>
+              </>
+            ) : null}
+            {bulkLeadDialog?.field === "sanitization_status" ? (
+              <>
+                <Label htmlFor="bulk-review">Review status</Label>
+                <Select value={bulkLeadSelectValue} onValueChange={setBulkLeadSelectValue}>
+                  <SelectTrigger id="bulk-review">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="accepted">Accepted</SelectItem>
+                    <SelectItem value="review">Needs review</SelectItem>
+                    <SelectItem value="rejected">Rejected</SelectItem>
+                  </SelectContent>
+                </Select>
+              </>
+            ) : null}
+            {bulkLeadDialog?.field === "lead_status_internal" ? (
+              <>
+                <Label htmlFor="bulk-send-status">Send pipeline status</Label>
+                <Select value={bulkLeadSelectValue} onValueChange={setBulkLeadSelectValue}>
+                  <SelectTrigger id="bulk-send-status">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="pending">Pending</SelectItem>
+                    <SelectItem value="sent">Sent</SelectItem>
+                    <SelectItem value="bounced">Bounced</SelectItem>
+                    <SelectItem value="opt_out">Opt out</SelectItem>
+                    <SelectItem value="skipped">Skipped</SelectItem>
+                  </SelectContent>
+                </Select>
+              </>
+            ) : null}
+          </div>
+          <DialogFooter className="gap-2 sm:justify-end">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setBulkLeadDialog(null);
+                setBulkLeadSelectValue("");
+              }}
+              disabled={bulkLeadSubmitting}
+            >
+              Cancel
+            </Button>
+            <Button type="button" onClick={() => void submitBulkLeadDialog()} disabled={bulkLeadSubmitting}>
+              {bulkLeadSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-2 inline" /> : null}
+              Apply to selected
             </Button>
           </DialogFooter>
         </DialogContent>
