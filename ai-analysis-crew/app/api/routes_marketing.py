@@ -486,6 +486,16 @@ async def bulk_manage_leads(
     return api_ok(data={"updated": updated, "ids": ids[:20]})
 
 
+def _discovery_candidate_has_usable_email(candidate: dict[str, Any]) -> bool:
+    """Discovery only persists rows with a syntactically valid, non-disposable mailbox."""
+    em = str(candidate.get("email") or "").strip().lower()
+    if not is_valid_email(em):
+        return False
+    if is_disposable_domain(em):
+        return False
+    return True
+
+
 def _upsert_lead(
     supabase: Any,
     row: dict[str, Any],
@@ -812,10 +822,12 @@ async def discover_serpapi(
                 errs.append(f"{q}: {msg}")
                 logger.warning("marketing discover: zero organic_results query=%r keys=%s", q, list(resp.keys())[:20])
             candidates = organic_results_to_lead_candidates(resp, query=q)
-            per_query.append({"query": q, "organic_count": len(organic), "candidates": len(candidates)})
+            stored_q = 0
             for c in candidates:
                 if tag_cc:
                     c["target_country_code"] = tag_cc
+                if not _discovery_candidate_has_usable_email(c):
+                    continue
                 _upsert_lead(
                     supabase,
                     c,
@@ -824,6 +836,19 @@ async def discover_serpapi(
                     run_sanitize=True,
                 )
                 created += 1
+                stored_q += 1
+            per_query.append(
+                {
+                    "query": q,
+                    "organic_count": len(organic),
+                    "candidates_seen": len(candidates),
+                    "candidates_stored": stored_q,
+                }
+            )
+            if organic and candidates and stored_q == 0:
+                errs.append(
+                    f"{q}: skipped {len(candidates)} organic row(s) — no valid non-disposable email in SERP/snippet scrape"
+                )
         except Exception as e:
             errs.append(f"{q}: {e}")
             log_error(supabase, severity="error", message=f"serp discover: {e}", context={"query": q})
@@ -1071,12 +1096,27 @@ async def cron_marketing_discover(max_queries: int = Query(default=2, ge=1, le=1
                 )
                 logger.warning("cron marketing-discover: zero organic_results query=%r", q)
             candidates = organic_results_to_lead_candidates(resp, query=q)
-            per_query.append({"query": q, "organic_count": len(organic), "candidates": len(candidates)})
+            stored_q = 0
             for c in candidates:
                 if tag_cc:
                     c["target_country_code"] = tag_cc
+                if not _discovery_candidate_has_usable_email(c):
+                    continue
                 _upsert_lead(supabase, c, campaign_id=None, source=lead_source, run_sanitize=True)
                 created += 1
+                stored_q += 1
+            per_query.append(
+                {
+                    "query": q,
+                    "organic_count": len(organic),
+                    "candidates_seen": len(candidates),
+                    "candidates_stored": stored_q,
+                }
+            )
+            if organic and candidates and stored_q == 0:
+                errs.append(
+                    f"{q}: skipped {len(candidates)} organic row(s) — no valid non-disposable email in SERP/snippet scrape"
+                )
         except Exception as e:
             errs.append(str(e))
     return {"ok": True, "candidates_upserted": created, "errors": errs, "per_query": per_query}

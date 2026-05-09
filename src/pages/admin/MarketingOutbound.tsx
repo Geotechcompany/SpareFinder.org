@@ -39,6 +39,25 @@ import {
 } from "lucide-react";
 import { API_BASE_URL } from "@/lib/config";
 
+/** Aligns with ai-analysis-crew `marketing_rules` (valid + non-disposable). */
+const DISPOSABLE_MARKETING_EMAIL_DOMAINS = new Set([
+  "mailinator.com",
+  "guerrillamail.com",
+  "tempmail.com",
+  "throwaway.email",
+  "yopmail.com",
+  "trashmail.com",
+]);
+
+const MARKETING_LEAD_EMAIL_RE = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+
+function leadRowHasUsableEmail(email: unknown): boolean {
+  const e = typeof email === "string" ? email.trim().toLowerCase() : "";
+  if (!e || !MARKETING_LEAD_EMAIL_RE.test(e)) return false;
+  const domain = e.split("@").pop() || "";
+  return !DISPOSABLE_MARKETING_EMAIL_DOMAINS.has(domain);
+}
+
 type Campaign = {
   id: string;
   name: string;
@@ -285,12 +304,25 @@ const MarketingOutbound: React.FC = () => {
       const data = res.data as {
         candidates_upserted?: number;
         errors?: string[];
-        per_query?: { query: string; organic_count: number; candidates: number }[];
+        per_query?: {
+          query: string;
+          organic_count: number;
+          candidates_seen?: number;
+          candidates_stored?: number;
+          candidates?: number;
+        }[];
       };
       const n = data?.candidates_upserted ?? 0;
       const errLines = (data?.errors || []).filter(Boolean);
       const pq = data?.per_query?.length
-        ? ` SERP: ${data.per_query.map((p) => `${p.organic_count} organic`).join(", ")}.`
+        ? ` ${data.per_query
+            .map((p) => {
+              const org = p.organic_count ?? 0;
+              const seen = p.candidates_seen ?? p.candidates ?? 0;
+              const stored = p.candidates_stored ?? 0;
+              return `${org} organic → ${stored} saved (valid email; ${seen} scanned)`;
+            })
+            .join("; ")}.`
         : "";
       toast({
         title: "Discovery run",
@@ -344,6 +376,35 @@ const MarketingOutbound: React.FC = () => {
 
   const runBulkUpdate = async (field: "sanitization_status" | "lead_status_internal" | "campaign_id") => {
     if (!selectedLeadIds.length) return;
+    let idsForUpdate = [...selectedLeadIds];
+
+    if (field === "sanitization_status") {
+      const rows = (leads as Record<string, unknown>[]).filter((r) => idsForUpdate.includes(String(r.id)));
+      const noEmailIds = rows.filter((r) => !leadRowHasUsableEmail(r.email)).map((r) => String(r.id));
+      if (noEmailIds.length) {
+        const ok = window.confirm(
+          `Remove ${noEmailIds.length} selected lead(s) with no valid email (or disposable domain), then set status for the rest?`
+        );
+        if (!ok) return;
+        const delRes = await adminApi.bulkManageMarketingLeads({ ids: noEmailIds, action: "delete" });
+        if (!delRes.success) {
+          toast({
+            variant: "destructive",
+            title: "Could not remove no-email leads",
+            description: delRes.message || delRes.error || "Delete failed",
+          });
+          return;
+        }
+        idsForUpdate = idsForUpdate.filter((id) => !noEmailIds.includes(id));
+        setSelectedLeadIds(idsForUpdate);
+        toast({ title: "Removed no-email leads", description: `${noEmailIds.length} deleted from selection.` });
+        if (!idsForUpdate.length) {
+          loadAll();
+          return;
+        }
+      }
+    }
+
     let value = "";
     if (field === "sanitization_status") {
       value = window.prompt("Set sanitization status: accepted | review | rejected", "accepted") || "";
@@ -357,12 +418,12 @@ const MarketingOutbound: React.FC = () => {
     }
     const payload: Record<string, unknown> = { [field]: field === "campaign_id" ? value || null : value };
     const res = await adminApi.bulkManageMarketingLeads({
-      ids: selectedLeadIds,
+      ids: idsForUpdate,
       action: "update",
       payload,
     });
     if (res.success) {
-      toast({ title: "Bulk update applied", description: `${selectedLeadIds.length} lead(s) updated.` });
+      toast({ title: "Bulk update applied", description: `${idsForUpdate.length} lead(s) updated.` });
       loadAll();
     } else {
       toast({ variant: "destructive", title: "Bulk update failed", description: res.message || res.error });
@@ -550,7 +611,8 @@ const MarketingOutbound: React.FC = () => {
                     <CardDescription>
                       Latest 50 rows. Serp discovery leads are tagged with a target country when you set one on
                       the Google discovery tab — filter below applies to those tags (CSV imports have no country until you
-                      extend the pipeline).
+                      extend the pipeline). <strong>Bulk sanitize status</strong> first deletes selected leads with no
+                      valid email (or a disposable domain), then asks for the new status for the rest.
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="overflow-x-auto">
@@ -580,7 +642,13 @@ const MarketingOutbound: React.FC = () => {
                         <PencilLine className="h-4 w-4 mr-1" />
                         {selectedLeadIds.length ? "Toggle page selection" : "Select page"}
                       </Button>
-                      <Button size="sm" variant="outline" onClick={() => runBulkUpdate("sanitization_status")} disabled={!selectedLeadIds.length}>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => runBulkUpdate("sanitization_status")}
+                        disabled={!selectedLeadIds.length}
+                        title="Removes selected rows with no valid email first, then prompts for accepted | review | rejected"
+                      >
                         Bulk sanitize status
                       </Button>
                       <Button size="sm" variant="outline" onClick={() => runBulkUpdate("lead_status_internal")} disabled={!selectedLeadIds.length}>
