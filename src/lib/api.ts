@@ -1052,6 +1052,8 @@ export const adminApi = {
     serp_target_country_code?: string;
     serp_target_hl?: string;
     google_search_provider?: "serpapi" | "serper" | string;
+    /** Pinned campaign for new leads; omit or empty string clears → server picks highest-priority active campaign. */
+    default_outbound_campaign_id?: string | null;
   }): Promise<ApiResponse> => {
     const response = await apiClient.patch("/admin/marketing/settings", payload);
     return response.data;

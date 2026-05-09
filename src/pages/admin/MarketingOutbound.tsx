@@ -118,6 +118,8 @@ const MarketingOutbound: React.FC = () => {
   const [serpApiKey, setSerpApiKey] = useState("");
   const [serpCountryCode, setSerpCountryCode] = useState("");
   const [serpHl, setSerpHl] = useState("en");
+  /** Empty = no pin: server assigns highest-priority active campaign (or pin a specific campaign UUID). */
+  const [defaultOutboundCampaignId, setDefaultOutboundCampaignId] = useState("");
   const [leadCountryFilter, setLeadCountryFilter] = useState<string>("all");
   const [aiQueriesLoading, setAiQueriesLoading] = useState(false);
   const [newCampaignName, setNewCampaignName] = useState("Outbound — industrial buyers");
@@ -163,6 +165,7 @@ const MarketingOutbound: React.FC = () => {
           serpapi_key?: string;
           serp_target_country_code?: string;
           serp_target_hl?: string;
+          default_outbound_campaign_id?: string;
         };
       })?.settings;
       const templates = st?.serp_query_templates;
