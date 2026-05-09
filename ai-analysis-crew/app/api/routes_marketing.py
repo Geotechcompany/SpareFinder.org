@@ -32,6 +32,7 @@ from ..marketing_pipeline import (
     send_marketing_email,
 )
 from ..marketing_rules import is_disposable_domain, is_valid_email, normalize_row
+from ..marketing_outbound_defaults import default_campaign_id_for_new_leads, get_marketing_settings_row
 from ..marketing_serpapi import organic_results_to_lead_candidates, search_google
 from .auth_dependencies import CurrentUser, require_roles
 from .responses import api_error, api_ok
@@ -229,28 +230,10 @@ async def patch_campaign(
 # ---------- Admin: settings ----------
 
 
-def _get_settings_row(supabase: Any) -> dict[str, Any]:
-    r = supabase.table("marketing_settings").select("*").eq("setting_key", "defaults").execute()
-    if r.data:
-        return r.data[0]
-    supabase.table("marketing_settings").insert(
-        {
-            "setting_key": "defaults",
-            "setting_value": {
-                "serp_query_templates": [],
-                "serp_results_per_query": 10,
-                "google_search_provider": "serper",
-            },
-        }
-    ).execute()
-    r2 = supabase.table("marketing_settings").select("*").eq("setting_key", "defaults").execute()
-    return (r2.data or [{}])[0]
-
-
 @admin_router.get("/settings")
 async def get_marketing_settings(_admin: CurrentUser = Depends(require_roles("admin", "super_admin"))):
     supabase = get_supabase_admin()
-    row = _get_settings_row(supabase)
+    row = get_marketing_settings_row(supabase)
     return api_ok(data={"settings": row.get("setting_value") or {}})
 
 
@@ -260,7 +243,7 @@ async def patch_marketing_settings(
     _admin: CurrentUser = Depends(require_roles("admin", "super_admin")),
 ):
     supabase = get_supabase_admin()
-    row = _get_settings_row(supabase)
+    row = get_marketing_settings_row(supabase)
     val = dict(row.get("setting_value") or {})
     if body.serp_query_templates is not None:
         val["serp_query_templates"] = [str(q).strip() for q in body.serp_query_templates if str(q).strip()]
@@ -502,45 +485,6 @@ async def bulk_manage_leads(
     return api_ok(data={"updated": updated, "ids": ids[:20]})
 
 
-def _default_campaign_id_for_new_leads(supabase: Any) -> str | None:
-    """
-    Campaign to attach when caller passes no campaign_id (CSV import, Google discover, cron discover).
-    Uses default_outbound_campaign_id from marketing settings if that campaign exists; otherwise the
-    highest-priority unpaused campaign (newest first when priorities tie). If none are unpaused,
-    falls back to the highest-priority campaign overall so scheduled discovery still assigns a campaign.
-    """
-    row = _get_settings_row(supabase)
-    val = row.get("setting_value") or {}
-    explicit = str(val.get("default_outbound_campaign_id") or "").strip()
-    if explicit:
-        chk = supabase.table("marketing_campaigns").select("id").eq("id", explicit).limit(1).execute()
-        if chk.data:
-            return explicit
-    r = (
-        supabase.table("marketing_campaigns")
-        .select("id")
-        .eq("is_paused", False)
-        .order("priority", desc=True)
-        .order("created_at", desc=True)
-        .limit(1)
-        .execute()
-    )
-    rows = r.data or []
-    if rows:
-        return str(rows[0]["id"])
-    # No unpaused campaigns: still attach leads to the highest-priority row so cron/discover imports are not orphaned.
-    r_any = (
-        supabase.table("marketing_campaigns")
-        .select("id")
-        .order("priority", desc=True)
-        .order("created_at", desc=True)
-        .limit(1)
-        .execute()
-    )
-    rows_any = r_any.data or []
-    return str(rows_any[0]["id"]) if rows_any else None
-
-
 def _discovery_candidate_has_usable_email(candidate: dict[str, Any]) -> bool:
     """Discovery only persists rows with a syntactically valid, non-disposable mailbox."""
     em = str(candidate.get("email") or "").strip().lower()
@@ -571,7 +515,7 @@ def _upsert_lead(
 
     effective_campaign = (str(campaign_id).strip() if campaign_id else "") or None
     if not effective_campaign:
-        effective_campaign = _default_campaign_id_for_new_leads(supabase)
+        effective_campaign = default_campaign_id_for_new_leads(supabase)
 
     payload = {
         "full_name": str(full_name).strip() or None,
@@ -913,7 +857,7 @@ def _run_google_serp_discovery(
             log_error(supabase, severity="error", message=f"serp discover: {e}", context={"query": q})
 
     explicit = (str(campaign_id).strip() if campaign_id else "") or None
-    resolved_campaign_id = explicit or _default_campaign_id_for_new_leads(supabase)
+    resolved_campaign_id = explicit or default_campaign_id_for_new_leads(supabase)
     return {
         "candidates_upserted": created,
         "errors": errs,
@@ -929,7 +873,7 @@ async def discover_serpapi(
     _admin: CurrentUser = Depends(require_roles("admin", "super_admin")),
 ):
     supabase = get_supabase_admin()
-    settings = _get_settings_row(supabase)
+    settings = get_marketing_settings_row(supabase)
     val = settings.get("setting_value") or {}
     key_override = (
         str(body.serpapi_key or "").strip()
@@ -1207,7 +1151,7 @@ async def cron_marketing_digest():
 async def cron_marketing_discover(max_queries: int = Query(default=2, ge=1, le=10)):
     """Scheduled Google discovery using saved query templates (Serper.dev by default)."""
     supabase = get_supabase_admin()
-    settings = _get_settings_row(supabase)
+    settings = get_marketing_settings_row(supabase)
     val = settings.get("setting_value") or {}
     key_override = str(val.get("serpapi_key") or "").strip() or None
     templates = val.get("serp_query_templates") or []

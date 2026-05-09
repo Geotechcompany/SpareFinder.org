@@ -11,6 +11,7 @@ from typing import Any
 from .email_sender import send_basic_email_smtp, send_email_via_email_service
 from .marketing_crew import EmailContent, generate_email_with_crew, generate_email_with_openai
 from .marketing_merge import apply_merge, html_to_plain, lead_to_merge_dict
+from .marketing_outbound_defaults import default_campaign_id_for_new_leads
 
 logger = logging.getLogger(__name__)
 
@@ -246,6 +247,38 @@ def run_marketing_send_cron(
         log_error(supabase, severity="critical", message=f"load campaigns: {e}")
         return {"ok": False, "error": str(e), "sent": 0, "failed": 0, "skipped": 0}
 
+    orphan_leads_assigned_campaign = 0
+    active_ids: list[str] = []
+    try:
+        target_cid = default_campaign_id_for_new_leads(supabase)
+        if campaigns:
+            active_ids = [str(c["id"]) for c in campaigns if c.get("id")]
+            if active_ids and (not target_cid or target_cid not in active_ids):
+                target_cid = active_ids[0]
+        if target_cid:
+            q = (
+                supabase.table("marketing_leads")
+                .select("id")
+                .eq("lead_status_internal", "pending")
+                .eq("sanitization_status", "accepted")
+                .limit(500)
+            )
+            if len(active_ids) == 1 and target_cid == active_ids[0]:
+                only = active_ids[0]
+                q = q.or_(f"campaign_id.is.null,campaign_id.neq.{only}")
+            else:
+                q = q.is_("campaign_id", "null")
+            sel = q.execute()
+            oids = [str(r["id"]) for r in (sel.data or [])]
+            if oids:
+                now_iso = datetime.now(timezone.utc).isoformat()
+                supabase.table("marketing_leads").update(
+                    {"campaign_id": target_cid, "updated_at": now_iso}
+                ).in_("id", oids).execute()
+                orphan_leads_assigned_campaign = len(oids)
+    except Exception as e:
+        logger.warning("send cron: orphan campaign_id backfill skipped: %s", e)
+
     for campaign in campaigns:
         if remaining_global <= 0:
             break
@@ -400,7 +433,8 @@ def run_marketing_send_cron(
     elif candidates_considered == 0:
         hints.append(
             "No matching leads: for each active campaign, leads need campaign_id set to that campaign, "
-            "lead_status_internal=pending, sanitization_status=accepted, and a non-empty email."
+            "lead_status_internal=pending, sanitization_status=accepted, and a non-empty email. "
+            "(The send cron now assigns campaign_id to accepted+pending rows that were still null — up to 500 per run.)"
         )
     if sent == 0 and failed > 0:
         hints.append(
@@ -421,6 +455,7 @@ def run_marketing_send_cron(
             "unpaused_campaigns": n_camp,
             "campaigns_with_send_budget": campaigns_with_budget,
             "pending_accepted_candidates_seen": candidates_considered,
+            "orphan_leads_assigned_campaign": orphan_leads_assigned_campaign,
             "hints": hints,
         },
     }
