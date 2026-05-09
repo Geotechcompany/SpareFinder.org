@@ -1,5 +1,7 @@
 import React, { useCallback, useEffect, useState } from "react";
+import { motion } from "framer-motion";
 import AdminDesktopSidebar from "@/components/AdminDesktopSidebar";
+import { ADMIN_MOBILE_TOP_PADDING, useAdminMainMotion } from "@/lib/admin-layout";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -43,6 +45,7 @@ type Campaign = {
 const MarketingOutbound: React.FC = () => {
   const { toast } = useToast();
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const mainMotion = useAdminMainMotion(isCollapsed);
   const [loading, setLoading] = useState(true);
   const [dashboard, setDashboard] = useState<Record<string, unknown> | null>(null);
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
@@ -272,20 +275,25 @@ const MarketingOutbound: React.FC = () => {
   return (
     <div className="flex min-h-screen bg-background">
       <AdminDesktopSidebar isCollapsed={isCollapsed} onToggle={() => setIsCollapsed(!isCollapsed)} />
-      <main className="flex-1 overflow-auto p-6 md:p-10">
-        <div className="mx-auto max-w-6xl space-y-8">
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <div>
-              <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
+      <motion.main
+        initial={false}
+        animate={mainMotion}
+        transition={{ duration: 0.3, ease: "easeInOut" }}
+        className={`flex-1 overflow-auto p-4 sm:p-6 md:p-10 ${ADMIN_MOBILE_TOP_PADDING}`}
+      >
+        <div className="mx-auto max-w-6xl space-y-6 sm:space-y-8">
+          <div className="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+            <div className="min-w-0">
+              <h1 className="text-2xl font-bold tracking-tight flex flex-wrap items-center gap-2 sm:text-3xl">
                 <Megaphone className="h-8 w-8 text-primary" />
                 Marketing outbound
               </h1>
-              <p className="text-muted-foreground mt-1">
+              <p className="text-muted-foreground mt-1 text-sm sm:text-base break-words">
                 Campaigns, leads, SerpAPI discovery, send logs. Cron URLs are documented in{" "}
-                <code className="text-xs bg-muted px-1 rounded">docs/MARKETING_CRON.md</code>.
+                <code className="text-xs bg-muted px-1 rounded break-all">docs/MARKETING_CRON.md</code>.
               </p>
             </div>
-            <Button variant="outline" size="sm" onClick={() => loadAll()} disabled={loading}>
+            <Button variant="outline" size="sm" className="shrink-0 self-start sm:self-auto" onClick={() => loadAll()} disabled={loading}>
               {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
               <span className="ml-2">Refresh</span>
             </Button>
@@ -297,7 +305,7 @@ const MarketingOutbound: React.FC = () => {
             </div>
           ) : (
             <Tabs defaultValue="overview" className="space-y-6">
-              <TabsList className="flex flex-wrap h-auto gap-1">
+              <TabsList className="flex h-auto w-full min-w-0 flex-nowrap justify-start gap-1 overflow-x-auto pb-1 sm:flex-wrap sm:overflow-visible">
                 <TabsTrigger value="overview">Overview</TabsTrigger>
                 <TabsTrigger value="campaigns">Campaigns</TabsTrigger>
                 <TabsTrigger value="leads">Leads</TabsTrigger>
@@ -652,7 +660,7 @@ const MarketingOutbound: React.FC = () => {
             </Tabs>
           )}
         </div>
-      </main>
+      </motion.main>
     </div>
   );
 };

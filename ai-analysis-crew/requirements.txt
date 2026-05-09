@@ -6,7 +6,7 @@ python-multipart==0.0.6
 # Keep it compatible with google-genai (<15.1,>=13) and realtime (<16,>=11).
 websockets==14.2
 
-setuptools>=65.5.0
+setuptools>=65.5.0,<82
 crewai==0.80.0
 crewai-tools==0.14.0
 langchain-openai==0.2.14

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { motion } from "framer-motion";
 import {
   Card,
   CardContent,
@@ -36,6 +37,7 @@ import { api } from "@/lib/api";
 import { AdminTicketReplyComposer } from "@/components/admin/AdminTicketReplyComposer";
 import { TicketMessageRichBody } from "@/components/admin/ticketMessageRichBody";
 import AdminDesktopSidebar from "@/components/AdminDesktopSidebar";
+import { ADMIN_MOBILE_TOP_PADDING, useAdminMainMotion } from "@/lib/admin-layout";
 import { TableSkeleton } from "@/components/skeletons";
 import { Ticket, Mail, User, Lock } from "lucide-react";
 import { toast } from "sonner";
@@ -93,6 +95,7 @@ const TicketManagement = () => {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [loading, setLoading] = useState(true);
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const mainMotion = useAdminMainMotion(isCollapsed);
   const [selectedTicket, setSelectedTicket] = useState<TicketDetail | null>(null);
   /** Bumped when the detail dialog closes or a new ticket is opened — ignores stale getTicket responses. */
   const detailFetchGen = useRef(0);
@@ -296,7 +299,12 @@ const TicketManagement = () => {
   return (
     <div className="flex min-h-screen flex-col bg-background md:flex-row">
       <AdminDesktopSidebar isCollapsed={isCollapsed} onToggle={() => setIsCollapsed(!isCollapsed)} />
-      <main className="flex-1 bg-gradient-to-b from-background via-violet-50/30 to-sky-50/20 pb-10 dark:via-violet-950/20 dark:to-slate-950/40">
+      <motion.main
+        initial={false}
+        animate={mainMotion}
+        transition={{ duration: 0.3, ease: "easeInOut" }}
+        className={`flex-1 overflow-x-auto bg-gradient-to-b from-background via-violet-50/30 to-sky-50/20 pb-10 dark:via-violet-950/20 dark:to-slate-950/40 ${ADMIN_MOBILE_TOP_PADDING}`}
+      >
         <div className="mx-auto max-w-6xl space-y-6 p-3 sm:p-6 lg:p-8">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div className="min-w-0">
@@ -445,7 +453,7 @@ const TicketManagement = () => {
             </CardContent>
           </Card>
         </div>
-      </main>
+      </motion.main>
 
       <Dialog open={!!selectedTicket} onOpenChange={(open) => !open && closeTicketDetail()}>
         <DialogContent className="flex max-h-[90dvh] w-[calc(100vw-1rem)] max-w-3xl flex-col gap-0 overflow-hidden rounded-2xl border-border/60 p-0 shadow-2xl sm:w-full">

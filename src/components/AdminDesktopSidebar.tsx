@@ -8,7 +8,15 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { cn } from "@/lib/utils";
 import {
   Skeleton,
   SkeletonAvatar,
@@ -42,6 +50,7 @@ import {
   Tag,
   Ticket,
   Megaphone,
+  Menu,
 } from "lucide-react";
 
 interface AdminSidebarProps {
@@ -87,6 +96,7 @@ const AdminDesktopSidebar: React.FC<AdminSidebarProps> = ({
   const { toast } = useToast();
   const { logout } = useAuth();
   const [navQuery, setNavQuery] = useState("");
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   const [adminStats, setAdminStats] = useState<AdminStats>({
     totalUsers: 0,
@@ -103,6 +113,10 @@ const AdminDesktopSidebar: React.FC<AdminSidebarProps> = ({
   useEffect(() => {
     fetchAdminData();
   }, []);
+
+  useEffect(() => {
+    setMobileNavOpen(false);
+  }, [location.pathname]);
 
   const fetchAdminData = async () => {
     try {
@@ -348,7 +362,155 @@ const AdminDesktopSidebar: React.FC<AdminSidebarProps> = ({
   ].filter((s) => s.items.length > 0);
 
   return (
-    <motion.div
+    <>
+      <Sheet open={mobileNavOpen} onOpenChange={setMobileNavOpen}>
+        <header className="fixed left-0 right-0 top-0 z-40 flex h-14 shrink-0 items-center gap-2 border-b border-border bg-background/95 px-3 shadow-sm backdrop-blur-md supports-[backdrop-filter]:bg-background/85 lg:hidden">
+          <SheetTrigger asChild>
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              className="h-10 w-10 shrink-0 border-border bg-card"
+              aria-label="Open admin navigation"
+            >
+              <Menu className="h-5 w-5" />
+            </Button>
+          </SheetTrigger>
+          <Link
+            to="/admin/dashboard"
+            className="flex min-w-0 flex-1 items-center gap-2 rounded-lg py-1 pr-2"
+            onClick={() => setMobileNavOpen(false)}
+          >
+            <img
+              src="/sparefinderlogo.png"
+              alt=""
+              className="h-8 w-auto object-contain dark:hidden"
+            />
+            <img
+              src="/sparefinderlogodark.png"
+              alt=""
+              className="hidden h-8 w-auto object-contain dark:inline-block"
+            />
+            <span className="truncate text-sm font-semibold text-foreground">Admin</span>
+          </Link>
+        </header>
+
+        <SheetContent
+          side="left"
+          className="flex w-[min(100vw-1rem,22rem)] max-w-[22rem] flex-col gap-0 overflow-hidden border-border bg-background p-0 dark:border-white/10"
+        >
+          <SheetHeader className="space-y-0 border-b border-border px-4 py-3 text-left dark:border-white/10">
+            <SheetTitle className="text-base">Admin menu</SheetTitle>
+          </SheetHeader>
+
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+            <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-4 pt-2">
+              <div className="mb-3">
+                <div className="relative">
+                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <input
+                    value={navQuery}
+                    onChange={(e) => setNavQuery(e.target.value)}
+                    placeholder="Search admin…"
+                    className="w-full rounded-xl border border-border bg-background py-2 pl-9 pr-3 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/30 dark:border-white/10 dark:bg-white/5 dark:text-white"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                {navSections.map((section) => (
+                  <div key={section.title} className="space-y-2">
+                    <div className="px-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                      {section.title}
+                    </div>
+                    <div className="space-y-1">
+                      {section.items.map((item) => {
+                        const active = isActive(item.href);
+                        return (
+                          <Link
+                            key={item.href}
+                            to={item.href}
+                            onClick={() => setMobileNavOpen(false)}
+                            className={cn(
+                              "relative flex items-center gap-3 rounded-xl border px-3 py-2.5 transition-colors",
+                              active
+                                ? "border-primary/30 bg-primary/10 text-foreground shadow-sm dark:bg-blue-900/25"
+                                : "border-transparent bg-muted/40 hover:bg-muted/70 dark:bg-white/5 dark:hover:bg-white/10"
+                            )}
+                          >
+                            <div
+                              className={cn(
+                                "flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ring-1 ring-border/60 dark:ring-white/10",
+                                active
+                                  ? "bg-primary/15 text-primary"
+                                  : "bg-background text-muted-foreground"
+                              )}
+                            >
+                              <item.icon className="h-4 w-4" />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="truncate text-sm font-semibold">{item.label}</span>
+                                {item.badge ? (
+                                  <span className="shrink-0 rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 text-[11px] font-semibold text-primary">
+                                    {item.badge}
+                                  </span>
+                                ) : null}
+                              </div>
+                              <p className="truncate text-[11px] text-muted-foreground">{item.description}</p>
+                            </div>
+                          </Link>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="shrink-0 border-t border-border p-4 dark:border-white/10">
+              {isLoading ? (
+                <div className="space-y-2">
+                  <Skeleton className="h-10 w-full rounded-xl" />
+                  <Skeleton className="h-10 w-full rounded-xl" />
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <div className="flex items-center gap-3 rounded-xl border border-border bg-muted/40 p-3 dark:border-white/10">
+                    <Avatar className="h-10 w-10">
+                      <AvatarImage src={adminUser?.avatar_url} />
+                      <AvatarFallback className="bg-gradient-to-r from-blue-600 to-purple-600 text-white">
+                        {adminUser?.full_name?.charAt(0) ||
+                          adminUser?.email?.charAt(0) ||
+                          "A"}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium">
+                        {adminUser?.full_name || "Administrator"}
+                      </p>
+                      <p className="truncate text-xs text-muted-foreground">{adminUser?.email}</p>
+                    </div>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    className="w-full justify-start rounded-xl"
+                    onClick={() => {
+                      setMobileNavOpen(false);
+                      void handleLogout();
+                    }}
+                  >
+                    <LogOut className="mr-3 h-5 w-5" />
+                    Logout
+                  </Button>
+                </div>
+              )}
+            </div>
+          </div>
+        </SheetContent>
+      </Sheet>
+
+      <motion.div
       initial={false}
       animate={{ width: isCollapsed ? 80 : 320 }}
       transition={{ duration: 0.3, ease: "easeInOut" }}
@@ -695,6 +857,7 @@ const AdminDesktopSidebar: React.FC<AdminSidebarProps> = ({
         )}
       </div>
     </motion.div>
+    </>
   );
 };
 

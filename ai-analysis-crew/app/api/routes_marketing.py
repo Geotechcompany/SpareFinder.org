@@ -16,6 +16,7 @@ from fastapi import APIRouter, Body, Depends, File, Form, HTTPException, Query, 
 from pydantic import BaseModel, Field
 
 from ..marketing_crew import (
+    auto_extract_email_from_csv_row,
     extract_lead_fields_from_csv_row,
     generate_email_with_openai,
     sanitize_lead_with_openai,
@@ -625,9 +626,10 @@ async def import_leads_csv(
             row = {str(k or "").strip(): (v or "") for k, v in row.items() if str(k or "").strip()}
 
             out: dict[str, Any] = {}
-            em = ""
-            if email_c:
-                em = (row.get(email_c) or "").strip()
+            mapped_email = (row.get(email_c) or "").strip() if email_c else ""
+            auto_email = auto_extract_email_from_csv_row({k: (v or "") for k, v in row.items()})
+            # Always prioritize AI/auto extraction for emails.
+            em = auto_email or mapped_email
             if fn_c:
                 out["full_name"] = (row.get(fn_c) or "").strip()
             if job_c:

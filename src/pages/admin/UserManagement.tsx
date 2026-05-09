@@ -13,7 +13,7 @@ import { Input } from "@/components/ui/input";
 import { useToast } from "@/components/ui/use-toast";
 import { api } from "@/lib/api";
 import AdminDesktopSidebar from "@/components/AdminDesktopSidebar";
-import MobileSidebar from "@/components/MobileSidebar";
+import { ADMIN_MOBILE_TOP_PADDING, useAdminMainMotion } from "@/lib/admin-layout";
 import { TableSkeleton } from "@/components/skeletons";
 import {
   Table,
@@ -63,7 +63,6 @@ import {
   Crown,
   Shield,
   User,
-  Menu,
   ChevronLeft,
   ChevronRight,
   ChevronDown,
@@ -109,7 +108,7 @@ const UserManagement = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [roleFilter, setRoleFilter] = useState<string>("all");
   const [isCollapsed, setIsCollapsed] = useState(false);
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const mainMotion = useAdminMainMotion(isCollapsed);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkActionLoading, setBulkActionLoading] = useState(false);
   const [bulkDeleteDialogOpen, setBulkDeleteDialogOpen] = useState(false);
@@ -444,10 +443,6 @@ const UserManagement = () => {
     setIsCollapsed(!isCollapsed);
   };
 
-  const handleToggleMobileMenu = () => {
-    setIsMobileMenuOpen(!isMobileMenuOpen);
-  };
-
   return (
     <div className="min-h-screen flex w-full bg-gradient-to-br from-background via-[#F0F2F5] to-[#E8EBF1] dark:from-[#0B1026] dark:via-[#1A1033] dark:to-[#0C1226] relative overflow-hidden">
       {/* Animated Background Elements */}
@@ -484,29 +479,12 @@ const UserManagement = () => {
         onToggle={handleToggleSidebar}
       />
 
-      {/* Mobile Sidebar */}
-      <MobileSidebar
-        isOpen={isMobileMenuOpen}
-        onClose={() => setIsMobileMenuOpen(false)}
-      />
-
-      {/* Mobile Menu Button */}
-      <button
-        onClick={handleToggleMobileMenu}
-        className="fixed top-4 right-4 z-50 p-2 rounded-lg border border-border bg-card/90 text-muted-foreground shadow-soft-elevated backdrop-blur-xl hover:bg-accent hover:text-accent-foreground md:hidden dark:bg-black/70 dark:border-white/10 dark:text-white"
-      >
-        <Menu className="w-5 h-5" />
-      </button>
-
       {/* Main Content */}
       <motion.div
         initial={false}
-        animate={{
-          marginLeft: isCollapsed ? "80px" : "320px",
-          width: isCollapsed ? "calc(100% - 80px)" : "calc(100% - 320px)",
-        }}
+        animate={mainMotion}
         transition={{ duration: 0.3, ease: "easeInOut" }}
-        className="flex-1 p-2 sm:p-4 lg:p-8 relative z-10 overflow-x-hidden md:overflow-x-visible"
+        className={`flex-1 p-2 sm:p-4 lg:p-8 relative z-10 overflow-x-hidden md:overflow-x-visible ${ADMIN_MOBILE_TOP_PADDING}`}
       >
         <motion.div
           initial={{ opacity: 0, y: 20 }}

@@ -97,11 +97,73 @@ def run_marketing_digest(supabase: Any) -> dict[str, Any]:
     except Exception:
         u_ct = 0
 
+    summary_lines.append("--- Yesterday (UTC calendar day) ---")
     summary_lines.append(f"Window (UTC): {day_start.isoformat()} → {day_end.isoformat()}")
     summary_lines.append(f"New leads: {nl}")
     summary_lines.append(f"Sends (sent): {s_ok}")
     summary_lines.append(f"Sends (failed): {s_fail}")
     summary_lines.append(f"New marketing unsubscribes: {u_ct}")
+
+    # Rolling 7 days (UTC) so quiet single days still show useful context
+    week_start = day_end - timedelta(days=7)
+    try:
+        w_leads = (
+            supabase.table("marketing_leads")
+            .select("id", count="exact")
+            .gte("created_at", week_start.isoformat())
+            .lt("created_at", day_end.isoformat())
+            .execute()
+        )
+        w_nl = int(getattr(w_leads, "count", None) or 0)
+    except Exception:
+        w_nl = 0
+    try:
+        w_sent = (
+            supabase.table("marketing_sends")
+            .select("id", count="exact")
+            .eq("status", "sent")
+            .gte("sent_at", week_start.isoformat())
+            .lt("sent_at", day_end.isoformat())
+            .execute()
+        )
+        w_ok = int(getattr(w_sent, "count", None) or 0)
+    except Exception:
+        w_ok = 0
+    try:
+        w_fail = (
+            supabase.table("marketing_sends")
+            .select("id", count="exact")
+            .eq("status", "failed")
+            .gte("created_at", week_start.isoformat())
+            .lt("created_at", day_end.isoformat())
+            .execute()
+        )
+        w_f = int(getattr(w_fail, "count", None) or 0)
+    except Exception:
+        w_f = 0
+    try:
+        w_un = (
+            supabase.table("marketing_unsubscribes")
+            .select("id", count="exact")
+            .gte("unsubscribed_at", week_start.isoformat())
+            .lt("unsubscribed_at", day_end.isoformat())
+            .execute()
+        )
+        w_u = int(getattr(w_un, "count", None) or 0)
+    except Exception:
+        w_u = 0
+
+    summary_lines.append("")
+    summary_lines.append(f"--- Last 7 days (UTC): {week_start.isoformat()} → {day_end.isoformat()} ---")
+    summary_lines.append(f"New leads: {w_nl}")
+    summary_lines.append(f"Sends (sent): {w_ok}")
+    summary_lines.append(f"Sends (failed): {w_f}")
+    summary_lines.append(f"Marketing unsubscribes: {w_u}")
+    summary_lines.append("")
+    summary_lines.append(
+        "Note: Yesterday counts only rows whose timestamps fall inside that UTC day. "
+        "If you imported/sent outside that window, yesterday can be 0 while the 7-day block still shows activity."
+    )
 
     body_html = "<h2>SpareFinder marketing digest</h2><pre style='font-family:system-ui'>" + "\n".join(
         summary_lines

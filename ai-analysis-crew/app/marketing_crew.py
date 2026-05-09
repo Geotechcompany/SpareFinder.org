@@ -106,6 +106,20 @@ def extract_lead_fields_from_csv_row(raw_row: dict[str, Any]) -> ExtractedLeadFi
         return ExtractedLeadFields(email=heuristic_email)
 
 
+def auto_extract_email_from_csv_row(raw_row: dict[str, Any]) -> str:
+    """
+    Automatic email extraction pipeline for CSV rows.
+    Priority:
+    1) AI extraction result
+    2) Regex heuristic from raw row text
+    """
+    extracted = extract_lead_fields_from_csv_row(raw_row)
+    email = (extracted.email or "").strip().lower()
+    if email:
+        return email
+    return _heuristic_email_from_row(raw_row).strip().lower()
+
+
 def sanitize_lead_with_openai(raw_payload: dict[str, Any], *, fast_path: bool = True) -> SanitizeResult:
     """
     Normalize messy CSV/Serp rows into structured fields + gatekeeper status.

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import AdminDesktopSidebar from '@/components/AdminDesktopSidebar';
+import { ADMIN_MOBILE_TOP_PADDING, useAdminMainMotion } from '@/lib/admin-layout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -49,6 +50,7 @@ interface AuditLog {
 
 const AuditLogs = () => {
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const mainMotion = useAdminMainMotion(isCollapsed);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedLevel, setSelectedLevel] = useState('all');
   const [selectedUser, setSelectedUser] = useState('all');
@@ -268,12 +270,9 @@ const AuditLogs = () => {
       
       <motion.div
         initial={false}
-        animate={{ 
-          marginLeft: isCollapsed ? '80px' : '320px',
-          width: isCollapsed ? 'calc(100% - 80px)' : 'calc(100% - 320px)'
-        }}
+        animate={mainMotion}
         transition={{ duration: 0.3, ease: "easeInOut" }}
-        className="flex-1 p-8 relative z-10"
+        className={`flex-1 p-4 sm:p-6 lg:p-8 relative z-10 overflow-x-auto ${ADMIN_MOBILE_TOP_PADDING}`}
       >
         <motion.div
           initial={{ opacity: 0, y: 20 }}

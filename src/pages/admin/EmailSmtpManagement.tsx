@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import AdminDesktopSidebar from "@/components/AdminDesktopSidebar";
+import { ADMIN_MOBILE_TOP_PADDING, useAdminMainMotion } from "@/lib/admin-layout";
 import {
   Card,
   CardContent,
@@ -48,6 +49,7 @@ import {
 
 const EmailSmtpManagement = () => {
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const mainMotion = useAdminMainMotion(isCollapsed);
   const [showPassword, setShowPassword] = useState(false);
   const [testResult, setTestResult] = useState<
     "idle" | "testing" | "success" | "error"
@@ -485,9 +487,9 @@ const EmailSmtpManagement = () => {
 
       <motion.div
         initial={false}
-        animate={{ marginLeft: isCollapsed ? 80 : 320 }}
+        animate={mainMotion}
         transition={{ duration: 0.3, ease: "easeInOut" }}
-        className="flex-1 p-4 lg:p-8 relative z-10"
+        className={`flex-1 overflow-x-auto p-4 lg:p-8 relative z-10 ${ADMIN_MOBILE_TOP_PADDING}`}
       >
         <motion.div
           initial={{ opacity: 0, y: 20 }}

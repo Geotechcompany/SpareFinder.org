@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import AdminDesktopSidebar from "@/components/AdminDesktopSidebar";
-import MobileSidebar from "@/components/MobileSidebar";
+import { ADMIN_MOBILE_TOP_PADDING } from "@/lib/admin-layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -23,7 +23,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Loader2, RefreshCw, FileText, ChevronLeft, ChevronRight, Menu } from "lucide-react";
+import { Loader2, RefreshCw, FileText, ChevronLeft, ChevronRight } from "lucide-react";
 
 type SurveyRow = {
   id: string;
@@ -63,8 +63,6 @@ const OnboardingSurveys = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [range, setRange] = useState<"7d" | "30d" | "90d" | "365d">("90d");
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-
   const [surveys, setSurveys] = useState<SurveyRow[]>([]);
   const [pagination, setPagination] = useState<Pagination>({
     page: 1,
@@ -134,21 +132,6 @@ const OnboardingSurveys = () => {
         onToggle={() => setIsCollapsed(!isCollapsed)}
       />
 
-      {/* Mobile Sidebar (dashboard-style, but used across admin pages for small screens) */}
-      <MobileSidebar
-        isOpen={isMobileMenuOpen}
-        onClose={() => setIsMobileMenuOpen(false)}
-      />
-
-      {/* Mobile Menu Button */}
-      <button
-        onClick={() => setIsMobileMenuOpen((v) => !v)}
-        className="fixed top-4 right-4 z-50 p-2 rounded-lg border border-border bg-card/90 text-muted-foreground shadow-soft-elevated backdrop-blur-xl hover:bg-accent hover:text-accent-foreground md:hidden dark:bg-black/70 dark:border-white/10 dark:text-white"
-        aria-label="Open menu"
-      >
-        <Menu className="w-5 h-5" />
-      </button>
-
       {/* Main Content */}
       <motion.div
         initial={false}
@@ -160,7 +143,7 @@ const OnboardingSurveys = () => {
             "--admin-sidebar-offset": isCollapsed ? "80px" : "320px",
           } as React.CSSProperties
         }
-        className="flex-1 p-2 sm:p-4 lg:p-8 relative z-10 overflow-x-hidden md:overflow-x-visible lg:ml-[var(--admin-sidebar-offset)] lg:w-[calc(100%-var(--admin-sidebar-offset))]"
+        className={`flex-1 p-2 sm:p-4 lg:p-8 relative z-10 overflow-x-hidden md:overflow-x-visible lg:ml-[var(--admin-sidebar-offset)] lg:w-[calc(100%-var(--admin-sidebar-offset))] ${ADMIN_MOBILE_TOP_PADDING}`}
       >
         <motion.div
           initial={{ opacity: 0, y: 10 }}

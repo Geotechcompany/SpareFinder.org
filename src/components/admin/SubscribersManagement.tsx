@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { adminApi } from "../../lib/api";
 import AdminDesktopSidebar from "../AdminDesktopSidebar";
-import MobileSidebar from "../MobileSidebar";
+import { ADMIN_MOBILE_TOP_PADDING, useAdminMainMotion } from "@/lib/admin-layout";
 import {
   Card,
   CardContent,
@@ -34,7 +34,6 @@ import {
   DollarSign,
   Calendar,
   Filter,
-  Menu,
   RefreshCw,
   X,
 } from "lucide-react";
@@ -91,7 +90,7 @@ const SubscribersManagement: React.FC = () => {
   const [totalPages, setTotalPages] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const mainMotion = useAdminMainMotion(sidebarCollapsed);
   const [selectedSubscriber, setSelectedSubscriber] =
     useState<Subscriber | null>(null);
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
@@ -203,140 +202,80 @@ const SubscribersManagement: React.FC = () => {
   if (loading) {
     console.log("📊 Rendering skeleton loader");
     return (
-      <div className="min-h-screen bg-gradient-to-br from-background via-[#F0F2F5] to-[#E8EBF1] dark:from-[#0B1026] dark:via-[#1A1033] dark:to-[#0C1226]">
-        {/* Mobile Header */}
-        <div className="lg:hidden bg-card border-b border-border px-4 py-3 flex items-center justify-between shadow-sm dark:bg-gray-800 dark:border-gray-700">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setMobileMenuOpen(true)}
-            className="p-2"
-          >
-            <Menu className="h-5 w-5" />
-          </Button>
-          <h1 className="text-lg font-semibold text-white">Subscribers</h1>
-          <div className="w-9" /> {/* Spacer for centering */}
-        </div>
-
-        {/* Mobile Sidebar */}
-        <MobileSidebar
-          isOpen={mobileMenuOpen}
-          onClose={() => setMobileMenuOpen(false)}
-        />
-
-        {/* Desktop Layout */}
-        <div className="hidden lg:flex min-h-screen">
-          <AdminDesktopSidebar
-            isCollapsed={sidebarCollapsed}
-            onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
-          />
-          <motion.div
-            className="flex-1 flex flex-col"
-            animate={{ marginLeft: sidebarCollapsed ? 80 : 320 }}
-            transition={{ duration: 0.3, ease: "easeInOut" }}
-          >
-            {/* Desktop Header */}
-            <div className="bg-card border-b border-border px-6 py-4 shadow-sm dark:bg-gray-800 dark:border-gray-700">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h1 className="text-2xl font-bold text-foreground dark:text-white">
-                    Subscribers Management
-                  </h1>
-                  <p className="text-sm text-muted-foreground dark:text-gray-300">
-                    Manage user subscriptions and billing
-                  </p>
-                </div>
-                <Button onClick={fetchSubscribers} disabled={loading}>
-                  <RefreshCw className="w-4 h-4 mr-2" />
-                  Refresh
-                </Button>
-              </div>
-            </div>
-
-            {/* Loading Content */}
-            <div className="flex-1 p-6 space-y-6">
-              {/* Stats Skeleton */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                {Array.from({ length: 4 }, (_, index) => (
-                  <CardSkeleton key={index} variant="stats" />
-                ))}
-              </div>
-
-              {/* Table Skeleton */}
-              <div className="p-6">
-                <TableSkeleton variant="detailed" rows={5} />
-              </div>
-            </div>
-          </motion.div>
-        </div>
-      </div>
-    );
-  }
-
-  console.log("📊 Rendering main content");
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-[#F0F2F5] to-[#E8EBF1] dark:from-[#0B1026] dark:via-[#1A1033] dark:to-[#0C1226]">
-      {/* Mobile Header */}
-      <div className="lg:hidden bg-card border-b border-border px-4 py-3 flex items-center justify-between shadow-sm dark:bg-gray-800 dark:border-gray-700">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => setMobileMenuOpen(true)}
-          className="p-2"
-        >
-          <Menu className="h-5 w-5" />
-        </Button>
-        <h1 className="text-lg font-semibold text-white">Subscribers</h1>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={fetchSubscribers}
-          disabled={loading}
-          className="p-2"
-        >
-          <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
-        </Button>
-      </div>
-
-      {/* Mobile Sidebar */}
-      <MobileSidebar
-        isOpen={mobileMenuOpen}
-        onClose={() => setMobileMenuOpen(false)}
-      />
-
-      {/* Desktop Layout */}
-      <div className="hidden lg:flex min-h-screen">
+      <div className="flex min-h-screen bg-gradient-to-br from-background via-[#F0F2F5] to-[#E8EBF1] dark:from-[#0B1026] dark:via-[#1A1033] dark:to-[#0C1226]">
         <AdminDesktopSidebar
           isCollapsed={sidebarCollapsed}
           onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
         />
         <motion.div
-          className="flex-1 flex flex-col"
-          animate={{ marginLeft: sidebarCollapsed ? 80 : 320 }}
+          className={`flex flex-1 flex-col ${ADMIN_MOBILE_TOP_PADDING}`}
+          initial={false}
+          animate={mainMotion}
           transition={{ duration: 0.3, ease: "easeInOut" }}
         >
-          {/* Desktop Header */}
-          <div className="bg-card border-b border-border px-6 py-4 shadow-sm dark:bg-gray-800 dark:border-gray-700">
-            <div className="flex items-center justify-between">
+          <div className="border-b border-border bg-card px-4 py-4 shadow-sm dark:border-gray-700 dark:bg-gray-800 sm:px-6">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <h1 className="text-2xl font-bold text-foreground dark:text-white">
+                <h1 className="text-xl font-bold text-foreground dark:text-white sm:text-2xl">
                   Subscribers Management
                 </h1>
                 <p className="text-sm text-muted-foreground dark:text-gray-300">
                   Manage user subscriptions and billing
                 </p>
               </div>
-              <Button onClick={fetchSubscribers} disabled={loading}>
-                <RefreshCw
-                  className={`w-4 h-4 mr-2 ${loading ? "animate-spin" : ""}`}
-                />
+              <Button onClick={fetchSubscribers} disabled={loading} className="shrink-0 self-start sm:self-auto">
+                <RefreshCw className="mr-2 h-4 w-4" />
                 Refresh
               </Button>
             </div>
           </div>
 
-          {/* Main Content */}
-          <div className="flex-1 p-6 space-y-6">
+          <div className="flex-1 space-y-6 p-4 sm:p-6">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+              {Array.from({ length: 4 }, (_, index) => (
+                <CardSkeleton key={index} variant="stats" />
+              ))}
+            </div>
+            <div className="p-2 sm:p-6">
+              <TableSkeleton variant="detailed" rows={5} />
+            </div>
+          </div>
+        </motion.div>
+      </div>
+    );
+  }
+
+  console.log("📊 Rendering main content");
+  return (
+    <div className="flex min-h-screen bg-gradient-to-br from-background via-[#F0F2F5] to-[#E8EBF1] dark:from-[#0B1026] dark:via-[#1A1033] dark:to-[#0C1226]">
+      <AdminDesktopSidebar
+        isCollapsed={sidebarCollapsed}
+        onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
+      />
+      <motion.div
+        initial={false}
+        animate={mainMotion}
+        transition={{ duration: 0.3, ease: "easeInOut" }}
+        className={`flex flex-1 flex-col ${ADMIN_MOBILE_TOP_PADDING}`}
+      >
+        <div className="border-b border-border bg-card px-4 py-4 shadow-sm dark:border-gray-700 dark:bg-gray-800 sm:px-6">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h1 className="text-xl font-bold text-foreground dark:text-white sm:text-2xl">
+                Subscribers Management
+              </h1>
+              <p className="text-sm text-muted-foreground dark:text-gray-300">
+                Manage user subscriptions and billing
+              </p>
+            </div>
+            <Button onClick={fetchSubscribers} disabled={loading} className="shrink-0 self-start sm:self-auto">
+              <RefreshCw className={`mr-2 h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+              Refresh
+            </Button>
+          </div>
+        </div>
+
+        <div className="flex-1 space-y-6 p-4 sm:p-6">
             {/* Statistics Cards */}
             {stats && (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -467,7 +406,8 @@ const SubscribersManagement: React.FC = () => {
               </Card>
             )}
 
-            {/* Subscribers Table */}
+            {/* Subscribers Table (desktop) */}
+            <div className="hidden lg:block">
             <Card>
               <CardHeader>
                 <CardTitle>Subscribers ({totalCount})</CardTitle>
@@ -645,101 +585,11 @@ const SubscribersManagement: React.FC = () => {
                 )}
               </CardContent>
             </Card>
-          </div>
-        </motion.div>
-      </div>
-
-      {/* Mobile Content */}
-      <div className="lg:hidden p-4 space-y-6">
-        {/* Statistics Cards */}
-        {stats && (
-          <div className="grid grid-cols-2 gap-4">
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium flex items-center">
-                  <Users className="h-4 w-4 mr-2" />
-                  Total
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{stats.total}</div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium flex items-center">
-                  <Calendar className="h-4 w-4 mr-2" />
-                  Active
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">
-                  {stats.by_status.active}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        )}
-
-        {/* Mobile Filters */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Filters</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="relative">
-              <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-              <Input
-                placeholder="Search subscribers..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
-              />
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <Select value={tierFilter} onValueChange={setTierFilter}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Tier" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Tiers</SelectItem>
-                  <SelectItem value="free">Free</SelectItem>
-                  <SelectItem value="pro">Pro</SelectItem>
-                  <SelectItem value="enterprise">Enterprise</SelectItem>
-                </SelectContent>
-              </Select>
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Status</SelectItem>
-                  <SelectItem value="active">Active</SelectItem>
-                  <SelectItem value="trialing">Trialing</SelectItem>
-                  <SelectItem value="canceled">Canceled</SelectItem>
-                  <SelectItem value="past_due">Past Due</SelectItem>
-                  <SelectItem value="unpaid">Unpaid</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <Button
-              variant="outline"
-              onClick={() => {
-                setSearchTerm("");
-                setTierFilter("all");
-                setStatusFilter("all");
-                setCurrentPage(1);
-              }}
-              className="w-full"
-            >
-              <Filter className="w-4 h-4 mr-2" />
-              Clear Filters
-            </Button>
-          </CardContent>
-        </Card>
 
-        {/* Mobile Subscribers List */}
-        <Card>
+            {/* Subscribers list (small screens) */}
+            <div className="lg:hidden">
+            <Card>
           <CardHeader>
             <CardTitle>Subscribers ({totalCount})</CardTitle>
             <CardDescription>
@@ -833,7 +683,9 @@ const SubscribersManagement: React.FC = () => {
             )}
           </CardContent>
         </Card>
-      </div>
+            </div>
+          </div>
+        </motion.div>
 
       {/* Subscriber Details Modal */}
       {isDetailsModalOpen && selectedSubscriber && (

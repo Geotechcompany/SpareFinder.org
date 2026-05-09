@@ -14,7 +14,7 @@ import { api } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 import AdminDesktopSidebar from "@/components/AdminDesktopSidebar";
-import MobileSidebar from "@/components/MobileSidebar";
+import { ADMIN_MOBILE_TOP_PADDING, useAdminMainMotion } from "@/lib/admin-layout";
 import {
   PageSkeleton,
   CardSkeleton,
@@ -32,7 +32,6 @@ import {
   Settings,
   FileText,
   BarChart3,
-  Menu,
   RefreshCw,
   Download,
   Bell,
@@ -136,7 +135,7 @@ const AdminDashboardLayout = () => {
   const [estimatedRevenue, setEstimatedRevenue] = useState<number | null>(null);
   const [adminUser, setAdminUser] = useState<AdminUser | null>(null);
   const [isCollapsed, setIsCollapsed] = useState(false);
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const mainMotion = useAdminMainMotion(isCollapsed);
   const [analytics, setAnalytics] = useState<AdminAnalytics | null>(null);
   const [onboardingSummary, setOnboardingSummary] = useState<OnboardingSummary | null>(null);
 
@@ -298,10 +297,6 @@ const AdminDashboardLayout = () => {
 
   const handleToggleSidebar = () => {
     setIsCollapsed(!isCollapsed);
-  };
-
-  const handleToggleMobileMenu = () => {
-    setIsMobileMenuOpen(!isMobileMenuOpen);
   };
 
   const handleRefresh = () => {
@@ -562,29 +557,12 @@ const AdminDashboardLayout = () => {
         onToggle={handleToggleSidebar}
       />
 
-      {/* Mobile Sidebar */}
-      <MobileSidebar
-        isOpen={isMobileMenuOpen}
-        onClose={() => setIsMobileMenuOpen(false)}
-      />
-
-      {/* Mobile Menu Button */}
-      <button
-        onClick={handleToggleMobileMenu}
-        className="fixed top-4 right-4 z-50 p-2 rounded-lg bg-card border border-border text-foreground md:hidden"
-      >
-        <Menu className="w-5 h-5 text-foreground" />
-      </button>
-
       {/* Main Content */}
       <motion.div
         initial={false}
-        animate={{
-          marginLeft: isCollapsed ? "80px" : "320px",
-          width: isCollapsed ? "calc(100% - 80px)" : "calc(100% - 320px)",
-        }}
+        animate={mainMotion}
         transition={{ duration: 0.3, ease: "easeInOut" }}
-        className="flex-1 p-2 sm:p-4 lg:p-8 relative z-10 overflow-x-hidden md:overflow-x-visible"
+        className={`flex-1 p-2 sm:p-4 lg:p-8 relative z-10 overflow-x-hidden md:overflow-x-visible ${ADMIN_MOBILE_TOP_PADDING}`}
       >
         <motion.div
           initial={{ opacity: 0, y: 20 }}
