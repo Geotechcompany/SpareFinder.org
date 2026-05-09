@@ -102,6 +102,9 @@ class DiscoverBody(BaseModel):
     # Optional SerpAPI geo (overrides saved settings for this run). ISO 3166-1 alpha-2 e.g. ng
     gl: str | None = Field(default=None, max_length=8)
     hl: str | None = Field(default=None, max_length=12)
+    # When set, used for this run only (lets "Run discovery" match the form without Save first).
+    google_search_provider: str | None = Field(default=None, max_length=32)
+    serpapi_key: str | None = Field(default=None, max_length=256)
 
 
 class GenerateSerpQueriesBody(BaseModel):
@@ -758,7 +761,11 @@ async def discover_serpapi(
     supabase = get_supabase_admin()
     settings = _get_settings_row(supabase)
     val = settings.get("setting_value") or {}
-    key_override = str(val.get("serpapi_key") or "").strip() or None
+    key_override = (
+        str(body.serpapi_key or "").strip()
+        or str(val.get("serpapi_key") or "").strip()
+        or None
+    )
     templates = body.queries if body.queries else (val.get("serp_query_templates") or [])
     if not templates:
         return api_error("No queries configured — add serp_query_templates in settings or pass queries[]", status_code=400)
@@ -768,7 +775,10 @@ async def discover_serpapi(
     gl_use = (str(body.gl or val.get("serp_target_country_code") or "").strip() or None)
     hl_use = (str(body.hl or val.get("serp_target_hl") or "").strip() or None)
     tag_cc = gl_use.lower()[:4] if gl_use else ""
-    prov_raw = str(val.get("google_search_provider") or os.getenv("MARKETING_GOOGLE_SEARCH_PROVIDER") or "serpapi").strip().lower()
+    if body.google_search_provider is not None and str(body.google_search_provider).strip():
+        prov_raw = str(body.google_search_provider).strip().lower()
+    else:
+        prov_raw = str(val.get("google_search_provider") or os.getenv("MARKETING_GOOGLE_SEARCH_PROVIDER") or "serpapi").strip().lower()
     search_provider = "serper" if prov_raw in ("serper", "serper.dev", "google.serper") else "serpapi"
     lead_source = "serper_google" if search_provider == "serper" else "serpapi_google"
 

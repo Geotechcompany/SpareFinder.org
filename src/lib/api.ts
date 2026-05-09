@@ -1130,6 +1130,8 @@ export const adminApi = {
     campaign_id?: string | null;
     gl?: string | null;
     hl?: string | null;
+    google_search_provider?: "serpapi" | "serper" | string;
+    serpapi_key?: string;
   }): Promise<ApiResponse> => {
     const response = await apiClient.post("/admin/marketing/discover", payload);
     return response.data;

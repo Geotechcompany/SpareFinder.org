@@ -22,6 +22,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { adminApi } from "@/lib/api";
 import { MARKETING_SERP_COUNTRIES, marketingCountryLabel } from "@/lib/marketingCountries";
 import { useToast } from "@/components/ui/use-toast";
@@ -201,7 +202,7 @@ const MarketingOutbound: React.FC = () => {
       serp_target_hl: serpHl.trim().toLowerCase() || "en",
       google_search_provider: googleSearchProvider,
     });
-    if (res.success) toast({ title: "SerpAPI queries saved" });
+    if (res.success) toast({ title: "Discovery settings saved" });
     else toast({ variant: "destructive", title: "Save failed" });
   };
 
@@ -275,12 +276,15 @@ const MarketingOutbound: React.FC = () => {
       .filter(Boolean);
     const gl = serpCountryCode.trim().toLowerCase() || undefined;
     const hl = serpHl.trim().toLowerCase() || undefined;
+    const keyTrim = serpApiKey.trim();
     const res = await adminApi.discoverMarketingSerp({
       max_queries: 3,
       campaign_id: null,
       queries: lines.length ? lines : undefined,
       gl: gl || null,
       hl: hl || null,
+      google_search_provider: googleSearchProvider,
+      ...(keyTrim ? { serpapi_key: keyTrim } : {}),
     });
     if (res.success) {
       const data = res.data as {
@@ -410,21 +414,23 @@ const MarketingOutbound: React.FC = () => {
                 <TabsTrigger value="campaigns">Campaigns</TabsTrigger>
                 <TabsTrigger value="leads">Leads</TabsTrigger>
                 <TabsTrigger value="import">CSV import</TabsTrigger>
-                <TabsTrigger value="serp">SerpAPI</TabsTrigger>
+                <TabsTrigger value="serp">Google discovery</TabsTrigger>
                 <TabsTrigger value="logs">Send log</TabsTrigger>
                 <TabsTrigger value="errors">Errors</TabsTrigger>
               </TabsList>
 
               <TabsContent value="overview">
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                  {[
-                    ["Leads (total)", dashboard?.leads_total],
-                    ["Pending send", dashboard?.leads_pending_send],
-                    ["Needs review", dashboard?.leads_needs_review],
-                    ["Sends today (UTC)", dashboard?.sends_today],
-                    ["Failed today", dashboard?.failed_today],
-                  ].map(([label, val]) => (
-                    <Card key={String(label)}>
+                  {(
+                    [
+                      ["Leads (total)", dashboard?.leads_total],
+                      ["Pending send", dashboard?.leads_pending_send],
+                      ["Needs review", dashboard?.leads_needs_review],
+                      ["Sends today (UTC)", dashboard?.sends_today],
+                      ["Failed today", dashboard?.failed_today],
+                    ] as [string, unknown][]
+                  ).map(([label, val]) => (
+                    <Card key={label}>
                       <CardHeader className="pb-2">
                         <CardDescription>{label}</CardDescription>
                         <CardTitle className="text-3xl">{String(val ?? "—")}</CardTitle>
@@ -705,40 +711,51 @@ const MarketingOutbound: React.FC = () => {
                 <Card>
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
-                      <Search className="h-5 w-5" /> SerpAPI discovery
+                      <Search className="h-5 w-5" /> Google discovery
                     </CardTitle>
                     <CardDescription>
-                      Choose <strong>SerpAPI</strong> (serpapi.com) or <strong>Serper.dev</strong> — the same key field
-                      holds whichever vendor you use. Query templates feed{" "}
-                      <code className="text-xs">/api/cron/marketing-discover</code>.
+                      <strong>Run discovery now</strong> uses the vendor and key on this screen (you do not have to Save
+                      first). Save to persist the same settings for{" "}
+                      <code className="text-xs">/api/cron/marketing-discover</code>. Google result titles/snippets rarely
+                      include email addresses — rows are often “review” with company + link until you add
+                      contacts manually, import CSV, or enable API env{" "}
+                      <code className="text-xs">MARKETING_SERP_EMAIL_SCRAPE=1</code> (fetches each result page; slower,
+                      respect site terms).
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    <div>
-                      <Label>Search API vendor</Label>
-                      <Select
+                    <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-3">
+                      <Label className="text-base">Search API vendor</Label>
+                      <RadioGroup
+                        className="flex flex-col gap-3 sm:flex-row sm:gap-8"
                         value={googleSearchProvider}
                         onValueChange={(v) => setGoogleSearchProvider(v === "serper" ? "serper" : "serpapi")}
                       >
-                        <SelectTrigger className="max-w-md">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="serpapi">SerpAPI (serpapi.com)</SelectItem>
-                          <SelectItem value="serper">Serper.dev (google.serper.dev)</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Serper keys only work when Serper.dev is selected (they are rejected by SerpAPI).
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="serpapi" id="vendor-serpapi" />
+                          <Label htmlFor="vendor-serpapi" className="font-normal cursor-pointer">
+                            SerpAPI (GET serpapi.com)
+                          </Label>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="serper" id="vendor-serper" />
+                          <Label htmlFor="vendor-serper" className="font-normal cursor-pointer">
+                            Serper.dev (POST google.serper.dev, header X-API-KEY)
+                          </Label>
+                        </div>
+                      </RadioGroup>
+                      <p className="text-xs text-muted-foreground">
+                        Serper keys return 401 from SerpAPI — select Serper here (same behavior as your Serper playground
+                        snippet).
                       </p>
                     </div>
                     <div>
-                      <Label>API key (SerpAPI or Serper — same field)</Label>
+                      <Label>API key (paste from the vendor you selected)</Label>
                       <Input
                         type="password"
                         value={serpApiKey}
                         onChange={(e) => setSerpApiKey(e.target.value)}
-                        placeholder="Paste key from serpapi.com/manage-api-key or serper.dev/api-keys"
+                        placeholder="SerpAPI or Serper dashboard → API keys"
                       />
                     </div>
                     <div className="grid gap-4 sm:grid-cols-2">
@@ -793,7 +810,7 @@ const MarketingOutbound: React.FC = () => {
                       placeholder={"industrial spare parts procurement Kenya\nfleet maintenance parts suppliers"}
                     />
                     <div className="flex flex-wrap gap-2">
-                      <Button onClick={saveSerpTemplates}>Save queries</Button>
+                      <Button onClick={saveSerpTemplates}>Save discovery settings</Button>
                       <Button variant="secondary" onClick={runDiscover}>
                         Run discovery now
                       </Button>

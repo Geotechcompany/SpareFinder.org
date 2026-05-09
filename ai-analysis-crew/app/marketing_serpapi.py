@@ -6,6 +6,7 @@ import logging
 import os
 import re
 from typing import Any
+from urllib.parse import unquote, urlparse
 
 import httpx
 
@@ -25,6 +26,133 @@ def _extract_emails(text: str) -> list[str]:
         if el not in out:
             out.append(el)
     return out
+
+
+def _env_truthy(name: str) -> bool:
+    return (os.getenv(name) or "").strip().lower() in ("1", "true", "yes", "on")
+
+
+def _host_from_url(url: str) -> str:
+    try:
+        h = (urlparse(url).hostname or "").lower()
+        return h[4:] if h.startswith("www.") else h
+    except Exception:
+        return ""
+
+
+def _mailto_from_link(link: str) -> str | None:
+    if not link or "mailto:" not in link.lower():
+        return None
+    m = re.search(
+        r"mailto:([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})",
+        unquote(link),
+        flags=re.I,
+    )
+    return m.group(1).strip().lower() if m else None
+
+
+_SKIP_EMAIL_LOCALS = frozenset({"noreply", "no-reply", "donotreply", "mailer-daemon", "postmaster"})
+_BAD_EMAIL_DOMAINS = frozenset({"example.com", "test.com", "domain.com", "email.com", "yoursite.com", "sentry.io"})
+
+
+def _pick_best_email(emails: list[str], host_hint: str) -> str | None:
+    """Prefer addresses on the same host as the result URL; skip obvious system locals."""
+    if not emails:
+        return None
+    host_hint = (host_hint or "").lower()
+    if host_hint.startswith("www."):
+        host_hint = host_hint[4:]
+    scored: list[tuple[int, str]] = []
+    for raw in emails:
+        el = (raw or "").strip().lower()
+        if "@" not in el:
+            continue
+        local, _, domain = el.partition("@")
+        domain = domain[4:] if domain.startswith("www.") else domain
+        if domain in _BAD_EMAIL_DOMAINS:
+            continue
+        if local in _SKIP_EMAIL_LOCALS:
+            continue
+        score = 0
+        if host_hint and (domain == host_hint or domain.endswith("." + host_hint)):
+            score += 10
+        scored.append((score, el))
+    if scored:
+        scored.sort(key=lambda x: -x[0])
+        return scored[0][1]
+    return emails[0].strip().lower() if emails else None
+
+
+def _collect_sitelink_strings(obj: Any, sink: list[str]) -> None:
+    if isinstance(obj, dict):
+        for k in ("title", "snippet", "link", "text"):
+            v = obj.get(k)
+            if isinstance(v, str) and v.strip():
+                sink.append(v.strip())
+        for v in obj.values():
+            if isinstance(v, (dict, list)):
+                _collect_sitelink_strings(v, sink)
+    elif isinstance(obj, list):
+        for x in obj:
+            _collect_sitelink_strings(x, sink)
+
+
+def _gather_organic_text(item: dict[str, Any]) -> str:
+    parts: list[str] = []
+    for key in ("title", "snippet", "description", "date"):
+        v = item.get(key)
+        if isinstance(v, str) and v.strip():
+            parts.append(v.strip())
+    sh = item.get("snippet_highlighted_words")
+    if isinstance(sh, list):
+        parts.extend(str(x).strip() for x in sh if str(x).strip())
+    link = str(item.get("link") or "").strip()
+    if link:
+        parts.append(link)
+    mt = _mailto_from_link(link)
+    if mt:
+        parts.append(mt)
+    _collect_sitelink_strings(item.get("sitelinks"), parts)
+    attrs = item.get("attributes")
+    if isinstance(attrs, dict):
+        for v in attrs.values():
+            if isinstance(v, str) and v.strip():
+                parts.append(v.strip())
+    return "\n".join(parts)
+
+
+_SCRAPE_UA = (
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+    "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+)
+
+
+def _try_emails_from_result_url(url: str) -> list[str]:
+    """
+    Optional slow path: fetch the ranking URL and regex-scan HTML for addresses.
+    Enable with env MARKETING_SERP_EMAIL_SCRAPE=1 — respect robots/terms of target sites.
+    """
+    if not url.startswith(("http://", "https://")):
+        return []
+    try:
+        with httpx.Client(
+            timeout=httpx.Timeout(6.0, connect=4.0),
+            follow_redirects=True,
+            headers={
+                "User-Agent": _SCRAPE_UA,
+                "Accept": "text/html,application/xhtml+xml;q=0.9,*/*;q=0.8",
+            },
+        ) as client:
+            r = client.get(url)
+            if r.status_code >= 400:
+                return []
+            ct = (r.headers.get("content-type") or "").lower()
+            if "html" not in ct and "xhtml" not in ct:
+                return []
+            return _extract_emails((r.text or "")[:400_000])
+    except Exception as e:
+        logger.debug("MARKETING_SERP_EMAIL_SCRAPE skip %s: %s", url[:96], e)
+        return []
 
 
 def _resolve_search_provider(explicit: str | None) -> str:
@@ -133,8 +261,15 @@ def search_google(
 
 
 def organic_results_to_lead_candidates(resp: dict[str, Any], *, query: str) -> list[dict[str, Any]]:
-    """Map SerpAPI `organic_results` or Serper `organic` into preliminary lead dicts for sanitization."""
+    """
+    Map SerpAPI `organic_results` or Serper `organic` into preliminary lead dicts.
+
+    Google titles/snippets usually do **not** contain email addresses; we still regex-scan
+    all available SERP text (including sitelinks / mailto). Optional env
+    ``MARKETING_SERP_EMAIL_SCRAPE=1`` fetches each result URL and scans HTML (slower; use responsibly).
+    """
     organic = resp.get("organic_results") or resp.get("organic") or []
+    scrape_pages = _env_truthy("MARKETING_SERP_EMAIL_SCRAPE")
     candidates: list[dict[str, Any]] = []
     for item in organic:
         if not isinstance(item, dict):
@@ -142,9 +277,12 @@ def organic_results_to_lead_candidates(resp: dict[str, Any], *, query: str) -> l
         title = str(item.get("title") or "").strip()
         link = str(item.get("link") or "").strip()
         snippet = str(item.get("snippet") or "").strip()
-        combined = f"{title}\n{snippet}"
+        host = _host_from_url(link)
+        combined = _gather_organic_text(item)
         emails = _extract_emails(combined)
-        email = emails[0] if emails else None
+        email = _pick_best_email(emails, host)
+        if not email and scrape_pages and link:
+            email = _pick_best_email(_try_emails_from_result_url(link), host)
         company_guess = title.split("|")[0].split("-")[0].strip() if title else ""
 
         candidates.append(
