@@ -28,6 +28,7 @@ from ..marketing_pipeline import (
     frontend_base_url,
     log_error,
     render_message_for_lead,
+    run_marketing_admin_send_to_leads,
     run_marketing_send_cron,
     send_marketing_email,
 )
@@ -138,6 +139,11 @@ class BulkLeadActionBody(BaseModel):
     ids: list[str] = Field(default_factory=list)
     action: Literal["delete", "update"]
     payload: dict[str, Any] | None = None
+
+
+class AdminBulkSendLeadsBody(BaseModel):
+    ids: list[str] = Field(default_factory=list)
+    limit: int = Field(default=25, ge=1, le=100)
 
 
 class MarketingSettingsBody(BaseModel):
@@ -525,6 +531,28 @@ async def bulk_manage_leads(
     res = supabase.table("marketing_leads").update(patch).in_("id", ids).execute()
     updated = len(res.data or [])
     return api_ok(data={"updated": updated, "ids": ids[:20]})
+
+
+@admin_router.post("/leads/send")
+async def admin_bulk_send_leads(
+    body: AdminBulkSendLeadsBody,
+    _admin: CurrentUser = Depends(require_roles("admin", "super_admin")),
+):
+    """
+    Send real campaign emails for up to `limit` selected leads (admin). Does not enforce max_per_day / max_per_run;
+    each lead must be pending, review accepted, tied to an unpaused campaign, and pass suppression checks.
+    """
+    if len(body.ids) > 500:
+        raise HTTPException(status_code=400, detail="Too many ids; max 500 in one request")
+    supabase = get_supabase_admin()
+    try:
+        out = run_marketing_admin_send_to_leads(supabase, lead_ids=body.ids, max_batch=body.limit)
+    except Exception as e:
+        logger.exception("admin_bulk_send_leads")
+        raise HTTPException(status_code=500, detail=str(e)) from e
+    if not out.get("ok"):
+        return api_error(out.get("error") or "Send failed", status_code=500)
+    return api_ok(data=out)
 
 
 def _discovery_candidate_has_usable_email(candidate: dict[str, Any]) -> bool:

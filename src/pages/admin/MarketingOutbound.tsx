@@ -31,6 +31,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { adminApi } from "@/lib/api";
 import { MARKETING_SERP_COUNTRIES, marketingCountryLabel } from "@/lib/marketingCountries";
 import { useToast } from "@/components/ui/use-toast";
@@ -51,6 +61,7 @@ import {
   PencilLine,
   Sparkles,
   UserPlus,
+  Send,
 } from "lucide-react";
 import { API_BASE_URL } from "@/lib/config";
 
@@ -148,6 +159,9 @@ const MarketingOutbound: React.FC = () => {
   const [manualLeadCampaignId, setManualLeadCampaignId] = useState("__auto__");
   const [manualLeadSanitize, setManualLeadSanitize] = useState(false);
   const [manualLeadSaving, setManualLeadSaving] = useState(false);
+  const [bulkSendConfirmOpen, setBulkSendConfirmOpen] = useState(false);
+  const [bulkSendMaxInput, setBulkSendMaxInput] = useState("25");
+  const [bulkSendSubmitting, setBulkSendSubmitting] = useState(false);
 
   const loadAll = useCallback(async () => {
     setLoading(true);
@@ -608,6 +622,51 @@ const MarketingOutbound: React.FC = () => {
     }
   };
 
+  const openBulkSendConfirm = () => {
+    if (!selectedLeadIds.length) return;
+    const cap = Math.min(selectedLeadIds.length, 100);
+    setBulkSendMaxInput(String(Math.min(Math.max(cap, 1), 50)));
+    setBulkSendConfirmOpen(true);
+  };
+
+  const executeBulkSendSelected = async () => {
+    const parsed = parseInt(bulkSendMaxInput, 10);
+    const lim = Number.isFinite(parsed)
+      ? Math.max(1, Math.min(100, parsed))
+      : Math.min(selectedLeadIds.length, 50);
+    setBulkSendSubmitting(true);
+    try {
+      const res = await adminApi.sendMarketingLeadsBatch({ ids: selectedLeadIds, limit: lim });
+      if (res.success) {
+        const d = res.data as {
+          sent?: number;
+          failed?: number;
+          skipped?: number;
+          errors?: string[];
+          hints?: string[];
+        };
+        const parts = [`Sent ${d?.sent ?? 0}`];
+        if (d?.failed) parts.push(`failed ${d.failed}`);
+        if (d?.skipped) parts.push(`skipped ${d.skipped}`);
+        const extra = d?.errors?.length ? ` — ${d.errors[0]}` : d?.hints?.[0] ? ` — ${d.hints[0]}` : "";
+        toast({ title: "Bulk send finished", description: `${parts.join(", ")}${extra}` });
+        setBulkSendConfirmOpen(false);
+        setSelectedLeadIds([]);
+        loadAll();
+      } else {
+        toast({
+          variant: "destructive",
+          title: "Bulk send failed",
+          description: (res as { message?: string }).message || res.error || "Request failed",
+        });
+      }
+    } catch (e) {
+      toast({ variant: "destructive", title: "Bulk send failed", description: formatMarketingApiError(e) });
+    } finally {
+      setBulkSendSubmitting(false);
+    }
+  };
+
   const cronBase = `${String(API_BASE_URL || "").replace(/\/$/, "")}/api`;
 
   return (
@@ -827,7 +886,9 @@ const MarketingOutbound: React.FC = () => {
                       Showing the latest 50 rows. Contacts found on Google pick up the country you set under Find on
                       Google — use the filter below to narrow them (spreadsheet imports do not set a country yet).{" "}
                       <strong>Bulk review status</strong> first removes selected rows that have no real email (or use a
-                      throwaway inbox), then opens a dialog to set the status for the rest.
+                      throwaway inbox), then opens a dialog to set the status for the rest.{" "}
+                      <strong>Send to selected</strong> sends the real campaign email (pending, accepted, active
+                      campaign) up to the limit you set — same SMTP path as the automated cron.
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="overflow-x-auto">
@@ -880,6 +941,16 @@ const MarketingOutbound: React.FC = () => {
                       </Button>
                       <Button size="sm" variant="outline" onClick={() => void openBulkLeadDialog("campaign_id")} disabled={!selectedLeadIds.length}>
                         Bulk set campaign
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={openBulkSendConfirm}
+                        disabled={!selectedLeadIds.length}
+                        title="Sends campaign mail to selected contacts that are pending, review accepted, and on an active campaign"
+                      >
+                        <Send className="h-4 w-4 mr-1" />
+                        Send to selected
                       </Button>
                       <Button size="sm" variant="destructive" onClick={runBulkDelete} disabled={!selectedLeadIds.length}>
                         <Trash2 className="h-4 w-4 mr-1" />
@@ -1418,6 +1489,47 @@ const MarketingOutbound: React.FC = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog
+        open={bulkSendConfirmOpen}
+        onOpenChange={(open) => {
+          setBulkSendConfirmOpen(open);
+          if (!open) setBulkSendSubmitting(false);
+        }}
+      >
+        <AlertDialogContent className="sm:max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Send campaign email to selected contacts?</AlertDialogTitle>
+            <AlertDialogDescription className="space-y-3 text-left">
+              <span className="block text-muted-foreground">
+                This uses the same live send path as the marketing cron (SMTP / email service). Only rows that are{" "}
+                <strong>pending</strong>, review <strong>accepted</strong>, on an <strong>active</strong> campaign, and
+                not suppressed will receive mail. Others are reported in the result toast.
+              </span>
+              <span className="block">
+                <Label htmlFor="bulk-send-max">Max sends this run (1–100)</Label>
+                <Input
+                  id="bulk-send-max"
+                  type="number"
+                  min={1}
+                  max={100}
+                  className="mt-1 max-w-[120px]"
+                  value={bulkSendMaxInput}
+                  onChange={(e) => setBulkSendMaxInput(e.target.value)}
+                  disabled={bulkSendSubmitting}
+                />
+              </span>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="gap-2 sm:justify-end">
+            <AlertDialogCancel disabled={bulkSendSubmitting}>Cancel</AlertDialogCancel>
+            <Button type="button" disabled={bulkSendSubmitting} onClick={() => void executeBulkSendSelected()}>
+              {bulkSendSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-2 inline" /> : null}
+              Send emails
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

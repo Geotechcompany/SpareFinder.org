@@ -471,3 +471,198 @@ def run_marketing_send_cron(
             pass
 
     return {"ok": True, **summary}
+
+
+def run_marketing_admin_send_to_leads(
+    supabase: Any,
+    *,
+    lead_ids: list[str],
+    max_batch: int = 25,
+) -> dict[str, Any]:
+    """
+    Send campaign emails for specific lead IDs (admin UI). Same rules as the send cron for each row:
+    pending, accepted review, non-paused campaign, not suppressed. Ignores daily/run caps on campaigns.
+    """
+    import time
+
+    seen: list[str] = []
+    for raw in lead_ids:
+        s = str(raw).strip()
+        if s and s not in seen:
+            seen.append(s)
+    cap = max(1, min(int(max_batch), 100, len(seen)))
+    ids = seen[:cap]
+
+    sent = 0
+    failed = 0
+    skipped = 0
+    errors: list[str] = []
+    hints: list[str] = []
+
+    try:
+        lr = supabase.table("marketing_leads").select("*").in_("id", ids).execute()
+        by_id = {str(r["id"]): r for r in (lr.data or [])}
+    except Exception as e:
+        logger.exception("admin bulk send: load leads")
+        return {
+            "ok": False,
+            "error": str(e),
+            "sent": 0,
+            "failed": 0,
+            "skipped": 0,
+            "errors": [],
+            "hints": [str(e)],
+        }
+
+    camp_cache: dict[str, dict[str, Any]] = {}
+
+    def load_campaign(cid: str) -> dict[str, Any] | None:
+        if cid in camp_cache:
+            return camp_cache[cid]
+        try:
+            r = supabase.table("marketing_campaigns").select("*").eq("id", cid).limit(1).execute()
+            row = (r.data or [None])[0]
+            if isinstance(row, dict):
+                camp_cache[cid] = row
+                return row
+        except Exception as e:
+            logger.warning("admin bulk send: load campaign %s: %s", cid, e)
+        return None
+
+    cron_run_id: str | None = None
+
+    for lid in ids:
+        lead = by_id.get(lid)
+        if not lead:
+            errors.append(f"{lid}: lead not found")
+            continue
+        email = (lead.get("email") or "").strip().lower()
+        if not email:
+            errors.append(f"{lid}: missing email")
+            continue
+        if lead.get("lead_status_internal") != "pending":
+            errors.append(f"{email}: send status must be pending (got {lead.get('lead_status_internal')})")
+            continue
+        if lead.get("sanitization_status") != "accepted":
+            errors.append(f"{email}: review must be accepted (got {lead.get('sanitization_status')})")
+            continue
+        raw_cid = lead.get("campaign_id")
+        if not raw_cid:
+            errors.append(f"{email}: assign a campaign before sending")
+            continue
+        cid = str(raw_cid)
+        campaign = load_campaign(cid)
+        if not campaign:
+            errors.append(f"{email}: campaign not found")
+            continue
+        if campaign.get("is_paused"):
+            cname = campaign.get("name") or cid
+            errors.append(f"{email}: campaign {cname!r} is paused — activate it or reassign the contact.")
+            continue
+
+        if is_suppressed(supabase, email):
+            skipped += 1
+            record_send(
+                supabase,
+                lead_id=str(lead["id"]),
+                campaign_id=cid,
+                cron_run_id=cron_run_id,
+                status="skipped",
+                error_message="suppressed",
+                subject_snapshot=None,
+                body_html_snapshot=None,
+            )
+            continue
+
+        token = ensure_unsubscribe_token(lead)
+        if token != lead.get("unsubscribe_token"):
+            try:
+                supabase.table("marketing_leads").update({"unsubscribe_token": token}).eq("id", lead["id"]).execute()
+                lead["unsubscribe_token"] = token
+            except Exception:
+                pass
+
+        use_ai = bool(campaign.get("use_ai"))
+        use_crew = bool(campaign.get("use_crew_ai"))
+
+        try:
+            subj, html, text = render_message_for_lead(
+                lead=lead,
+                campaign=campaign,
+                use_ai=use_ai,
+                use_crew_ai=use_crew,
+            )
+        except Exception as ge:
+            failed += 1
+            record_send(
+                supabase,
+                lead_id=str(lead["id"]),
+                campaign_id=cid,
+                cron_run_id=cron_run_id,
+                status="failed",
+                error_message=f"render: {ge}"[:2000],
+                subject_snapshot=None,
+                body_html_snapshot=None,
+            )
+            log_error(
+                supabase,
+                severity="error",
+                message=str(ge)[:2000],
+                context={"lead_id": str(lead["id"]), "campaign_id": cid, "source": "admin_bulk_send"},
+            )
+            continue
+
+        ok = send_marketing_email(to_email=email, subject=subj, html=html, text=text)
+        if ok:
+            sent += 1
+            try:
+                supabase.table("marketing_leads").update(
+                    {
+                        "lead_status_internal": "sent",
+                        "last_sent_at": datetime.now(timezone.utc).isoformat(),
+                    }
+                ).eq("id", lead["id"]).execute()
+            except Exception:
+                pass
+            record_send(
+                supabase,
+                lead_id=str(lead["id"]),
+                campaign_id=cid,
+                cron_run_id=cron_run_id,
+                status="sent",
+                error_message=None,
+                subject_snapshot=subj[:500],
+                body_html_snapshot=html[:50000],
+            )
+        else:
+            failed += 1
+            record_send(
+                supabase,
+                lead_id=str(lead["id"]),
+                campaign_id=cid,
+                cron_run_id=cron_run_id,
+                status="failed",
+                error_message="smtp/email service failed",
+                subject_snapshot=subj[:500],
+                body_html_snapshot=None,
+            )
+
+        delay_sec = int(campaign.get("min_delay_seconds") or 0)
+        if delay_sec > 0:
+            time.sleep(min(delay_sec, 60))
+
+    if sent == 0 and failed == 0 and skipped == 0 and not errors:
+        hints.append(
+            "Nothing was sent — rows must be pending, review accepted, on an active campaign, and not suppressed."
+        )
+    elif sent == 0 and failed > 0:
+        hints.append("SMTP or email-service failed — verify server configuration.")
+
+    return {
+        "ok": True,
+        "sent": sent,
+        "failed": failed,
+        "skipped": skipped,
+        "errors": errors[:40],
+        "hints": hints,
+    }

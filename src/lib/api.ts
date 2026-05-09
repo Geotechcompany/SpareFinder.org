@@ -1101,6 +1101,15 @@ export const adminApi = {
     const response = await apiClient.post("/admin/marketing/leads", payload);
     return response.data;
   },
+  sendMarketingLeadsBatch: async (payload: {
+    ids: string[];
+    limit?: number;
+  }): Promise<ApiResponse> => {
+    const response = await apiClient.post("/admin/marketing/leads/send", payload, {
+      timeout: 600000,
+    });
+    return response.data;
+  },
   patchMarketingLead: async (
     leadId: string,
     payload: {
