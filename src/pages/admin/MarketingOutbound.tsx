@@ -15,7 +15,15 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { adminApi } from "@/lib/api";
+import { MARKETING_SERP_COUNTRIES, marketingCountryLabel } from "@/lib/marketingCountries";
 import { useToast } from "@/components/ui/use-toast";
 import {
   Loader2,
@@ -27,6 +35,7 @@ import {
   AlertCircle,
   Trash2,
   PencilLine,
+  Sparkles,
 } from "lucide-react";
 import { API_BASE_URL } from "@/lib/config";
 
@@ -54,6 +63,11 @@ const MarketingOutbound: React.FC = () => {
   const [errors, setErrors] = useState<unknown[]>([]);
   const [settingsText, setSettingsText] = useState("");
   const [serpApiKey, setSerpApiKey] = useState("");
+  const [serpCountryCode, setSerpCountryCode] = useState("");
+  const [serpHl, setSerpHl] = useState("en");
+  const [googleSearchProvider, setGoogleSearchProvider] = useState<"serpapi" | "serper">("serpapi");
+  const [leadCountryFilter, setLeadCountryFilter] = useState<string>("all");
+  const [aiQueriesLoading, setAiQueriesLoading] = useState(false);
   const [newCampaignName, setNewCampaignName] = useState("Outbound — industrial buyers");
   const [aiGoal, setAiGoal] = useState("Reach maintenance and procurement teams that struggle with parts identification and sourcing delays.");
   const [aiAudience, setAiAudience] = useState("Maintenance managers, procurement leads, operations teams");
@@ -69,7 +83,11 @@ const MarketingOutbound: React.FC = () => {
       const [dash, camps, ld, sn, err, setRes] = await Promise.all([
         adminApi.getMarketingDashboard(),
         adminApi.getMarketingCampaigns(),
-        adminApi.getMarketingLeads({ page: 1, limit: 50 }),
+        adminApi.getMarketingLeads({
+          page: 1,
+          limit: 50,
+          country_code: leadCountryFilter,
+        }),
         adminApi.getMarketingSends({ page: 1, limit: 50 }),
         adminApi.getMarketingErrors({ page: 1, limit: 50 }),
         adminApi.getMarketingSettings(),
@@ -83,10 +101,22 @@ const MarketingOutbound: React.FC = () => {
       setSends(Array.isArray(sendPayload) ? sendPayload : []);
       const errPayload = (err.data as { errors?: unknown[] })?.errors;
       setErrors(Array.isArray(errPayload) ? errPayload : []);
-      const st = (setRes.data as { settings?: { serp_query_templates?: string[]; serpapi_key?: string } })?.settings;
+      const st = (setRes.data as {
+        settings?: {
+          serp_query_templates?: string[];
+          serpapi_key?: string;
+          serp_target_country_code?: string;
+          serp_target_hl?: string;
+          google_search_provider?: string;
+        };
+      })?.settings;
       const templates = st?.serp_query_templates;
       setSettingsText(Array.isArray(templates) ? templates.join("\n") : "");
       setSerpApiKey(st?.serpapi_key || "");
+      setSerpCountryCode((st?.serp_target_country_code || "").toLowerCase());
+      setSerpHl((st?.serp_target_hl || "en").toLowerCase() || "en");
+      const gp = (st?.google_search_provider || "serpapi").toLowerCase();
+      setGoogleSearchProvider(gp === "serper" ? "serper" : "serpapi");
     } catch (e) {
       console.error(e);
       toast({
@@ -97,7 +127,7 @@ const MarketingOutbound: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [toast]);
+  }, [toast, leadCountryFilter]);
 
   useEffect(() => {
     loadAll();
@@ -167,9 +197,55 @@ const MarketingOutbound: React.FC = () => {
       serp_query_templates: lines,
       serp_results_per_query: 10,
       serpapi_key: serpApiKey.trim(),
+      serp_target_country_code: serpCountryCode.trim().toLowerCase(),
+      serp_target_hl: serpHl.trim().toLowerCase() || "en",
+      google_search_provider: googleSearchProvider,
     });
     if (res.success) toast({ title: "SerpAPI queries saved" });
     else toast({ variant: "destructive", title: "Save failed" });
+  };
+
+  const handleAiGenerateSerpQueries = async () => {
+    setAiQueriesLoading(true);
+    try {
+      const cc = serpCountryCode.trim().toLowerCase();
+      const res = await adminApi.generateMarketingSerpQueriesAi({
+        country_code: cc,
+        country_name: cc ? marketingCountryLabel(cc) : "Global",
+        count: 8,
+        extra_context: "SpareFinder B2B outbound; industrial spare parts, MRO, procurement.",
+      });
+      if (res.success) {
+        const qs = (res.data as { queries?: string[] })?.queries;
+        if (Array.isArray(qs) && qs.length) {
+          setSettingsText((prev) => {
+            const base = prev.trim();
+            const add = qs.join("\n");
+            return base ? `${base}\n${add}` : add;
+          });
+          toast({
+            title: "Queries generated",
+            description: `${qs.length} lines added to the editor. Review, edit, then Save queries.`,
+          });
+        } else {
+          toast({ variant: "destructive", title: "No queries returned", description: "Try again." });
+        }
+      } else {
+        toast({
+          variant: "destructive",
+          title: "AI query generation failed",
+          description: (res as { message?: string }).message || "Error",
+        });
+      }
+    } catch (e) {
+      toast({
+        variant: "destructive",
+        title: "AI query generation failed",
+        description: e instanceof Error ? e.message : "Unknown error",
+      });
+    } finally {
+      setAiQueriesLoading(false);
+    }
   };
 
   const handleAiCampaignCreate = async () => {
@@ -193,12 +269,36 @@ const MarketingOutbound: React.FC = () => {
   };
 
   const runDiscover = async () => {
-    const res = await adminApi.discoverMarketingSerp({ max_queries: 3, campaign_id: null });
+    const lines = settingsText
+      .split("\n")
+      .map((s) => s.trim())
+      .filter(Boolean);
+    const gl = serpCountryCode.trim().toLowerCase() || undefined;
+    const hl = serpHl.trim().toLowerCase() || undefined;
+    const res = await adminApi.discoverMarketingSerp({
+      max_queries: 3,
+      campaign_id: null,
+      queries: lines.length ? lines : undefined,
+      gl: gl || null,
+      hl: hl || null,
+    });
     if (res.success) {
-      const data = res.data as { candidates_upserted?: number; errors?: string[] };
+      const data = res.data as {
+        candidates_upserted?: number;
+        errors?: string[];
+        per_query?: { query: string; organic_count: number; candidates: number }[];
+      };
+      const n = data?.candidates_upserted ?? 0;
+      const errLines = (data?.errors || []).filter(Boolean);
+      const pq = data?.per_query?.length
+        ? ` SERP: ${data.per_query.map((p) => `${p.organic_count} organic`).join(", ")}.`
+        : "";
       toast({
         title: "Discovery run",
-        description: `Upserted ${data?.candidates_upserted ?? 0} candidates`,
+        description:
+          errLines.length && !n
+            ? `${errLines.slice(0, 2).join(" ")}${pq}`
+            : `Upserted ${n} candidate(s).${errLines.length ? ` Notes: ${errLines[0]}` : ""}${pq}`,
       });
       loadAll();
     } else {
@@ -446,9 +546,34 @@ const MarketingOutbound: React.FC = () => {
                 <Card>
                   <CardHeader>
                     <CardTitle>Lead library</CardTitle>
-                    <CardDescription>Latest 50 rows — use filters via API for larger sets.</CardDescription>
+                    <CardDescription>
+                      Latest 50 rows. Serp discovery leads are tagged with a target country when you set one on
+                      the SerpAPI tab — filter below applies to those tags (CSV imports have no country until you
+                      extend the pipeline).
+                    </CardDescription>
                   </CardHeader>
                   <CardContent className="overflow-x-auto">
+                    <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
+                      <div className="min-w-[200px] max-w-xs">
+                        <Label>Filter by country (discovery tag)</Label>
+                        <Select
+                          value={leadCountryFilter}
+                          onValueChange={(v) => setLeadCountryFilter(v)}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Country" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all">All countries</SelectItem>
+                            {MARKETING_SERP_COUNTRIES.filter((c) => c.value).map((c) => (
+                              <SelectItem key={c.value} value={c.value}>
+                                {c.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
                     <div className="mb-3 flex flex-wrap items-center gap-2">
                       <Button size="sm" variant="outline" onClick={toggleAllLeadsOnPage}>
                         <PencilLine className="h-4 w-4 mr-1" />
@@ -477,30 +602,39 @@ const MarketingOutbound: React.FC = () => {
                           <th className="p-2">Select</th>
                           <th className="p-2">Email</th>
                           <th className="p-2">Company</th>
+                          <th className="p-2">Country</th>
                           <th className="p-2">Source</th>
                           <th className="p-2">Sanitize</th>
                           <th className="p-2">Status</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {(leads as Record<string, string>[]).map((row) => (
-                          <tr key={row.id} className="border-b border-border/60">
+                        {(leads as Record<string, unknown>[]).map((row) => {
+                          const rp = row.raw_payload as Record<string, unknown> | undefined;
+                          const tag =
+                            typeof rp?.target_country_code === "string"
+                              ? String(rp.target_country_code).toUpperCase()
+                              : "—";
+                          return (
+                          <tr key={String(row.id)} className="border-b border-border/60">
                             <td className="p-2">
                               <input
                                 type="checkbox"
-                                checked={selectedLeadIds.includes(row.id)}
-                                onChange={() => toggleLeadSelection(row.id)}
+                                checked={selectedLeadIds.includes(String(row.id))}
+                                onChange={() => toggleLeadSelection(String(row.id))}
                               />
                             </td>
-                            <td className="p-2 font-mono text-xs">{row.email || "—"}</td>
-                            <td className="p-2">{row.company_name || row.sanitized_company_name || "—"}</td>
-                            <td className="p-2">{row.source}</td>
+                            <td className="p-2 font-mono text-xs">{String(row.email || "—")}</td>
+                            <td className="p-2">{String(row.company_name || row.sanitized_company_name || "—")}</td>
+                            <td className="p-2 text-xs text-muted-foreground">{tag}</td>
+                            <td className="p-2">{String(row.source)}</td>
                             <td className="p-2">
-                              <Badge variant="outline">{row.sanitization_status}</Badge>
+                              <Badge variant="outline">{String(row.sanitization_status)}</Badge>
                             </td>
-                            <td className="p-2">{row.lead_status_internal}</td>
+                            <td className="p-2">{String(row.lead_status_internal)}</td>
                           </tr>
-                        ))}
+                          );
+                        })}
                       </tbody>
                     </table>
                   </CardContent>
@@ -574,19 +708,83 @@ const MarketingOutbound: React.FC = () => {
                       <Search className="h-5 w-5" /> SerpAPI discovery
                     </CardTitle>
                     <CardDescription>
-                      Add scraper key here (stored in marketing settings) and query templates used by{" "}
+                      Choose <strong>SerpAPI</strong> (serpapi.com) or <strong>Serper.dev</strong> — the same key field
+                      holds whichever vendor you use. Query templates feed{" "}
                       <code className="text-xs">/api/cron/marketing-discover</code>.
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <div>
-                      <Label>SerpAPI key (dashboard-managed)</Label>
+                      <Label>Search API vendor</Label>
+                      <Select
+                        value={googleSearchProvider}
+                        onValueChange={(v) => setGoogleSearchProvider(v === "serper" ? "serper" : "serpapi")}
+                      >
+                        <SelectTrigger className="max-w-md">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="serpapi">SerpAPI (serpapi.com)</SelectItem>
+                          <SelectItem value="serper">Serper.dev (google.serper.dev)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Serper keys only work when Serper.dev is selected (they are rejected by SerpAPI).
+                      </p>
+                    </div>
+                    <div>
+                      <Label>API key (SerpAPI or Serper — same field)</Label>
                       <Input
                         type="password"
                         value={serpApiKey}
                         onChange={(e) => setSerpApiKey(e.target.value)}
-                        placeholder="SERPAPI_KEY"
+                        placeholder="Paste key from serpapi.com/manage-api-key or serper.dev/api-keys"
                       />
+                    </div>
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <div>
+                        <Label>Target country (manual)</Label>
+                        <p className="text-xs text-muted-foreground mb-2">
+                          Sets SerpAPI <code className="text-[11px]">gl</code> bias, tags new discovery leads, and
+                          steers AI query generation. Save after changing.
+                        </p>
+                        <Select value={serpCountryCode || "none"} onValueChange={(v) => setSerpCountryCode(v === "none" ? "" : v)}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Country" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {MARKETING_SERP_COUNTRIES.map((c) => (
+                              <SelectItem key={c.value || "none"} value={c.value || "none"}>
+                                {c.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <Label>Google UI language (hl)</Label>
+                        <Input
+                          value={serpHl}
+                          onChange={(e) => setSerpHl(e.target.value)}
+                          placeholder="en"
+                          maxLength={12}
+                          className="max-w-[120px]"
+                        />
+                        <p className="text-xs text-muted-foreground mt-1">e.g. en, fr, de</p>
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Button type="button" variant="outline" onClick={handleAiGenerateSerpQueries} disabled={aiQueriesLoading}>
+                        {aiQueriesLoading ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Sparkles className="h-4 w-4" />
+                        )}
+                        <span className="ml-2">AI-generate queries</span>
+                      </Button>
+                      <span className="text-xs text-muted-foreground">
+                        Appends lines to the editor from OpenAI (review before Save).
+                      </span>
                     </div>
                     <Textarea
                       rows={6}

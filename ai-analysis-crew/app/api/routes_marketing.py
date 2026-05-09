@@ -6,6 +6,7 @@ import csv
 import io
 import json
 import logging
+import os
 import re
 import secrets
 from difflib import SequenceMatcher
@@ -19,6 +20,7 @@ from ..marketing_crew import (
     auto_extract_email_from_csv_row,
     extract_lead_fields_from_csv_row,
     generate_email_with_openai,
+    generate_serp_discovery_queries,
     sanitize_lead_with_openai,
 )
 from ..marketing_pipeline import (
@@ -97,6 +99,16 @@ class DiscoverBody(BaseModel):
     queries: list[str] | None = None
     max_queries: int = 3
     campaign_id: str | None = None
+    # Optional SerpAPI geo (overrides saved settings for this run). ISO 3166-1 alpha-2 e.g. ng
+    gl: str | None = Field(default=None, max_length=8)
+    hl: str | None = Field(default=None, max_length=12)
+
+
+class GenerateSerpQueriesBody(BaseModel):
+    country_code: str = Field(default="", max_length=4)
+    country_name: str | None = Field(default=None, max_length=120)
+    count: int = Field(default=8, ge=5, le=15)
+    extra_context: str | None = Field(default=None, max_length=800)
 
 
 class LeadPatchBody(BaseModel):
@@ -119,6 +131,11 @@ class MarketingSettingsBody(BaseModel):
     serp_query_templates: list[str] | None = None
     serp_results_per_query: int | None = None
     serpapi_key: str | None = None
+    # ISO 3166-1 alpha-2 for SerpAPI `gl` + lead tagging (e.g. ng, ke). Empty = global.
+    serp_target_country_code: str | None = None
+    serp_target_hl: str | None = Field(default=None, max_length=12)
+    # serpapi = serpapi.com ; serper = serper.dev (same key field, different vendor)
+    google_search_provider: str | None = Field(default=None, max_length=32)
 
 
 class GenerateCampaignBody(BaseModel):
@@ -237,10 +254,45 @@ async def patch_marketing_settings(
         val["serp_results_per_query"] = max(1, min(int(body.serp_results_per_query), 20))
     if body.serpapi_key is not None:
         val["serpapi_key"] = body.serpapi_key.strip()
+    if body.serp_target_country_code is not None:
+        cc = body.serp_target_country_code.strip().lower()[:4]
+        val["serp_target_country_code"] = cc
+    if body.serp_target_hl is not None:
+        hl = body.serp_target_hl.strip().lower()[:12]
+        val["serp_target_hl"] = hl
+    if body.google_search_provider is not None:
+        gp = body.google_search_provider.strip().lower()
+        if gp in ("serper", "serper.dev", "google.serper"):
+            val["google_search_provider"] = "serper"
+        elif gp in ("serpapi", "serpapi.com", ""):
+            val["google_search_provider"] = "serpapi"
+        else:
+            val["google_search_provider"] = "serpapi"
     supabase.table("marketing_settings").update(
         {"setting_value": val, "updated_at": datetime.now(timezone.utc).isoformat()}
     ).eq("setting_key", "defaults").execute()
     return api_ok(data={"settings": val})
+
+
+@admin_router.post("/serp-queries/ai-generate")
+async def ai_generate_serp_queries(
+    body: GenerateSerpQueriesBody,
+    _admin: CurrentUser = Depends(require_roles("admin", "super_admin")),
+):
+    """Return AI-suggested Google queries for SerpAPI discovery (does not persist until you Save)."""
+    try:
+        queries = generate_serp_discovery_queries(
+            country_code=body.country_code or "",
+            country_name=body.country_name or body.country_code or "Global",
+            count=body.count,
+            extra_context=body.extra_context,
+        )
+    except Exception as e:
+        logger.exception("ai_generate_serp_queries")
+        return api_error(str(e), status_code=400)
+    if not queries:
+        return api_error("AI returned no queries — try again or adjust country/context", status_code=400)
+    return api_ok(data={"queries": queries})
 
 
 @admin_router.post("/campaigns/ai-generate")
@@ -308,6 +360,10 @@ async def list_leads(
     source: str | None = None,
     sanitization_status: str | None = None,
     campaign_id: str | None = None,
+    country_code: str | None = Query(
+        None,
+        description="Filter by target_country_code stored on lead raw_payload (Serp discovery). Use 'all' to skip.",
+    ),
     _admin: CurrentUser = Depends(require_roles("admin", "super_admin")),
 ):
     supabase = get_supabase_admin()
@@ -322,6 +378,9 @@ async def list_leads(
         q = q.eq("sanitization_status", sanitization_status)
     if campaign_id:
         q = q.eq("campaign_id", campaign_id)
+    cc = (country_code or "").strip().lower()
+    if cc and cc not in ("all", "any"):
+        q = q.contains("raw_payload", {"target_country_code": cc})
     res = q.range(offset, offset + limit - 1).execute()
     total = int(getattr(res, "count", None) or len(res.data or []))
     return api_ok(
@@ -706,20 +765,45 @@ async def discover_serpapi(
 
     max_q = max(1, min(body.max_queries, 10))
     per_q = max(1, min(int(val.get("serp_results_per_query") or 10), 20))
+    gl_use = (str(body.gl or val.get("serp_target_country_code") or "").strip() or None)
+    hl_use = (str(body.hl or val.get("serp_target_hl") or "").strip() or None)
+    tag_cc = gl_use.lower()[:4] if gl_use else ""
+    prov_raw = str(val.get("google_search_provider") or os.getenv("MARKETING_GOOGLE_SEARCH_PROVIDER") or "serpapi").strip().lower()
+    search_provider = "serper" if prov_raw in ("serper", "serper.dev", "google.serper") else "serpapi"
+    lead_source = "serper_google" if search_provider == "serper" else "serpapi_google"
 
     created = 0
     errs: list[str] = []
+    per_query: list[dict[str, Any]] = []
 
     for q in templates[:max_q]:
         try:
-            resp = search_google(query=q, num=per_q, api_key=key_override)
+            resp = search_google(
+                query=q,
+                num=per_q,
+                api_key=key_override,
+                gl=gl_use,
+                hl=hl_use,
+                provider=search_provider,
+            )
+            organic = resp.get("organic_results") or []
+            if not organic:
+                msg = (
+                    "Search API returned no organic results for this query (layout may be local pack, "
+                    "news, or zero web matches). Try a broader query or set country / hl for your market."
+                )
+                errs.append(f"{q}: {msg}")
+                logger.warning("marketing discover: zero organic_results query=%r keys=%s", q, list(resp.keys())[:20])
             candidates = organic_results_to_lead_candidates(resp, query=q)
+            per_query.append({"query": q, "organic_count": len(organic), "candidates": len(candidates)})
             for c in candidates:
+                if tag_cc:
+                    c["target_country_code"] = tag_cc
                 _upsert_lead(
                     supabase,
                     c,
                     campaign_id=body.campaign_id,
-                    source="serpapi_google",
+                    source=lead_source,
                     run_sanitize=True,
                 )
                 created += 1
@@ -727,7 +811,14 @@ async def discover_serpapi(
             errs.append(f"{q}: {e}")
             log_error(supabase, severity="error", message=f"serp discover: {e}", context={"query": q})
 
-    return api_ok(data={"candidates_upserted": created, "errors": errs})
+    return api_ok(
+        data={
+            "candidates_upserted": created,
+            "errors": errs,
+            "queries_run": templates[:max_q],
+            "per_query": per_query,
+        }
+    )
 
 
 # ---------- Admin: logs & dashboard ----------
@@ -937,18 +1028,41 @@ async def cron_marketing_discover(max_queries: int = Query(default=2, ge=1, le=1
     if not templates:
         return {"ok": False, "error": "No serp_query_templates in marketing settings"}
     per_q = max(1, min(int(val.get("serp_results_per_query") or 10), 20))
+    gl_use = (str(val.get("serp_target_country_code") or "").strip() or None)
+    hl_use = (str(val.get("serp_target_hl") or "").strip() or None)
+    tag_cc = gl_use.lower()[:4] if gl_use else ""
+    prov_raw = str(val.get("google_search_provider") or os.getenv("MARKETING_GOOGLE_SEARCH_PROVIDER") or "serpapi").strip().lower()
+    search_provider = "serper" if prov_raw in ("serper", "serper.dev", "google.serper") else "serpapi"
+    lead_source = "serper_google" if search_provider == "serper" else "serpapi_google"
     created = 0
     errs: list[str] = []
+    per_query: list[dict[str, Any]] = []
     for q in templates[:max_queries]:
         try:
-            resp = search_google(query=q, num=per_q, api_key=key_override)
+            resp = search_google(
+                query=q,
+                num=per_q,
+                api_key=key_override,
+                gl=gl_use,
+                hl=hl_use,
+                provider=search_provider,
+            )
+            organic = resp.get("organic_results") or []
+            if not organic:
+                errs.append(
+                    f"{q}: no organic_results (try broader query or SERPAPI_GL / SERPAPI_HL for regional SERPs)"
+                )
+                logger.warning("cron marketing-discover: zero organic_results query=%r", q)
             candidates = organic_results_to_lead_candidates(resp, query=q)
+            per_query.append({"query": q, "organic_count": len(organic), "candidates": len(candidates)})
             for c in candidates:
-                _upsert_lead(supabase, c, campaign_id=None, source="serpapi_google", run_sanitize=True)
+                if tag_cc:
+                    c["target_country_code"] = tag_cc
+                _upsert_lead(supabase, c, campaign_id=None, source=lead_source, run_sanitize=True)
                 created += 1
         except Exception as e:
             errs.append(str(e))
-    return {"ok": True, "candidates_upserted": created, "errors": errs}
+    return {"ok": True, "candidates_upserted": created, "errors": errs, "per_query": per_query}
 
 
 class EspWebhookBody(BaseModel):

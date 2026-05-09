@@ -1049,6 +1049,9 @@ export const adminApi = {
     serp_query_templates?: string[];
     serp_results_per_query?: number;
     serpapi_key?: string;
+    serp_target_country_code?: string;
+    serp_target_hl?: string;
+    google_search_provider?: "serpapi" | "serper" | string;
   }): Promise<ApiResponse> => {
     const response = await apiClient.patch("/admin/marketing/settings", payload);
     return response.data;
@@ -1070,6 +1073,7 @@ export const adminApi = {
     source?: string;
     sanitization_status?: string;
     campaign_id?: string;
+    country_code?: string;
   }): Promise<ApiResponse> => {
     const q = new URLSearchParams();
     if (params.page) q.append("page", String(params.page));
@@ -1079,6 +1083,8 @@ export const adminApi = {
     if (params.sanitization_status && params.sanitization_status !== "all")
       q.append("sanitization_status", params.sanitization_status);
     if (params.campaign_id) q.append("campaign_id", params.campaign_id);
+    if (params.country_code && params.country_code !== "all")
+      q.append("country_code", params.country_code);
     const response = await apiClient.get(`/admin/marketing/leads?${q.toString()}`);
     return response.data;
   },
@@ -1122,8 +1128,19 @@ export const adminApi = {
     queries?: string[];
     max_queries?: number;
     campaign_id?: string | null;
+    gl?: string | null;
+    hl?: string | null;
   }): Promise<ApiResponse> => {
     const response = await apiClient.post("/admin/marketing/discover", payload);
+    return response.data;
+  },
+  generateMarketingSerpQueriesAi: async (payload: {
+    country_code?: string;
+    country_name?: string;
+    count?: number;
+    extra_context?: string;
+  }): Promise<ApiResponse> => {
+    const response = await apiClient.post("/admin/marketing/serp-queries/ai-generate", payload);
     return response.data;
   },
   getMarketingSends: async (params: {

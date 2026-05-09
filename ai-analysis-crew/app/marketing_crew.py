@@ -293,3 +293,63 @@ def generate_email_with_crew(
         logger.warning("Crew outbound JSON parse failed: %s", e)
 
     raise ValueError("crew_output_not_json")
+
+
+def generate_serp_discovery_queries(
+    *,
+    country_code: str,
+    country_name: str,
+    count: int = 8,
+    extra_context: str | None = None,
+) -> list[str]:
+    """
+    AI-generated Google search strings for SerpAPI B2B discovery (SpareFinder / industrial parts).
+    """
+    client = _openai_client()
+    model = os.getenv("MARKETING_SANITIZE_MODEL", "gpt-4o-mini")
+    cc = (country_code or "").strip().lower()[:4] or "global"
+    cn = (country_name or "").strip()[:120] or cc.upper()
+    n = max(5, min(int(count), 15))
+    extra = (extra_context or "").strip()[:800]
+    user_obj = {
+        "country_code": cc,
+        "country_label": cn,
+        "count": n,
+        "product": "SpareFinder — identify industrial spare parts from photos and find suppliers faster.",
+        "notes": extra,
+    }
+    system = (
+        f"You produce {n} DISTINCT Google web search queries to find B2B leads (companies or roles) who care about "
+        "industrial spare parts, MRO, maintenance, procurement, asset reliability, or fleet operations. "
+        f"Geography focus: {cn} (region code hint: {cc}). "
+        "Each query must be a short string suitable for Google's search box (no bullet prefixes). "
+        "Mix angles: procurement + industry, maintenance + sector, OEM parts, plant engineering, distributors, etc. "
+        "Stay factual; no scams or illegal angles. "
+        f'Return JSON ONLY: {{"queries": ["...", ...]}} with exactly {n} unique non-empty strings.'
+    )
+    resp = client.chat.completions.create(
+        model=model,
+        temperature=0.55,
+        max_tokens=900,
+        messages=[
+            {"role": "system", "content": system},
+            {"role": "user", "content": json.dumps(user_obj, ensure_ascii=False)},
+        ],
+        response_format={"type": "json_object"},
+    )
+    raw = resp.choices[0].message.content or "{}"
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError:
+        return []
+    arr = data.get("queries")
+    if not isinstance(arr, list):
+        return []
+    out: list[str] = []
+    for item in arr:
+        s = str(item).strip()
+        if s and s not in out:
+            out.append(s)
+        if len(out) >= n:
+            break
+    return out[:n]
