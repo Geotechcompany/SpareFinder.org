@@ -19,7 +19,7 @@ const ThemeToggle = () => {
         <Button
           variant="ghost"
           size="icon"
-          className="h-9 w-9 text-muted-foreground hover:text-foreground hover:bg-muted"
+          className="relative h-9 w-9 text-muted-foreground hover:bg-muted hover:text-foreground"
           aria-label="Toggle theme"
         >
           <Sun className="h-4 w-4 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
