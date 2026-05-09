@@ -377,6 +377,7 @@ const MarketingOutbound: React.FC = () => {
   const runBulkUpdate = async (field: "sanitization_status" | "lead_status_internal" | "campaign_id") => {
     if (!selectedLeadIds.length) return;
     let idsForUpdate = [...selectedLeadIds];
+    let didPruneNoEmailForSanitize = false;
 
     if (field === "sanitization_status") {
       const rows = (leads as Record<string, unknown>[]).filter((r) => idsForUpdate.includes(String(r.id)));
@@ -395,6 +396,7 @@ const MarketingOutbound: React.FC = () => {
           });
           return;
         }
+        didPruneNoEmailForSanitize = true;
         idsForUpdate = idsForUpdate.filter((id) => !noEmailIds.includes(id));
         setSelectedLeadIds(idsForUpdate);
         toast({ title: "Removed no-email leads", description: `${noEmailIds.length} deleted from selection.` });
@@ -414,7 +416,10 @@ const MarketingOutbound: React.FC = () => {
       value = window.prompt("Set campaign UUID (leave blank to clear)", "") ?? "";
     }
     if (value === "") {
-      if (field !== "campaign_id") return;
+      if (field !== "campaign_id") {
+        if (didPruneNoEmailForSanitize) loadAll();
+        return;
+      }
     }
     const payload: Record<string, unknown> = { [field]: field === "campaign_id" ? value || null : value };
     const res = await adminApi.bulkManageMarketingLeads({
