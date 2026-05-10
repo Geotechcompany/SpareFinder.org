@@ -20,6 +20,11 @@ def get_marketing_settings_row(supabase: Any) -> dict[str, Any]:
                 "serp_query_templates": [],
                 "serp_results_per_query": 10,
                 "google_search_provider": "serper",
+                # In-process scheduler (see marketing_scheduled_tasks); 0 = off until set in admin.
+                "scheduled_discover_interval_sec": 0,
+                "scheduled_send_interval_sec": 0,
+                "scheduled_discover_max_queries": 3,
+                "scheduled_send_batch": 20,
             },
         }
     ).execute()

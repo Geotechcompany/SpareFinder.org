@@ -1054,6 +1054,12 @@ export const adminApi = {
     google_search_provider?: "serpapi" | "serper" | string;
     /** Pinned campaign for new leads; omit or empty string clears → server picks highest-priority active campaign. */
     default_outbound_campaign_id?: string | null;
+    /** Seconds between automated Google discovery runs on the API (0 = off). */
+    scheduled_discover_interval_sec?: number;
+    /** Seconds between automated batch sends (0 = off). */
+    scheduled_send_interval_sec?: number;
+    scheduled_discover_max_queries?: number;
+    scheduled_send_batch?: number;
   }): Promise<ApiResponse> => {
     const response = await apiClient.patch("/admin/marketing/settings", payload);
     return response.data;

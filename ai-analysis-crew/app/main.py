@@ -350,6 +350,14 @@ async def startup_event():
     asyncio.create_task(auto_start_pending_jobs())
     logger.info("Started auto-start pending jobs background task")
 
+    # In-process marketing scheduler (idle until admin or env sets intervals); see docs/MARKETING_CRON.md
+    try:
+        from .marketing_scheduled_tasks import start_marketing_scheduled_tasks
+
+        start_marketing_scheduled_tasks()
+    except Exception as e:
+        logger.warning("Marketing scheduled tasks not started: %s", e)
+
     # Redis Pub/Sub: subscribe to crew_job_updates and broadcast to WebSocket clients
     try:
         from .redis_client import is_redis_configured, start_job_updates_subscriber

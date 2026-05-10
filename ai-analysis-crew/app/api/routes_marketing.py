@@ -157,6 +157,11 @@ class MarketingSettingsBody(BaseModel):
     google_search_provider: str | None = Field(default=None, max_length=32)
     # When set, new leads (discover/CSV with no campaign) attach here; unset = highest-priority unpaused campaign.
     default_outbound_campaign_id: str | None = Field(default=None, max_length=64)
+    # In-process marketing cron (single API worker). Seconds between runs; 0 = disabled.
+    scheduled_discover_interval_sec: int | None = Field(default=None, ge=0, le=604800)
+    scheduled_send_interval_sec: int | None = Field(default=None, ge=0, le=604800)
+    scheduled_discover_max_queries: int | None = Field(default=None, ge=1, le=10)
+    scheduled_send_batch: int | None = Field(default=None, ge=1, le=200)
 
 
 class GenerateCampaignBody(BaseModel):
@@ -286,6 +291,14 @@ async def patch_marketing_settings(
             val["default_outbound_campaign_id"] = dcid
         else:
             val.pop("default_outbound_campaign_id", None)
+    if body.scheduled_discover_interval_sec is not None:
+        val["scheduled_discover_interval_sec"] = int(body.scheduled_discover_interval_sec)
+    if body.scheduled_send_interval_sec is not None:
+        val["scheduled_send_interval_sec"] = int(body.scheduled_send_interval_sec)
+    if body.scheduled_discover_max_queries is not None:
+        val["scheduled_discover_max_queries"] = max(1, min(int(body.scheduled_discover_max_queries), 10))
+    if body.scheduled_send_batch is not None:
+        val["scheduled_send_batch"] = max(1, min(int(body.scheduled_send_batch), 200))
     supabase.table("marketing_settings").update(
         {"setting_value": val, "updated_at": datetime.now(timezone.utc).isoformat()}
     ).eq("setting_key", "defaults").execute()
@@ -1193,34 +1206,11 @@ async def test_send(
 # ---------- Public cron (no auth) ----------
 
 
-@cron_router.get("/cron/marketing-send")
-async def cron_marketing_send(limit: int = Query(default=20, ge=1, le=200)):
-    supabase = get_supabase_admin()
-    try:
-        result = run_marketing_send_cron(supabase, max_batch=limit)
-        return result
-    except Exception as e:
-        logger.error("cron marketing-send: %s", e)
-        log_error(supabase, severity="critical", message=f"cron marketing-send: {e}")
-        return {"ok": False, "error": str(e)}
-
-
-@cron_router.get("/cron/marketing-digest")
-async def cron_marketing_digest():
-    supabase = get_supabase_admin()
-    try:
-        from ..marketing_digest import run_marketing_digest
-
-        return run_marketing_digest(supabase)
-    except Exception as e:
-        logger.error("cron marketing-digest: %s", e)
-        return {"ok": False, "error": str(e)}
-
-
-@cron_router.get("/cron/marketing-discover")
-async def cron_marketing_discover(max_queries: int = Query(default=2, ge=1, le=10)):
-    """Scheduled Google discovery using saved query templates (Serper.dev by default)."""
-    supabase = get_supabase_admin()
+def run_marketing_discover_cron_job(supabase: Any, max_queries: int = 2) -> dict[str, Any]:
+    """
+    Same work as GET /api/cron/marketing-discover (used by optional in-process scheduler).
+    """
+    max_queries = max(1, min(int(max_queries), 10))
     settings = get_marketing_settings_row(supabase)
     val = settings.get("setting_value") or {}
     key_override = str(val.get("serpapi_key") or "").strip() or None
@@ -1253,6 +1243,37 @@ async def cron_marketing_discover(max_queries: int = Query(default=2, ge=1, le=1
         "resolved_campaign_id": data.get("resolved_campaign_id"),
         "note": "Leads use default_outbound_campaign_id from settings, else highest-priority unpaused campaign (else any campaign).",
     }
+
+
+@cron_router.get("/cron/marketing-send")
+async def cron_marketing_send(limit: int = Query(default=20, ge=1, le=200)):
+    supabase = get_supabase_admin()
+    try:
+        result = run_marketing_send_cron(supabase, max_batch=limit)
+        return result
+    except Exception as e:
+        logger.error("cron marketing-send: %s", e)
+        log_error(supabase, severity="critical", message=f"cron marketing-send: {e}")
+        return {"ok": False, "error": str(e)}
+
+
+@cron_router.get("/cron/marketing-digest")
+async def cron_marketing_digest():
+    supabase = get_supabase_admin()
+    try:
+        from ..marketing_digest import run_marketing_digest
+
+        return run_marketing_digest(supabase)
+    except Exception as e:
+        logger.error("cron marketing-digest: %s", e)
+        return {"ok": False, "error": str(e)}
+
+
+@cron_router.get("/cron/marketing-discover")
+async def cron_marketing_discover(max_queries: int = Query(default=2, ge=1, le=10)):
+    """Scheduled Google discovery using saved query templates (Serper.dev by default)."""
+    supabase = get_supabase_admin()
+    return run_marketing_discover_cron_job(supabase, max_queries=max_queries)
 
 
 class EspWebhookBody(BaseModel):

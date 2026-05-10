@@ -80,6 +80,28 @@ const DISPOSABLE_MARKETING_EMAIL_DOMAINS = new Set([
 
 const MARKETING_LEAD_EMAIL_RE = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
 
+/** In-process API scheduler (see docs/MARKETING_CRON.md); persisted with discovery settings. */
+const SCHED_DISCOVER_PRESETS: { label: string; value: number }[] = [
+  { label: "Off", value: 0 },
+  { label: "Every hour", value: 3600 },
+  { label: "Every 6 hours", value: 21600 },
+  { label: "Every 12 hours", value: 43200 },
+  { label: "Once per day (recommended)", value: 86400 },
+];
+
+const SCHED_SEND_PRESETS: { label: string; value: number }[] = [
+  { label: "Off", value: 0 },
+  { label: "Every 30 minutes", value: 1800 },
+  { label: "Every hour", value: 3600 },
+  { label: "Every 2 hours", value: 7200 },
+  { label: "Every 6 hours", value: 21600 },
+];
+
+function parseSettingsInt(v: unknown, fallback: number): number {
+  const n = Number(v);
+  return Number.isFinite(n) ? Math.trunc(n) : fallback;
+}
+
 function leadRowHasUsableEmail(email: unknown): boolean {
   const e = typeof email === "string" ? email.trim().toLowerCase() : "";
   if (!e || !MARKETING_LEAD_EMAIL_RE.test(e)) return false;
@@ -137,6 +159,11 @@ const MarketingOutbound: React.FC = () => {
   const [serpHl, setSerpHl] = useState("en");
   /** Empty = no pin: server assigns highest-priority active campaign (or pin a specific campaign UUID). */
   const [defaultOutboundCampaignId, setDefaultOutboundCampaignId] = useState("");
+  /** Seconds between automated Google discovery on the API (0 = off). */
+  const [scheduledDiscoverIntervalSec, setScheduledDiscoverIntervalSec] = useState(0);
+  const [scheduledSendIntervalSec, setScheduledSendIntervalSec] = useState(0);
+  const [scheduledDiscoverMaxQueries, setScheduledDiscoverMaxQueries] = useState(3);
+  const [scheduledSendBatch, setScheduledSendBatch] = useState(20);
   const [leadCountryFilter, setLeadCountryFilter] = useState<string>("all");
   const [aiQueriesLoading, setAiQueriesLoading] = useState(false);
   const [newCampaignName, setNewCampaignName] = useState("Outbound — industrial buyers");
@@ -197,6 +224,10 @@ const MarketingOutbound: React.FC = () => {
           serp_target_country_code?: string;
           serp_target_hl?: string;
           default_outbound_campaign_id?: string;
+          scheduled_discover_interval_sec?: number;
+          scheduled_send_interval_sec?: number;
+          scheduled_discover_max_queries?: number;
+          scheduled_send_batch?: number;
         };
       })?.settings;
       const templates = st?.serp_query_templates;
@@ -207,6 +238,14 @@ const MarketingOutbound: React.FC = () => {
       setDefaultOutboundCampaignId(
         typeof st?.default_outbound_campaign_id === "string" ? st.default_outbound_campaign_id.trim() : ""
       );
+      setScheduledDiscoverIntervalSec(
+        Math.min(604800, Math.max(0, parseSettingsInt(st?.scheduled_discover_interval_sec, 0)))
+      );
+      setScheduledSendIntervalSec(Math.min(604800, Math.max(0, parseSettingsInt(st?.scheduled_send_interval_sec, 0))));
+      setScheduledDiscoverMaxQueries(
+        Math.min(10, Math.max(1, parseSettingsInt(st?.scheduled_discover_max_queries, 3)))
+      );
+      setScheduledSendBatch(Math.min(200, Math.max(1, parseSettingsInt(st?.scheduled_send_batch, 20))));
     } catch (e) {
       console.error(e);
       toast({
@@ -348,8 +387,17 @@ const MarketingOutbound: React.FC = () => {
       serp_target_hl: serpHl.trim().toLowerCase() || "en",
       google_search_provider: "serper",
       default_outbound_campaign_id: defaultOutboundCampaignId.trim() || "",
+      scheduled_discover_interval_sec: scheduledDiscoverIntervalSec,
+      scheduled_send_interval_sec: scheduledSendIntervalSec,
+      scheduled_discover_max_queries: scheduledDiscoverMaxQueries,
+      scheduled_send_batch: scheduledSendBatch,
     });
-    if (res.success) toast({ title: "Discovery settings saved" });
+    if (res.success)
+      toast({
+        title: "Discovery settings saved",
+        description:
+          "Queries, Serper options, and automation intervals are stored. The API re-reads schedules about once a minute — no restart required.",
+      });
     else toast({ variant: "destructive", title: "Save failed" });
   };
 
@@ -850,6 +898,11 @@ const MarketingOutbound: React.FC = () => {
                     <p className="text-xs text-muted-foreground">
                       Suggested timing: send mail every 1–3 hours, summary once a day, Google search once a day.
                     </p>
+                    <p className="text-xs text-muted-foreground">
+                      Prefer <strong>Admin → Find on Google</strong> to set automated discovery/send intervals (saved with
+                      discovery settings). Env vars with the same names override those values for ops lock-in. See{" "}
+                      <code className="text-xs">docs/MARKETING_CRON.md</code>.
+                    </p>
                   </CardContent>
                 </Card>
               </TabsContent>
@@ -1300,6 +1353,123 @@ const MarketingOutbound: React.FC = () => {
                         </SelectContent>
                       </Select>
                     </div>
+
+                    <div className="rounded-lg border border-dashed border-primary/25 bg-primary/5 p-4 space-y-4">
+                      <div>
+                        <p className="text-sm font-semibold text-foreground">Automatic discovery &amp; send (API server)</p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          When the AI API runs as a <strong>single</strong> worker, it can repeat the same jobs as the
+                          public cron URLs on a timer. Values are saved here; the server re-reads them about once a
+                          minute — no restart needed. If your host sets{" "}
+                          <code className="text-[11px]">MARKETING_SCHEDULED_DISCOVER_INTERVAL_SEC</code> or{" "}
+                          <code className="text-[11px]">MARKETING_SCHEDULED_SEND_INTERVAL_SEC</code>, those env vars{" "}
+                          <strong>override</strong> the numbers below.
+                        </p>
+                      </div>
+                      <div className="grid gap-4 sm:grid-cols-2">
+                        <div>
+                          <Label>Google discovery interval</Label>
+                          <p className="text-xs text-muted-foreground mb-2">
+                            Runs your saved queries and upserts contacts with valid emails.{" "}
+                            <span className="font-medium text-foreground">Once per day</span> is the usual choice.
+                          </p>
+                          <Select
+                            value={String(scheduledDiscoverIntervalSec)}
+                            onValueChange={(v) => setScheduledDiscoverIntervalSec(parseInt(v, 10) || 0)}
+                          >
+                            <SelectTrigger className="max-w-md">
+                              <SelectValue placeholder="Interval" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {SCHED_DISCOVER_PRESETS.map((p) => (
+                                <SelectItem key={p.label} value={String(p.value)}>
+                                  {p.label}
+                                </SelectItem>
+                              ))}
+                              {!SCHED_DISCOVER_PRESETS.some((p) => p.value === scheduledDiscoverIntervalSec) ? (
+                                <SelectItem value={String(scheduledDiscoverIntervalSec)}>
+                                  Custom ({scheduledDiscoverIntervalSec}s)
+                                </SelectItem>
+                              ) : null}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <Label>Batch send interval</Label>
+                          <p className="text-xs text-muted-foreground mb-2">
+                            Sends the next batch for <strong>active</strong> campaigns. Leave off until campaigns and
+                            contacts are ready.
+                          </p>
+                          <Select
+                            value={String(scheduledSendIntervalSec)}
+                            onValueChange={(v) => setScheduledSendIntervalSec(parseInt(v, 10) || 0)}
+                          >
+                            <SelectTrigger className="max-w-md">
+                              <SelectValue placeholder="Interval" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {SCHED_SEND_PRESETS.map((p) => (
+                                <SelectItem key={p.label} value={String(p.value)}>
+                                  {p.label}
+                                </SelectItem>
+                              ))}
+                              {!SCHED_SEND_PRESETS.some((p) => p.value === scheduledSendIntervalSec) ? (
+                                <SelectItem value={String(scheduledSendIntervalSec)}>
+                                  Custom ({scheduledSendIntervalSec}s)
+                                </SelectItem>
+                              ) : null}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <Label>Queries per discovery run</Label>
+                          <p className="text-xs text-muted-foreground mb-2">Uses the first N lines from your query list.</p>
+                          <Select
+                            value={String(scheduledDiscoverMaxQueries)}
+                            onValueChange={(v) => setScheduledDiscoverMaxQueries(parseInt(v, 10) || 3)}
+                          >
+                            <SelectTrigger className="w-[120px]">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {[1, 2, 3, 5, 7, 10].map((n) => (
+                                <SelectItem key={n} value={String(n)}>
+                                  {n}
+                                </SelectItem>
+                              ))}
+                              {![1, 2, 3, 5, 7, 10].includes(scheduledDiscoverMaxQueries) ? (
+                                <SelectItem value={String(scheduledDiscoverMaxQueries)}>
+                                  Custom ({scheduledDiscoverMaxQueries})
+                                </SelectItem>
+                              ) : null}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <Label>Max emails per send run</Label>
+                          <p className="text-xs text-muted-foreground mb-2">Cap for each automated send cycle.</p>
+                          <Select
+                            value={String(scheduledSendBatch)}
+                            onValueChange={(v) => setScheduledSendBatch(parseInt(v, 10) || 20)}
+                          >
+                            <SelectTrigger className="w-[120px]">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {[10, 15, 20, 25, 50, 100].map((n) => (
+                                <SelectItem key={n} value={String(n)}>
+                                  {n}
+                                </SelectItem>
+                              ))}
+                              {![10, 15, 20, 25, 50, 100].includes(scheduledSendBatch) ? (
+                                <SelectItem value={String(scheduledSendBatch)}>Custom ({scheduledSendBatch})</SelectItem>
+                              ) : null}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                    </div>
+
                     <div className="flex flex-wrap items-center gap-2">
                       <Button type="button" variant="outline" onClick={handleAiGenerateSerpQueries} disabled={aiQueriesLoading}>
                         {aiQueriesLoading ? (
