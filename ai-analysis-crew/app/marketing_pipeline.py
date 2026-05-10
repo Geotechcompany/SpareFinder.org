@@ -136,13 +136,14 @@ def render_message_for_lead(
                     campaign_brief=campaign.get("ai_brief") or "",
                     compliance_footer_html=compliance_footer,
                 )
-            html_out = (body.html or "").strip()
-            if "{{unsubscribe_url}}" not in html_out and "{{unsubscribe_token}}" not in html_out:
-                html_out = html_out + "\n" + compliance_footer
-            else:
-                html_out = apply_merge(html_out, ctx) + "\n" + compliance_footer
+            # Always merge: AI output may still contain {{frontend_url}} etc. even when
+            # it omits unsubscribe placeholders (previously we skipped merge in that case).
+            html_out = apply_merge((body.html or "").strip(), ctx) + "\n" + compliance_footer
             subj = apply_merge(body.subject or "", ctx)
-            text_out = body.text.strip() if body.text else html_to_plain(html_out)
+            if body.text and body.text.strip():
+                text_out = apply_merge(body.text.strip(), ctx)
+            else:
+                text_out = html_to_plain(html_out)
             return subj, html_out, text_out
         except Exception as e:
             logger.warning("AI generation failed, falling back to template: %s", e)
