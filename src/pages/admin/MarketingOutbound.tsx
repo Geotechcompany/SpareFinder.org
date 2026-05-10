@@ -62,6 +62,9 @@ import {
   Sparkles,
   UserPlus,
   Send,
+  Eye,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { API_BASE_URL } from "@/lib/config";
 
@@ -162,18 +165,20 @@ const MarketingOutbound: React.FC = () => {
   const [bulkSendConfirmOpen, setBulkSendConfirmOpen] = useState(false);
   const [bulkSendMaxInput, setBulkSendMaxInput] = useState("25");
   const [bulkSendSubmitting, setBulkSendSubmitting] = useState(false);
+  const [sendLogView, setSendLogView] = useState<Record<string, unknown> | null>(null);
+  const [leadsPage, setLeadsPage] = useState(1);
+  const [leadsLimit, setLeadsLimit] = useState(25);
+  const [leadsSearchInput, setLeadsSearchInput] = useState("");
+  const [leadsSearch, setLeadsSearch] = useState("");
+  const [leadsTotal, setLeadsTotal] = useState(0);
+  const [leadsLoading, setLeadsLoading] = useState(false);
 
-  const loadAll = useCallback(async () => {
+  const loadGlobal = useCallback(async () => {
     setLoading(true);
     try {
-      const [dash, camps, ld, sn, err, setRes] = await Promise.all([
+      const [dash, camps, sn, err, setRes] = await Promise.all([
         adminApi.getMarketingDashboard(),
         adminApi.getMarketingCampaigns(),
-        adminApi.getMarketingLeads({
-          page: 1,
-          limit: 50,
-          country_code: leadCountryFilter,
-        }),
         adminApi.getMarketingSends({ page: 1, limit: 50 }),
         adminApi.getMarketingErrors({ page: 1, limit: 50 }),
         adminApi.getMarketingSettings(),
@@ -181,8 +186,6 @@ const MarketingOutbound: React.FC = () => {
       if (dash.success && dash.data) setDashboard(dash.data as Record<string, unknown>);
       const campPayload = (camps.data as { campaigns?: Campaign[] })?.campaigns;
       setCampaigns(Array.isArray(campPayload) ? campPayload : []);
-      const leadPayload = (ld.data as { leads?: unknown[] })?.leads;
-      setLeads(Array.isArray(leadPayload) ? leadPayload : []);
       const sendPayload = (sn.data as { sends?: unknown[] })?.sends;
       setSends(Array.isArray(sendPayload) ? sendPayload : []);
       const errPayload = (err.data as { errors?: unknown[] })?.errors;
@@ -214,11 +217,68 @@ const MarketingOutbound: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [toast, leadCountryFilter]);
+  }, [toast]);
+
+  const loadLeads = useCallback(async () => {
+    setLeadsLoading(true);
+    try {
+      const ld = await adminApi.getMarketingLeads({
+        page: leadsPage,
+        limit: leadsLimit,
+        search: leadsSearch.trim() || undefined,
+        country_code: leadCountryFilter,
+      });
+      if (ld.success && ld.data) {
+        const d = ld.data as {
+          leads?: unknown[];
+          pagination?: { page?: number; limit?: number; total?: number };
+        };
+        setLeads(Array.isArray(d.leads) ? d.leads : []);
+        const total = Number(d.pagination?.total);
+        setLeadsTotal(Number.isFinite(total) ? total : Array.isArray(d.leads) ? d.leads.length : 0);
+      }
+    } catch (e) {
+      console.error(e);
+      toast({
+        variant: "destructive",
+        title: "Contacts failed to load",
+        description: e instanceof Error ? e.message : "Unknown error",
+      });
+    } finally {
+      setLeadsLoading(false);
+    }
+  }, [toast, leadsPage, leadsLimit, leadsSearch, leadCountryFilter]);
+
+  const loadAll = useCallback(async () => {
+    await Promise.all([loadGlobal(), loadLeads()]);
+  }, [loadGlobal, loadLeads]);
 
   useEffect(() => {
-    loadAll();
-  }, [loadAll]);
+    void loadGlobal();
+  }, [loadGlobal]);
+
+  useEffect(() => {
+    void loadLeads();
+  }, [loadLeads]);
+
+  useEffect(() => {
+    setSelectedLeadIds([]);
+  }, [leadsPage, leadsSearch, leadCountryFilter, leadsLimit]);
+
+  const applyLeadSearch = () => {
+    setLeadsSearch(leadsSearchInput.trim());
+    setLeadsPage(1);
+  };
+
+  const clearLeadSearch = () => {
+    setLeadsSearchInput("");
+    setLeadsSearch("");
+    setLeadsPage(1);
+  };
+
+  const leadsTotalPages = Math.max(1, Math.ceil(leadsTotal / leadsLimit) || 1);
+  const leadsRangeFrom = leadsTotal === 0 ? 0 : (leadsPage - 1) * leadsLimit + 1;
+  const leadsRangeTo = leadsTotal === 0 ? 0 : Math.min(leadsPage * leadsLimit, leadsTotal);
 
   const handleCreateCampaign = async () => {
     const res = await adminApi.createMarketingCampaign({
@@ -883,21 +943,49 @@ const MarketingOutbound: React.FC = () => {
                   <CardHeader>
                     <CardTitle>Contacts</CardTitle>
                     <CardDescription>
-                      Showing the latest 50 rows. Contacts found on Google pick up the country you set under Find on
-                      Google — use the filter below to narrow them (spreadsheet imports do not set a country yet).{" "}
-                      <strong>Bulk review status</strong> first removes selected rows that have no real email (or use a
-                      throwaway inbox), then opens a dialog to set the status for the rest.{" "}
-                      <strong>Send to selected</strong> sends the real campaign email (pending, accepted, active
-                      campaign) up to the limit you set — same SMTP path as the automated cron.
+                      Paginated list with search (email, name, or company). Contacts from Google pick up the country from
+                      Find on Google — use the country filter to narrow them (spreadsheet imports do not set a country
+                      yet). <strong>Bulk review status</strong> first removes selected rows that have no real email (or
+                      use a throwaway inbox), then opens a dialog for the rest. <strong>Send to selected</strong> sends
+                      the real campaign email (pending, accepted, active campaign) up to the limit you set — same SMTP
+                      path as the automated cron.
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="overflow-x-auto">
-                    <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
+                    <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:flex-wrap lg:items-end">
+                      <div className="min-w-[200px] flex-1 max-w-md">
+                        <Label htmlFor="leads-search">Search</Label>
+                        <div className="mt-1 flex flex-wrap gap-2">
+                          <Input
+                            id="leads-search"
+                            value={leadsSearchInput}
+                            onChange={(e) => setLeadsSearchInput(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") applyLeadSearch();
+                            }}
+                            placeholder="Email, name, or company"
+                            className="min-w-[200px] flex-1"
+                            disabled={leadsLoading}
+                          />
+                          <Button type="button" size="sm" onClick={applyLeadSearch} disabled={leadsLoading}>
+                            Search
+                          </Button>
+                          {leadsSearch ? (
+                            <Button type="button" size="sm" variant="outline" onClick={clearLeadSearch} disabled={leadsLoading}>
+                              Clear
+                            </Button>
+                          ) : null}
+                        </div>
+                      </div>
                       <div className="min-w-[200px] max-w-xs">
                         <Label>Filter by country (discovery tag)</Label>
                         <Select
                           value={leadCountryFilter}
-                          onValueChange={(v) => setLeadCountryFilter(v)}
+                          onValueChange={(v) => {
+                            setLeadCountryFilter(v);
+                            setLeadsPage(1);
+                          }}
+                          disabled={leadsLoading}
                         >
                           <SelectTrigger>
                             <SelectValue placeholder="Country" />
@@ -960,47 +1048,107 @@ const MarketingOutbound: React.FC = () => {
                         <Badge variant="secondary">{selectedLeadIds.length} selected</Badge>
                       )}
                     </div>
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="border-b text-left">
-                          <th className="p-2">Select</th>
-                          <th className="p-2">Email</th>
-                          <th className="p-2">Company</th>
-                          <th className="p-2">Country</th>
-                          <th className="p-2">Source</th>
-                          <th className="p-2">Review</th>
-                          <th className="p-2">Status</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {(leads as Record<string, unknown>[]).map((row) => {
-                          const rp = row.raw_payload as Record<string, unknown> | undefined;
-                          const tag =
-                            typeof rp?.target_country_code === "string"
-                              ? String(rp.target_country_code).toUpperCase()
-                              : "—";
-                          return (
-                          <tr key={String(row.id)} className="border-b border-border/60">
-                            <td className="p-2">
-                              <input
-                                type="checkbox"
-                                checked={selectedLeadIds.includes(String(row.id))}
-                                onChange={() => toggleLeadSelection(String(row.id))}
-                              />
-                            </td>
-                            <td className="p-2 font-mono text-xs">{String(row.email || "—")}</td>
-                            <td className="p-2">{String(row.company_name || row.sanitized_company_name || "—")}</td>
-                            <td className="p-2 text-xs text-muted-foreground">{tag}</td>
-                            <td className="p-2">{String(row.source)}</td>
-                            <td className="p-2">
-                              <Badge variant="outline">{String(row.sanitization_status)}</Badge>
-                            </td>
-                            <td className="p-2">{String(row.lead_status_internal)}</td>
+                    <div className="relative min-h-[120px]">
+                      {leadsLoading ? (
+                        <div className="absolute inset-0 z-10 flex items-center justify-center rounded-md bg-background/60 backdrop-blur-[1px]">
+                          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" aria-hidden />
+                        </div>
+                      ) : null}
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="border-b text-left">
+                            <th className="p-2">Select</th>
+                            <th className="p-2">Email</th>
+                            <th className="p-2">Company</th>
+                            <th className="p-2">Country</th>
+                            <th className="p-2">Source</th>
+                            <th className="p-2">Review</th>
+                            <th className="p-2">Status</th>
                           </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
+                        </thead>
+                        <tbody>
+                          {(leads as Record<string, unknown>[]).map((row) => {
+                            const rp = row.raw_payload as Record<string, unknown> | undefined;
+                            const tag =
+                              typeof rp?.target_country_code === "string"
+                                ? String(rp.target_country_code).toUpperCase()
+                                : "—";
+                            return (
+                              <tr key={String(row.id)} className="border-b border-border/60">
+                                <td className="p-2">
+                                  <input
+                                    type="checkbox"
+                                    checked={selectedLeadIds.includes(String(row.id))}
+                                    onChange={() => toggleLeadSelection(String(row.id))}
+                                  />
+                                </td>
+                                <td className="p-2 font-mono text-xs">{String(row.email || "—")}</td>
+                                <td className="p-2">{String(row.company_name || row.sanitized_company_name || "—")}</td>
+                                <td className="p-2 text-xs text-muted-foreground">{tag}</td>
+                                <td className="p-2">{String(row.source)}</td>
+                                <td className="p-2">
+                                  <Badge variant="outline">{String(row.sanitization_status)}</Badge>
+                                </td>
+                                <td className="p-2">{String(row.lead_status_internal)}</td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                    <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+                      <p className="text-sm text-muted-foreground">
+                        {leadsTotal === 0
+                          ? "No contacts match this filter."
+                          : `Showing ${leadsRangeFrom}–${leadsRangeTo} of ${leadsTotal} · page ${leadsPage} of ${leadsTotalPages}`}
+                      </p>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <div className="flex items-center gap-2">
+                          <Label className="text-xs whitespace-nowrap">Per page</Label>
+                          <Select
+                            value={String(leadsLimit)}
+                            onValueChange={(v) => {
+                              setLeadsLimit(Number(v));
+                              setLeadsPage(1);
+                            }}
+                            disabled={leadsLoading}
+                          >
+                            <SelectTrigger className="h-8 w-[88px]">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="25">25</SelectItem>
+                              <SelectItem value="50">50</SelectItem>
+                              <SelectItem value="100">100</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="h-8 px-2"
+                            disabled={leadsPage <= 1 || leadsLoading}
+                            onClick={() => setLeadsPage((p) => Math.max(1, p - 1))}
+                            aria-label="Previous page"
+                          >
+                            <ChevronLeft className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="h-8 px-2"
+                            disabled={leadsPage >= leadsTotalPages || leadsLoading || leadsTotal === 0}
+                            onClick={() => setLeadsPage((p) => p + 1)}
+                            aria-label="Next page"
+                          >
+                            <ChevronRight className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
                   </CardContent>
                 </Card>
               </TabsContent>
@@ -1185,24 +1333,45 @@ const MarketingOutbound: React.FC = () => {
                 <Card>
                   <CardHeader>
                     <CardTitle>Sent emails log</CardTitle>
+                    <CardDescription>
+                      Stored HTML snapshots are shown as sent (may be truncated for very large templates). Scripts are
+                      disabled in the preview.
+                    </CardDescription>
                   </CardHeader>
                   <CardContent className="overflow-x-auto">
                     <table className="w-full text-sm">
                       <thead>
                         <tr className="border-b text-left">
+                          <th className="p-2 w-24">View</th>
                           <th className="p-2">Status</th>
                           <th className="p-2">Subject</th>
                           <th className="p-2">When</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {(sends as Record<string, string>[]).map((row) => (
-                          <tr key={row.id} className="border-b border-border/60">
+                        {(sends as Record<string, unknown>[]).map((row) => (
+                          <tr key={String(row.id)} className="border-b border-border/60">
                             <td className="p-2">
-                              <Badge variant={row.status === "sent" ? "default" : "destructive"}>{row.status}</Badge>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="h-8 px-2"
+                                onClick={() => setSendLogView(row)}
+                                title="View stored email body"
+                              >
+                                <Eye className="h-4 w-4" />
+                              </Button>
                             </td>
-                            <td className="p-2 max-w-xs truncate">{row.subject_snapshot || "—"}</td>
-                            <td className="p-2 text-xs text-muted-foreground">{row.sent_at || row.created_at}</td>
+                            <td className="p-2">
+                              <Badge variant={row.status === "sent" ? "default" : "destructive"}>
+                                {String(row.status ?? "—")}
+                              </Badge>
+                            </td>
+                            <td className="p-2 max-w-xs truncate">{String(row.subject_snapshot || "—")}</td>
+                            <td className="p-2 text-xs text-muted-foreground">
+                              {String(row.sent_at || row.created_at || "—")}
+                            </td>
                           </tr>
                         ))}
                       </tbody>
@@ -1387,6 +1556,59 @@ const MarketingOutbound: React.FC = () => {
             <Button type="button" onClick={() => void submitBulkLeadDialog()} disabled={bulkLeadSubmitting}>
               {bulkLeadSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-2 inline" /> : null}
               Apply to selected
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={!!sendLogView}
+        onOpenChange={(open) => {
+          if (!open) setSendLogView(null);
+        }}
+      >
+        <DialogContent className="max-h-[92vh] flex flex-col gap-0 overflow-hidden sm:max-w-4xl">
+          <DialogHeader className="shrink-0 space-y-2 pr-2">
+            <DialogTitle className="line-clamp-2 text-left">
+              {sendLogView ? String(sendLogView.subject_snapshot || "Sent email") : ""}
+            </DialogTitle>
+            <DialogDescription asChild>
+              <div className="space-y-1 text-left text-sm text-muted-foreground">
+                <p>
+                  <span className="font-medium text-foreground">Status:</span>{" "}
+                  {sendLogView ? String(sendLogView.status ?? "—") : ""}
+                  {sendLogView?.error_message ? (
+                    <>
+                      {" "}
+                      ·{" "}
+                      <span className="text-destructive">
+                        {String(sendLogView.error_message)}
+                      </span>
+                    </>
+                  ) : null}
+                </p>
+                <p>
+                  <span className="font-medium text-foreground">When:</span>{" "}
+                  {sendLogView ? String(sendLogView.sent_at || sendLogView.created_at || "—") : ""}
+                </p>
+              </div>
+            </DialogDescription>
+          </DialogHeader>
+          <div className="min-h-[280px] flex-1 overflow-hidden rounded-md border bg-background">
+            <iframe
+              title="Email HTML preview"
+              sandbox=""
+              className="h-[min(65vh,560px)] w-full bg-white"
+              srcDoc={
+                typeof sendLogView?.body_html_snapshot === "string" && String(sendLogView.body_html_snapshot).trim()
+                  ? String(sendLogView.body_html_snapshot)
+                  : '<p style="padding:1.25rem;font-family:system-ui,sans-serif;color:#64748b;font-size:14px;">No HTML snapshot was stored for this send (e.g. skipped or failed before render).</p>'
+              }
+            />
+          </div>
+          <DialogFooter className="shrink-0 pt-4">
+            <Button type="button" variant="outline" onClick={() => setSendLogView(null)}>
+              Close
             </Button>
           </DialogFooter>
         </DialogContent>
