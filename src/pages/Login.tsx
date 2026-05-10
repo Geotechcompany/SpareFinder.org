@@ -24,7 +24,7 @@ type ClerkRedirectStrategy = Parameters<
 type OAuthStrategy = Extract<ClerkRedirectStrategy, `oauth_${string}`>;
 
 const Login = () => {
-  const { isLoading, isAuthenticated } = useAuth();
+  const { isLoading, isAuthenticated, user } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const { isLoaded, signIn, setActive } = useSignIn();
@@ -48,10 +48,6 @@ const Login = () => {
     [location.state]
   );
 
-    if (!isLoading && isAuthenticated) {
-    return <Navigate to="/dashboard" replace />;
-  }
-
   const oauthStrategies = useMemo(() => {
     if (!isLoaded || !signIn) return [] as OAuthStrategy[];
     const supported = ((signIn as any).supportedFirstFactors || []) as Array<{
@@ -67,6 +63,12 @@ const Login = () => {
     // This keeps the UI in sync with the Clerk Dashboard (e.g. when disabling Google).
     return Array.from(new Set(fromSignIn)) as OAuthStrategy[];
   }, [isLoaded, signIn]);
+
+  // Match ProtectedRoute: dashboard requires backend `user`, not only Clerk session.
+  // Redirecting on `isSignedIn` alone caused /dashboard → /login loops after reset when profile was slow/failed.
+  if (!isLoading && isAuthenticated && user) {
+    return <Navigate to="/dashboard" replace />;
+  }
 
   const formatStrategyLabel = (strategy: OAuthStrategy) => {
     const raw = strategy.replace(/^oauth_/, "");
