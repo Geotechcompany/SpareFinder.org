@@ -1,6 +1,7 @@
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
+import { CONTACT_EMAIL } from '@/lib/config';
 
 const Footer = () => {
   return (
@@ -192,10 +193,10 @@ const Footer = () => {
                 <div>
                   Email:{' '}
                   <a
-                    href="mailto:email@sparefinder.org"
+                    href={`mailto:${CONTACT_EMAIL}`}
                     className="underline-offset-2 hover:underline"
                   >
-                    email@sparefinder.org
+                    {CONTACT_EMAIL}
                   </a>
                 </div>
               </div>

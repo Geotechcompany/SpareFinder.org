@@ -17,6 +17,9 @@ export const AI_CREW_WS_URL =
   import.meta.env.VITE_AI_CREW_WS_URL ||
   API_BASE_URL.replace(/^http/, "ws");
 
+/** Public address for support and general inquiries (shown sitewide). */
+export const CONTACT_EMAIL = "email@sparefinder.org";
+
 // Upload Configuration
 export const config = {
   upload: {

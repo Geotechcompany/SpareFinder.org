@@ -7,6 +7,7 @@ from fastapi import APIRouter
 from pydantic import BaseModel, EmailStr, Field
 
 from ..email_sender import send_basic_email_smtp, send_email_via_email_service
+from ..sparefinder_contact import CONTACT_EMAIL
 from .responses import api_error, api_ok
 
 router = APIRouter(prefix="/contact", tags=["contact"])
@@ -46,8 +47,8 @@ async def submit_contact_form(payload: ContactBody):
         if not name or not message:
             return api_error(status_code=400, error="Validation failed", message="Invalid contact form data")
 
-        to_sales = _env("CONTACT_TO_EMAIL", "sales@tpsinternational.co.uk")
-        frontend_url = _env("FRONTEND_URL", "https://app.sparefinder.org")
+        to_sales = _env("CONTACT_TO_EMAIL", CONTACT_EMAIL)
+        frontend_url = _env("FRONTEND_URL", "https://sparefinder.org")
 
         email_subject = subject and f"[{inquiry_type.upper()}] {subject}" or f"[{inquiry_type.upper()}] New Contact Form Submission"
 
@@ -111,7 +112,7 @@ async def submit_contact_form(payload: ContactBody):
             error="Internal server error",
             message=(
                 "We apologize, but there was an error processing your message. "
-                "Please try again or contact us directly at sales@tpsinternational.co.uk"
+                f"Please try again or contact us directly at {CONTACT_EMAIL}"
             ),
         )
 

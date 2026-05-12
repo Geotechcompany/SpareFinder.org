@@ -17,6 +17,7 @@ from .responses import api_error, api_ok
 from .support_ticket_email import format_ticket_message_html_for_email, format_ticket_message_plain_for_email
 from .support_ticket_thread import enrich_ticket_messages_authors, fetch_ticket_messages_raw
 from .supabase_admin import get_supabase_admin
+from ..sparefinder_contact import CONTACT_EMAIL
 
 logger = logging.getLogger(__name__)
 
@@ -77,7 +78,7 @@ class UserReplyTicketBody(BaseModel):
 
 def _get_admin_emails() -> list[str]:
     """Return list of email addresses for all admin and super_admin profiles."""
-    fallback = _env("ADMIN_NOTIFY_EMAIL") or _env("CONTACT_TO_EMAIL") or ""
+    fallback = _env("ADMIN_NOTIFY_EMAIL") or _env("CONTACT_TO_EMAIL") or CONTACT_EMAIL
     try:
         supabase = get_supabase_admin()
         res = (
@@ -95,9 +96,7 @@ def _get_admin_emails() -> list[str]:
             return emails
     except Exception as e:
         logger.warning("Could not fetch admin emails from profiles: %s", e)
-    if fallback:
-        return [fallback]
-    return []
+    return [fallback]
 
 
 def _notify_admin_new_ticket(

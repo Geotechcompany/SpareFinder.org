@@ -354,7 +354,7 @@ const AdminDashboardLayout = () => {
 
   if (error) {
     return (
-      <div className="dashboard-premium min-h-screen flex items-center justify-center bg-background">
+      <div className="dashboard-premium admin-console-neo min-h-screen flex items-center justify-center bg-background">
         <div className="text-center">
           <AlertCircle className="w-10 h-10 text-purple-500 mx-auto mb-4" />
           <p className="text-muted-foreground mb-4">{error}</p>
@@ -552,34 +552,11 @@ const AdminDashboardLayout = () => {
   };
 
   return (
-    <div className="dashboard-premium min-h-screen flex w-full bg-background relative overflow-hidden">
-      {/* Animated Background Elements */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <motion.div
-          className="hidden"
-          animate={{
-            scale: [1, 1.3, 1],
-            rotate: [0, 180, 360],
-          }}
-          transition={{
-            duration: 20,
-            repeat: Infinity,
-            ease: "linear",
-          }}
-        />
-        <motion.div
-          className="hidden"
-          animate={{
-            scale: [1.2, 1, 1.2],
-            x: [0, 50, 0],
-            y: [0, -30, 0],
-          }}
-          transition={{
-            duration: 25,
-            repeat: Infinity,
-            ease: "easeInOut",
-          }}
-        />
+    <div className="dashboard-premium admin-console-neo min-h-screen flex w-full bg-background relative overflow-hidden">
+      <div className="admin-neo-ambient" aria-hidden>
+        <div className="admin-neo-ambient__orb admin-neo-ambient__orb--violet" />
+        <div className="admin-neo-ambient__orb admin-neo-ambient__orb--cyan" />
+        <div className="admin-neo-ambient__orb admin-neo-ambient__orb--rose" />
       </div>
 
       <AdminDesktopSidebar

@@ -434,15 +434,15 @@ const AdminDesktopSidebar: React.FC<AdminSidebarProps> = ({
                             className={cn(
                               "relative flex items-center gap-3 rounded-xl border px-3 py-2.5 transition-colors",
                               active
-                                ? "border-primary/30 bg-primary/10 text-foreground shadow-sm dark:bg-blue-900/25"
-                                : "border-transparent bg-muted/40 hover:bg-muted/70 dark:bg-white/5 dark:hover:bg-white/10"
+                                ? "border-violet-500/30 bg-violet-500/10 text-foreground shadow-sm dark:border-violet-500/35 dark:bg-gradient-to-r dark:from-violet-600/20 dark:to-indigo-600/15 dark:text-zinc-50 admin-nav-link-active"
+                                : "border-transparent bg-muted/40 hover:bg-muted/70 dark:bg-white/[0.05] dark:hover:bg-white/[0.09]"
                             )}
                           >
                             <div
                               className={cn(
                                 "flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ring-1 ring-border/60 dark:ring-white/10",
                                 active
-                                  ? "bg-primary/15 text-primary"
+                                  ? "bg-gradient-to-br from-violet-500/35 to-cyan-500/15 text-primary shadow-[0_0_14px_-3px_rgba(139,92,246,0.4)]"
                                   : "bg-background text-muted-foreground"
                               )}
                             >
@@ -511,14 +511,14 @@ const AdminDesktopSidebar: React.FC<AdminSidebarProps> = ({
       </Sheet>
 
       <motion.div
-      initial={false}
-      animate={{ width: isCollapsed ? 80 : 320 }}
-      transition={{ duration: 0.3, ease: "easeInOut" }}
-      className="hidden lg:flex h-screen bg-sidebar text-sidebar-foreground border-r border-sidebar-border backdrop-blur-xl flex-col fixed left-0 top-0 z-30 dark:bg-black/95 dark:text-white dark:border-white/10"
-    >
+        initial={false}
+        animate={{ width: isCollapsed ? 80 : 320 }}
+        transition={{ duration: 0.3, ease: "easeInOut" }}
+        className="admin-sidebar-neo hidden h-screen flex-col fixed left-0 top-0 z-30 border-r border-sidebar-border bg-sidebar text-sidebar-foreground backdrop-blur-xl dark:text-white lg:flex"
+      >
       {/* Header */}
       <div className="relative">
-        <div className="absolute inset-0 bg-gradient-to-r from-sidebar-accent/40 to-purple-500/20 opacity-70 dark:from-blue-900/30 dark:to-purple-900/20" />
+        <div className="absolute inset-0 bg-gradient-to-r from-violet-200/50 via-fuchsia-100/30 to-cyan-200/40 opacity-80 dark:from-blue-900/30 dark:via-purple-900/15 dark:to-indigo-900/20 dark:opacity-70" />
         <div className="relative p-6 border-b border-sidebar-border/80 dark:border-blue-800/30">
           <AnimatePresence mode="wait">
             {!isCollapsed ? (
@@ -668,7 +668,7 @@ const AdminDesktopSidebar: React.FC<AdminSidebarProps> = ({
                 value={navQuery}
                 onChange={(e) => setNavQuery(e.target.value)}
                 placeholder="Search admin…"
-                className="w-full rounded-xl border border-border bg-background/70 py-2 pl-9 pr-3 text-sm text-foreground placeholder:text-muted-foreground shadow-sm backdrop-blur focus:outline-none focus:ring-2 focus:ring-primary/30 dark:bg-white/5 dark:border-white/10 dark:text-white"
+                className="w-full rounded-xl border border-border bg-background/70 py-2 pl-9 pr-3 text-sm text-foreground placeholder:text-muted-foreground shadow-sm backdrop-blur focus:outline-none focus:ring-2 focus:ring-primary/30 dark:border-white/10 dark:bg-white/[0.04] dark:text-white"
               />
             </div>
           </div>
@@ -692,11 +692,12 @@ const AdminDesktopSidebar: React.FC<AdminSidebarProps> = ({
                   const linkEl = (
                     <Link
                       to={item.href}
-                      className={`relative flex items-center gap-3 rounded-xl px-3 py-2.5 transition-all duration-200 group border ${
+                      className={cn(
+                        "group relative flex items-center gap-3 rounded-xl border px-3 py-2.5 transition-all duration-200",
                         active
-                          ? "bg-sidebar-accent/80 text-sidebar-accent-foreground border-sidebar-border shadow-soft-elevated dark:bg-gradient-to-r dark:from-blue-600/20 dark:to-purple-600/20 dark:border-blue-500/30 dark:text-blue-100"
-                          : "border-transparent text-sidebar-foreground/80 hover:text-sidebar-foreground hover:bg-sidebar-accent/60 dark:text-gray-300 dark:hover:text-blue-200 dark:hover:bg-blue-800/10"
-                      }`}
+                          ? "border-violet-300/70 bg-gradient-to-r from-violet-500/12 via-white/90 to-cyan-500/12 text-sidebar-accent-foreground shadow-sm dark:border-violet-500/35 dark:from-violet-600/25 dark:via-indigo-600/15 dark:to-cyan-600/20 dark:text-blue-50 admin-nav-link-active"
+                          : "border-transparent text-sidebar-foreground/80 hover:bg-violet-500/[0.08] hover:text-sidebar-foreground dark:text-zinc-400 dark:hover:bg-white/[0.06] dark:hover:text-zinc-100"
+                      )}
                     >
                       {/* Active indicator */}
                       {active ? (
@@ -704,11 +705,12 @@ const AdminDesktopSidebar: React.FC<AdminSidebarProps> = ({
                       ) : null}
 
                       <div
-                        className={`flex h-9 w-9 items-center justify-center rounded-xl transition-colors ring-1 ${
+                        className={cn(
+                          "flex h-9 w-9 items-center justify-center rounded-xl ring-1 transition-colors",
                           active
-                            ? "bg-gradient-to-r from-purple-600/20 to-blue-600/20 text-blue-300 ring-blue-500/25"
-                            : "bg-muted text-muted-foreground ring-border/60 group-hover:bg-sidebar-accent/50 group-hover:text-sidebar-accent-foreground dark:bg-gray-800/50 dark:text-gray-400 dark:ring-white/10 dark:group-hover:bg-blue-800/20 dark:group-hover:text-blue-300"
-                        }`}
+                            ? "bg-gradient-to-br from-violet-500/35 to-cyan-500/20 text-violet-950 ring-violet-400/40 shadow-[0_0_14px_-3px_rgba(139,92,246,0.25)] dark:text-cyan-50 dark:shadow-[0_0_18px_-4px_rgba(139,92,246,0.45)]"
+                            : "bg-muted text-muted-foreground ring-border/60 group-hover:bg-violet-500/[0.12] group-hover:text-violet-800 group-hover:ring-violet-300/50 dark:bg-white/[0.06] dark:text-zinc-400 dark:ring-white/10 dark:group-hover:bg-white/[0.1] dark:group-hover:text-violet-200"
+                        )}
                       >
                         <item.icon className="h-4.5 w-4.5" />
                       </div>

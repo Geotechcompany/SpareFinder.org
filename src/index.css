@@ -278,6 +278,211 @@
     --radius: 1rem;
 }
 
+/* Admin console — light: soft pastel mesh; dark: deep neon (scoped via .admin-console-neo) */
+.dashboard-premium.admin-console-neo {
+    background:
+        radial-gradient(ellipse 95% 75% at 88% -5%, hsl(265 92% 94% / 0.95), transparent 50%),
+        radial-gradient(ellipse 75% 60% at -5% 25%, hsl(199 95% 93% / 0.85), transparent 48%),
+        radial-gradient(ellipse 65% 50% at 102% 88%, hsl(320 85% 95% / 0.75), transparent 52%),
+        radial-gradient(ellipse 50% 40% at 40% 100%, hsl(45 95% 94% / 0.45), transparent 45%),
+        hsl(var(--background));
+}
+
+.dashboard-premium.admin-console-neo::before {
+    opacity: 0.04;
+    background-size: 22px 22px;
+}
+
+.dark .dashboard-premium.admin-console-neo {
+    --background: 262 32% 7%;
+    --card: 262 28% 11%;
+    background:
+        radial-gradient(ellipse 100% 80% at 50% -30%, hsl(270 65% 22% / 0.55), transparent 55%),
+        radial-gradient(ellipse 70% 50% at 100% 40%, hsl(220 70% 18% / 0.35), transparent 50%),
+        radial-gradient(ellipse 55% 45% at 0% 85%, hsl(195 75% 16% / 0.28), transparent 50%),
+        hsl(var(--background));
+}
+
+.dark .dashboard-premium.admin-console-neo::before {
+    opacity: 0.055;
+    background-size: 28px 28px;
+}
+
+@keyframes admin-neo-orb-drift {
+    0%,
+    100% {
+        transform: translate(0, 0) scale(1);
+    }
+    33% {
+        transform: translate(2%, 1.5%) scale(1.03);
+    }
+    66% {
+        transform: translate(-1.5%, 1%) scale(0.98);
+    }
+}
+
+.admin-neo-ambient {
+    pointer-events: none;
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    z-index: 0;
+}
+
+.admin-neo-ambient__orb {
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(72px);
+    opacity: 0.42;
+    will-change: transform;
+}
+
+/* Light orbs — candy pastels */
+.admin-neo-ambient__orb--violet {
+    width: min(38rem, 88vw);
+    height: min(38rem, 88vw);
+    top: -16%;
+    left: 5%;
+    background: radial-gradient(circle at 35% 35%, hsl(265 90% 78% / 0.55), transparent 68%);
+    opacity: 0.55;
+    animation: admin-neo-orb-drift 26s ease-in-out infinite;
+}
+
+.admin-neo-ambient__orb--cyan {
+    width: min(34rem, 82vw);
+    height: min(34rem, 82vw);
+    bottom: -14%;
+    right: -6%;
+    background: radial-gradient(circle at 65% 65%, hsl(192 95% 78% / 0.5), transparent 66%);
+    opacity: 0.48;
+    animation: admin-neo-orb-drift 30s ease-in-out infinite reverse;
+}
+
+.admin-neo-ambient__orb--rose {
+    width: min(26rem, 72vw);
+    height: min(26rem, 72vw);
+    top: 48%;
+    left: 32%;
+    background: radial-gradient(circle at 50% 50%, hsl(310 85% 82% / 0.38), transparent 70%);
+    opacity: 0.4;
+    animation: admin-neo-orb-drift 34s ease-in-out infinite;
+}
+
+.dark .admin-neo-ambient__orb--violet {
+    width: min(42rem, 90vw);
+    height: min(42rem, 90vw);
+    top: -18%;
+    left: 8%;
+    background: radial-gradient(circle at 30% 30%, hsl(270 85% 52% / 0.45), transparent 68%);
+    opacity: 0.42;
+    animation: admin-neo-orb-drift 24s ease-in-out infinite;
+}
+
+.dark .admin-neo-ambient__orb--cyan {
+    width: min(36rem, 80vw);
+    height: min(36rem, 80vw);
+    bottom: -12%;
+    right: -8%;
+    background: radial-gradient(circle at 70% 70%, hsl(190 90% 42% / 0.32), transparent 65%);
+    opacity: 0.38;
+    animation: admin-neo-orb-drift 28s ease-in-out infinite reverse;
+}
+
+.dark .admin-neo-ambient__orb--rose {
+    width: min(28rem, 70vw);
+    height: min(28rem, 70vw);
+    top: 42%;
+    left: 35%;
+    background: radial-gradient(circle at 50% 50%, hsl(285 70% 38% / 0.18), transparent 70%);
+    animation: admin-neo-orb-drift 32s ease-in-out infinite;
+    opacity: 0.28;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .admin-neo-ambient__orb--violet,
+    .admin-neo-ambient__orb--cyan,
+    .admin-neo-ambient__orb--rose {
+        animation: none;
+    }
+}
+
+/* Light neo — chart / content cards */
+.dashboard-premium.admin-console-neo .premium-card {
+    background: linear-gradient(
+        162deg,
+        hsl(0 0% 100% / 0.98) 0%,
+        hsl(230 80% 99% / 0.95) 40%,
+        hsl(270 70% 99% / 0.93) 100%
+    );
+    border-color: hsl(258 35% 88% / 0.95);
+    box-shadow:
+        0 0 0 1px hsl(195 90% 85% / 0.35) inset,
+        0 16px 40px -14px hsl(258 45% 55% / 0.12),
+        0 8px 24px -8px hsl(199 60% 50% / 0.08);
+}
+
+.dashboard-premium.admin-console-neo .premium-card:hover {
+    border-color: hsl(258 48% 72% / 0.95);
+    box-shadow:
+        0 0 0 1px hsl(270 65% 70% / 0.2) inset,
+        0 14px 36px -12px hsl(258 50% 52% / 0.16),
+        0 22px 48px -16px hsl(200 55% 55% / 0.1);
+}
+
+.dark .dashboard-premium.admin-console-neo .premium-card {
+    background: linear-gradient(158deg, hsl(262 26% 13% / 0.94) 0%, hsl(240 28% 9% / 0.9) 100%);
+    border-color: hsl(0 0% 100% / 0.07);
+    box-shadow:
+        0 0 0 1px hsl(270 60% 55% / 0.06) inset,
+        0 20px 50px -14px rgba(0, 0, 0, 0.55);
+}
+
+.dark .dashboard-premium.admin-console-neo .premium-card:hover {
+    border-color: hsl(270 70% 55% / 0.22);
+    box-shadow:
+        0 0 0 1px hsl(270 70% 50% / 0.1) inset,
+        0 0 40px -12px hsl(270 80% 50% / 0.18),
+        0 26px 56px -14px rgba(0, 0, 0, 0.6);
+}
+
+/* Light sidebar — tinted glass rail */
+.admin-sidebar-neo {
+    background: linear-gradient(
+        185deg,
+        hsl(230 70% 99.2% / 0.97) 0%,
+        hsl(265 55% 98.5% / 0.95) 45%,
+        hsl(195 60% 98% / 0.93) 100%
+    ) !important;
+    border-color: hsl(258 32% 88% / 0.9) !important;
+    box-shadow:
+        inset -1px 0 0 hsl(258 45% 80% / 0.25),
+        4px 0 36px -14px hsl(258 40% 55% / 0.1);
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+}
+
+.dark .admin-sidebar-neo {
+    background: linear-gradient(180deg, hsl(262 28% 8% / 0.92) 0%, hsl(260 30% 6% / 0.96) 100%) !important;
+    border-color: hsl(0 0% 100% / 0.06) !important;
+    box-shadow:
+        inset -1px 0 0 hsl(0 0% 100% / 0.04),
+        4px 0 48px -12px rgba(0, 0, 0, 0.55);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+}
+
+.admin-nav-link-active {
+    box-shadow:
+        0 0 0 1px hsl(258 50% 72% / 0.45),
+        0 10px 32px -10px hsl(258 55% 55% / 0.22);
+}
+
+.dark .admin-nav-link-active {
+    box-shadow:
+        0 0 0 1px hsl(270 70% 50% / 0.22),
+        0 0 32px -8px hsl(270 85% 55% / 0.35);
+}
+
 .dark .premium-card {
     background: #1c1f2e;
     border-color: rgba(255, 255, 255, 0.05);
@@ -288,23 +493,87 @@
     box-shadow: 0 22px 55px rgba(5, 8, 20, 0.34);
 }
 
-.dark .admin-kpi-card {
-    border-color: hsl(0 0% 100% / 0.08);
-    background: linear-gradient(145deg, hsl(229 24% 16% / 0.95) 0%, hsl(230 28% 12% / 0.88) 100%);
+/* Neo KPI tiles — light first, then dark overrides */
+.dashboard-premium.admin-console-neo .admin-kpi-card {
+    border-color: hsl(258 32% 86% / 0.95);
+    background: linear-gradient(
+        145deg,
+        hsl(0 0% 100% / 0.99) 0%,
+        hsl(230 75% 98.5% / 0.94) 45%,
+        hsl(275 65% 99% / 0.9) 100%
+    );
     box-shadow:
-        0 0 0 1px hsl(0 0% 100% / 0.04) inset,
-        0 22px 48px -12px rgba(0, 0, 0, 0.45);
+        0 0 0 1px hsl(0 0% 100% / 0.85) inset,
+        0 0 48px -20px hsl(258 55% 58% / 0.16),
+        0 16px 36px -12px hsl(220 35% 45% / 0.07);
 }
 
-.dark .admin-kpi-card::before {
-    background: radial-gradient(120% 85% at 100% 0%, hsl(var(--primary) / 0.14), transparent 58%);
+.dashboard-premium.admin-console-neo .admin-kpi-card::before {
+    background:
+        radial-gradient(120% 90% at 100% 0%, hsl(270 80% 58% / 0.12), transparent 54%),
+        radial-gradient(75% 55% at 0% 100%, hsl(192 85% 48% / 0.09), transparent 52%);
 }
 
-.dark .admin-kpi-card:hover {
-    border-color: hsl(var(--primary) / 0.28);
+.dashboard-premium.admin-console-neo .admin-kpi-card:hover {
+    border-color: hsl(258 45% 70% / 0.95);
     box-shadow:
-        0 0 0 1px hsl(var(--primary) / 0.08) inset,
-        0 28px 56px -14px rgba(0, 0, 0, 0.55);
+        0 0 0 1px hsl(270 55% 60% / 0.1) inset,
+        0 0 40px -12px hsl(258 58% 55% / 0.22),
+        0 24px 48px -14px hsl(199 50% 50% / 0.1);
+}
+
+.dashboard-premium.admin-console-neo .admin-kpi-spark {
+    opacity: 0.44;
+    filter: drop-shadow(0 0 5px hsl(258 70% 55% / 0.28));
+}
+
+.dark .dashboard-premium.admin-console-neo .admin-kpi-card {
+    border-color: hsl(0 0% 100% / 0.09);
+    background: linear-gradient(145deg, hsl(262 28% 14% / 0.92) 0%, hsl(245 32% 9% / 0.88) 100%);
+    box-shadow:
+        0 0 0 1px hsl(270 50% 60% / 0.08) inset,
+        0 0 48px -20px hsl(270 70% 40% / 0.2),
+        0 22px 48px -12px rgba(0, 0, 0, 0.5);
+}
+
+.dark .dashboard-premium.admin-console-neo .admin-kpi-card::before {
+    background:
+        radial-gradient(120% 90% at 100% 0%, hsl(270 80% 55% / 0.18), transparent 55%),
+        radial-gradient(80% 60% at 0% 100%, hsl(190 70% 45% / 0.08), transparent 50%);
+}
+
+.dark .dashboard-premium.admin-console-neo .admin-kpi-card::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    z-index: 0;
+    opacity: 0.55;
+    background: linear-gradient(105deg, transparent 40%, hsl(0 0% 100% / 0.04) 48%, transparent 56%);
+}
+
+.dark .dashboard-premium.admin-console-neo .admin-kpi-card:hover {
+    border-color: hsl(270 75% 58% / 0.35);
+    box-shadow:
+        0 0 0 1px hsl(270 70% 50% / 0.12) inset,
+        0 0 44px -10px hsl(270 90% 55% / 0.28),
+        0 28px 56px -14px rgba(0, 0, 0, 0.58);
+}
+
+.dark .dashboard-premium.admin-console-neo .admin-kpi-spark {
+    opacity: 0.38;
+    filter: drop-shadow(0 0 6px hsl(270 90% 60% / 0.35));
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .admin-kpi-spark {
+        display: none !important;
+    }
+
+    .dark .dashboard-premium.admin-console-neo .admin-kpi-card::after {
+        opacity: 0;
+    }
 }
 
 .dashboard-premium::before {

@@ -8,6 +8,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from .email_sender import send_basic_email_smtp, send_email_via_email_service
+from .sparefinder_contact import CONTACT_EMAIL
 
 logger = logging.getLogger(__name__)
 
@@ -17,7 +18,7 @@ def _env(name: str, default: str = "") -> str:
 
 
 def _get_admin_emails(supabase: Any) -> list[str]:
-    fallback = _env("ADMIN_NOTIFY_EMAIL") or _env("CONTACT_TO_EMAIL") or ""
+    fallback = _env("ADMIN_NOTIFY_EMAIL") or _env("CONTACT_TO_EMAIL") or CONTACT_EMAIL
     try:
         res = (
             supabase.table("profiles")
@@ -34,9 +35,7 @@ def _get_admin_emails(supabase: Any) -> list[str]:
             return emails
     except Exception as e:
         logger.warning("digest admin emails: %s", e)
-    if fallback:
-        return [fallback]
-    return []
+    return [fallback]
 
 
 def run_marketing_digest(supabase: Any) -> dict[str, Any]:

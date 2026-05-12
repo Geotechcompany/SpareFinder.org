@@ -18,6 +18,7 @@ import {
   Loader2
 } from 'lucide-react';
 import { api } from '@/lib/api';
+import { CONTACT_EMAIL } from '@/lib/config';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 
@@ -175,12 +176,12 @@ const Contact: React.FC = () => {
                       <p className="font-medium text-foreground dark:text-white">
                         Email
                       </p>
-                      <p className="text-sm text-muted-foreground dark:text-gray-300">
-                        email@sparefinder.org
-                      </p>
-                      <p className="text-sm text-muted-foreground dark:text-gray-300">
-                        sales@tpsinternational.co.uk
-                      </p>
+                      <a
+                        href={`mailto:${CONTACT_EMAIL}`}
+                        className="text-sm text-primary hover:underline dark:text-purple-300"
+                      >
+                        {CONTACT_EMAIL}
+                      </a>
                     </div>
                   </div>
                   

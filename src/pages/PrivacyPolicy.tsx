@@ -84,7 +84,13 @@ const PrivacyPolicy = () => {
                 <Building2 className="h-4 w-4 text-primary" />
                 TPS E&P International Ltd
               </span>
-              <p className="text-muted-foreground">Registered Address: Durham Workspace, Abbey Road, Pity Me. DH1 5JZ Durham. UK</p>
+              <div className="text-muted-foreground mb-3 space-y-0.5">
+                <p>Collingwood Buildings</p>
+                <p>38 Collingwood Street</p>
+                <p>Newcastle</p>
+                <p>NE1 1JF</p>
+                <p>GB</p>
+              </div>
               <a href="mailto:email@sparefinder.org" className="text-primary hover:underline">email@sparefinder.org</a>
               <br />
               <a href="https://sparefinder.org" className="text-primary hover:underline">https://sparefinder.org</a>

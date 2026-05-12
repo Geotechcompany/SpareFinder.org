@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel, EmailStr, Field
 
 from ..email_sender import send_basic_email_smtp, send_email_via_email_service
+from ..sparefinder_contact import CONTACT_EMAIL
 from .auth_dependencies import CurrentUser, get_current_user
 from .errors import ApiError
 from .responses import api_ok
@@ -170,7 +171,7 @@ async def submit_public_review(payload: PublicReviewBody, user: CurrentUser = De
     )
 
     # Notify sales (best-effort)
-    to_sales = _env("REVIEWS_TO_EMAIL", _env("CONTACT_TO_EMAIL", "sales@tpsinternational.co.uk"))
+    to_sales = _env("REVIEWS_TO_EMAIL", _env("CONTACT_TO_EMAIL", CONTACT_EMAIL))
     subject = f"New Customer Review: {payload.rating} stars - {payload.title.strip()}"
     html_sales = f"""
 <h2>New Customer Review</h2>

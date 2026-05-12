@@ -17,6 +17,7 @@ from .unsubscribe_utils import (
     generate_unsubscribe_token,
     create_unsubscribe_url,
 )
+from .api.supabase_admin import get_supabase_admin
 
 
 class ProfileRow(TypedDict, total=False):
@@ -31,8 +32,25 @@ def _app_url() -> str:
     return (os.getenv("SPAREFINDER_APP_URL") or "https://sparefinder.org").strip().rstrip("/")
 
 
-def _admin_email() -> str:
-    return (os.getenv("CRON_ADMIN_EMAIL") or "arthurbreck417@gmail.com").strip()
+def _get_platform_admin_emails() -> list[str]:
+    """Emails of users with admin or super_admin role (cron run summaries)."""
+    try:
+        supabase = get_supabase_admin()
+        res = (
+            supabase.table("profiles")
+            .select("email")
+            .in_("role", ["admin", "super_admin"])
+            .execute()
+        )
+        emails: list[str] = []
+        for row in res.data or []:
+            e = (row.get("email") or "").strip()
+            if e and "@" in e and e not in emails:
+                emails.append(e)
+        return emails
+    except Exception as e:
+        logger.warning("cron admin summary: could not fetch admin profiles: %s", e)
+        return []
 
 
 def _cron_token() -> str:
@@ -390,15 +408,23 @@ async def run_cron_reminders_background(
             "runAt": now.isoformat(),
         }
 
-    # Admin summary (best-effort)
-    admin_email = _admin_email()
-    if admin_email:
-        send_email_via_email_service(
-            to_email=admin_email,
-            subject=f"SpareFinder cron – {reminder_type} reminders ({sent}/{summary['processed']})",
-            html=f"<pre>{summary}</pre>",
-            text=str(summary),
-        )
+    # Admin summary: every platform admin / super_admin (best-effort)
+    admin_emails = _get_platform_admin_emails()
+    if not admin_emails:
+        logger.warning("cron reminders: no admin profile emails; skipping admin summary email")
+    else:
+        subject = f"SpareFinder cron – {reminder_type} reminders ({sent}/{summary['processed']})"
+        html = f"<pre>{summary}</pre>"
+        text = str(summary)
+        for to_email in admin_emails:
+            ok = send_email_via_email_service(
+                to_email=to_email,
+                subject=subject,
+                html=html,
+                text=text,
+            )
+            if not ok:
+                logger.warning("cron admin summary email failed for %s", to_email)
 
     return summary
 

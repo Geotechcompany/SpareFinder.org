@@ -3,6 +3,7 @@ import { Scale, ArrowLeft, Mail, Building2, FileText, Shield } from 'lucide-reac
 import { Link } from 'react-router-dom';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
+import { CONTACT_EMAIL } from '@/lib/config';
 
 const sectionNum = (n: number) => (
   <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-sm font-bold text-primary ring-2 ring-primary/20">
@@ -71,13 +72,20 @@ const TermsOfService = () => {
               Sparefinder.org is owned and operated by TPS E&P International Ltd, a company
               registered in England and Wales, Company Number 15607982.
             </p>
-            <div className="mt-4 flex flex-col gap-1 rounded-xl bg-muted/50 px-4 py-3 text-sm">
+            <div className="mt-4 flex flex-col gap-2 rounded-xl bg-muted/50 px-4 py-3 text-sm">
               <span className="flex items-center gap-2 font-medium text-foreground">
                 <Building2 className="h-4 w-4 text-primary" />
-                Registered Office: Durham Workspace, Abbey Road, Pity Me, DH1 5JZ, UK
+                TPS E&P International Ltd
               </span>
-              <a href="mailto:email@sparefinder.org" className="text-primary hover:underline">
-                email@sparefinder.org
+              <div className="text-muted-foreground space-y-0.5 pl-6 sm:pl-7">
+                <div>Collingwood Buildings</div>
+                <div>38 Collingwood Street</div>
+                <div>Newcastle</div>
+                <div>NE1 1JF</div>
+                <div>GB</div>
+              </div>
+              <a href={`mailto:${CONTACT_EMAIL}`} className="text-primary hover:underline">
+                {CONTACT_EMAIL}
               </a>
               <a href="https://sparefinder.org" className="text-primary hover:underline">
                 https://sparefinder.org
@@ -249,7 +257,7 @@ const TermsOfService = () => {
               {sectionNum(10)}
               <h2 className="text-xl font-bold text-foreground">Copyright complaints</h2>
             </div>
-            <p className="text-muted-foreground"><strong className="text-foreground">10.1</strong> If you believe content infringes your copyright, contact: <a href="mailto:copyright@sparefinder.org" className="text-primary hover:underline">copyright@sparefinder.org</a></p>
+            <p className="text-muted-foreground"><strong className="text-foreground">10.1</strong> If you believe content infringes your copyright, contact: <a href={`mailto:${CONTACT_EMAIL}`} className="text-primary hover:underline">{CONTACT_EMAIL}</a></p>
             <p className="mt-2 text-muted-foreground"><strong className="text-foreground">10.2</strong> Include: identification of the copyrighted work, description of the infringement, and your contact details.</p>
           </motion.article>
 
@@ -306,11 +314,11 @@ const TermsOfService = () => {
           <p className="mt-2 text-muted-foreground">Contact us for any questions regarding the Terms of Use.</p>
           <div className="mt-8 flex flex-col gap-4 sm:flex-row sm:justify-center">
             <a
-              href="mailto:email@sparefinder.org"
+              href={`mailto:${CONTACT_EMAIL}`}
               className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-purple-600 px-6 py-3 font-semibold text-white shadow-lg shadow-purple-500/25 transition hover:from-blue-700 hover:to-purple-700 hover:shadow-purple-500/30"
             >
               <Mail className="h-5 w-5" />
-              email@sparefinder.org
+              {CONTACT_EMAIL}
             </a>
             <Link
               to="/"
