@@ -41,6 +41,7 @@ const OnboardingSurveys = lazy(() => import("@/pages/admin/OnboardingSurveys"));
 const PlansManagement = lazy(() => import("@/pages/admin/PlansManagement"));
 const TicketManagement = lazy(() => import("@/pages/admin/TicketManagement"));
 const MarketingOutbound = lazy(() => import("@/pages/admin/MarketingOutbound"));
+const AdminAnnouncements = lazy(() => import("@/pages/admin/AdminAnnouncements"));
 
 const Landing = lazy(() => import("@/pages/Landing"));
 const PrivacyPolicy = lazy(() => import("@/pages/PrivacyPolicy"));
@@ -277,6 +278,14 @@ const App = () => (
                     element={
                       <AdminProtectedRoute>
                         <MarketingOutbound />
+                      </AdminProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/admin/announcements"
+                    element={
+                      <AdminProtectedRoute>
+                        <AdminAnnouncements />
                       </AdminProtectedRoute>
                     }
                   />

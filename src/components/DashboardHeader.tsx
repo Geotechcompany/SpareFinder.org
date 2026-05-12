@@ -1,7 +1,6 @@
 import React from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { Bell, ChevronDown } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { ChevronDown } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -13,6 +12,7 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import ThemeToggle from "@/components/ThemeToggle";
 import CreditsDisplay from "@/components/CreditsDisplay";
+import { NotificationBellDropdown } from "@/components/NotificationBellDropdown";
 import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
 
@@ -117,28 +117,24 @@ export const DashboardHeader: React.FC = () => {
           </p>
         </div>
 
-        <div className="flex w-full items-center justify-end gap-2 md:w-auto md:gap-3">
-          <CreditsDisplay
-            size="small"
-            className="inline-flex shadow-sm"
-          />
-
-          {/* Notifications */}
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={() => navigate("/dashboard/notifications")}
+        <div className="flex w-full flex-wrap items-center justify-end gap-2 md:w-auto md:gap-3">
+          <div
             className={cn(
-              "h-9 w-9 border-border bg-background/80 text-muted-foreground hover:bg-accent hover:text-foreground md:h-9 md:w-9",
-              pathname.startsWith("/dashboard/notifications") &&
-                "bg-primary/10 text-primary border-primary/30 hover:bg-primary/15"
+              "inline-flex flex-wrap items-center gap-1 rounded-full border border-violet-200/50 bg-card/90 p-1 pl-2 shadow-sm backdrop-blur-md",
+              "dark:border-white/[0.08] dark:bg-zinc-900/75"
             )}
-            aria-label="Notifications"
           >
-            <Bell className="h-4 w-4" />
-          </Button>
-
-          <ThemeToggle />
+            <CreditsDisplay
+              size="small"
+              className="inline-flex border-0 bg-transparent shadow-none"
+            />
+            <span
+              className="hidden h-6 w-px shrink-0 bg-border/80 sm:block"
+              aria-hidden
+            />
+            <NotificationBellDropdown />
+            <ThemeToggle />
+          </div>
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -187,6 +183,11 @@ export const DashboardHeader: React.FC = () => {
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => navigate("/dashboard/profile")}>
                 Profile
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => navigate("/dashboard/notifications")}
+              >
+                Notifications
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => navigate("/dashboard/settings")}>
                 Settings

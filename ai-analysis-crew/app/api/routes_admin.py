@@ -13,6 +13,7 @@ import stripe
 
 from fastapi import APIRouter, Body, Depends, Path, Query
 from pydantic import BaseModel, Field, field_validator
+from starlette.concurrency import run_in_threadpool
 
 from .auth_dependencies import CurrentUser, require_roles
 from .errors import ApiError
@@ -1308,6 +1309,99 @@ async def admin_update_ticket(
         )
     except Exception as e:
         return api_error(f"Failed to update ticket: {e}", status_code=500)
+
+
+class AdminBroadcastNotificationBody(BaseModel):
+    """Create the same in-app notification row for many users (product announcements)."""
+
+    title: str = Field(..., min_length=1, max_length=200)
+    message: str = Field(..., min_length=1, max_length=5000)
+    type: str = Field(default="info", pattern=r"^(info|success|warning|error)$")
+    action_url: Optional[str] = Field(default=None, max_length=2000)
+    audience: str = Field(
+        default="customers",
+        description="customers = exclude admin/super_admin; all = every profile",
+        pattern=r"^(all|customers)$",
+    )
+
+
+@router.post("/notifications/broadcast")
+async def admin_broadcast_notifications(
+    payload: AdminBroadcastNotificationBody,
+    _admin: CurrentUser = Depends(require_roles("admin", "super_admin")),
+):
+    title = payload.title.strip()
+    message = payload.message.strip()
+    if not title or not message:
+        return api_error("Title and message are required", code="invalid_request", status_code=400)
+
+    audience = payload.audience
+
+    def _broadcast() -> dict[str, int]:
+        supabase = get_supabase_admin()
+        page_size = 800
+        page = 0
+        user_ids: list[str] = []
+        while True:
+            res = (
+                supabase.table("profiles")
+                .select("id,role")
+                .order("id", desc=False)
+                .range(page * page_size, page * page_size + page_size - 1)
+                .execute()
+            )
+            rows = res.data or []
+            for r in rows:
+                if not isinstance(r, dict):
+                    continue
+                uid = str(r.get("id") or "").strip()
+                if not uid:
+                    continue
+                role = str(r.get("role") or "user").strip() or "user"
+                if audience == "customers" and role in ("admin", "super_admin"):
+                    continue
+                user_ids.append(uid)
+            if len(rows) < page_size:
+                break
+            page += 1
+
+        if not user_ids:
+            return {"recipient_count": 0, "notifications_created": 0}
+
+        batch: list[dict[str, Any]] = []
+        created = 0
+        insert_chunk = 120
+        base_row = {
+            "title": title,
+            "message": message,
+            "type": payload.type,
+            "action_url": (payload.action_url or "").strip() or None,
+            "read": False,
+            "metadata": {"source": "admin_broadcast"},
+        }
+
+        for uid in user_ids:
+            row = {"user_id": uid, **base_row}
+            batch.append(row)
+            if len(batch) >= insert_chunk:
+                supabase.table("notifications").insert(batch).execute()
+                created += len(batch)
+                batch = []
+        if batch:
+            supabase.table("notifications").insert(batch).execute()
+            created += len(batch)
+
+        return {"recipient_count": len(user_ids), "notifications_created": created}
+
+    try:
+        data = await run_in_threadpool(_broadcast)
+    except Exception as e:
+        return api_error(str(e), code="broadcast_failed", status_code=500)
+
+    return api_ok(
+        data=data,
+        message=f"Posted to {data['recipient_count']} user(s); {data['notifications_created']} notification row(s) created.",
+    )
 
 
 

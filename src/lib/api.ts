@@ -1060,6 +1060,8 @@ export const adminApi = {
     scheduled_send_interval_sec?: number;
     scheduled_discover_max_queries?: number;
     scheduled_send_batch?: number;
+    /** Per marketing-send/discover cron: max leads in sanitization review to re-run AI on (0 = off). Default 25 in DB. */
+    sanitize_review_batch?: number;
   }): Promise<ApiResponse> => {
     const response = await apiClient.patch("/admin/marketing/settings", payload);
     return response.data;
@@ -1219,6 +1221,17 @@ export const adminApi = {
     to_email: string;
   }): Promise<ApiResponse> => {
     const response = await apiClient.post("/admin/marketing/test-send", payload);
+    return response.data;
+  },
+
+  broadcastAppNotifications: async (payload: {
+    title: string;
+    message: string;
+    type?: "info" | "success" | "warning" | "error";
+    action_url?: string;
+    audience?: "all" | "customers";
+  }): Promise<ApiResponse> => {
+    const response = await apiClient.post("/admin/notifications/broadcast", payload);
     return response.data;
   },
 };

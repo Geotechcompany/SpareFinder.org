@@ -37,6 +37,7 @@ import { useDashboardLayout } from "@/contexts/DashboardLayoutContext";
 import { PageSkeleton } from "@/components/skeletons";
 import { notificationsApi } from "@/lib/api";
 import { toast } from "sonner";
+import { useNavigate } from "react-router-dom";
 
 interface Notification {
   id: string;
@@ -59,6 +60,7 @@ interface NotificationStats {
 
 const Notifications = () => {
   const { inLayout } = useDashboardLayout();
+  const navigate = useNavigate();
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [selectedFilter, setSelectedFilter] = useState("all");
@@ -256,6 +258,7 @@ const Notifications = () => {
     const date = new Date(timestamp);
     const now = new Date();
     const diff = now.getTime() - date.getTime();
+    if (diff < 60_000) return "Just now";
 
     const minutes = Math.floor(diff / (1000 * 60));
     const hours = Math.floor(diff / (1000 * 60 * 60));
@@ -271,8 +274,15 @@ const Notifications = () => {
   };
 
   return (
-    <div className="min-h-screen flex w-full bg-gradient-to-br from-background via-[#F0F2F5] to-[#E8EBF1] dark:from-gray-900 dark:via-purple-900/20 dark:to-blue-900/20 relative overflow-hidden">
+    <div
+      className={
+        inLayout
+          ? "relative w-full overflow-x-hidden"
+          : "relative flex min-h-screen w-full overflow-hidden bg-gradient-to-br from-background via-[#F0F2F5] to-[#E8EBF1] dark:from-gray-900 dark:via-purple-900/20 dark:to-blue-900/20"
+      }
+    >
       {/* Animated Background Elements */}
+      {!inLayout && (
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <motion.div
           className="absolute top-1/4 -right-40 w-80 h-80 bg-purple-600/15 rounded-full blur-3xl opacity-60"
@@ -300,6 +310,7 @@ const Notifications = () => {
           }}
         />
       </div>
+      )}
 
       {/* Sidebar and mobile menu handled by layout when inLayout */}
       {!inLayout && (
@@ -430,7 +441,11 @@ const Notifications = () => {
                     whileTap={{ scale: 0.95 }}
                     className="w-full sm:w-auto"
                   >
-                    <Button className="w-full sm:w-auto bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 shadow-lg shadow-purple-500/25 h-12 px-6">
+                    <Button
+                      type="button"
+                      onClick={() => navigate("/dashboard/settings")}
+                      className="w-full sm:w-auto bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 shadow-lg shadow-purple-500/25 h-12 px-6"
+                    >
                       <Settings className="w-4 h-4 mr-2" />
                       Settings
                     </Button>
@@ -573,7 +588,7 @@ const Notifications = () => {
                                 </div>
                                 <div className="flex-1 min-w-0">
                                   <div className="flex items-center justify-between mb-1">
-                                    <h4 className="text-white font-medium truncate">
+                                    <h4 className="font-medium truncate text-foreground">
                                       {notification.title}
                                     </h4>
                                     <div className="flex items-center space-x-2">
@@ -596,15 +611,15 @@ const Notifications = () => {
                                       </motion.button>
                                     </div>
                                   </div>
-                                  <p className="text-gray-400 text-sm mb-2">
+                                  <p className="mb-2 text-sm text-muted-foreground">
                                     {notification.message}
                                   </p>
                                   <div className="flex items-center justify-between">
-                                    <span className="text-gray-500 text-xs">
+                                    <span className="text-xs text-muted-foreground">
                                       {formatTimestamp(notification.created_at)}
                                     </span>
                                     {notification.read && (
-                                      <span className="text-green-400 text-xs flex items-center">
+                                      <span className="flex items-center text-xs text-emerald-600 dark:text-emerald-400">
                                         <Check className="w-3 h-3 mr-1" />
                                         Read
                                       </span>
@@ -631,12 +646,12 @@ const Notifications = () => {
                               ease: "easeInOut",
                             }}
                           >
-                            <Bell className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+                            <Bell className="mx-auto mb-4 h-16 w-16 text-muted-foreground/50" />
                           </motion.div>
-                          <p className="text-gray-300 text-lg mb-2">
+                          <p className="mb-2 text-lg text-muted-foreground">
                             No notifications found
                           </p>
-                          <p className="text-gray-400">
+                          <p className="text-sm text-muted-foreground/90">
                             Try adjusting your filter or check back later
                           </p>
                         </motion.div>

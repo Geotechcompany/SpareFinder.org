@@ -9,9 +9,15 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from .email_sender import send_basic_email_smtp, send_email_via_email_service
-from .marketing_crew import EmailContent, generate_email_with_crew, generate_email_with_openai
+from .marketing_crew import (
+    EmailContent,
+    generate_email_with_crew,
+    generate_email_with_openai,
+    sanitize_lead_with_openai,
+)
 from .marketing_merge import apply_merge, html_to_plain, lead_to_merge_dict
-from .marketing_outbound_defaults import default_campaign_id_for_new_leads
+from .marketing_outbound_defaults import default_campaign_id_for_new_leads, sanitize_review_batch_cap
+from .marketing_rules import is_disposable_domain, is_valid_email
 
 logger = logging.getLogger(__name__)
 
@@ -258,6 +264,111 @@ def log_error(
         logger.error("log_error failed: %s", e)
 
 
+def run_marketing_sanitize_review_batch(
+    supabase: Any,
+    *,
+    max_batch: int = 25,
+) -> dict[str, Any]:
+    """
+    Process leads stuck in sanitization_status=review: rule-check email, then re-run OpenAI sanitize.
+    Called from marketing send/discover crons so the queue drains without manual admin actions.
+    """
+    max_batch = max(0, min(int(max_batch), 100))
+    if max_batch == 0:
+        return {
+            "ok": True,
+            "processed": 0,
+            "accepted": 0,
+            "rejected": 0,
+            "still_review": 0,
+            "errors": 0,
+        }
+
+    try:
+        lr = (
+            supabase.table("marketing_leads")
+            .select("*")
+            .eq("sanitization_status", "review")
+            .order("updated_at", desc=False)
+            .limit(max_batch)
+            .execute()
+        )
+        rows = lr.data or []
+    except Exception as e:
+        logger.error("sanitize_review_batch: load leads: %s", e)
+        return {
+            "ok": False,
+            "error": str(e),
+            "processed": 0,
+            "accepted": 0,
+            "rejected": 0,
+            "still_review": 0,
+            "errors": 0,
+        }
+
+    accepted = 0
+    rejected = 0
+    still_review = 0
+    errors = 0
+    now_iso = datetime.now(timezone.utc).isoformat()
+
+    for lead in rows:
+        lid = str(lead.get("id") or "").strip()
+        if not lid:
+            continue
+        email = (lead.get("email") or "").strip().lower()
+        raw = {k: v for k, v in dict(lead).items() if k not in ("sanitization_status",)}
+        patch: dict[str, Any] = {"updated_at": now_iso}
+        status_out = "review"
+
+        try:
+            if not email or not is_valid_email(email):
+                patch["sanitization_status"] = "rejected"
+                patch["crew_trace"] = "cron_sanitize:invalid_email"
+                status_out = "rejected"
+            elif is_disposable_domain(email):
+                patch["sanitization_status"] = "rejected"
+                patch["crew_trace"] = "cron_sanitize:disposable_domain"
+                status_out = "rejected"
+            else:
+                sr = sanitize_lead_with_openai(raw, fast_path=True)
+                patch["sanitized_full_name"] = sr.sanitized_full_name or None
+                patch["sanitized_job_title"] = sr.sanitized_job_title or None
+                patch["sanitized_company_name"] = sr.sanitized_company_name or None
+                patch["sanitized_notes"] = sr.sanitized_notes or None
+                patch["sanitization_status"] = sr.sanitization_status
+                patch["crew_trace"] = (sr.crew_trace or "cron_sanitize")[:2000]
+                status_out = sr.sanitization_status
+        except Exception as ex:
+            logger.warning("sanitize_review_batch OpenAI lead %s: %s", lid, ex)
+            patch["sanitization_status"] = "review"
+            patch["crew_trace"] = f"cron_sanitize_error:{ex}"[:500]
+            status_out = "review"
+            errors += 1
+
+        try:
+            supabase.table("marketing_leads").update(patch).eq("id", lid).execute()
+            if status_out == "accepted":
+                accepted += 1
+            elif status_out == "rejected":
+                rejected += 1
+            else:
+                still_review += 1
+        except Exception as ue:
+            logger.warning("sanitize_review_batch update %s: %s", lid, ue)
+            errors += 1
+
+    processed = len(rows)
+    return {
+        "ok": True,
+        "processed": processed,
+        "accepted": accepted,
+        "rejected": rejected,
+        "still_review": still_review,
+        "errors": errors,
+    }
+
+
 def run_marketing_send_cron(
     supabase: Any,
     *,
@@ -277,6 +388,13 @@ def run_marketing_send_cron(
         ).execute()
     except Exception:
         run_id = ""
+
+    sanitize_cap = sanitize_review_batch_cap(supabase)
+    sanitize_review = (
+        run_marketing_sanitize_review_batch(supabase, max_batch=sanitize_cap)
+        if sanitize_cap > 0
+        else {"ok": True, "processed": 0, "accepted": 0, "rejected": 0, "still_review": 0, "errors": 0}
+    )
 
     sent = 0
     failed = 0
@@ -491,6 +609,7 @@ def run_marketing_send_cron(
         "failed": failed,
         "skipped": skipped,
         "cron_run_id": run_id,
+        "sanitize_review_queue": sanitize_review,
         "diagnostics": {
             "unpaused_campaigns": n_camp,
             "campaigns_with_send_budget": campaigns_with_budget,

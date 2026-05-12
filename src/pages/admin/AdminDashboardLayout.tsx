@@ -35,7 +35,6 @@ import {
   RefreshCw,
   LogOut,
   Download,
-  Bell,
   Clock,
   Zap,
   Database,
@@ -47,6 +46,7 @@ import {
 } from "lucide-react";
 import { PLAN_CONFIG } from "@/lib/plans";
 import ThemeToggle from "@/components/ThemeToggle";
+import { NotificationBellDropdown } from "@/components/NotificationBellDropdown";
 import {
   ResponsiveContainer,
   AreaChart,
@@ -676,6 +676,11 @@ const AdminDashboardLayout = () => {
                   {adminUser?.role === "super_admin" ? "Super admin" : "Admin"}
                 </Badge>
                 <div className="mx-0.5 hidden h-7 w-px bg-border/70 sm:block" aria-hidden />
+                <NotificationBellDropdown
+                  heading="Your alerts"
+                  viewAllLabel="Open notifications"
+                  triggerButtonClassName="h-9 w-9 rounded-xl text-muted-foreground hover:bg-muted/80 hover:text-foreground dark:text-zinc-200"
+                />
                 <ThemeToggle />
                 <Tooltip>
                   <TooltipTrigger asChild>

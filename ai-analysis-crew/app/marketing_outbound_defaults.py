@@ -25,6 +25,8 @@ def get_marketing_settings_row(supabase: Any) -> dict[str, Any]:
                 "scheduled_send_interval_sec": 0,
                 "scheduled_discover_max_queries": 3,
                 "scheduled_send_batch": 20,
+                # Auto re-sanitize leads stuck in sanitization_status=review (per send/discover cron); 0 = off.
+                "sanitize_review_batch": 25,
             },
         }
     ).execute()
@@ -70,3 +72,21 @@ def default_campaign_id_for_new_leads(supabase: Any) -> str | None:
     except Exception as e:
         logger.warning("default_campaign_id_for_new_leads: %s", e)
         return None
+
+
+def sanitize_review_batch_cap(supabase: Any) -> int:
+    """
+    Max marketing_leads rows in sanitization review to process per marketing-send / marketing-discover cron.
+    Stored in marketing_settings.defaults.sanitize_review_batch (admin). Default 25; 0 disables the batch.
+    """
+    try:
+        row = get_marketing_settings_row(supabase)
+        val = row.get("setting_value") or {}
+        raw = val.get("sanitize_review_batch")
+        if raw is None:
+            n = 25
+        else:
+            n = int(raw)
+    except (TypeError, ValueError):
+        n = 25
+    return max(0, min(int(n), 100))

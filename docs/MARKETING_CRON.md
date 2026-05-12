@@ -10,7 +10,7 @@ If you run **one** web worker (typical small Render plan), you can skip an exter
 
 ### Admin UI (recommended)
 
-In **Admin → Email campaigns → Find on Google**, set **Google discovery interval** and **Batch send interval** (and optional max queries / batch size), then **Save discovery settings**. Values are stored in Supabase `marketing_settings.defaults` (`scheduled_discover_interval_sec`, `scheduled_send_interval_sec`, etc.). The server re-reads them about every 60 seconds, so changes apply without redeploy.
+In **Admin → Email campaigns → Find on Google**, set **Google discovery interval** and **Batch send interval** (and optional max queries / batch size), **Sanitize review batch** (how many “needs review” leads to re-run AI sanitization on each send/discover cron; default 25, `0` = off), then **Save discovery settings**. Values are stored in Supabase `marketing_settings.defaults` (`scheduled_discover_interval_sec`, `scheduled_send_interval_sec`, `sanitize_review_batch`, etc.). The server re-reads them about every 60 seconds, so changes apply without redeploy.
 
 ### Environment overrides (optional)
 

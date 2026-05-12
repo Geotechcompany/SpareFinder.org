@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/sheet";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+import { NotificationBellDropdown } from "@/components/NotificationBellDropdown";
 import {
   Skeleton,
   SkeletonAvatar,
@@ -38,7 +39,6 @@ import {
   Crown,
   Server,
   Activity,
-  Bell,
   Search,
   FileText,
   Zap,
@@ -51,6 +51,7 @@ import {
   Ticket,
   Megaphone,
   Menu,
+  BellRing,
 } from "lucide-react";
 
 interface AdminSidebarProps {
@@ -249,6 +250,14 @@ const AdminDesktopSidebar: React.FC<AdminSidebarProps> = ({
       section: "Core",
     },
     {
+      href: "/admin/announcements",
+      label: "In-app announcements",
+      icon: BellRing,
+      description: "Notify users in the dashboard",
+      badge: null,
+      section: "Core",
+    },
+    {
       href: "/admin/system-settings",
       label: "Site settings",
       icon: Settings,
@@ -393,6 +402,13 @@ const AdminDesktopSidebar: React.FC<AdminSidebarProps> = ({
             />
             <span className="truncate text-sm font-semibold text-foreground">Admin</span>
           </Link>
+          <div className="ml-auto shrink-0">
+            <NotificationBellDropdown
+              heading="Your alerts"
+              viewAllLabel="Open page"
+              triggerButtonClassName="h-9 w-9 rounded-xl border border-border/60 bg-card/90 text-muted-foreground hover:bg-muted/80 dark:border-white/10 dark:bg-white/5 dark:text-zinc-100"
+            />
+          </div>
         </header>
 
         <SheetContent
@@ -571,6 +587,22 @@ const AdminDesktopSidebar: React.FC<AdminSidebarProps> = ({
               </motion.div>
             )}
           </AnimatePresence>
+
+          <div
+            className={cn(
+              "mt-3 flex",
+              isCollapsed ? "justify-center" : "justify-end"
+            )}
+          >
+            <NotificationBellDropdown
+              heading="Your alerts"
+              viewAllLabel="Full page"
+              triggerButtonClassName={cn(
+                "h-9 w-9 rounded-xl text-sidebar-foreground hover:bg-white/10 dark:hover:bg-blue-900/40",
+                "border border-transparent hover:border-sidebar-border/60"
+              )}
+            />
+          </div>
 
           {/* Toggle Button */}
           {onToggle && (

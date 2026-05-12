@@ -31,10 +31,15 @@ from ..marketing_pipeline import (
     render_message_for_lead,
     run_marketing_admin_send_to_leads,
     run_marketing_send_cron,
+    run_marketing_sanitize_review_batch,
     send_marketing_email,
 )
 from ..marketing_rules import is_disposable_domain, is_valid_email, normalize_row
-from ..marketing_outbound_defaults import default_campaign_id_for_new_leads, get_marketing_settings_row
+from ..marketing_outbound_defaults import (
+    default_campaign_id_for_new_leads,
+    get_marketing_settings_row,
+    sanitize_review_batch_cap,
+)
 from ..marketing_serpapi import organic_results_to_lead_candidates, search_google
 from ..marketing_tracking import gif_pixel_response, validate_redirect_url
 from .auth_dependencies import CurrentUser, require_roles
@@ -164,6 +169,8 @@ class MarketingSettingsBody(BaseModel):
     scheduled_send_interval_sec: int | None = Field(default=None, ge=0, le=604800)
     scheduled_discover_max_queries: int | None = Field(default=None, ge=1, le=10)
     scheduled_send_batch: int | None = Field(default=None, ge=1, le=200)
+    # Per cron: re-run AI sanitization on this many leads stuck in review (0 = off). Default 25 when unset.
+    sanitize_review_batch: int | None = Field(default=None, ge=0, le=100)
 
 
 class GenerateCampaignBody(BaseModel):
@@ -301,6 +308,8 @@ async def patch_marketing_settings(
         val["scheduled_discover_max_queries"] = max(1, min(int(body.scheduled_discover_max_queries), 10))
     if body.scheduled_send_batch is not None:
         val["scheduled_send_batch"] = max(1, min(int(body.scheduled_send_batch), 200))
+    if body.sanitize_review_batch is not None:
+        val["sanitize_review_batch"] = max(0, min(int(body.sanitize_review_batch), 100))
     supabase.table("marketing_settings").update(
         {"setting_value": val, "updated_at": datetime.now(timezone.utc).isoformat()}
     ).eq("setting_key", "defaults").execute()
@@ -1299,13 +1308,21 @@ def run_marketing_discover_cron_job(supabase: Any, max_queries: int = 2) -> dict
         campaign_id=None,
         cron_style_organic_errors=True,
     )
+    scap = sanitize_review_batch_cap(supabase)
+    sanitize_review = (
+        run_marketing_sanitize_review_batch(supabase, max_batch=scap)
+        if scap > 0
+        else {"ok": True, "processed": 0, "accepted": 0, "rejected": 0, "still_review": 0, "errors": 0}
+    )
     return {
         "ok": True,
         "candidates_upserted": data["candidates_upserted"],
         "errors": data["errors"],
         "per_query": data["per_query"],
         "resolved_campaign_id": data.get("resolved_campaign_id"),
-        "note": "Leads use default_outbound_campaign_id from settings, else highest-priority unpaused campaign (else any campaign).",
+        "sanitize_review_queue": sanitize_review,
+        "note": "Leads use default_outbound_campaign_id from settings, else highest-priority unpaused campaign (else any campaign). "
+        "sanitize_review_queue uses Admin → Email campaigns → Find on Google → “Sanitize review batch” (marketing_settings.defaults).",
     }
 
 
