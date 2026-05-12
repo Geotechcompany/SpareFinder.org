@@ -44,6 +44,7 @@ import {
 import { adminApi } from "@/lib/api";
 import { MARKETING_SERP_COUNTRIES, marketingCountryLabel } from "@/lib/marketingCountries";
 import { useToast } from "@/components/ui/use-toast";
+import { useSearchParams } from "react-router-dom";
 import {
   Tooltip,
   TooltipContent,
@@ -68,6 +69,23 @@ import {
   Users,
 } from "lucide-react";
 import { API_BASE_URL } from "@/lib/config";
+
+/** Recognized `?tab=` query values for deep links (e.g. admin dashboard). */
+const MARKETING_TAB_VALUES = [
+  "overview",
+  "campaigns",
+  "leads",
+  "import",
+  "serp",
+  "logs",
+  "errors",
+] as const;
+type MarketingTab = (typeof MARKETING_TAB_VALUES)[number];
+
+function resolveMarketingTab(searchParams: URLSearchParams): MarketingTab {
+  const raw = (searchParams.get("tab") || "").trim();
+  return (MARKETING_TAB_VALUES as readonly string[]).includes(raw) ? (raw as MarketingTab) : "overview";
+}
 
 /** Aligns with ai-analysis-crew `marketing_rules` (valid + non-disposable). */
 const DISPOSABLE_MARKETING_EMAIL_DOMAINS = new Set([
@@ -151,6 +169,25 @@ type BulkLeadUpdateField = "sanitization_status" | "lead_status_internal" | "cam
 
 const MarketingOutbound: React.FC = () => {
   const { toast } = useToast();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const marketingTab = resolveMarketingTab(searchParams);
+  const handleMarketingTabChange = useCallback(
+    (value: string) => {
+      const next = (MARKETING_TAB_VALUES as readonly string[]).includes(value)
+        ? (value as MarketingTab)
+        : "overview";
+      setSearchParams(
+        (prev) => {
+          const p = new URLSearchParams(prev);
+          if (next === "overview") p.delete("tab");
+          else p.set("tab", next);
+          return p;
+        },
+        { replace: true }
+      );
+    },
+    [setSearchParams]
+  );
   const [isCollapsed, setIsCollapsed] = useState(false);
   const mainMotion = useAdminMainMotion(isCollapsed);
   const [loading, setLoading] = useState(true);
@@ -842,7 +879,11 @@ const MarketingOutbound: React.FC = () => {
               <Loader2 className="h-10 w-10 animate-spin text-muted-foreground" />
             </div>
           ) : (
-            <Tabs defaultValue="overview" className="space-y-6">
+            <Tabs
+              value={marketingTab}
+              onValueChange={handleMarketingTabChange}
+              className="space-y-6"
+            >
               <TabsList className="flex h-auto w-full min-w-0 flex-nowrap justify-start gap-1 overflow-x-auto pb-1 sm:flex-wrap sm:overflow-visible">
                 <TabsTrigger value="overview">Overview</TabsTrigger>
                 <TabsTrigger value="campaigns">Campaigns</TabsTrigger>

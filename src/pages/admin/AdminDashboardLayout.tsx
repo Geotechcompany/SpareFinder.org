@@ -12,7 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/components/ui/use-toast";
 import { api } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import AdminDesktopSidebar from "@/components/AdminDesktopSidebar";
 import { ADMIN_MOBILE_TOP_PADDING, useAdminMainMotion } from "@/lib/admin-layout";
 import {
@@ -42,6 +42,8 @@ import {
   Server,
   CreditCard,
   PoundSterling,
+  Megaphone,
+  Send,
 } from "lucide-react";
 import { PLAN_CONFIG } from "@/lib/plans";
 import ThemeToggle from "@/components/ThemeToggle";
@@ -126,6 +128,13 @@ type OnboardingSummary = {
   topInterests: Array<{ interest: string; count: number }>;
 };
 
+function marketingMetric(d: Record<string, unknown> | null, key: string): number {
+  if (!d) return 0;
+  const v = d[key];
+  const n = typeof v === "number" ? v : Number(v);
+  return Number.isFinite(n) ? n : 0;
+}
+
 const AdminDashboardLayout = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -138,6 +147,7 @@ const AdminDashboardLayout = () => {
   const mainMotion = useAdminMainMotion(isCollapsed);
   const [analytics, setAnalytics] = useState<AdminAnalytics | null>(null);
   const [onboardingSummary, setOnboardingSummary] = useState<OnboardingSummary | null>(null);
+  const [marketingDashboard, setMarketingDashboard] = useState<Record<string, unknown> | null>(null);
 
   const { toast } = useToast();
   const {
@@ -264,6 +274,19 @@ const AdminDashboardLayout = () => {
         console.warn("⚠️ Failed to load admin charts:", chartErr);
         setAnalytics(null);
         setOnboardingSummary(null);
+      }
+
+      try {
+        const marketingResp = await api.admin.getMarketingDashboard();
+        const md = (marketingResp as { success?: boolean; data?: unknown })?.data;
+        if (marketingResp.success && md && typeof md === "object" && !Array.isArray(md)) {
+          setMarketingDashboard(md as Record<string, unknown>);
+        } else {
+          setMarketingDashboard(null);
+        }
+      } catch (mErr) {
+        console.warn("⚠️ Failed to load marketing dashboard snapshot:", mErr);
+        setMarketingDashboard(null);
       }
     } catch (err: any) {
       console.error("❌ Error fetching admin data:", err);
@@ -410,6 +433,62 @@ const AdminDashboardLayout = () => {
       animation: {
         target: stats?.success_rate ?? 0,
         kind: "percent1" as const,
+      },
+    },
+  ];
+
+  const marketingBase = "/admin/marketing-outbound";
+  const marketingLeadStats = [
+    {
+      title: "Marketing contacts",
+      value: marketingMetric(marketingDashboard, "leads_total").toLocaleString(),
+      subtitle: "All rows in marketing_leads",
+      href: `${marketingBase}?tab=leads`,
+      icon: Users,
+      iconClassName:
+        "bg-sky-500/[0.11] text-sky-600 ring-sky-500/15 dark:text-sky-400",
+      animation: {
+        target: marketingMetric(marketingDashboard, "leads_total"),
+        kind: "integer" as const,
+      },
+    },
+    {
+      title: "Ready for auto-send",
+      value: marketingMetric(marketingDashboard, "leads_pending_send").toLocaleString(),
+      subtitle: "Pending, accepted, active campaign (cron rules)",
+      href: `${marketingBase}?tab=overview`,
+      icon: Send,
+      iconClassName:
+        "bg-teal-500/[0.11] text-teal-600 ring-teal-500/15 dark:text-teal-400",
+      animation: {
+        target: marketingMetric(marketingDashboard, "leads_pending_send"),
+        kind: "integer" as const,
+      },
+    },
+    {
+      title: "Needs sanitization review",
+      value: marketingMetric(marketingDashboard, "leads_needs_review").toLocaleString(),
+      subtitle: "Queued for manual check",
+      href: `${marketingBase}?tab=leads`,
+      icon: AlertCircle,
+      iconClassName:
+        "bg-orange-500/[0.11] text-orange-600 ring-orange-500/15 dark:text-orange-400",
+      animation: {
+        target: marketingMetric(marketingDashboard, "leads_needs_review"),
+        kind: "integer" as const,
+      },
+    },
+    {
+      title: "New leads (7 days)",
+      value: marketingMetric(marketingDashboard, "leads_pipeline_new_last_7_days").toLocaleString(),
+      subtitle: "Pipeline — created in the last week (UTC)",
+      href: `${marketingBase}?tab=leads`,
+      icon: Megaphone,
+      iconClassName:
+        "bg-fuchsia-500/[0.11] text-fuchsia-600 ring-fuchsia-500/15 dark:text-fuchsia-400",
+      animation: {
+        target: marketingMetric(marketingDashboard, "leads_pipeline_new_last_7_days"),
+        kind: "integer" as const,
       },
     },
   ];
@@ -652,6 +731,38 @@ const AdminDashboardLayout = () => {
                 animation={stat.animation}
               />
             ))}
+          </div>
+
+          {/* Marketing leads — links to outbound marketing */}
+          <div className="space-y-3">
+            <div className="flex flex-wrap items-end justify-between gap-2">
+              <div>
+                <h2 className="text-lg font-semibold tracking-tight text-foreground">Marketing leads</h2>
+                <p className="text-sm text-muted-foreground">
+                  Live counts from outbound marketing. Click a tile to open the marketing workspace.
+                </p>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-4 lg:gap-5">
+              {marketingLeadStats.map((stat, index) => (
+                <Link
+                  key={stat.title}
+                  to={stat.href}
+                  className="block h-full rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                >
+                  <AdminKpiStatCard
+                    title={stat.title}
+                    subtitle={stat.subtitle}
+                    icon={stat.icon}
+                    index={index}
+                    staggerGroupDelay={0.04}
+                    iconClassName={stat.iconClassName}
+                    value={stat.value}
+                    animation={stat.animation}
+                  />
+                </Link>
+              ))}
+            </div>
           </div>
 
           {/* Revenue & Subscribers */}
