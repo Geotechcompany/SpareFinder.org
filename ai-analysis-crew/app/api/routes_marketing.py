@@ -10,10 +10,11 @@ import os
 import re
 import secrets
 from difflib import SequenceMatcher
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any, Literal
 
-from fastapi import APIRouter, Body, Depends, File, Form, HTTPException, Query, UploadFile
+from fastapi import APIRouter, Body, Depends, File, Form, HTTPException, Query, Request, UploadFile
+from fastapi.responses import RedirectResponse, Response
 from pydantic import BaseModel, Field
 
 from ..marketing_crew import (
@@ -35,6 +36,7 @@ from ..marketing_pipeline import (
 from ..marketing_rules import is_disposable_domain, is_valid_email, normalize_row
 from ..marketing_outbound_defaults import default_campaign_id_for_new_leads, get_marketing_settings_row
 from ..marketing_serpapi import organic_results_to_lead_candidates, search_google
+from ..marketing_tracking import gif_pixel_response, validate_redirect_url
 from .auth_dependencies import CurrentUser, require_roles
 from .responses import api_error, api_ok
 from .supabase_admin import get_supabase_admin
@@ -1098,6 +1100,14 @@ async def marketing_dashboard(_admin: CurrentUser = Depends(require_roles("admin
             )
             .execute()
         )
+        engagement: dict[str, Any] = {}
+        try:
+            from ..marketing_engagement import marketing_engagement_snapshot
+
+            engagement = marketing_engagement_snapshot(supabase)
+        except Exception as ex:
+            logger.warning("dashboard engagement stats skipped: %s", ex)
+
         return api_ok(
             data={
                 "leads_total": int(getattr(leads_total, "count", None) or 0),
@@ -1107,7 +1117,8 @@ async def marketing_dashboard(_admin: CurrentUser = Depends(require_roles("admin
                 "leads_needs_review": int(getattr(review, "count", None) or 0),
                 "sends_today": int(getattr(sends_today, "count", None) or 0),
                 "failed_today": int(getattr(failed_today, "count", None) or 0),
-                "timezone_note": "Counts use UTC day boundary for today. “Waiting to email” counts only contacts ready for the automatic sender (active campaign, pending, accepted).",
+                "timezone_note": "Counts use UTC day boundary for today. “Waiting to email” counts only contacts ready for the automatic sender (active campaign, pending, accepted). Open/click stats need marketing_sends tracking columns (see docs/sql/marketing_sends_tracking.sql).",
+                **engagement,
             }
         )
     except Exception as e:
@@ -1274,6 +1285,70 @@ async def cron_marketing_discover(max_queries: int = Query(default=2, ge=1, le=1
     """Scheduled Google discovery using saved query templates (Serper.dev by default)."""
     supabase = get_supabase_admin()
     return run_marketing_discover_cron_job(supabase, max_queries=max_queries)
+
+
+@cron_router.api_route("/track/mopen/{token}", methods=["GET", "HEAD"])
+async def marketing_track_open(request: Request, token: str):
+    """1x1 pixel: record an open for a sent marketing email (requires tracking_token on marketing_sends)."""
+    body, hdr = gif_pixel_response()
+    headers = dict(hdr)
+    t = (token or "").strip()
+    if 8 <= len(t) <= 128:
+        try:
+            supabase = get_supabase_admin()
+            r = (
+                supabase.table("marketing_sends")
+                .select("id,open_count,first_opened_at")
+                .eq("tracking_token", t)
+                .eq("status", "sent")
+                .limit(1)
+                .execute()
+            )
+            rows = r.data or []
+            if rows:
+                row = rows[0]
+                now = datetime.now(timezone.utc).isoformat()
+                oc = int(row.get("open_count") or 0) + 1
+                patch: dict[str, Any] = {"open_count": oc}
+                if not row.get("first_opened_at"):
+                    patch["first_opened_at"] = now
+                supabase.table("marketing_sends").update(patch).eq("id", row["id"]).execute()
+        except Exception as e:
+            logger.debug("marketing_track_open: %s", e)
+    if request.method == "HEAD":
+        return Response(status_code=200, headers=headers, media_type=headers.get("Content-Type"))
+    return Response(content=body, headers=headers, media_type=headers.get("Content-Type"))
+
+
+@cron_router.get("/track/mclk/{token}")
+async def marketing_track_click(token: str, u: str = Query(..., description="Destination URL (http/https)")):
+    """Redirect through the API to count a link click, then 302 to the original URL."""
+    t = (token or "").strip()
+    dest = validate_redirect_url(u)
+    if not (8 <= len(t) <= 128) or not dest:
+        raise HTTPException(status_code=400, detail="Invalid link")
+    try:
+        supabase = get_supabase_admin()
+        r = (
+            supabase.table("marketing_sends")
+            .select("id,click_count,first_clicked_at")
+            .eq("tracking_token", t)
+            .eq("status", "sent")
+            .limit(1)
+            .execute()
+        )
+        rows = r.data or []
+        if rows:
+            row = rows[0]
+            now = datetime.now(timezone.utc).isoformat()
+            cc = int(row.get("click_count") or 0) + 1
+            patch: dict[str, Any] = {"click_count": cc}
+            if not row.get("first_clicked_at"):
+                patch["first_clicked_at"] = now
+            supabase.table("marketing_sends").update(patch).eq("id", row["id"]).execute()
+    except Exception as e:
+        logger.debug("marketing_track_click: %s", e)
+    return RedirectResponse(url=dest, status_code=302)
 
 
 class EspWebhookBody(BaseModel):

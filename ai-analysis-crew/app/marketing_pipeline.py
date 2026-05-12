@@ -175,6 +175,7 @@ def record_send(
     error_message: str | None,
     subject_snapshot: str | None,
     body_html_snapshot: str | None,
+    tracking_token: str | None = None,
 ) -> None:
     payload: dict[str, Any] = {
         "lead_id": lead_id,
@@ -187,10 +188,59 @@ def record_send(
     }
     if status == "sent":
         payload["sent_at"] = datetime.now(timezone.utc).isoformat()
+    if tracking_token:
+        payload["tracking_token"] = tracking_token
     try:
         supabase.table("marketing_sends").insert(payload).execute()
     except Exception as e:
         logger.error("Failed to record marketing_sends: %s", e)
+
+
+def send_tracked_marketing_and_record(
+    supabase: Any,
+    *,
+    to_email: str,
+    lead_id: str,
+    campaign_id: str,
+    cron_run_id: str | None,
+    subj: str,
+    html: str,
+    text: str,
+) -> bool:
+    """
+    Inject open pixel + click redirects (when enabled), send via SMTP/email-service,
+    and append a marketing_sends row. Returns True on successful delivery.
+    """
+    from .marketing_tracking import inject_tracking_into_html, tracking_enabled
+
+    track = secrets.token_urlsafe(24) if tracking_enabled() else None
+    html_out = inject_tracking_into_html(html, tracking_token=track) if track else html
+    ok = send_marketing_email(to_email=to_email, subject=subj, html=html_out, text=text)
+    if ok:
+        record_send(
+            supabase,
+            lead_id=lead_id,
+            campaign_id=campaign_id,
+            cron_run_id=cron_run_id,
+            status="sent",
+            error_message=None,
+            subject_snapshot=subj[:500],
+            body_html_snapshot=html_out[:50000],
+            tracking_token=track,
+        )
+    else:
+        record_send(
+            supabase,
+            lead_id=lead_id,
+            campaign_id=campaign_id,
+            cron_run_id=cron_run_id,
+            status="failed",
+            error_message="smtp/email service failed",
+            subject_snapshot=subj[:500],
+            body_html_snapshot=None,
+            tracking_token=None,
+        )
+    return ok
 
 
 def log_error(
@@ -379,7 +429,16 @@ def run_marketing_send_cron(
                 )
                 continue
 
-            ok = send_marketing_email(to_email=email, subject=subj, html=html, text=text)
+            ok = send_tracked_marketing_and_record(
+                supabase,
+                to_email=email,
+                lead_id=str(lead["id"]),
+                campaign_id=str(cid),
+                cron_run_id=run_id or None,
+                subj=subj,
+                html=html,
+                text=text,
+            )
             if ok:
                 sent += 1
                 remaining_global -= 1
@@ -393,30 +452,10 @@ def run_marketing_send_cron(
                     ).eq("id", lead["id"]).execute()
                 except Exception:
                     pass
-                record_send(
-                    supabase,
-                    lead_id=str(lead["id"]),
-                    campaign_id=str(cid),
-                    cron_run_id=run_id or None,
-                    status="sent",
-                    error_message=None,
-                    subject_snapshot=subj[:500],
-                    body_html_snapshot=html[:50000],
-                )
             else:
                 failed += 1
                 remaining_global -= 1
                 budget -= 1
-                record_send(
-                    supabase,
-                    lead_id=str(lead["id"]),
-                    campaign_id=str(cid),
-                    cron_run_id=run_id or None,
-                    status="failed",
-                    error_message="smtp/email service failed",
-                    subject_snapshot=subj[:500],
-                    body_html_snapshot=None,
-                )
 
             if delay_sec > 0:
                 time.sleep(min(delay_sec, 60))
@@ -613,7 +652,16 @@ def run_marketing_admin_send_to_leads(
             )
             continue
 
-        ok = send_marketing_email(to_email=email, subject=subj, html=html, text=text)
+        ok = send_tracked_marketing_and_record(
+            supabase,
+            to_email=email,
+            lead_id=str(lead["id"]),
+            campaign_id=cid,
+            cron_run_id=cron_run_id,
+            subj=subj,
+            html=html,
+            text=text,
+        )
         if ok:
             sent += 1
             try:
@@ -625,28 +673,8 @@ def run_marketing_admin_send_to_leads(
                 ).eq("id", lead["id"]).execute()
             except Exception:
                 pass
-            record_send(
-                supabase,
-                lead_id=str(lead["id"]),
-                campaign_id=cid,
-                cron_run_id=cron_run_id,
-                status="sent",
-                error_message=None,
-                subject_snapshot=subj[:500],
-                body_html_snapshot=html[:50000],
-            )
         else:
             failed += 1
-            record_send(
-                supabase,
-                lead_id=str(lead["id"]),
-                campaign_id=cid,
-                cron_run_id=cron_run_id,
-                status="failed",
-                error_message="smtp/email service failed",
-                subject_snapshot=subj[:500],
-                body_html_snapshot=None,
-            )
 
         delay_sec = int(campaign.get("min_delay_seconds") or 0)
         if delay_sec > 0:

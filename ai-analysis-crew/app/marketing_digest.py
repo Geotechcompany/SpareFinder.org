@@ -97,12 +97,41 @@ def run_marketing_digest(supabase: Any) -> dict[str, Any]:
     except Exception:
         u_ct = 0
 
+    o_y = 0
+    c_y = 0
+    try:
+        opens_y = (
+            supabase.table("marketing_sends")
+            .select("id", count="exact")
+            .eq("status", "sent")
+            .gte("first_opened_at", day_start.isoformat())
+            .lt("first_opened_at", day_end.isoformat())
+            .execute()
+        )
+        o_y = int(getattr(opens_y, "count", None) or 0)
+    except Exception:
+        o_y = 0
+    try:
+        clicks_y = (
+            supabase.table("marketing_sends")
+            .select("id", count="exact")
+            .eq("status", "sent")
+            .gte("first_clicked_at", day_start.isoformat())
+            .lt("first_clicked_at", day_end.isoformat())
+            .execute()
+        )
+        c_y = int(getattr(clicks_y, "count", None) or 0)
+    except Exception:
+        c_y = 0
+
     summary_lines.append("--- Yesterday (UTC calendar day) ---")
     summary_lines.append(f"Window (UTC): {day_start.isoformat()} → {day_end.isoformat()}")
     summary_lines.append(f"New leads: {nl}")
     summary_lines.append(f"Sends (sent): {s_ok}")
     summary_lines.append(f"Sends (failed): {s_fail}")
     summary_lines.append(f"New marketing unsubscribes: {u_ct}")
+    summary_lines.append(f"Email opens (first open logged this UTC day): {o_y}")
+    summary_lines.append(f"Email clicks (first click logged this UTC day): {c_y}")
 
     # Rolling 7 days (UTC) so quiet single days still show useful context
     week_start = day_end - timedelta(days=7)
@@ -159,6 +188,26 @@ def run_marketing_digest(supabase: Any) -> dict[str, Any]:
     summary_lines.append(f"Sends (sent): {w_ok}")
     summary_lines.append(f"Sends (failed): {w_f}")
     summary_lines.append(f"Marketing unsubscribes: {w_u}")
+    summary_lines.append("")
+    try:
+        from .marketing_engagement import marketing_engagement_snapshot
+
+        eng = marketing_engagement_snapshot(supabase)
+        summary_lines.append("--- Email engagement (last 7 days, UTC) ---")
+        summary_lines.append(
+            f"Sends (status=sent): {eng.get('sends_last_7_days', 0)} | "
+            f"Sends with at least one open: {eng.get('sends_last_7_days_with_open', 0)} "
+            f"({eng.get('open_rate_last_7_days_pct', 0)}% open rate)"
+        )
+        summary_lines.append(
+            f"Sends with at least one tracked click: {eng.get('sends_last_7_days_with_click', 0)} "
+            f"({eng.get('click_rate_last_7_days_pct', 0)}% click rate)"
+        )
+        summary_lines.append(
+            "Note: Some inbox providers prefetch images (e.g. Apple Mail Privacy), which can inflate open counts."
+        )
+    except Exception as ex:
+        logger.warning("digest engagement block skipped: %s", ex)
     summary_lines.append("")
     summary_lines.append(
         "Note: Yesterday counts only rows whose timestamps fall inside that UTC day. "

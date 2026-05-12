@@ -185,3 +185,5 @@ DROP TRIGGER IF EXISTS marketing_settings_updated_at ON marketing_settings;
 CREATE TRIGGER marketing_settings_updated_at
     BEFORE UPDATE ON marketing_settings
     FOR EACH ROW EXECUTE FUNCTION set_marketing_updated_at();
+
+-- Optional: open/click columns on marketing_sends — see marketing_sends_tracking.sql

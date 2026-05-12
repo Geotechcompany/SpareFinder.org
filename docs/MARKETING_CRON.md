@@ -28,10 +28,21 @@ If an env var is **set to any non-empty string** (including `0`), it **overrides
 
 **Do not** use in-process automation on multiple replicas, or each instance will duplicate work. For horizontal scale, use the HTTP cron URLs below with one external scheduler instead.
 
+## Open & click tracking (SMTP sends)
+
+Run `docs/sql/marketing_sends_tracking.sql` on Supabase so `marketing_sends` stores `tracking_token`, `open_count`, `click_count`, and first-open / first-click timestamps. For each **sent** message, the API injects a **1×1 pixel** and rewrites **http(s)** anchor links to count clicks before redirecting.
+
+| Endpoint | Method | Purpose |
+|----------|--------|---------|
+| `/api/track/mopen/{token}` | GET, HEAD | Returns a 1×1 GIF and records an open for the send row with that `tracking_token`. |
+| `/api/track/mclk/{token}?u={url}` | GET | Records a click, then **302** to `u` (`http`/`https` only). |
+
+Use **`MARKETING_LINK_BASE_URL`** or **`API_PUBLIC_URL`** as the **public origin of this FastAPI app** so pixel and click URLs resolve (same base as unsubscribe links). If it points at the frontend only, tracking will not hit the API.
+
 | Endpoint | Method | Purpose |
 |----------|--------|---------|
 | `/api/cron/marketing-send` | GET | Batch send pending leads for **active** (unpaused) campaigns. Query: `limit` (1–200, default 20). |
-| `/api/cron/marketing-digest` | GET | Email admins yesterday’s UTC digest (new leads, sends, failures, unsubscribes). Uses `ADMIN_NOTIFY_EMAIL` / admin profiles. |
+| `/api/cron/marketing-digest` | GET | Email admins a digest (yesterday UTC + 7-day roll-up: leads, sends, failures, unsubscribes, **open/click engagement**). Uses `ADMIN_NOTIFY_EMAIL` / admin profiles. |
 | `/api/cron/marketing-discover` | GET | Run SerpAPI Google discovery using saved query templates (`PATCH /api/admin/marketing/settings`). Query: `max_queries` (1–10). Requires `SERPAPI_KEY`. |
 
 ### Recommended scheduler (e.g. cron-job.org)
@@ -46,9 +57,10 @@ If an env var is **set to any non-empty string** (including `0`), it **overrides
 |----------|---------|
 | `SERPAPI_KEY` | SerpAPI key for discovery |
 | `OPENAI_API_KEY` | Lead sanitization + AI email bodies |
-| `MARKETING_LINK_BASE_URL` or `API_PUBLIC_URL` | Base URL for `/unsubscribe/marketing` links in emails (defaults to `FRONTEND_URL` if unset) |
+| `MARKETING_LINK_BASE_URL` or `API_PUBLIC_URL` | Public API base for `/unsubscribe/marketing`, **open pixel**, and **click redirects** (defaults to `FRONTEND_URL` if unset — often wrong for tracking; set to the AI API URL). |
+| `MARKETING_TRACKING_ENABLED` | Default `1`. Set to `0` to disable open pixel and click link wrapping. |
 | `ADMIN_NOTIFY_EMAIL` | Fallback recipient for digest if no admin profiles |
 
-### Delivery tracking
+### Delivery & engagement tracking
 
-SMTP sends log attempts in `marketing_sends`. Inbox delivery / async bounces require ESP webhooks — stub: `POST /api/webhooks/email/esp`.
+SMTP sends log attempts in `marketing_sends`. **Opens** and **link clicks** are recorded when recipients hit `/api/track/mopen/...` and `/api/track/mclk/...` (see above). Inbox delivery / async bounces still require ESP webhooks — stub: `POST /api/webhooks/email/esp`.

@@ -102,6 +102,11 @@ function parseSettingsInt(v: unknown, fallback: number): number {
   return Number.isFinite(n) ? Math.trunc(n) : fallback;
 }
 
+function fmtMarketingPct(v: unknown): string {
+  if (typeof v === "number" && Number.isFinite(v)) return `${v}%`;
+  return "—";
+}
+
 function leadRowHasUsableEmail(email: unknown): boolean {
   const e = typeof email === "string" ? email.trim().toLowerCase() : "";
   if (!e || !MARKETING_LEAD_EMAIL_RE.test(e)) return false;
@@ -856,6 +861,10 @@ const MarketingOutbound: React.FC = () => {
                       ["Needs your review", dashboard?.leads_needs_review],
                       ["Emails sent today (UTC)", dashboard?.sends_today],
                       ["Failed sends today", dashboard?.failed_today],
+                      ["Opens logged today (UTC)", dashboard?.opens_logged_today],
+                      ["Clicks logged today (UTC)", dashboard?.clicks_logged_today],
+                      ["7-day open rate", fmtMarketingPct(dashboard?.open_rate_last_7_days_pct)],
+                      ["7-day click rate", fmtMarketingPct(dashboard?.click_rate_last_7_days_pct)],
                     ] as [string, unknown][]
                   ).map(([label, val]) => (
                     <Card key={label}>
@@ -866,6 +875,16 @@ const MarketingOutbound: React.FC = () => {
                     </Card>
                   ))}
                 </div>
+                {(typeof dashboard?.sends_last_7_days === "number" ||
+                  typeof dashboard?.sends_last_7_days_with_open === "number") && (
+                  <p className="text-sm text-muted-foreground mt-3 rounded-lg border bg-muted/30 px-3 py-2">
+                    <span className="font-medium text-foreground">Last 7 days (UTC): </span>
+                    {String(dashboard?.sends_last_7_days ?? "—")} sent ·{" "}
+                    {String(dashboard?.sends_last_7_days_with_open ?? "—")} with at least one open ·{" "}
+                    {String(dashboard?.sends_last_7_days_with_click ?? "—")} with at least one tracked link click. Opens
+                    use a 1×1 pixel; some mail apps prefetch images, so treat open rate as directional.
+                  </p>
+                )}
                 <p className="text-sm text-muted-foreground mt-4">{String(dashboard?.timezone_note || "")}</p>
                 <Card className="mt-6">
                   <CardHeader>
@@ -1504,8 +1523,9 @@ const MarketingOutbound: React.FC = () => {
                   <CardHeader>
                     <CardTitle>Sent emails log</CardTitle>
                     <CardDescription>
-                      Stored HTML snapshots are shown as sent (may be truncated for very large templates). Scripts are
-                      disabled in the preview.
+                      Opens and clicks are counted when recipients load the tracking pixel or follow wrapped links (see{" "}
+                      <code className="text-xs">docs/sql/marketing_sends_tracking.sql</code>). Stored HTML may be truncated;
+                      scripts are disabled in the preview.
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="overflow-x-auto">
@@ -1515,6 +1535,8 @@ const MarketingOutbound: React.FC = () => {
                           <th className="p-2 w-24">View</th>
                           <th className="p-2">Status</th>
                           <th className="p-2">Subject</th>
+                          <th className="p-2 w-16 text-right">Opens</th>
+                          <th className="p-2 w-16 text-right">Clicks</th>
                           <th className="p-2">When</th>
                         </tr>
                       </thead>
@@ -1539,6 +1561,12 @@ const MarketingOutbound: React.FC = () => {
                               </Badge>
                             </td>
                             <td className="p-2 max-w-xs truncate">{String(row.subject_snapshot || "—")}</td>
+                            <td className="p-2 text-right tabular-nums text-muted-foreground">
+                              {row.status === "sent" ? String(row.open_count ?? 0) : "—"}
+                            </td>
+                            <td className="p-2 text-right tabular-nums text-muted-foreground">
+                              {row.status === "sent" ? String(row.click_count ?? 0) : "—"}
+                            </td>
                             <td className="p-2 text-xs text-muted-foreground">
                               {String(row.sent_at || row.created_at || "—")}
                             </td>

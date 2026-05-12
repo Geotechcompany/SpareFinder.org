@@ -41,7 +41,7 @@ import {
   Database,
   Server,
   CreditCard,
-  DollarSign,
+  PoundSterling,
 } from "lucide-react";
 import { PLAN_CONFIG } from "@/lib/plans";
 import ThemeToggle from "@/components/ThemeToggle";
@@ -65,6 +65,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { AdminPageHeader, AdminPageHeaderToolbar } from "@/components/admin/AdminPageHeader";
+import { AdminKpiStatCard } from "@/components/admin/AdminKpiStatCard";
 
 interface AdminStats {
   total_users: number;
@@ -374,35 +375,42 @@ const AdminDashboardLayout = () => {
   const quickStats = [
     {
       title: "Signed-up users",
-      value: stats?.total_users?.toLocaleString() || "0",
-      change: `+${stats?.new_users_today || 0} joined today`,
+      value: (stats?.total_users ?? 0).toLocaleString(),
+      subtitle: `+${stats?.new_users_today || 0} joined today`,
       icon: Users,
-      color: "bg-accent/20 text-accent",
-      trend: "up",
+      iconClassName:
+        "bg-violet-500/[0.11] text-violet-600 ring-violet-500/15 dark:text-violet-400",
+      animation: { target: stats?.total_users ?? 0, kind: "integer" as const },
     },
     {
       title: "Part lookups",
-      value: stats?.total_searches?.toLocaleString() || "0",
-      change: `+${stats?.searches_today || 0} run today`,
+      value: (stats?.total_searches ?? 0).toLocaleString(),
+      subtitle: `+${stats?.searches_today || 0} run today`,
       icon: Search,
-      color: "bg-emerald-500/20 text-emerald-500",
-      trend: "up",
+      iconClassName:
+        "bg-emerald-500/[0.11] text-emerald-600 ring-emerald-500/15 dark:text-emerald-400",
+      animation: { target: stats?.total_searches ?? 0, kind: "integer" as const },
     },
     {
       title: "Recently active users",
-      value: stats?.active_users?.toLocaleString() || "0",
-      change: "Used the app in the last 30 days",
+      value: (stats?.active_users ?? 0).toLocaleString(),
+      subtitle: "Used the app in the last 30 days",
       icon: Activity,
-      color: "bg-primary/20 text-primary",
-      trend: "up",
+      iconClassName:
+        "bg-primary/[0.11] text-primary ring-primary/15",
+      animation: { target: stats?.active_users ?? 0, kind: "integer" as const },
     },
     {
       title: "Successful AI matches",
-      value: `${stats?.success_rate?.toFixed(1) || "0"}%`,
-      change: "Lookups that ended with a strong match",
+      value: `${stats?.success_rate?.toFixed(1) ?? "0.0"}%`,
+      subtitle: "Lookups that ended with a strong match",
       icon: TrendingUp,
-      color: "bg-amber-500/20 text-amber-500",
-      trend: "up",
+      iconClassName:
+        "bg-amber-500/[0.11] text-amber-600 ring-amber-500/15 dark:text-amber-400",
+      animation: {
+        target: stats?.success_rate ?? 0,
+        kind: "percent1" as const,
+      },
     },
   ];
 
@@ -438,11 +446,19 @@ const AdminDashboardLayout = () => {
       title: "Rough monthly income",
       value:
         estimatedRevenue !== null
-          ? `£${estimatedRevenue.toLocaleString()}`
-          : "£0",
-      change: "From listed plan prices (estimate only)",
-      icon: DollarSign,
-      color: "from-emerald-600 to-green-600",
+          ? `£${estimatedRevenue.toLocaleString(undefined, {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 2,
+            })}`
+          : "£0.00",
+      subtitle: "From listed plan prices (estimate only)",
+      icon: PoundSterling,
+      iconClassName:
+        "bg-emerald-500/[0.11] text-emerald-600 ring-emerald-500/15 dark:text-emerald-400",
+      animation: {
+        target: estimatedRevenue ?? 0,
+        kind: "currencyGBP" as const,
+      },
     },
     {
       title: "People on a plan",
@@ -450,9 +466,14 @@ const AdminDashboardLayout = () => {
         subscriptionStats?.total !== undefined
           ? subscriptionStats.total.toLocaleString()
           : "0",
-      change: "Free and paid plans combined",
+      subtitle: "Free and paid plans combined",
       icon: Users,
-      color: "bg-accent/20 text-accent",
+      iconClassName:
+        "bg-violet-500/[0.11] text-violet-600 ring-violet-500/15 dark:text-violet-400",
+      animation: {
+        target: subscriptionStats?.total ?? 0,
+        kind: "integer" as const,
+      },
     },
     {
       title: "Paying subscriptions",
@@ -460,9 +481,14 @@ const AdminDashboardLayout = () => {
         subscriptionStats?.by_status?.active !== undefined
           ? subscriptionStats.by_status.active.toLocaleString()
           : "0",
-      change: "Currently in good standing",
+      subtitle: "Currently in good standing",
       icon: CreditCard,
-      color: "bg-primary/20 text-primary",
+      iconClassName:
+        "bg-primary/[0.11] text-primary ring-primary/15",
+      animation: {
+        target: subscriptionStats?.by_status?.active ?? 0,
+        kind: "integer" as const,
+      },
     },
     {
       title: "Canceled plans",
@@ -470,9 +496,14 @@ const AdminDashboardLayout = () => {
         subscriptionStats?.by_status?.canceled !== undefined
           ? subscriptionStats.by_status.canceled.toLocaleString()
           : "0",
-      change: "All-time cancellations",
+      subtitle: "All-time cancellations",
       icon: TrendingUp,
-      color: "bg-amber-500/20 text-amber-500",
+      iconClassName:
+        "bg-amber-500/[0.11] text-amber-600 ring-amber-500/15 dark:text-amber-400",
+      animation: {
+        target: subscriptionStats?.by_status?.canceled ?? 0,
+        kind: "integer" as const,
+      },
     },
   ];
 
@@ -631,96 +662,35 @@ const AdminDashboardLayout = () => {
           />
 
           {/* Quick Stats */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-5">
             {quickStats.map((stat, index) => (
-              <motion.div
+              <AdminKpiStatCard
                 key={stat.title}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.1 * index, duration: 0.5 }}
-                whileHover={{ y: -8, scale: 1.03 }}
-                className="relative group"
-              >
-                <div className="hidden" />
-                <Card className="premium-card relative bg-card/95 backdrop-blur-md">
-                  <CardContent className="p-6">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm font-medium text-muted-foreground">
-                          {stat.title}
-                        </p>
-                        <p className="mt-1 text-2xl font-bold text-foreground">
-                          {stat.value}
-                        </p>
-                        <p className="mt-1 text-sm text-muted-foreground">
-                          {stat.change}
-                        </p>
-                      </div>
-                      <motion.div
-                        initial={{ scale: 1, rotate: 0 }}
-                        animate={{ scale: [1, 1.05, 1], rotate: [0, 2, -2, 0] }}
-                        transition={{
-                          duration: 4,
-                          repeat: Infinity,
-                          repeatType: "reverse",
-                          ease: "easeInOut",
-                          delay: index * 0.15,
-                        }}
-                        className="p-3 rounded-xl bg-primary/20 text-primary ring-1 ring-primary/30 transition-transform duration-300 group-hover:scale-105"
-                      >
-                        <stat.icon className="w-6 h-6" />
-                      </motion.div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </motion.div>
+                title={stat.title}
+                subtitle={stat.subtitle}
+                icon={stat.icon}
+                index={index}
+                iconClassName={stat.iconClassName}
+                value={stat.value}
+                animation={stat.animation}
+              />
             ))}
           </div>
 
           {/* Revenue & Subscribers */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-5">
             {revenueStats.map((stat, index) => (
-              <motion.div
+              <AdminKpiStatCard
                 key={stat.title}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.15 + 0.1 * index, duration: 0.5 }}
-                whileHover={{ y: -8, scale: 1.03 }}
-                className="relative group"
-              >
-                <div className="hidden" />
-                <Card className="premium-card relative bg-card/95 backdrop-blur-md">
-                  <CardContent className="p-6">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm font-medium text-muted-foreground">
-                          {stat.title}
-                        </p>
-                        <p className="mt-1 text-2xl font-bold text-foreground">
-                          {stat.value}
-                        </p>
-                        <p className="mt-1 text-sm text-muted-foreground">
-                          {stat.change}
-                        </p>
-                      </div>
-                      <motion.div
-                        initial={{ scale: 1, rotate: 0 }}
-                        animate={{ scale: [1, 1.05, 1], rotate: [0, -2, 2, 0] }}
-                        transition={{
-                          duration: 4,
-                          repeat: Infinity,
-                          repeatType: "reverse",
-                          ease: "easeInOut",
-                          delay: 0.3 + index * 0.15,
-                        }}
-                        className="p-3 rounded-xl bg-accent/20 text-accent ring-1 ring-accent/30 transition-transform duration-300 group-hover:scale-105"
-                      >
-                        <stat.icon className="w-6 h-6" />
-                      </motion.div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </motion.div>
+                title={stat.title}
+                subtitle={stat.subtitle}
+                icon={stat.icon}
+                index={index}
+                staggerGroupDelay={0.08}
+                iconClassName={stat.iconClassName}
+                value={stat.value}
+                animation={stat.animation}
+              />
             ))}
           </div>
 
