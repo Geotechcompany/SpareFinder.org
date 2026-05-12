@@ -1080,6 +1080,51 @@ async def marketing_dashboard(_admin: CurrentUser = Depends(require_roles("admin
             .eq("sanitization_status", "review")
             .execute()
         )
+        now_utc = datetime.now(timezone.utc)
+        today_start = now_utc.replace(hour=0, minute=0, second=0, microsecond=0)
+        week_start = today_start - timedelta(days=7)
+
+        def _lead_count_eq(**kwargs: str) -> int:
+            q = supabase.table("marketing_leads").select("id", count="exact")
+            for k, v in kwargs.items():
+                q = q.eq(k, v)
+            try:
+                r = q.execute()
+                return int(getattr(r, "count", None) or 0)
+            except Exception:
+                return 0
+
+        leads_pipeline_sent = _lead_count_eq(lead_status_internal="sent")
+        leads_pipeline_bounced = _lead_count_eq(lead_status_internal="bounced")
+        leads_pipeline_opt_out = _lead_count_eq(lead_status_internal="opt_out")
+        leads_pipeline_skipped = _lead_count_eq(lead_status_internal="skipped")
+        leads_pipeline_rejected = _lead_count_eq(sanitization_status="rejected")
+        leads_pipeline_pending_accepted = _lead_count_eq(
+            lead_status_internal="pending", sanitization_status="accepted"
+        )
+        try:
+            leads_created_7d = (
+                supabase.table("marketing_leads")
+                .select("id", count="exact")
+                .gte("created_at", week_start.isoformat())
+                .execute()
+            )
+            leads_new_last_7_days = int(getattr(leads_created_7d, "count", None) or 0)
+        except Exception:
+            leads_new_last_7_days = 0
+        try:
+            orphan_pending = (
+                supabase.table("marketing_leads")
+                .select("id", count="exact")
+                .eq("lead_status_internal", "pending")
+                .eq("sanitization_status", "accepted")
+                .is_("campaign_id", "null")
+                .execute()
+            )
+            leads_pending_no_campaign = int(getattr(orphan_pending, "count", None) or 0)
+        except Exception:
+            leads_pending_no_campaign = 0
+
         sends_today = (
             supabase.table("marketing_sends")
             .select("id", count="exact")
