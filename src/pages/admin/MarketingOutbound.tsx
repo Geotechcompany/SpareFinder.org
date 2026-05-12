@@ -65,6 +65,7 @@ import {
   Eye,
   ChevronLeft,
   ChevronRight,
+  Users,
 } from "lucide-react";
 import { API_BASE_URL } from "@/lib/config";
 
@@ -852,41 +853,134 @@ const MarketingOutbound: React.FC = () => {
                 <TabsTrigger value="errors">Issues</TabsTrigger>
               </TabsList>
 
-              <TabsContent value="overview">
-                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                  {(
-                    [
-                      ["All contacts", dashboard?.leads_total],
-                      ["Ready for auto-send", dashboard?.leads_pending_send],
-                      ["Needs your review", dashboard?.leads_needs_review],
-                      ["Emails sent today (UTC)", dashboard?.sends_today],
-                      ["Failed sends today", dashboard?.failed_today],
-                      ["Opens logged today (UTC)", dashboard?.opens_logged_today],
-                      ["Clicks logged today (UTC)", dashboard?.clicks_logged_today],
-                      ["7-day open rate", fmtMarketingPct(dashboard?.open_rate_last_7_days_pct)],
-                      ["7-day click rate", fmtMarketingPct(dashboard?.click_rate_last_7_days_pct)],
-                    ] as [string, unknown][]
-                  ).map(([label, val]) => (
-                    <Card key={label}>
-                      <CardHeader className="pb-2">
-                        <CardDescription>{label}</CardDescription>
-                        <CardTitle className="text-3xl">{String(val ?? "—")}</CardTitle>
-                      </CardHeader>
-                    </Card>
-                  ))}
-                </div>
-                {(typeof dashboard?.sends_last_7_days === "number" ||
-                  typeof dashboard?.sends_last_7_days_with_open === "number") && (
-                  <p className="text-sm text-muted-foreground mt-3 rounded-lg border bg-muted/30 px-3 py-2">
-                    <span className="font-medium text-foreground">Last 7 days (UTC): </span>
-                    {String(dashboard?.sends_last_7_days ?? "—")} sent ·{" "}
-                    {String(dashboard?.sends_last_7_days_with_open ?? "—")} with at least one open ·{" "}
-                    {String(dashboard?.sends_last_7_days_with_click ?? "—")} with at least one tracked link click. Opens
-                    use a 1×1 pixel; some mail apps prefetch images, so treat open rate as directional.
-                  </p>
-                )}
-                <p className="text-sm text-muted-foreground mt-4">{String(dashboard?.timezone_note || "")}</p>
-                <Card className="mt-6">
+              <TabsContent value="overview" className="space-y-8">
+                <section aria-labelledby="overview-email-heading">
+                  <h2 id="overview-email-heading" className="text-lg font-semibold tracking-tight text-foreground mb-3">
+                    Email &amp; engagement
+                  </h2>
+                  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                    {(
+                      [
+                        ["Emails sent today (UTC)", dashboard?.sends_today],
+                        ["Failed sends today", dashboard?.failed_today],
+                        ["Opens logged today (UTC)", dashboard?.opens_logged_today],
+                        ["Clicks logged today (UTC)", dashboard?.clicks_logged_today],
+                        ["7-day open rate", fmtMarketingPct(dashboard?.open_rate_last_7_days_pct)],
+                        ["7-day click rate", fmtMarketingPct(dashboard?.click_rate_last_7_days_pct)],
+                      ] as [string, unknown][]
+                    ).map(([label, val]) => (
+                      <Card key={label}>
+                        <CardHeader className="pb-2">
+                          <CardDescription>{label}</CardDescription>
+                          <CardTitle className="text-3xl">{String(val ?? "—")}</CardTitle>
+                        </CardHeader>
+                      </Card>
+                    ))}
+                  </div>
+                  {(typeof dashboard?.sends_last_7_days === "number" ||
+                    typeof dashboard?.sends_last_7_days_with_open === "number") && (
+                    <p className="text-sm text-muted-foreground mt-3 rounded-lg border bg-muted/30 px-3 py-2">
+                      <span className="font-medium text-foreground">Last 7 days (UTC): </span>
+                      {String(dashboard?.sends_last_7_days ?? "—")} sent ·{" "}
+                      {String(dashboard?.sends_last_7_days_with_open ?? "—")} with at least one open ·{" "}
+                      {String(dashboard?.sends_last_7_days_with_click ?? "—")} with at least one tracked link click.
+                      Opens use a 1×1 pixel; some mail apps prefetch images, so treat open rate as directional.
+                    </p>
+                  )}
+                </section>
+
+                <section aria-labelledby="overview-leads-heading">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle id="overview-leads-heading" className="flex flex-wrap items-center gap-2 text-xl">
+                        <Users className="h-6 w-6 shrink-0 text-primary" aria-hidden />
+                        Lead pipeline
+                      </CardTitle>
+                      <CardDescription>
+                        From <code className="text-xs">marketing_leads</code>. &ldquo;Ready for auto-send&rdquo; matches
+                        the batch sender: pending, sanitization accepted, on an <strong>active</strong> campaign.
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                        {(
+                          [
+                            ["All contacts", dashboard?.leads_total],
+                            ["Ready for auto-send", dashboard?.leads_pending_send],
+                            ["Pending (any campaign)", dashboard?.leads_pending_any_campaign],
+                            ["Pending + accepted", dashboard?.leads_pipeline_pending_accepted],
+                            ["Needs sanitization review", dashboard?.leads_needs_review],
+                            ["Rejected (sanitization)", dashboard?.leads_pipeline_rejected],
+                            ["Marked sent (lead status)", dashboard?.leads_pipeline_sent],
+                          ] as [string, unknown][]
+                        ).map(([label, val]) => (
+                          <Card key={label}>
+                            <CardHeader className="pb-2">
+                              <CardDescription>{label}</CardDescription>
+                              <CardTitle className="text-3xl">{String(val ?? "—")}</CardTitle>
+                            </CardHeader>
+                          </Card>
+                        ))}
+                        <Card className="border-dashed bg-muted/20">
+                          <CardHeader className="pb-2">
+                            <CardDescription>Post-send outcomes</CardDescription>
+                            <div className="mt-2 grid grid-cols-3 gap-2 text-center">
+                              <div>
+                                <p className="text-2xl font-semibold tabular-nums">
+                                  {String(dashboard?.leads_pipeline_bounced ?? "—")}
+                                </p>
+                                <p className="text-[11px] text-muted-foreground">Bounced</p>
+                              </div>
+                              <div>
+                                <p className="text-2xl font-semibold tabular-nums">
+                                  {String(dashboard?.leads_pipeline_opt_out ?? "—")}
+                                </p>
+                                <p className="text-[11px] text-muted-foreground">Opt-out</p>
+                              </div>
+                              <div>
+                                <p className="text-2xl font-semibold tabular-nums">
+                                  {String(dashboard?.leads_pipeline_skipped ?? "—")}
+                                </p>
+                                <p className="text-[11px] text-muted-foreground">Skipped</p>
+                              </div>
+                            </div>
+                          </CardHeader>
+                        </Card>
+                        <Card>
+                          <CardHeader className="pb-2">
+                            <CardDescription>Pending, accepted, no campaign</CardDescription>
+                            <CardTitle className="text-3xl">
+                              {String(dashboard?.leads_pipeline_pending_no_campaign ?? "—")}
+                            </CardTitle>
+                            <p className="text-xs text-muted-foreground pt-1">
+                              The send cron can assign a default campaign; use bulk actions on the Leads tab if needed.
+                            </p>
+                          </CardHeader>
+                        </Card>
+                        <Card>
+                          <CardHeader className="pb-2">
+                            <CardDescription>New contacts (7 days, UTC)</CardDescription>
+                            <CardTitle className="text-3xl">
+                              {String(dashboard?.leads_pipeline_new_last_7_days ?? "—")}
+                            </CardTitle>
+                          </CardHeader>
+                        </Card>
+                        <Card>
+                          <CardHeader className="pb-2">
+                            <CardDescription>Active campaigns</CardDescription>
+                            <CardTitle className="text-3xl">
+                              {String(dashboard?.active_unpaused_campaigns ?? "—")}
+                            </CardTitle>
+                            <p className="text-xs text-muted-foreground pt-1">Unpaused — eligible for auto-send</p>
+                          </CardHeader>
+                        </Card>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </section>
+
+                <p className="text-sm text-muted-foreground">{String(dashboard?.timezone_note || "")}</p>
+                <Card>
                   <CardHeader>
                     <CardTitle>Automatic sending (for IT / hosting)</CardTitle>
                     <CardDescription>
