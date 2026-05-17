@@ -28,6 +28,7 @@ import {
 import { useToast } from "@/components/ui/use-toast";
 import { api, apiClient, dashboardApi } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
+import { useUser as useClerkUser } from "@clerk/clerk-react";
 import { useSubscription } from "@/contexts/SubscriptionContext";
 import {
   DashboardOverviewStats,
@@ -75,6 +76,16 @@ interface UserProfile {
   created_at?: string;
 }
 
+function formatMemberSince(iso?: string | null): string {
+  if (!iso) return "N/A";
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "N/A";
+  return date.toLocaleDateString("en-GB", {
+    month: "long",
+    year: "numeric",
+  });
+}
+
 const Profile = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -93,6 +104,7 @@ const Profile = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
   const { user, checkAuth, isAdmin } = useAuth();
+  const { user: clerkUser } = useClerkUser();
   const { tier, isPlanActive, isTrialing, isLoading: subscriptionLoading } =
     useSubscription();
   const avatarInputRef = useRef<HTMLInputElement>(null);
@@ -116,41 +128,73 @@ const Profile = () => {
     }
   }, [profile]);
 
+  useEffect(() => {
+    const clerkCreatedAt = clerkUser?.createdAt
+      ? new Date(clerkUser.createdAt).toISOString()
+      : null;
+    const iso =
+      profile?.created_at || user?.created_at || clerkCreatedAt || null;
+    setMemberSince(formatMemberSince(iso));
+  }, [profile?.created_at, user?.created_at, clerkUser?.createdAt]);
+
   const fetchUserProfile = async () => {
     try {
       setIsLoading(true);
       setError(null);
 
-      // First, try to use profile data from auth context
+      let nextProfile: UserProfile | null = null;
+
       if (user) {
-        setProfile({
+        nextProfile = {
           id: user.id,
           email: user.email,
           username: null,
           full_name: user.full_name || "",
           avatar_url: user.avatar_url || null,
           created_at: user.created_at,
-        });
-        setIsLoading(false);
-        return;
+        };
       }
 
-      // Fallback to API if no auth context data
-      const response = await api.profile.getProfile();
+      try {
+        const response = await api.user.getProfile();
+        const apiProfile =
+          (response as { data?: { profile?: Record<string, unknown> } })?.data
+            ?.profile ??
+          (response as { profile?: Record<string, unknown> })?.profile;
 
-      if (response.success && response.data) {
-        const profileData = (response.data as any).profile;
-        setProfile({
-          id: profileData.id,
-          email: profileData.email,
-          username: null, // Username not available in current API
-          full_name: profileData.full_name || "",
-          avatar_url: profileData.avatar_url,
-          created_at: profileData.created_at,
-        });
-      } else {
+        if (apiProfile) {
+          nextProfile = {
+            id: String(apiProfile.id ?? nextProfile?.id ?? user?.id ?? ""),
+            email: String(
+              apiProfile.email ?? nextProfile?.email ?? user?.email ?? ""
+            ),
+            username:
+              typeof apiProfile.username === "string"
+                ? apiProfile.username
+                : nextProfile?.username ?? null,
+            full_name: String(
+              apiProfile.full_name ?? nextProfile?.full_name ?? ""
+            ),
+            avatar_url:
+              typeof apiProfile.avatar_url === "string"
+                ? apiProfile.avatar_url
+                : nextProfile?.avatar_url ?? null,
+            created_at:
+              typeof apiProfile.created_at === "string"
+                ? apiProfile.created_at
+                : nextProfile?.created_at,
+          };
+        }
+      } catch (profileApiError) {
+        if (!nextProfile) throw profileApiError;
+        console.warn("Could not enrich profile from API:", profileApiError);
+      }
+
+      if (!nextProfile) {
         throw new Error("Failed to fetch profile data");
       }
+
+      setProfile(nextProfile);
     } catch (err) {
       console.error("Error fetching user profile:", err);
       setError(
@@ -169,15 +213,6 @@ const Profile = () => {
   const fetchUserStats = async () => {
     setStatsLoading(true);
     try {
-      setMemberSince(
-        profile?.created_at
-          ? new Date(profile.created_at).toLocaleDateString("en-GB", {
-              month: "long",
-              year: "numeric",
-            })
-          : "N/A"
-      );
-
       const [statsResponse, analyticsResponse, crewJobsResponse] =
         await Promise.allSettled([
           dashboardApi.getStats(),
