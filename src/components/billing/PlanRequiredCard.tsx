@@ -1,76 +1,174 @@
 import React from "react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { motion } from "framer-motion";
+import {
+  ArrowRight,
+  BarChart3,
+  Clock3,
+  CreditCard,
+  History,
+  LockKeyhole,
+  Sparkles,
+  Upload,
+} from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { ArrowRight, LockKeyhole, Sparkles } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
+import { cn } from "@/lib/utils";
+
+const UNLOCK_FEATURES = [
+  { icon: Upload, label: "AI part uploads", accent: "from-brand to-brand-light" },
+  { icon: History, label: "Search history", accent: "from-sky-500 to-cyan-400" },
+  { icon: BarChart3, label: "Analytics", accent: "from-emerald-500 to-teal-400" },
+  { icon: Clock3, label: "Priority processing", accent: "from-amber-500 to-orange-400" },
+] as const;
 
 export const PlanRequiredCard: React.FC<{
   title?: string;
   description?: string;
+  className?: string;
 }> = ({
   title = "No active plan",
-  description = "You have no active plan. Select a plan to get started and unlock uploads, history, reviews, and analytics.",
+  description = "Choose a plan to unlock uploads, history, reviews, and analytics across your workspace.",
+  className,
 }) => {
   const navigate = useNavigate();
   const { user, isLoading } = useAuth();
 
-  return (
-    <div className="min-h-[70dvh] flex items-center justify-center px-4 py-10">
-      <div className="relative w-full max-w-2xl">
-        <div className="pointer-events-none absolute -top-24 -right-24 h-56 w-56 rounded-full bg-gradient-to-r from-brand/20 to-blue-500/15 blur-3xl" />
-        <div className="pointer-events-none absolute -bottom-24 -left-24 h-56 w-56 rounded-full bg-gradient-to-r from-emerald-500/15 to-teal-500/10 blur-3xl" />
+  const handleSelectPlan = () => {
+    const needsOnboarding =
+      !isLoading && user && (!user.company || user.company.trim().length === 0);
+    navigate(
+      needsOnboarding
+        ? `/onboarding/profile?next=${encodeURIComponent("/dashboard/billing")}`
+        : "/onboarding/trial"
+    );
+  };
 
-        <Card className="relative overflow-hidden border-border bg-card/90 backdrop-blur-xl shadow-soft-elevated">
-          <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-brand/5 via-transparent to-blue-500/5 dark:from-brand/10 dark:to-blue-500/10" />
-          <CardHeader className="space-y-3">
-            <div className="flex items-start justify-between gap-4">
-              <div className="flex items-center gap-3">
-                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-r from-brand to-brand-dark text-white shadow-lg shadow-brand/20">
-                  <Sparkles className="h-5 w-5" />
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4, ease: "easeOut" }}
+      className={cn(
+        "flex min-h-[min(70dvh,640px)] items-center justify-center px-4 py-10 sm:py-14",
+        className
+      )}
+    >
+      <motion.div
+        className="relative w-full max-w-xl"
+        initial={{ opacity: 0, scale: 0.98 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ delay: 0.05, duration: 0.45 }}
+      >
+        <div
+          className="pointer-events-none absolute -right-20 -top-20 h-52 w-52 rounded-full bg-brand/20 blur-3xl"
+          aria-hidden
+        />
+        <div
+          className="pointer-events-none absolute -bottom-24 -left-16 h-56 w-56 rounded-full bg-sky-400/15 blur-3xl"
+          aria-hidden
+        />
+
+        <article
+          className={cn(
+            "group relative overflow-hidden rounded-2xl border border-border/50",
+            "bg-card/85 shadow-sm backdrop-blur-xl",
+            "transition-shadow duration-300 hover:shadow-md",
+            "dark:border-white/10 dark:bg-card/60"
+          )}
+        >
+          <div
+            className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-brand via-brand-light to-sky-400"
+            aria-hidden
+          />
+          <motion.div
+            className="pointer-events-none absolute -right-10 -top-10 h-32 w-32 rounded-full bg-brand/15 blur-2xl"
+            aria-hidden
+          />
+
+          <div className="relative px-6 pb-6 pt-8 sm:px-8 sm:pb-8 sm:pt-10">
+            <div className="flex flex-col items-center text-center">
+              <div className="relative mb-5">
+                <div
+                  className="absolute inset-0 rounded-full bg-gradient-to-br from-brand/30 to-sky-400/20 blur-xl"
+                  aria-hidden
+                />
+                <div className="relative flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-brand to-brand-dark text-white shadow-lg shadow-brand/25 ring-1 ring-white/20">
+                  <Sparkles className="h-7 w-7" aria-hidden />
                 </div>
-                <div>
-                  <CardTitle className="text-xl">{title}</CardTitle>
-                  <p className="mt-1 text-sm text-muted-foreground">{description}</p>
+                <div className="absolute -bottom-1 -right-1 flex h-8 w-8 items-center justify-center rounded-full border-2 border-card bg-amber-500/15 text-amber-700 ring-2 ring-card dark:text-amber-200">
+                  <LockKeyhole className="h-3.5 w-3.5" aria-hidden />
                 </div>
               </div>
-              <div className="inline-flex items-center gap-2 rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-1 text-xs text-amber-700 dark:text-amber-200">
-                <LockKeyhole className="h-3.5 w-3.5" />
-                Locked
-              </div>
+
+              <span className="mb-3 inline-flex items-center gap-1.5 rounded-full border border-amber-500/25 bg-amber-500/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-amber-800 dark:text-amber-200">
+                <LockKeyhole className="h-3 w-3" aria-hidden />
+                Workspace locked
+              </span>
+
+              <h2 className="text-xl font-bold tracking-tight text-foreground sm:text-2xl">
+                {title}
+              </h2>
+              <p className="mt-2 max-w-md text-sm leading-relaxed text-muted-foreground sm:text-[15px]">
+                {description}
+              </p>
             </div>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex flex-col sm:flex-row gap-3">
+
+            <ul className="mt-8 grid grid-cols-2 gap-2.5 sm:gap-3">
+              {UNLOCK_FEATURES.map(({ icon: Icon, label, accent }, index) => (
+                <motion.li
+                  key={label}
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.12 + index * 0.05, duration: 0.35 }}
+                  className={cn(
+                    "flex items-center gap-2.5 rounded-xl border border-border/50 bg-muted/30 px-3 py-2.5",
+                    "text-left text-xs font-medium text-foreground sm:text-sm",
+                    "dark:border-white/10 dark:bg-white/[0.04]"
+                  )}
+                >
+                  <span
+                    className={cn(
+                      "flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br text-white shadow-sm",
+                      accent
+                    )}
+                  >
+                    <Icon className="h-3.5 w-3.5" aria-hidden />
+                  </span>
+                  <span className="leading-snug">{label}</span>
+                </motion.li>
+              ))}
+            </ul>
+
+            <div className="mt-8 flex flex-col gap-2.5 sm:flex-row sm:justify-center">
               <Button
-                onClick={() => {
-                  const needsOnboarding =
-                    !isLoading && user && (!user.company || user.company.trim().length === 0);
-                  navigate(
-                    needsOnboarding
-                      ? `/onboarding/profile?next=${encodeURIComponent("/dashboard/billing")}`
-                      : "/onboarding/trial"
-                  );
-                }}
-                className="w-full sm:w-auto bg-gradient-to-r from-brand to-brand-dark hover:from-brand-dark hover:to-brand-dark shadow-lg shadow-brand/20"
+                size="lg"
+                onClick={handleSelectPlan}
+                className="h-11 w-full bg-gradient-to-r from-brand to-brand-dark shadow-md shadow-brand/20 hover:from-brand-dark hover:to-brand-dark sm:w-auto sm:min-w-[180px]"
               >
                 Select a plan
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
               <Button
+                size="lg"
                 variant="outline"
                 onClick={() => navigate("/dashboard/billing")}
-                className="w-full sm:w-auto"
+                className="h-11 w-full border-border/80 bg-background/60 backdrop-blur-sm sm:w-auto sm:min-w-[160px]"
               >
+                <CreditCard className="mr-2 h-4 w-4" />
                 Go to Billing
               </Button>
             </div>
-            <p className="text-xs text-muted-foreground">
-              You can close this and browse your account, but core features stay locked until a plan is active.
+
+            <p className="mt-5 text-center text-[11px] leading-relaxed text-muted-foreground sm:text-xs">
+              You can browse account settings, but core features stay locked until a plan is
+              active. Plans start from{" "}
+              <span className="font-medium text-foreground">£12.99/month</span> with a free
+              trial for new accounts.
             </p>
-          </CardContent>
-        </Card>
-      </div>
-    </div>
+          </div>
+        </article>
+      </motion.div>
+    </motion.div>
   );
 };

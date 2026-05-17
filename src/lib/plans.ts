@@ -12,6 +12,19 @@ export const roundMoney = (value: number): number => {
   return Math.round((value + Number.EPSILON) * 100) / 100;
 };
 
+/** Format amounts in GBP (app default currency). */
+export const formatGBP = (
+  amount: number,
+  options?: { minimumFractionDigits?: number; maximumFractionDigits?: number }
+): string => {
+  return new Intl.NumberFormat("en-GB", {
+    style: "currency",
+    currency: "GBP",
+    minimumFractionDigits: options?.minimumFractionDigits ?? 0,
+    maximumFractionDigits: options?.maximumFractionDigits ?? 0,
+  }).format(amount);
+};
+
 export const calculateAnnualPrice = (monthlyPrice: number): number => {
   return roundMoney(monthlyPrice * 12 * ANNUAL_DISCOUNT_FACTOR);
 };

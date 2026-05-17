@@ -26,8 +26,19 @@ import {
   FormSkeleton,
 } from "@/components/skeletons";
 import { useToast } from "@/components/ui/use-toast";
-import { api } from "@/lib/api";
+import { api, apiClient, dashboardApi } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
+import { useSubscription } from "@/contexts/SubscriptionContext";
+import {
+  DashboardOverviewStats,
+  type DashboardOverviewMetrics,
+} from "@/components/dashboard/DashboardOverviewStats";
+import {
+  buildSparklineFromAnalytics,
+  computeAnalyticsRollups,
+  defaultOverviewMetrics,
+  parseDashboardStatsPayload,
+} from "@/lib/dashboard-metrics";
 import { useProfileData } from "@/hooks/useProfileData";
 import { Loader2 } from "lucide-react";
 import {
@@ -71,19 +82,19 @@ const Profile = () => {
   const { inLayout } = useDashboardLayout();
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [userStats, setUserStats] = useState({
-    totalUploads: 0,
-    successRate: 0,
-    avgConfidence: 0,
-    memberSince: "N/A",
-    streak: 0,
-    totalSaved: "$0",
-    achievements: 0,
-  });
+  const [overviewMetrics, setOverviewMetrics] = useState<DashboardOverviewMetrics>(
+    defaultOverviewMetrics
+  );
+  const [sparklineSeries, setSparklineSeries] = useState<number[]>([]);
+  const [statsLoading, setStatsLoading] = useState(true);
+  const [memberSince, setMemberSince] = useState("N/A");
+  const [streak, setStreak] = useState(0);
 
   const { toast } = useToast();
   const navigate = useNavigate();
-  const { user, checkAuth } = useAuth();
+  const { user, checkAuth, isAdmin } = useAuth();
+  const { tier, isPlanActive, isTrialing, isLoading: subscriptionLoading } =
+    useSubscription();
   const avatarInputRef = useRef<HTMLInputElement>(null);
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const {
@@ -156,57 +167,88 @@ const Profile = () => {
   };
 
   const fetchUserStats = async () => {
+    setStatsLoading(true);
     try {
-      // Fetch dashboard stats which includes comprehensive user data
-      const response = await api.dashboard.getStats();
+      setMemberSince(
+        profile?.created_at
+          ? new Date(profile.created_at).toLocaleDateString("en-GB", {
+              month: "long",
+              year: "numeric",
+            })
+          : "N/A"
+      );
 
-      if (response.success && response.data) {
-        const stats = response.data as {
-          totalUploads?: number;
-          successfulUploads?: number;
-          avgConfidence?: number;
-          currentStreak?: number;
-          totalSaved?: number;
-          totalAchievements?: number;
+      const [statsResponse, analyticsResponse, crewJobsResponse] =
+        await Promise.allSettled([
+          dashboardApi.getStats(),
+          dashboardApi.getAnalytics({ days: 30 }),
+          apiClient.get("/upload/crew-analysis-jobs"),
+        ]);
+
+      if (statsResponse.status === "fulfilled" && statsResponse.value.success) {
+        const parsed = parseDashboardStatsPayload(
+          statsResponse.value.data as Record<string, unknown>
+        );
+        setOverviewMetrics((prev) => ({ ...prev, ...parsed }));
+      }
+
+      if (
+        analyticsResponse.status === "fulfilled" &&
+        analyticsResponse.value.success
+      ) {
+        const series =
+          ((analyticsResponse.value.data as { series?: unknown[] })?.series as {
+            date?: string;
+            analyzedParts?: number;
+            completedAnalyses?: number;
+          }[]) || [];
+        setSparklineSeries(buildSparklineFromAnalytics(series));
+        const rollups = computeAnalyticsRollups(series);
+        setOverviewMetrics((prev) => ({ ...prev, ...rollups }));
+      }
+
+      if (crewJobsResponse.status === "fulfilled" && crewJobsResponse.value.data) {
+        const payload = crewJobsResponse.value.data as {
+          data?: unknown[];
+          jobs?: unknown[];
         };
-        // Normalize confidence score (handle both 0-1 decimal and 0-100 percentage formats)
-        let normalizedConfidence = stats.avgConfidence || 0;
-        if (normalizedConfidence > 100) {
-          // If value is over 100, it's likely incorrectly multiplied
-          normalizedConfidence = Math.round(normalizedConfidence / 100);
-        } else if (normalizedConfidence > 0 && normalizedConfidence <= 1) {
-          // If value is 0-1, convert to percentage
-          normalizedConfidence = Math.round(normalizedConfidence * 100);
-        } else {
-          // Already 0-100, just round it
-          normalizedConfidence = Math.round(normalizedConfidence);
-        }
-
-        setUserStats({
-          totalUploads: stats.totalUploads || 0,
-          successRate:
-            stats.successfulUploads && stats.totalUploads
-              ? Math.round(
-                  (stats.successfulUploads / stats.totalUploads) * 100
-                )
-              : 0,
-          avgConfidence: normalizedConfidence,
-          memberSince: profile?.created_at
-            ? new Date(profile.created_at).toLocaleDateString("en-US", {
-                month: "long",
-                year: "numeric",
-              })
-            : "N/A",
-          streak: stats.currentStreak || 0,
-          totalSaved: `$${stats.totalSaved || 0}`,
-          achievements: stats.totalAchievements || 0,
-        });
+        const jobs = Array.isArray(payload?.data)
+          ? payload.data
+          : Array.isArray(payload?.jobs)
+            ? payload.jobs
+            : Array.isArray(crewJobsResponse.value.data)
+              ? (crewJobsResponse.value.data as unknown[])
+              : [];
+        const inProgress = jobs.filter((job) => {
+          const status = String((job as { status?: string }).status || "").toLowerCase();
+          return [
+            "processing",
+            "pending",
+            "running",
+            "queued",
+            "in_progress",
+            "started",
+          ].includes(status);
+        }).length;
+        setOverviewMetrics((prev) => ({ ...prev, inProgress }));
       }
     } catch (error) {
-      console.error("Error fetching user stats:", error);
-      // Keep default values on error
+      console.error("Error fetching profile stats:", error);
+    } finally {
+      setStatsLoading(false);
     }
   };
+
+  const membershipBadgeLabel = (() => {
+    if (subscriptionLoading) return null;
+    if (isAdmin) return "Admin";
+    if (!isPlanActive) return null;
+    if (isTrialing) return "Trial member";
+    if (tier === "enterprise") return "Enterprise member";
+    if (tier === "pro") return "Pro member";
+    if (tier === "free") return "Starter member";
+    return null;
+  })();
 
   const handleToggleSidebar = () => {
     setIsCollapsed(!isCollapsed);
@@ -408,25 +450,27 @@ const Profile = () => {
                     />
                   </div>
                   <div>
-                    <motion.div
-                      initial={{ opacity: 0, scale: 0.8 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      transition={{ delay: 0.2 }}
-                      className="inline-flex items-center px-3 py-1 rounded-full border border-border bg-gradient-to-r from-[#E0E7FF] via-[#EEF2FF] to-[#F5F3FF] text-xs font-semibold text-[#4C1D95] shadow-soft-elevated dark:border-brand/30 dark:from-brand/20 dark:to-blue-600/20 dark:text-brand-light backdrop-blur-xl mb-2"
-                    >
+                    {membershipBadgeLabel ? (
                       <motion.div
-                        animate={{ rotate: [0, 360] }}
-                        transition={{
-                          duration: 3,
-                          repeat: Infinity,
-                          ease: "linear",
-                        }}
-                        className="mr-2"
+                        initial={{ opacity: 0, scale: 0.8 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        transition={{ delay: 0.2 }}
+                        className="inline-flex items-center px-3 py-1 rounded-full border border-border bg-gradient-to-r from-[#E0E7FF] via-[#EEF2FF] to-[#F5F3FF] text-xs font-semibold text-[#4C1D95] shadow-soft-elevated dark:border-brand/30 dark:from-brand/20 dark:to-blue-600/20 dark:text-brand-light backdrop-blur-xl mb-2"
                       >
-                        <Sparkles className="w-3 h-3 text-[#8F39BB]" />
+                        <motion.div
+                          animate={{ rotate: [0, 360] }}
+                          transition={{
+                            duration: 3,
+                            repeat: Infinity,
+                            ease: "linear",
+                          }}
+                          className="mr-2"
+                        >
+                          <Sparkles className="w-3 h-3 text-[#8F39BB]" />
+                        </motion.div>
+                        <span>{membershipBadgeLabel}</span>
                       </motion.div>
-                      <span>Pro Member</span>
-                    </motion.div>
+                    ) : null}
                     <div className="flex items-center gap-3 flex-wrap">
                       <h1 className="text-3xl lg:text-4xl font-bold text-foreground dark:bg-gradient-to-r dark:from-white dark:via-brand-light dark:to-blue-200 dark:bg-clip-text dark:text-transparent">
                         {profile?.full_name || "Anonymous User"}
@@ -466,15 +510,15 @@ const Profile = () => {
                       <div className="flex items-center space-x-1 text-muted-foreground dark:text-gray-400">
                         <Calendar className="w-4 h-4" />
                         <span className="text-sm">
-                          Member since {userStats.memberSince}
+                          Member since {memberSince}
                         </span>
                       </div>
-                      <div className="flex items-center space-x-1 text-muted-foreground dark:text-gray-400">
-                        <Clock className="w-4 h-4" />
-                        <span className="text-sm">
-                          {userStats.streak} day streak
-                        </span>
-                      </div>
+                      {streak > 0 ? (
+                        <div className="flex items-center space-x-1 text-muted-foreground dark:text-gray-400">
+                          <Clock className="w-4 h-4" />
+                          <span className="text-sm">{streak} day streak</span>
+                        </div>
+                      ) : null}
                     </div>
                   </div>
                 </div>
@@ -500,80 +544,15 @@ const Profile = () => {
             </div>
           </div>
 
-          {/* Stats Overview */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-6">
-            {[
-              {
-                title: "Total Uploads",
-                value: userStats.totalUploads.toLocaleString(),
-                icon: TrendingUp,
-                color: "from-brand to-brand-dark",
-                change: "+15%",
-              },
-              {
-                title: "Success Rate",
-                value: `${userStats.successRate}%`,
-                icon: Target,
-                color: "from-green-600 to-emerald-600",
-                change: "+2.1%",
-              },
-              {
-                title: "Avg Confidence",
-                value: `${userStats.avgConfidence}%`,
-                icon: Trophy,
-                color: "from-blue-600 to-cyan-600",
-                change: "+1.8%",
-              },
-              {
-                title: "Total Saved",
-                value: userStats.totalSaved,
-                icon: Zap,
-                color: "from-orange-600 to-red-600",
-                change: "+$340",
-              },
-            ].map((stat, index) => (
-              <motion.div
-                key={stat.title}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.1 * index, duration: 0.5 }}
-                whileHover={{ y: -5, scale: 1.02 }}
-                className="relative group"
-              >
-                <div
-                  className={`absolute inset-0 bg-gradient-to-r ${stat.color} opacity-10 rounded-2xl blur-xl group-hover:opacity-20 transition-opacity`}
-                />
-                <Card className="relative border border-border bg-card text-foreground shadow-soft-elevated backdrop-blur-xl transition-all duration-300 hover:border-[#C7D2FE] dark:bg-black/40 dark:border-white/10 dark:hover:border-white/20">
-                  <CardContent className="p-6">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground dark:text-gray-400">
-                          {stat.title}
-                        </p>
-                        <p className="mt-1 text-2xl font-bold text-foreground dark:text-white">
-                          {stat.value}
-                        </p>
-                        <p
-                          className={`text-sm mt-1 ${
-                            stat.change.startsWith("+")
-                              ? "text-emerald-500 dark:text-green-400"
-                              : "text-red-500 dark:text-red-400"
-                          }`}
-                        >
-                          {stat.change} this month
-                        </p>
-                      </div>
-                      <div
-                        className={`p-3 rounded-xl bg-gradient-to-r ${stat.color} shadow-lg shadow-brand/20`}
-                      >
-                        <stat.icon className="w-6 h-6 text-white" />
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </motion.div>
-            ))}
-          </div>
+          <DashboardOverviewStats
+            metrics={overviewMetrics}
+            sparklineSeries={sparklineSeries}
+            isLoading={statsLoading}
+            includeIds={["total", "success-rate", "confidence", "completed"]}
+            sectionTitle="Your activity"
+            sectionSubtitle="Live metrics from your active workspace"
+            gridClassName="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4"
+          />
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 lg:gap-8">
             {/* Achievements */}

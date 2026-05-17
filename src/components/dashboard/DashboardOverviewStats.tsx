@@ -151,7 +151,7 @@ function TrendBadge({ trend }: { trend: number | null | undefined }) {
   );
 }
 
-function StatCard({
+export function OverviewStatCard({
   stat,
   index,
   isLoading,
@@ -237,6 +237,12 @@ export type DashboardOverviewStatsProps = {
   sparklineSeries?: number[];
   isLoading?: boolean;
   className?: string;
+  /** Show only these stat ids (order preserved). */
+  includeIds?: string[];
+  showSectionHeader?: boolean;
+  sectionTitle?: string;
+  sectionSubtitle?: string;
+  gridClassName?: string;
 };
 
 export function DashboardOverviewStats({
@@ -244,8 +250,13 @@ export function DashboardOverviewStats({
   sparklineSeries = [],
   isLoading = false,
   className,
+  includeIds,
+  showSectionHeader = true,
+  sectionTitle = "Overview",
+  sectionSubtitle = "Live metrics from your identification workspace",
+  gridClassName = "grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4",
 }: DashboardOverviewStatsProps) {
-  const stats: StatConfig[] = useMemo(
+  const allStats: StatConfig[] = useMemo(
     () => [
       {
         id: "total",
@@ -319,21 +330,32 @@ export function DashboardOverviewStats({
     [metrics, sparklineSeries]
   );
 
+  const stats = useMemo(() => {
+    if (!includeIds?.length) return allStats;
+    const byId = new Map(allStats.map((s) => [s.id, s]));
+    return includeIds.map((id) => byId.get(id)).filter(Boolean) as StatConfig[];
+  }, [allStats, includeIds]);
+
   return (
     <section className={cn("space-y-3", className)} aria-label="Overview statistics">
-      <div className="flex flex-wrap items-end justify-between gap-2 px-0.5">
-        <div>
-          <h2 className="text-sm font-semibold text-foreground sm:text-base">
-            Overview
-          </h2>
-          <p className="text-xs text-muted-foreground">
-            Live metrics from your identification workspace
-          </p>
+      {showSectionHeader ? (
+        <div className="flex flex-wrap items-end justify-between gap-2 px-0.5">
+          <div>
+            <h2 className="text-sm font-semibold text-foreground sm:text-base">
+              {sectionTitle}
+            </h2>
+            <p className="text-xs text-muted-foreground">{sectionSubtitle}</p>
+          </div>
         </div>
-      </div>
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      ) : null}
+      <div className={gridClassName}>
         {stats.map((stat, index) => (
-          <StatCard key={stat.id} stat={stat} index={index} isLoading={isLoading} />
+          <OverviewStatCard
+            key={stat.id}
+            stat={stat}
+            index={index}
+            isLoading={isLoading}
+          />
         ))}
       </div>
     </section>
