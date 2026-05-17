@@ -489,10 +489,13 @@ export const authApi = {
 };
 
 // Dashboard API
-type DashboardStats = {
+export type DashboardStats = {
   totalUploads?: number;
   successfulUploads?: number;
+  failedUploads?: number;
   avgConfidence?: number;
+  avgProcessTime?: number;
+  avgResponseTime?: number;
   currentStreak?: number;
   totalSaved?: number;
   totalAchievements?: number;

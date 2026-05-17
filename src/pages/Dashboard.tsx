@@ -14,8 +14,6 @@ import {
   Upload,
   FileText,
   TrendingUp,
-  Clock,
-  CheckCircle,
   AlertTriangle,
   Zap,
   Eye,
@@ -39,8 +37,57 @@ import { useToast } from "@/components/ui/use-toast";
 import DashboardSkeleton from "@/components/DashboardSkeleton";
 import { PerformanceOverviewChart } from "@/components/PerformanceOverviewChart";
 import { getCrewJobDisplayName } from "@/services/aiAnalysisCrew";
-import { formatProcessingDisplay } from "@/lib/utils";
 import { DashboardWelcomeBanner } from "@/components/dashboard/DashboardWelcomeBanner";
+import {
+  DashboardOverviewStats,
+  type DashboardOverviewMetrics,
+} from "@/components/dashboard/DashboardOverviewStats";
+
+const IN_PROGRESS_STATUSES = new Set([
+  "processing",
+  "pending",
+  "running",
+  "queued",
+  "in_progress",
+  "started",
+]);
+
+const defaultOverviewMetrics = (): DashboardOverviewMetrics => ({
+  totalUploads: 0,
+  successfulUploads: 0,
+  failedUploads: 0,
+  inProgress: 0,
+  avgConfidence: 0,
+  avgProcessTime: 0,
+  successRate: 0,
+  analysesLast7Days: 0,
+  trend7dPercent: null,
+});
+
+function parseCrewJobs(payload: unknown): any[] {
+  const p = payload as any;
+  if (Array.isArray(p?.data)) return p.data;
+  if (Array.isArray(p?.jobs)) return p.jobs;
+  if (Array.isArray(p)) return p;
+  return [];
+}
+
+function buildSparklineFromAnalytics(series: any[]): number[] {
+  return (series || []).map((p) => Number(p?.analyzedParts ?? p?.completedAnalyses ?? 0));
+}
+
+function computeAnalyticsRollups(series: any[]) {
+  const points = (series || []).filter((p) => p?.date);
+  const last7 = points.slice(-7);
+  const prev7 = points.slice(-14, -7);
+  const sum = (arr: any[]) =>
+    arr.reduce((acc, p) => acc + Number(p?.analyzedParts ?? 0), 0);
+  const last7Sum = sum(last7);
+  const prev7Sum = sum(prev7);
+  const trend7dPercent =
+    prev7Sum > 0 ? ((last7Sum - prev7Sum) / prev7Sum) * 100 : last7Sum > 0 ? 100 : null;
+  return { analysesLast7Days: last7Sum, trend7dPercent };
+}
 
 const Dashboard = () => {
   const { inLayout } = useDashboardLayout();
@@ -69,12 +116,9 @@ const Dashboard = () => {
 
   // State for dashboard data (persist last successful stats to avoid flicker-to-zero)
   // Start with zero; hydrate from per-user cache once the user id is available.
-  const [stats, setStats] = useState(() => ({
-    totalUploads: 0,
-    successfulUploads: 0,
-    avgConfidence: 0,
-    avgProcessTime: 0,
-  }));
+  const [overviewMetrics, setOverviewMetrics] = useState<DashboardOverviewMetrics>(
+    defaultOverviewMetrics
+  );
 
   const [recentUploads, setRecentUploads] = useState<any[]>(() => []);
   const [recentActivities, setRecentActivities] = useState<any[]>(() => []);
@@ -200,32 +244,35 @@ const Dashboard = () => {
         // Match History page: use /dashboard/stats payload directly.
         const totalUploads = Number(data.totalUploads || 0);
         const successfulUploads = Number(data.successfulUploads || 0);
+        const failedUploads = Number(data.failedUploads || 0);
         const avgConfidence = Number(data.avgConfidence || 0);
-        // Backend /dashboard/stats returns seconds already (History shows `${avgProcessTime}s`)
         const avgSec =
           typeof data.avgProcessTime === "number"
             ? data.avgProcessTime
             : typeof data.avgResponseTime === "number"
             ? Math.round(data.avgResponseTime / 1000)
             : 0;
+        const successRate =
+          totalUploads > 0 ? (successfulUploads / totalUploads) * 100 : 0;
 
-        setStats({
-          totalUploads: totalUploads,
-          successfulUploads: successfulUploads,
-          avgConfidence,
-          avgProcessTime: avgSec,
+        setOverviewMetrics((prev) => {
+          const next = {
+            ...prev,
+            totalUploads,
+            successfulUploads,
+            failedUploads,
+            avgConfidence,
+            avgProcessTime: avgSec,
+            successRate,
+          };
+          try {
+            localStorage.setItem(
+              storageKey("dashboard_overview_stats_v1"),
+              JSON.stringify(next)
+            );
+          } catch {}
+          return next;
         });
-        try {
-          localStorage.setItem(
-            storageKey("dashboard_overview_stats_v1"),
-            JSON.stringify({
-              totalUploads,
-              successfulUploads,
-              avgConfidence,
-              avgProcessTime: avgSec,
-            })
-          );
-        } catch {}
       } else {
         // Keep last successful stats instead of wiping to 0 (avoids flicker on transient failures).
       }
@@ -235,14 +282,12 @@ const Dashboard = () => {
         crewJobsResponse.status === "fulfilled" &&
         crewJobsResponse.value.data
       ) {
-        const crewJobsPayload = crewJobsResponse.value.data as any;
-        const crewJobs = (Array.isArray(crewJobsPayload?.data)
-          ? crewJobsPayload.data
-          : Array.isArray(crewJobsPayload?.jobs)
-          ? crewJobsPayload.jobs
-          : Array.isArray(crewJobsPayload)
-          ? crewJobsPayload
-          : []) as any[];
+        const crewJobs = parseCrewJobs(crewJobsResponse.value.data);
+
+        const inProgress = crewJobs.filter((job: any) =>
+          IN_PROGRESS_STATUSES.has(String(job.status || "").toLowerCase())
+        ).length;
+        setOverviewMetrics((prev) => ({ ...prev, inProgress }));
 
         // Show only completed jobs, sorted by most recent
         const recentCompleted = crewJobs
@@ -482,6 +527,8 @@ const Dashboard = () => {
         const nextAnalyticsSeries =
           ((analyticsResponse.value.data as any)?.series as any[]) || [];
         setAnalyticsSeries(nextAnalyticsSeries);
+        const rollups = computeAnalyticsRollups(nextAnalyticsSeries);
+        setOverviewMetrics((prev) => ({ ...prev, ...rollups }));
         try {
           localStorage.setItem(
             storageKey("dashboard_analytics_series_v1"),
@@ -562,17 +609,20 @@ const Dashboard = () => {
     try {
       const rawStats = localStorage.getItem(storageKey("dashboard_overview_stats_v1"));
       if (rawStats && !hasLoadedOnceRef.current) {
-        const parsed = JSON.parse(rawStats) as Partial<{
-          totalUploads: number;
-          successfulUploads: number;
-          avgConfidence: number;
-          avgProcessTime: number;
-        }>;
-        setStats({
-          totalUploads: Number(parsed.totalUploads || 0),
-          successfulUploads: Number(parsed.successfulUploads || 0),
-          avgConfidence: Number(parsed.avgConfidence || 0),
-          avgProcessTime: Number(parsed.avgProcessTime || 0),
+        const parsed = JSON.parse(rawStats) as Partial<DashboardOverviewMetrics>;
+        setOverviewMetrics({
+          ...defaultOverviewMetrics(),
+          ...parsed,
+          totalUploads: Number(parsed.totalUploads ?? 0),
+          successfulUploads: Number(parsed.successfulUploads ?? 0),
+          failedUploads: Number(parsed.failedUploads ?? 0),
+          inProgress: Number(parsed.inProgress ?? 0),
+          avgConfidence: Number(parsed.avgConfidence ?? 0),
+          avgProcessTime: Number(parsed.avgProcessTime ?? 0),
+          successRate: Number(parsed.successRate ?? 0),
+          analysesLast7Days: Number(parsed.analysesLast7Days ?? 0),
+          trend7dPercent:
+            parsed.trend7dPercent == null ? null : Number(parsed.trend7dPercent),
         });
       }
 
@@ -705,64 +755,11 @@ const Dashboard = () => {
             onStartTour={startOnboarding}
           />
 
-          {/* Stats Grid */}
-          <div className="grid grid-cols-1 xs:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-6">
-            {[
-              {
-                title: "Total Uploads",
-                value: String(stats.totalUploads || 0),
-                icon: FileText,
-                color: "bg-primary/20 text-primary",
-              },
-              {
-                title: "Completed",
-                value: String(stats.successfulUploads || 0),
-                icon: CheckCircle,
-                color: "bg-[#2EE6A6]/20 text-[#2EE6A6]",
-              },
-              {
-                title: "Avg Confidence",
-                value: `${Number(stats.avgConfidence || 0).toFixed(1)}%`,
-                icon: TrendingUp,
-                color: "bg-accent/20 text-accent",
-              },
-              {
-                title: "Avg Processing",
-                value: formatProcessingDisplay(Number(stats.avgProcessTime) || 0),
-                icon: Clock,
-                color: "bg-white/10 text-foreground",
-              },
-            ].map((stat, index) => (
-              <motion.div
-                key={stat.title}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.1 * index, duration: 0.5 }}
-                whileHover={{ y: -4, scale: 1.01 }}
-                className="relative group"
-              >
-                <Card className="premium-card relative text-foreground backdrop-blur-md">
-                  <CardContent className="p-4 sm:p-6">
-                    <div className="flex items-center justify-between">
-                      <div className="flex-1 min-w-0">
-                        <p className="text-xs font-medium text-muted-foreground md:text-sm truncate">
-                          {stat.title}
-                        </p>
-                        <p className="mt-1 text-lg font-bold text-foreground md:text-xl lg:text-2xl truncate">
-                          {stat.value}
-                        </p>
-                      </div>
-                      <div
-                        className={`p-3 rounded-xl ${stat.color} flex-shrink-0`}
-                      >
-                        <stat.icon className="w-5 h-5" />
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </motion.div>
-            ))}
-          </div>
+          <DashboardOverviewStats
+            metrics={overviewMetrics}
+            sparklineSeries={buildSparklineFromAnalytics(analyticsSeries)}
+            isLoading={isDataLoading && !hasLoadedOnceRef.current}
+          />
 
           {/* Performance Overview */}
           <motion.div

@@ -57,7 +57,7 @@ const pageMeta: Record<
   },
   "/dashboard/notifications": {
     title: "Notifications",
-    description: "Stay on top of important events and job status updates.",
+    description: "Stay on top of important events and analysis status updates.",
     section: "Engagement",
   },
 };
