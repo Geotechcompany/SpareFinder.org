@@ -77,22 +77,35 @@ def plan_display_name(tier: str) -> str:
     return "Starter"
 
 
+async def _fetch_user_subscription_row(user_id: str) -> dict | None:
+    """Active or trialing subscription (matches frontend isPlanActive)."""
+    supabase = get_supabase_admin()
+    sub = (
+        supabase.table("subscriptions")
+        .select("tier, plan_type, status")
+        .eq("user_id", user_id)
+        .in_("status", ["active", "trialing"])
+        .limit(1)
+        .execute()
+    )
+    if sub.data:
+        return sub.data[0]
+    return None
+
+
+async def user_has_active_plan(user_id: str, role: str) -> bool:
+    if role in ("admin", "super_admin"):
+        return True
+    return (await _fetch_user_subscription_row(user_id)) is not None
+
+
 async def get_user_tier_and_limits(user_id: str, role: str) -> tuple[str, dict]:
     """Billing tier and limits for the account (shared across all workspaces)."""
     if role in ("admin", "super_admin"):
         return "enterprise", SUBSCRIPTION_LIMITS["enterprise"]
-    supabase = get_supabase_admin()
-    sub = (
-        supabase.table("subscriptions")
-        .select("tier, plan_type")
-        .eq("user_id", user_id)
-        .eq("status", "active")
-        .limit(1)
-        .execute()
-    )
+    row = _fetch_user_subscription_row(user_id)
     tier = "free"
-    if sub.data:
-        row = sub.data[0]
+    if row:
         tier = _normalize_tier(row.get("tier") or row.get("plan_type") or "free")
     limits = SUBSCRIPTION_LIMITS.get(tier, SUBSCRIPTION_LIMITS["free"])
     return tier, limits
@@ -166,7 +179,11 @@ async def get_workspace_quota(user_id: str, role: str) -> dict[str, Any]:
     tier, limits = await get_user_tier_and_limits(user_id, role)
     max_ws = get_max_workspaces_for_tier(tier)
     count = await count_user_workspaces(user_id)
-    can_create = role in ("admin", "super_admin") or max_ws == -1 or count < max_ws
+    has_plan = role in ("admin", "super_admin") or await user_has_active_plan(
+        user_id, role
+    )
+    under_limit = role in ("admin", "super_admin") or max_ws == -1 or count < max_ws
+    can_create = has_plan and under_limit
     return {
         "tier": tier,
         "planName": plan_display_name(tier),
@@ -182,11 +199,19 @@ async def assert_can_create_workspace(user: CurrentUser) -> str | None:
     """Return an error message if the user cannot create another workspace."""
     if user.role in ("admin", "super_admin"):
         return None
+    count = await count_user_workspaces(user.id)
+    # First workspace (onboarding) does not require a paid plan yet.
+    if count == 0:
+        return None
+    if not await user_has_active_plan(user.id, user.role):
+        return (
+            "An active subscription is required to create workspaces. "
+            "Choose a plan on the billing page to continue."
+        )
     tier, _ = await get_user_tier_and_limits(user.id, user.role)
     max_ws = get_max_workspaces_for_tier(tier)
     if max_ws == -1:
         return None
-    count = await count_user_workspaces(user.id)
     if count >= max_ws:
         plan = plan_display_name(tier)
         return (

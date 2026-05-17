@@ -22,9 +22,12 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { useAuth } from "@/contexts/AuthContext";
+import { useSubscription } from "@/contexts/SubscriptionContext";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
+import { useNavigate } from "react-router-dom";
 import { WorkspaceIcon } from "@/components/dashboard/WorkspaceIcon";
 import { ProfileImageUploader } from "@/components/profile/ProfileImageUploader";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -44,7 +47,10 @@ export function SidebarWorkspaceSwitcher({
 }: {
   isCollapsed?: boolean;
 }) {
+  const navigate = useNavigate();
   const { toast } = useToast();
+  const { isAdmin } = useAuth();
+  const { isPlanActive, isLoading: subscriptionLoading } = useSubscription();
   const {
     workspaces,
     activeWorkspace,
@@ -55,7 +61,9 @@ export function SidebarWorkspaceSwitcher({
     refreshWorkspaces,
   } = useWorkspace();
 
-  const canCreate = quota?.canCreateWorkspace ?? true;
+  const hasPlan = isAdmin || isPlanActive;
+  const canCreate =
+    hasPlan && !subscriptionLoading && (quota?.canCreateWorkspace ?? true);
   const quotaLabel = quota ? formatWorkspaceQuota(quota) : null;
 
   const [open, setOpen] = useState(false);
@@ -89,6 +97,30 @@ export function SidebarWorkspaceSwitcher({
     } finally {
       setIsSwitching(null);
     }
+  };
+
+  const handleCreateClick = () => {
+    if (subscriptionLoading) return;
+    if (!hasPlan) {
+      toast({
+        title: "Subscription required",
+        description: "Choose a plan on the billing page to create workspaces.",
+      });
+      navigate("/dashboard/billing");
+      setOpen(false);
+      return;
+    }
+    if (!canCreate) {
+      toast({
+        variant: "destructive",
+        title: "Workspace limit reached",
+        description: quotaLabel
+          ? `You have reached the limit for ${quota?.planName ?? "your plan"}.`
+          : "Upgrade your plan to add more workspaces.",
+      });
+      return;
+    }
+    setCreateOpen(true);
   };
 
   const handleCreate = async () => {
@@ -227,27 +259,15 @@ export function SidebarWorkspaceSwitcher({
           ) : null}
           <button
             type="button"
-            disabled={!canCreate}
-            onClick={() => {
-              if (!canCreate) {
-                toast({
-                  variant: "destructive",
-                  title: "Workspace limit reached",
-                  description:
-                    quota?.maxWorkspaces != null && quota.maxWorkspaces > 0
-                      ? `Your ${quota.planName} plan allows up to ${quota.maxWorkspaces} workspaces. Upgrade for more.`
-                      : "Upgrade your plan to create more workspaces.",
-                });
-                return;
-              }
-              setOpen(false);
-              setCreateOpen(true);
-            }}
+            disabled={subscriptionLoading}
+            onClick={handleCreateClick}
             className={cn(
               "flex w-full items-center gap-2 rounded-lg px-2 py-2 text-sm font-medium transition-colors",
               canCreate
                 ? "sidebar-workspace-active text-brand hover:bg-brand/10 dark:text-brand-light"
-                : "cursor-not-allowed text-muted-foreground opacity-60"
+                : hasPlan
+                  ? "cursor-not-allowed text-muted-foreground opacity-60"
+                  : "text-muted-foreground hover:bg-muted/80"
             )}
           >
             <Plus className="h-4 w-4" />
@@ -302,12 +322,19 @@ export function SidebarWorkspaceSwitcher({
           <DialogHeader>
             <DialogTitle>Create workspace</DialogTitle>
             <DialogDescription>
-              Analyses and monthly limits are shared across all workspaces on your plan.
-              {quota && quota.maxWorkspaces > 0
-                ? ` You can create up to ${quota.maxWorkspaces} workspaces on ${quota.planName}.`
-                : quota?.maxWorkspaces === -1
-                  ? " Your plan includes unlimited workspaces."
-                  : null}
+              {hasPlan ? (
+                <>
+                  Analyses and monthly limits are shared across all workspaces on your
+                  plan.
+                  {quota && quota.maxWorkspaces > 0
+                    ? ` You can create up to ${quota.maxWorkspaces} workspaces on ${quota.planName}.`
+                    : quota?.maxWorkspaces === -1
+                      ? " Your plan includes unlimited workspaces."
+                      : null}
+                </>
+              ) : (
+                "Choose a plan on the billing page to create workspaces."
+              )}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-2 py-2">
@@ -334,7 +361,7 @@ export function SidebarWorkspaceSwitcher({
             <Button
               type="button"
               onClick={() => void handleCreate()}
-              disabled={!newName.trim() || isCreating}
+              disabled={!hasPlan || !canCreate || !newName.trim() || isCreating}
             >
               {isCreating ? "Creating…" : "Create"}
             </Button>
