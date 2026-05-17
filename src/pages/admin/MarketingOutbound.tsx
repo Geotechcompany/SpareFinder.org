@@ -67,6 +67,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Users,
+  Download,
 } from "lucide-react";
 import { API_BASE_URL } from "@/lib/config";
 
@@ -244,6 +245,7 @@ const MarketingOutbound: React.FC = () => {
   const [leadsSearch, setLeadsSearch] = useState("");
   const [leadsTotal, setLeadsTotal] = useState(0);
   const [leadsLoading, setLeadsLoading] = useState(false);
+  const [isExportingLeads, setIsExportingLeads] = useState(false);
 
   const loadGlobal = useCallback(async () => {
     setLoading(true);
@@ -362,6 +364,51 @@ const MarketingOutbound: React.FC = () => {
     setLeadsPage(1);
   };
 
+  const downloadMarketingLeadsCsv = async (mode: "filtered" | "selected") => {
+    if (mode === "selected" && !selectedLeadIds.length) {
+      toast({
+        variant: "destructive",
+        title: "Nothing selected",
+        description: "Select at least one contact to export.",
+      });
+      return;
+    }
+    setIsExportingLeads(true);
+    try {
+      const blob = await adminApi.exportMarketingLeadsCsv({
+        search: mode === "filtered" ? leadsSearch.trim() || undefined : undefined,
+        country_code: mode === "filtered" ? leadCountryFilter : undefined,
+        ids: mode === "selected" ? selectedLeadIds : undefined,
+      });
+      const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
+      const filename =
+        mode === "selected"
+          ? `sparefinder-leads-selected-${stamp}.csv`
+          : `sparefinder-leads-${stamp}.csv`;
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = filename;
+      anchor.click();
+      URL.revokeObjectURL(url);
+      toast({
+        title: "Export ready",
+        description:
+          mode === "selected"
+            ? `Downloaded ${selectedLeadIds.length} selected contact(s).`
+            : "Downloaded all contacts matching your current search and filters.",
+      });
+    } catch (e) {
+      toast({
+        variant: "destructive",
+        title: "Export failed",
+        description: formatMarketingApiError(e),
+      });
+    } finally {
+      setIsExportingLeads(false);
+    }
+  };
+
   const leadsTotalPages = Math.max(1, Math.ceil(leadsTotal / leadsLimit) || 1);
   const leadsRangeFrom = leadsTotal === 0 ? 0 : (leadsPage - 1) * leadsLimit + 1;
   const leadsRangeTo = leadsTotal === 0 ? 0 : Math.min(leadsPage * leadsLimit, leadsTotal);
@@ -401,9 +448,18 @@ const MarketingOutbound: React.FC = () => {
         run_sanitize: csvRunSanitize,
       });
       if (res.success) {
-        const data = res.data as { imported?: number };
-        setCsvImportStatus(`Import complete. Upserted ${data?.imported ?? 0} rows.`);
-        toast({ title: "Import complete", description: `Upserted ${data?.imported ?? 0} rows` });
+        const data = res.data as {
+          imported?: number;
+          skipped_duplicate_lead?: number;
+          skipped_duplicate_user?: number;
+          skipped_no_email?: number;
+        };
+        const dupLead = data?.skipped_duplicate_lead ?? 0;
+        const dupUser = data?.skipped_duplicate_user ?? 0;
+        const noEmail = data?.skipped_no_email ?? 0;
+        const summary = `Imported ${data?.imported ?? 0} new lead(s). Skipped ${dupLead} duplicate lead(s), ${dupUser} existing account(s), ${noEmail} without email.`;
+        setCsvImportStatus(`Import complete. ${summary}`);
+        toast({ title: "Import complete", description: summary });
         loadAll();
       } else {
         setCsvImportStatus("Import failed.");
@@ -761,7 +817,7 @@ const MarketingOutbound: React.FC = () => {
         run_sanitize: manualLeadSanitize,
       });
       if (res.success) {
-        toast({ title: "Contact saved", description: "The lead was added or updated if the email already existed." });
+        toast({ title: "Contact saved", description: "The lead was added to the campaign queue." });
         setManualLeadOpen(false);
         loadAll();
       } else {
@@ -1217,6 +1273,30 @@ const MarketingOutbound: React.FC = () => {
                       <Button size="sm" onClick={openManualLeadDialog}>
                         <UserPlus className="h-4 w-4 mr-1" />
                         Add contact
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        disabled={isExportingLeads || leadsLoading}
+                        onClick={() => void downloadMarketingLeadsCsv("filtered")}
+                      >
+                        {isExportingLeads ? (
+                          <Loader2 className="h-4 w-4 mr-1 animate-spin" aria-hidden />
+                        ) : (
+                          <Download className="h-4 w-4 mr-1" aria-hidden />
+                        )}
+                        Export filtered
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        disabled={isExportingLeads || !selectedLeadIds.length}
+                        onClick={() => void downloadMarketingLeadsCsv("selected")}
+                      >
+                        <Download className="h-4 w-4 mr-1" aria-hidden />
+                        Export selected
                       </Button>
                       <Button size="sm" variant="outline" onClick={toggleAllLeadsOnPage}>
                         <PencilLine className="h-4 w-4 mr-1" />

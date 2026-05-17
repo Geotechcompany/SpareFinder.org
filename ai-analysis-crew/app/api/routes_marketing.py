@@ -34,7 +34,15 @@ from ..marketing_pipeline import (
     run_marketing_sanitize_review_batch,
     send_marketing_email,
 )
-from ..marketing_rules import is_disposable_domain, is_valid_email, normalize_row
+from ..marketing_rules import (
+    LeadInsertResult,
+    app_user_exists_for_email,
+    is_disposable_domain,
+    is_valid_email,
+    marketing_lead_exists,
+    normalize_email,
+    normalize_row,
+)
 from ..marketing_outbound_defaults import (
     default_campaign_id_for_new_leads,
     get_marketing_settings_row,
@@ -399,6 +407,135 @@ async def ai_generate_campaign(
 
 # ---------- Admin: leads ----------
 
+_MARKETING_LEADS_EXPORT_MAX = 50_000
+_MARKETING_LEADS_EXPORT_PAGE = 500
+
+_MARKETING_LEADS_CSV_FIELDS = [
+    "EMAIL",
+    "FULL_NAME",
+    "JOB_TITLE",
+    "COMPANY_NAME",
+    "PLATFORM",
+    "SOURCE",
+    "SANITIZATION_STATUS",
+    "LEAD_STATUS",
+    "CAMPAIGN_ID",
+    "TARGET_COUNTRY_CODE",
+    "CREATED_AT",
+    "SANITIZED_FULL_NAME",
+    "SANITIZED_JOB_TITLE",
+    "SANITIZED_COMPANY",
+]
+
+
+def _apply_marketing_leads_filters(
+    q: Any,
+    *,
+    search: str | None,
+    source: str | None,
+    sanitization_status: str | None,
+    campaign_id: str | None,
+    country_code: str | None,
+) -> Any:
+    if search and search.strip():
+        s = search.strip()
+        q = q.or_(f"email.ilike.%{s}%,company_name.ilike.%{s}%,full_name.ilike.%{s}%")
+    if source and source != "all":
+        q = q.eq("source", source)
+    if sanitization_status and sanitization_status != "all":
+        q = q.eq("sanitization_status", sanitization_status)
+    if campaign_id:
+        q = q.eq("campaign_id", campaign_id)
+    cc = (country_code or "").strip().lower()
+    if cc and cc not in ("all", "any"):
+        q = q.contains("raw_payload", {"target_country_code": cc})
+    return q
+
+
+def _parse_lead_export_ids(raw: str | None) -> list[str]:
+    if not raw or not str(raw).strip():
+        return []
+    ids = [x.strip() for x in str(raw).split(",") if x.strip()]
+    if len(ids) > 5000:
+        raise HTTPException(status_code=400, detail="Too many ids; max 5000 per export")
+    return ids
+
+
+def _lead_row_for_csv(lead: dict[str, Any]) -> dict[str, str]:
+    rp = lead.get("raw_payload")
+    if isinstance(rp, str):
+        try:
+            rp = json.loads(rp)
+        except Exception:
+            rp = {}
+    if not isinstance(rp, dict):
+        rp = {}
+    cc = rp.get("target_country_code")
+    created = lead.get("created_at")
+    return {
+        "EMAIL": str(lead.get("email") or ""),
+        "FULL_NAME": str(lead.get("full_name") or ""),
+        "JOB_TITLE": str(lead.get("job_title") or ""),
+        "COMPANY_NAME": str(lead.get("company_name") or ""),
+        "PLATFORM": str(lead.get("platform") or ""),
+        "SOURCE": str(lead.get("source") or ""),
+        "SANITIZATION_STATUS": str(lead.get("sanitization_status") or ""),
+        "LEAD_STATUS": str(lead.get("lead_status_internal") or ""),
+        "CAMPAIGN_ID": str(lead.get("campaign_id") or ""),
+        "TARGET_COUNTRY_CODE": str(cc or "").upper() if cc else "",
+        "CREATED_AT": str(created or ""),
+        "SANITIZED_FULL_NAME": str(lead.get("sanitized_full_name") or ""),
+        "SANITIZED_JOB_TITLE": str(lead.get("sanitized_job_title") or ""),
+        "SANITIZED_COMPANY": str(lead.get("sanitized_company_name") or ""),
+    }
+
+
+def _fetch_marketing_leads_export_rows(
+    supabase: Any,
+    *,
+    search: str | None,
+    source: str | None,
+    sanitization_status: str | None,
+    campaign_id: str | None,
+    country_code: str | None,
+    ids: list[str] | None,
+) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    page = 0
+    while len(rows) < _MARKETING_LEADS_EXPORT_MAX:
+        q = supabase.table("marketing_leads").select("*").order("created_at", desc=True)
+        if ids:
+            q = q.in_("id", ids)
+        else:
+            q = _apply_marketing_leads_filters(
+                q,
+                search=search,
+                source=source,
+                sanitization_status=sanitization_status,
+                campaign_id=campaign_id,
+                country_code=country_code,
+            )
+        offset = page * _MARKETING_LEADS_EXPORT_PAGE
+        res = q.range(offset, offset + _MARKETING_LEADS_EXPORT_PAGE - 1).execute()
+        batch = res.data or []
+        if not batch:
+            break
+        rows.extend(batch)
+        if len(batch) < _MARKETING_LEADS_EXPORT_PAGE:
+            break
+        page += 1
+    return rows[:_MARKETING_LEADS_EXPORT_MAX]
+
+
+def _build_marketing_leads_csv(leads: list[dict[str, Any]]) -> str:
+    buf = io.StringIO()
+    writer = csv.DictWriter(buf, fieldnames=_MARKETING_LEADS_CSV_FIELDS, extrasaction="ignore")
+    writer.writeheader()
+    for lead in leads:
+        if isinstance(lead, dict):
+            writer.writerow(_lead_row_for_csv(lead))
+    return buf.getvalue()
+
 
 @admin_router.get("/leads")
 async def list_leads(
@@ -417,18 +554,14 @@ async def list_leads(
     supabase = get_supabase_admin()
     offset = (page - 1) * limit
     q = supabase.table("marketing_leads").select("*", count="exact").order("created_at", desc=True)
-    if search and search.strip():
-        s = search.strip()
-        q = q.or_(f"email.ilike.%{s}%,company_name.ilike.%{s}%,full_name.ilike.%{s}%")
-    if source and source != "all":
-        q = q.eq("source", source)
-    if sanitization_status and sanitization_status != "all":
-        q = q.eq("sanitization_status", sanitization_status)
-    if campaign_id:
-        q = q.eq("campaign_id", campaign_id)
-    cc = (country_code or "").strip().lower()
-    if cc and cc not in ("all", "any"):
-        q = q.contains("raw_payload", {"target_country_code": cc})
+    q = _apply_marketing_leads_filters(
+        q,
+        search=search,
+        source=source,
+        sanitization_status=sanitization_status,
+        campaign_id=campaign_id,
+        country_code=country_code,
+    )
     res = q.range(offset, offset + limit - 1).execute()
     total = int(getattr(res, "count", None) or len(res.data or []))
     return api_ok(
@@ -439,12 +572,51 @@ async def list_leads(
     )
 
 
+@admin_router.get("/leads/export")
+async def export_leads_csv(
+    search: str | None = None,
+    source: str | None = None,
+    sanitization_status: str | None = None,
+    campaign_id: str | None = None,
+    country_code: str | None = Query(
+        None,
+        description="Filter by target_country_code on raw_payload. Use 'all' to skip.",
+    ),
+    ids: str | None = Query(
+        None,
+        description="Optional comma-separated lead UUIDs (exports only those rows, max 5000)",
+    ),
+    _admin: CurrentUser = Depends(require_roles("admin", "super_admin")),
+):
+    """Download marketing leads as CSV (same filters as GET /leads, or explicit ids)."""
+    supabase = get_supabase_admin()
+    id_list = _parse_lead_export_ids(ids)
+    leads = _fetch_marketing_leads_export_rows(
+        supabase,
+        search=search,
+        source=source,
+        sanitization_status=sanitization_status,
+        campaign_id=campaign_id,
+        country_code=country_code,
+        ids=id_list or None,
+    )
+    csv_text = _build_marketing_leads_csv(leads)
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
+    suffix = "selected" if id_list else "filtered"
+    filename = f"sparefinder-marketing-leads-{suffix}-{stamp}.csv"
+    return Response(
+        content=csv_text,
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
 @admin_router.post("/leads")
 async def create_lead_manual(
     body: ManualLeadCreateBody,
     _admin: CurrentUser = Depends(require_roles("admin", "super_admin")),
 ):
-    """Create or update (by email) a single marketing lead from the admin UI."""
+    """Create a single marketing lead from the admin UI (rejects duplicate emails)."""
     em = body.email.strip().lower()
     if not is_valid_email(em):
         raise HTTPException(status_code=400, detail="Invalid email format")
@@ -460,16 +632,26 @@ async def create_lead_manual(
         "company_name": (body.company_name or "").strip(),
         "platform": "manual_admin",
     }
-    out = _upsert_lead(
+    result = _insert_marketing_lead(
         supabase,
         row,
         campaign_id=cid or None,
         source="manual_admin",
         run_sanitize=body.run_sanitize,
     )
-    if not out:
+    if result.status == "duplicate_lead":
+        raise HTTPException(
+            status_code=409,
+            detail="This email is already in marketing leads.",
+        )
+    if result.status == "duplicate_user":
+        raise HTTPException(
+            status_code=409,
+            detail="This email belongs to an existing SpareFinder account.",
+        )
+    if result.status != "created" or not result.lead:
         return api_error("Could not save lead", status_code=500)
-    return api_ok(data={"lead": out}, message="Lead saved")
+    return api_ok(data={"lead": result.lead}, message="Lead saved")
 
 
 @admin_router.patch("/leads/{lead_id}")
@@ -492,6 +674,17 @@ async def patch_lead(
         normalized_email = body.email.strip().lower()
         if normalized_email and not is_valid_email(normalized_email):
             raise HTTPException(status_code=400, detail="Invalid email format")
+        if normalized_email:
+            if marketing_lead_exists(supabase, normalized_email, exclude_lead_id=lead_id):
+                raise HTTPException(
+                    status_code=409,
+                    detail="This email is already in marketing leads.",
+                )
+            if app_user_exists_for_email(supabase, normalized_email):
+                raise HTTPException(
+                    status_code=409,
+                    detail="This email belongs to an existing SpareFinder account.",
+                )
         patch["email"] = normalized_email or None
     if body.lead_status_internal is not None:
         patch["lead_status_internal"] = body.lead_status_internal
@@ -589,19 +782,24 @@ def _discovery_candidate_has_usable_email(candidate: dict[str, Any]) -> bool:
     return True
 
 
-def _upsert_lead(
+def _insert_marketing_lead(
     supabase: Any,
     row: dict[str, Any],
     *,
     campaign_id: str | None,
     source: str,
     run_sanitize: bool,
-) -> dict[str, Any] | None:
+) -> LeadInsertResult:
     raw = {k: v for k, v in dict(row).items() if k not in ("sanitization_status", "source")}
     raw = normalize_row(raw)
-    email = raw.get("email") or raw.get("EMAIL")
-    if isinstance(email, str):
-        email = email.strip().lower()
+    email = normalize_email(raw.get("email") or raw.get("EMAIL"))
+    if not email:
+        return LeadInsertResult(None, "missing_email")
+
+    if marketing_lead_exists(supabase, email):
+        return LeadInsertResult(None, "duplicate_lead")
+    if app_user_exists_for_email(supabase, email):
+        return LeadInsertResult(None, "duplicate_user")
     full_name = raw.get("full_name") or raw.get("FULL_NAME") or ""
     job_title = raw.get("job_title") or raw.get("JOB_TITLE") or ""
     company = raw.get("company_name") or raw.get("COMPANY_NAME") or ""
@@ -646,22 +844,19 @@ def _upsert_lead(
 
     payload["unsubscribe_token"] = secrets.token_urlsafe(32)
 
-    if email and is_valid_email(email):
-        existing = (
-            supabase.table("marketing_leads")
-            .select("id")
-            .eq("email", email)
-            .limit(1)
-            .execute()
-        )
-        if existing.data:
-            lid = existing.data[0]["id"]
-            up = {k: v for k, v in payload.items() if k != "unsubscribe_token"}
-            res = supabase.table("marketing_leads").update(up).eq("id", lid).execute()
-            return (res.data or [None])[0]
+    try:
+        ins = supabase.table("marketing_leads").insert(payload).execute()
+        lead = (ins.data or [None])[0]
+        if lead:
+            return LeadInsertResult(lead, "created")
+    except Exception as e:
+        msg = str(e).lower()
+        if "23505" in str(e) or "duplicate" in msg or "unique" in msg:
+            return LeadInsertResult(None, "duplicate_lead")
+        logger.warning("marketing lead insert failed: %s", e)
+        return LeadInsertResult(None, "failed")
 
-    ins = supabase.table("marketing_leads").insert(payload).execute()
-    return (ins.data or [None])[0]
+    return LeadInsertResult(None, "failed")
 
 
 @admin_router.post("/leads/import")
@@ -790,6 +985,8 @@ async def import_leads_csv(
 
     imported = 0
     skipped_no_email = 0
+    skipped_duplicate_lead = 0
+    skipped_duplicate_user = 0
     errors: list[str] = []
 
     for i, row in enumerate(reader):
@@ -849,8 +1046,23 @@ async def import_leads_csv(
             if not out.get("platform"):
                 out["platform"] = (ai_extracted.platform if ai_extracted else "") or "csv_import"
 
-            _upsert_lead(supabase, out, campaign_id=campaign_id, source="csv_import", run_sanitize=run_sanitize)
-            imported += 1
+            result = _insert_marketing_lead(
+                supabase,
+                out,
+                campaign_id=campaign_id,
+                source="csv_import",
+                run_sanitize=run_sanitize,
+            )
+            if result.status == "created":
+                imported += 1
+            elif result.status == "duplicate_lead":
+                skipped_duplicate_lead += 1
+            elif result.status == "duplicate_user":
+                skipped_duplicate_user += 1
+            elif result.status == "missing_email":
+                skipped_no_email += 1
+            else:
+                errors.append(f"row {i+2}: could not insert lead")
         except Exception as e:
             errors.append(f"row {i+2}: {e}")
 
@@ -861,6 +1073,8 @@ async def import_leads_csv(
         data={
             "imported": imported,
             "skipped_no_email": skipped_no_email,
+            "skipped_duplicate_lead": skipped_duplicate_lead,
+            "skipped_duplicate_user": skipped_duplicate_user,
             "delimiter": delimiter,
             "errors": errors[:20],
         }
@@ -882,11 +1096,13 @@ def _run_google_serp_discovery(
 ) -> dict[str, Any]:
     """
     Shared Google SERP → lead upsert path for admin /discover and GET /cron/marketing-discover.
-    When campaign_id is empty, _upsert_lead assigns marketing default or highest-priority campaign.
+    When campaign_id is empty, _insert_marketing_lead assigns marketing default or highest-priority campaign.
+    Duplicate emails (existing leads or SpareFinder accounts) are skipped, not updated.
     """
     lead_source = "serper_google" if search_provider == "serper" else "serpapi_google"
     tag_cc = gl_use.lower()[:4] if gl_use else ""
     created = 0
+    skipped_duplicate = 0
     errs: list[str] = []
     per_query: list[dict[str, Any]] = []
     max_q = max(1, min(max_queries, 10))
@@ -925,15 +1141,18 @@ def _run_google_serp_discovery(
                     c["target_country_code"] = tag_cc
                 if not _discovery_candidate_has_usable_email(c):
                     continue
-                _upsert_lead(
+                result = _insert_marketing_lead(
                     supabase,
                     c,
                     campaign_id=campaign_id,
                     source=lead_source,
                     run_sanitize=True,
                 )
-                created += 1
-                stored_q += 1
+                if result.status == "created":
+                    created += 1
+                    stored_q += 1
+                elif result.status in ("duplicate_lead", "duplicate_user"):
+                    skipped_duplicate += 1
             per_query.append(
                 {
                     "query": q,
@@ -954,6 +1173,7 @@ def _run_google_serp_discovery(
     resolved_campaign_id = explicit or default_campaign_id_for_new_leads(supabase)
     return {
         "candidates_upserted": created,
+        "candidates_skipped_duplicate": skipped_duplicate,
         "errors": errs,
         "queries_run": slice_templates,
         "per_query": per_query,

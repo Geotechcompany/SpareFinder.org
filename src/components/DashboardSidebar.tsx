@@ -7,7 +7,6 @@ import {
   History, 
   CreditCard, 
   Settings, 
-  LogOut,
   Zap,
   Users,
   BarChart3,
@@ -25,7 +24,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSubscription } from "@/contexts/SubscriptionContext";
-import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
+import { SidebarUserPlanCard } from "@/components/dashboard/SidebarUserPlanCard";
 
 interface SidebarProps {
   isCollapsed?: boolean;
@@ -49,8 +48,8 @@ const DashboardSidebar: React.FC<SidebarProps> = ({ isCollapsed = false, onToggl
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
-  const { user, logout, isAdmin } = useAuth();
-  const { isPlanActive, isLoading: subscriptionLoading, tier, status } = useSubscription();
+  const { logout } = useAuth();
+  const { isPlanActive, isLoading: subscriptionLoading } = useSubscription();
 
   // Close mobile menu on route change
   useEffect(() => {
@@ -139,96 +138,12 @@ const DashboardSidebar: React.FC<SidebarProps> = ({ isCollapsed = false, onToggl
     return location.pathname.startsWith(href);
   };
 
-  const getUserInitials = () => {
-    if (!user) return 'U';
-    const nameParts = [user.full_name, user.email].filter(Boolean)[0]?.split(' ') || [];
-    if (nameParts.length === 0) return 'U';
-    if (nameParts.length === 1) return nameParts[0][0].toUpperCase();
-    return (nameParts[0][0] + nameParts[nameParts.length - 1][0]).toUpperCase();
-  };
-
-  const planLabel = (() => {
-    if (subscriptionLoading) return "Checking plan…";
-    if (isAdmin) return "Admin access";
-    if (!isPlanActive) return "No active plan";
-    const tierLabel =
-      tier === "free"
-        ? "Starter"
-        : tier === "pro"
-        ? "Professional"
-        : tier === "enterprise"
-        ? "Enterprise"
-        : "Plan active";
-    return status === "trialing" ? `${tierLabel} (trial)` : tierLabel;
-  })();
-
-  const planCtaLabel = (() => {
-    if (subscriptionLoading) return "Checking plan…";
-    if (isAdmin) return null;
-    if (!isPlanActive) return "Choose plan";
-    if (tier === "enterprise") return "Manage plan";
-    return "Upgrade plan";
-  })();
-
-  const handlePlanCta = () => {
-    // If plan isn't active, take them to the plan selector. Otherwise Billing is fine.
-    navigate(!subscriptionLoading && !isPlanActive ? "/onboarding/trial" : "/dashboard/billing");
-  };
-
-  const renderUserSection = (isMobile = false) => (
-    <div className={`p-4 border-t border-sidebar-border/80 dark:border-white/10 ${isMobile ? '' : ''}`}>
-      <div className="relative overflow-hidden flex items-center space-x-3 p-3 rounded-2xl bg-sidebar-accent/40 border border-sidebar-border dark:bg-white/5 dark:border-white/10">
-        <div className="pointer-events-none absolute -top-10 -right-10 h-24 w-24 rounded-full bg-accent/10 blur-2xl" />
-        <div className="pointer-events-none absolute -bottom-10 -left-10 h-24 w-24 rounded-full bg-primary/10 blur-2xl" />
-        <Avatar className="w-10 h-10">
-          <AvatarImage src={user?.avatar_url} />
-          <AvatarFallback className="bg-primary/20 text-primary">
-            {getUserInitials()}
-          </AvatarFallback>
-        </Avatar>
-        {!isCollapsed && (
-          <div className="flex-1">
-            <p className="font-medium text-sidebar-foreground dark:text-white">
-              {user?.full_name || user?.email?.split('@')[0] || 'User'}
-            </p>
-            <p className="text-xs text-muted-foreground dark:text-gray-400">
-              {(user as any)?.company || " "}
-            </p>
-            <div className="mt-1 flex items-center gap-2">
-              <span className="inline-flex items-center rounded-full border border-white/10 bg-black/10 px-2 py-0.5 text-xs text-muted-foreground dark:bg-white/5 dark:text-gray-300">
-                {planLabel}
-              </span>
-              {!subscriptionLoading && !isPlanActive && !isAdmin ? (
-                <span className="inline-flex items-center rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-xs text-amber-600 dark:text-amber-300">
-                  Locked
-                </span>
-              ) : null}
-            </div>
-          </div>
-        )}
-      </div>
-      {!isCollapsed && (
-        <div className="mt-3 grid grid-cols-1 gap-2">
-          {planCtaLabel ? (
-          <Button
-            type="button"
-              onClick={handlePlanCta}
-              disabled={subscriptionLoading}
-            className="w-full justify-center premium-button bg-primary hover:bg-primary/90"
-          >
-              {planCtaLabel}
-          </Button>
-          ) : null}
-          <Button 
-            variant="ghost" 
-            className="w-full text-red-400 hover:text-red-300 hover:bg-red-600/10 justify-start"
-            onClick={handleSignOut}
-          >
-            <LogOut className="w-4 h-4 mr-2" />
-            Sign Out
-          </Button>
-        </div>
-      )}
+  const renderUserSection = (forceExpanded = false) => (
+    <div className="border-t border-sidebar-border/80 p-4 dark:border-white/10">
+      <SidebarUserPlanCard
+        isCollapsed={forceExpanded ? false : isCollapsed}
+        onSignOut={handleSignOut}
+      />
     </div>
   );
 

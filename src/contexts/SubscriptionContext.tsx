@@ -13,27 +13,37 @@ import { useAuth } from "@/contexts/AuthContext";
 type SubscriptionTier = "free" | "pro" | "enterprise" | "none";
 type SubscriptionStatus = string | null;
 
+type RawSubscription = {
+  tier?: string;
+  status?: string;
+  current_period_start?: string;
+  current_period_end?: string;
+};
+
 type RawBillingResponse =
   | {
-      subscription?: {
-        tier?: string;
-        status?: string;
-      };
+      subscription?: RawSubscription;
     }
   | {
       success?: boolean;
       data?: {
-        subscription?: {
-          tier?: string;
-          status?: string;
-        };
+        subscription?: RawSubscription;
       };
     };
+
+const parseIsoDate = (value: unknown): Date | null => {
+  if (!value || typeof value !== "string") return null;
+  const d = new Date(value);
+  return Number.isNaN(d.getTime()) ? null : d;
+};
 
 export type SubscriptionContextValue = {
   tier: SubscriptionTier;
   status: SubscriptionStatus;
   isPlanActive: boolean;
+  isTrialing: boolean;
+  currentPeriodStart: Date | null;
+  currentPeriodEnd: Date | null;
   isLoading: boolean;
   refreshSubscription: () => Promise<void>;
 };
@@ -53,7 +63,14 @@ const isStatusActive = (status: unknown): boolean => {
   return status === "active" || status === "trialing";
 };
 
-const parseBilling = (raw: unknown): { tier: SubscriptionTier; status: SubscriptionStatus } => {
+const parseBilling = (
+  raw: unknown
+): {
+  tier: SubscriptionTier;
+  status: SubscriptionStatus;
+  currentPeriodStart: Date | null;
+  currentPeriodEnd: Date | null;
+} => {
   const payload = raw as RawBillingResponse | null | undefined;
 
   const sub =
@@ -63,7 +80,12 @@ const parseBilling = (raw: unknown): { tier: SubscriptionTier; status: Subscript
   const status = (sub?.status ?? null) as SubscriptionStatus;
   const tier = isStatusActive(status) ? normalizeTier(sub?.tier) : "none";
 
-  return { tier, status };
+  return {
+    tier,
+    status,
+    currentPeriodStart: parseIsoDate(sub?.current_period_start),
+    currentPeriodEnd: parseIsoDate(sub?.current_period_end),
+  };
 };
 
 export const useSubscription = (): SubscriptionContextValue => {
@@ -81,6 +103,8 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const [tier, setTier] = useState<SubscriptionTier>("none");
   const [status, setStatus] = useState<SubscriptionStatus>(null);
+  const [currentPeriodStart, setCurrentPeriodStart] = useState<Date | null>(null);
+  const [currentPeriodEnd, setCurrentPeriodEnd] = useState<Date | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
   const abortRef = useRef<AbortController | null>(null);
@@ -89,6 +113,8 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({
     if (isAuthLoading || !isAuthenticated) {
       setTier("none");
       setStatus(null);
+      setCurrentPeriodStart(null);
+      setCurrentPeriodEnd(null);
       setIsLoading(false);
       return;
     }
@@ -105,12 +131,16 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({
       const next = parseBilling(response);
       setTier(next.tier);
       setStatus(next.status);
+      setCurrentPeriodStart(next.currentPeriodStart);
+      setCurrentPeriodEnd(next.currentPeriodEnd);
     } catch (err) {
       // If the request was intentionally aborted, ignore.
       if (err instanceof DOMException && err.name === "AbortError") return;
       // Fail closed: treat as no active plan.
       setTier("none");
       setStatus(null);
+      setCurrentPeriodStart(null);
+      setCurrentPeriodEnd(null);
     } finally {
       setIsLoading(false);
     }
@@ -128,10 +158,21 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({
       tier,
       status,
       isPlanActive: isStatusActive(status),
+      isTrialing: status === "trialing",
+      currentPeriodStart,
+      currentPeriodEnd,
       isLoading: isAuthLoading || isLoading,
       refreshSubscription,
     }),
-    [tier, status, isAuthLoading, isLoading, refreshSubscription]
+    [
+      tier,
+      status,
+      currentPeriodStart,
+      currentPeriodEnd,
+      isAuthLoading,
+      isLoading,
+      refreshSubscription,
+    ]
   );
 
   return (

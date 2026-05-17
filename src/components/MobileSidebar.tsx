@@ -1,8 +1,8 @@
 import React from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { SidebarUserPlanCard } from '@/components/dashboard/SidebarUserPlanCard';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSubscription } from "@/contexts/SubscriptionContext";
 import { 
@@ -10,7 +10,6 @@ import {
   Upload, 
   History, 
   Settings, 
-  LogOut,
   X,
   User,
   Bell,
@@ -39,9 +38,8 @@ type NavGroup = {
 
 const MobileSidebar: React.FC<MobileSidebarProps> = ({ isOpen, onClose }) => {
   const location = useLocation();
-  const navigate = useNavigate();
-  const { user, logout, isAdmin } = useAuth();
-  const { isPlanActive, isLoading: subscriptionLoading, tier, status } = useSubscription();
+  const { logout } = useAuth();
+  const { isPlanActive, isLoading: subscriptionLoading } = useSubscription();
 
   const navGroups: NavGroup[] = [
     {
@@ -105,40 +103,6 @@ const MobileSidebar: React.FC<MobileSidebarProps> = ({ isOpen, onClose }) => {
     }
   };
 
-  // Get user display info
-  const displayName = user?.full_name || user?.email?.split('@')[0] || 'User';
-  const userInitials = user?.full_name
-    ? user.full_name.split(' ').map(n => n[0]).join('').toUpperCase()
-    : user?.email?.charAt(0).toUpperCase() || 'U';
-  
-  const tierDisplay = (() => {
-    if (subscriptionLoading) return "Checking plan…";
-    if (isAdmin) return "Admin access";
-    if (!isPlanActive) return "No active plan";
-    const tierLabel =
-      tier === "free"
-        ? "Starter"
-        : tier === "pro"
-        ? "Professional"
-        : tier === "enterprise"
-        ? "Enterprise"
-        : "Plan active";
-    return status === "trialing" ? `${tierLabel} (trial)` : tierLabel;
-  })();
-
-  const handleUpgrade = () => {
-    onClose();
-    navigate(!subscriptionLoading && !isPlanActive ? "/onboarding/trial" : "/dashboard/billing");
-  };
-
-  const planCtaLabel = (() => {
-    if (subscriptionLoading) return "Checking plan…";
-    if (isAdmin) return null;
-    if (!isPlanActive) return "Choose plan";
-    if (tier === "enterprise") return "Manage plan";
-    return "Upgrade plan";
-  })();
-
   return (
     <AnimatePresence>
       {isOpen && (
@@ -158,62 +122,26 @@ const MobileSidebar: React.FC<MobileSidebarProps> = ({ isOpen, onClose }) => {
             animate={{ x: 0 }}
             exit={{ x: '-100%' }}
             transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-            className="fixed left-0 top-0 bottom-0 w-[280px] bg-sidebar text-sidebar-foreground border-r border-sidebar-border backdrop-blur-xl z-50 md:hidden dark:bg-[#0F1221] dark:text-white dark:border-white/10"
+            className="fixed left-0 top-0 bottom-0 flex w-[min(100vw,320px)] flex-col bg-sidebar text-sidebar-foreground border-r border-sidebar-border backdrop-blur-xl z-50 md:hidden dark:bg-[#0F1221] dark:text-white dark:border-white/10"
           >
-            {/* Header */}
-            <div className="flex items-center justify-between p-4 border-b border-sidebar-border/80 dark:border-white/10">
-              <div className="flex items-center gap-3">
-                <Avatar className="w-8 h-8">
-                  <AvatarImage src={user?.avatar_url} alt={displayName} />
-                  <AvatarFallback className="bg-primary/20 text-primary text-sm">
-                    {userInitials}
-                  </AvatarFallback>
-                </Avatar>
-                <div>
-                  <h3 className="font-semibold text-sm text-sidebar-foreground dark:text-white">
-                    {displayName}
-                  </h3>
-                  <p className="text-[11px] text-muted-foreground dark:text-gray-400">
-                    {(user as any)?.company || " "}
-                  </p>
-                  <div className="mt-1 flex items-center gap-2">
-                    <span className="inline-flex items-center rounded-full border border-white/10 bg-black/10 px-2 py-0.5 text-[11px] text-muted-foreground dark:bg-white/5 dark:text-gray-300">
-                      {tierDisplay}
-                    </span>
-                    {!subscriptionLoading && !isPlanActive && !isAdmin ? (
-                      <span className="inline-flex items-center rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[11px] text-amber-600 dark:text-amber-300">
-                        Locked
-                      </span>
-                    ) : null}
-                  </div>
-                </div>
-              </div>
+            <div className="flex items-center justify-between border-b border-sidebar-border/80 p-4 dark:border-white/10">
+              <motion.div>
+                <h2 className="text-base font-bold text-sidebar-foreground dark:text-white">SpareFinder</h2>
+                <p className="text-[11px] text-muted-foreground dark:text-gray-400">Your workspace</p>
+              </motion.div>
               <Button
                 variant="ghost"
                 size="icon"
                 onClick={onClose}
-                className="text-gray-400 hover:text-white"
+                className="text-muted-foreground hover:text-foreground dark:hover:text-white"
+                aria-label="Close menu"
               >
-                <X className="w-5 h-5" />
+                <X className="h-5 w-5" />
               </Button>
-            </div>
-
-            {/* Upgrade CTA */}
-            <div className="px-4 pt-4">
-              {planCtaLabel ? (
-              <Button
-                type="button"
-                onClick={handleUpgrade}
-                  disabled={subscriptionLoading}
-                className="h-11 w-full premium-button bg-primary hover:bg-primary/90"
-              >
-                  {planCtaLabel}
-              </Button>
-              ) : null}
             </div>
 
             {/* Navigation */}
-            <div className="flex-1 overflow-y-auto px-4 py-4">
+            <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
               <div className="space-y-5">
                 {visibleNavGroups.map((group) => (
                   <div key={group.title} className="space-y-2">
@@ -263,17 +191,9 @@ const MobileSidebar: React.FC<MobileSidebarProps> = ({ isOpen, onClose }) => {
               </div>
             </div>
 
-            {/* Footer */}
-            <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-sidebar-border/80 dark:border-white/10">
-              <Button
-                variant="ghost"
-                className="w-full justify-start text-red-400 hover:text-red-300 hover:bg-red-500/10"
-                onClick={handleSignOut}
-              >
-                <LogOut className="w-4 h-4 mr-2" />
-                Sign Out
-              </Button>
-            </div>
+            <motion.div className="border-t border-sidebar-border/80 p-4 dark:border-white/10">
+              <SidebarUserPlanCard onSignOut={handleSignOut} />
+            </motion.div>
           </motion.div>
         </>
       )}

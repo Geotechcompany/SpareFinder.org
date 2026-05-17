@@ -32,6 +32,12 @@ If an env var is **set to any non-empty string** (including `0`), it **overrides
 
 Run `docs/sql/marketing_sends_tracking.sql` on Supabase so `marketing_sends` stores `tracking_token`, `open_count`, `click_count`, and first-open / first-click timestamps. For each **sent** message, the API injects a **1×1 pixel** and rewrites **http(s)** anchor links to count clicks before redirecting.
 
+### Duplicate leads
+
+CSV import, Google discovery, and manual create **reject** emails that already exist on `marketing_leads` or on a SpareFinder `profiles` account (HTTP **409** for manual create). The DB also has a unique index on `lower(trim(email))` as a backstop.
+
+**Export:** Admin → Email campaigns → Leads → **Export filtered** (all rows matching search/country filter) or **Export selected**. API: `GET /api/admin/marketing/leads/export` (CSV download, max 50k rows).
+
 | Endpoint | Method | Purpose |
 |----------|--------|---------|
 | `/api/track/mopen/{token}` | GET, HEAD | Returns a 1×1 GIF and records an open for the send row with that `tracking_token`. |

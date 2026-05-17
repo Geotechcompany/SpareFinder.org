@@ -40,6 +40,7 @@ import DashboardSkeleton from "@/components/DashboardSkeleton";
 import { PerformanceOverviewChart } from "@/components/PerformanceOverviewChart";
 import { getCrewJobDisplayName } from "@/services/aiAnalysisCrew";
 import { formatProcessingDisplay } from "@/lib/utils";
+import { DashboardWelcomeBanner } from "@/components/dashboard/DashboardWelcomeBanner";
 
 const Dashboard = () => {
   const { inLayout } = useDashboardLayout();
@@ -697,68 +698,12 @@ const Dashboard = () => {
           transition={{ duration: 0.5 }}
           className="space-y-4 sm:space-y-6 lg:space-y-8"
         >
-          {/* Header */}
-          <div className="relative">
-            <div className="relative rounded-[18px] border border-white/5 bg-card shadow-[0_18px_48px_rgba(5,8,20,0.3)]">
-              <div className="flex flex-col gap-4 px-4 py-3 sm:px-6 sm:py-4">
-                {/* Top Row - Welcome Message and Actions */}
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
-                  <div>
-                    <motion.h1
-                      className="text-2xl sm:text-3xl lg:text-4xl font-bold text-foreground tracking-[-0.02em]"
-                      initial={{ opacity: 0, x: -20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: 0.2 }}
-                    >
-                      Welcome back,{" "}
-                      {user?.full_name || user?.email?.split("@")[0] || "User"}
-                    </motion.h1>
-                    <motion.p
-                      className="text-sm sm:text-base text-muted-foreground mt-2"
-                      initial={{ opacity: 0, x: -20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: 0.3 }}
-                    >
-                      Here's what's happening with your part identification
-                      today
-                    </motion.p>
-                  </div>
-                  <motion.div
-                    className="flex flex-wrap items-center gap-2 sm:gap-3"
-                    initial={{ opacity: 0, scale: 0.8 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    transition={{ delay: 0.4 }}
-                  >
-                    <motion.div
-                      whileHover={{ scale: 1.05, y: -2 }}
-                      whileTap={{ scale: 0.95 }}
-                      className="w-full sm:w-auto"
-                    >
-                      <Button
-                        onClick={() => navigate("/dashboard/upload")}
-                        className="premium-button w-full sm:w-auto bg-primary hover:bg-primary/90 focus:ring-2 focus:ring-primary/40"
-                      >
-                        <Upload className="w-4 h-4 mr-2" />
-                        New Upload
-                      </Button>
-                    </motion.div>
-                    <motion.div
-                      whileHover={{ scale: 1.05, y: -2 }}
-                      whileTap={{ scale: 0.95 }}
-                      className="w-full sm:w-auto"
-                    >
-                      <Button
-                        onClick={startOnboarding}
-                        className="premium-button w-full sm:w-auto bg-secondary text-foreground hover:bg-secondary/80 border border-white/5"
-                      >
-                        <Zap className="w-4 h-4 mr-2" /> Start Guided Tour
-                      </Button>
-                    </motion.div>
-                  </motion.div>
-                </div>
-              </div>
-            </div>
-          </div>
+          <DashboardWelcomeBanner
+            fullName={user?.full_name}
+            email={user?.email}
+            onNewUpload={() => navigate("/dashboard/upload")}
+            onStartTour={startOnboarding}
+          />
 
           {/* Stats Grid */}
           <div className="grid grid-cols-1 xs:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-6">

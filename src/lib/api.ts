@@ -1098,6 +1098,28 @@ export const adminApi = {
     const response = await apiClient.get(`/admin/marketing/leads?${q.toString()}`);
     return response.data;
   },
+  exportMarketingLeadsCsv: async (params: {
+    search?: string;
+    source?: string;
+    sanitization_status?: string;
+    campaign_id?: string;
+    country_code?: string;
+    ids?: string[];
+  }): Promise<Blob> => {
+    const q = new URLSearchParams();
+    if (params.search?.trim()) q.append("search", params.search.trim());
+    if (params.source && params.source !== "all") q.append("source", params.source);
+    if (params.sanitization_status && params.sanitization_status !== "all")
+      q.append("sanitization_status", params.sanitization_status);
+    if (params.campaign_id) q.append("campaign_id", params.campaign_id);
+    if (params.country_code && params.country_code !== "all")
+      q.append("country_code", params.country_code);
+    if (params.ids?.length) q.append("ids", params.ids.join(","));
+    const response = await apiClient.get(`/admin/marketing/leads/export?${q.toString()}`, {
+      responseType: "blob",
+    });
+    return response.data as Blob;
+  },
   createMarketingLead: async (payload: {
     email: string;
     full_name?: string;
