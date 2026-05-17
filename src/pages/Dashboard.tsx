@@ -694,15 +694,33 @@ const Dashboard = () => {
   // Removed periodic auto-refresh to avoid repeated background requests when stats are legitimately empty
 
   if (!subscriptionLoading && !isPlanActive) {
+    if (inLayout) {
+      return <PlanRequiredCard />;
+    }
     return (
-      <div
+      <motion.div
         className={cn(
-          "dashboard-premium min-h-screen flex w-full bg-background",
+          "dashboard-premium flex min-h-screen w-full bg-background",
           isSplitDashboard && "dashboard-theme-split"
         )}
       >
-        <PlanRequiredCard />
-      </div>
+        <DashboardSidebar
+          isCollapsed={isCollapsed}
+          onToggle={handleToggleSidebar}
+        />
+        <MobileSidebar
+          isOpen={isMobileMenuOpen}
+          onClose={() => setIsMobileMenuOpen(false)}
+        />
+        <motion.div
+          className={cn(
+            "dashboard-main-light min-h-screen flex-1 overflow-y-auto",
+            isSplitDashboard && "dashboard-docked-panel"
+          )}
+        >
+          <PlanRequiredCard />
+        </motion.div>
+      </motion.div>
     );
   }
 
@@ -710,8 +728,128 @@ const Dashboard = () => {
     return <DashboardSkeleton variant="user" showSidebar={!inLayout} />;
   }
 
+  const dashboardContent = (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5 }}
+      className="relative z-10 space-y-4 sm:space-y-6 lg:space-y-8"
+    >
+      <DashboardWelcomeBanner
+        fullName={user?.full_name}
+        email={user?.email}
+        onNewUpload={() => navigate("/dashboard/upload")}
+        onStartTour={startOnboarding}
+      />
+
+      <DashboardOverviewStats
+        metrics={overviewMetrics}
+        sparklineSeries={buildSparklineFromAnalytics(analyticsSeries)}
+        isLoading={isDataLoading && !hasLoadedOnceRef.current}
+      />
+
+      {/* Performance Overview */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.6 }}
+        className="relative"
+      >
+        <Card className="premium-card relative bg-card/95 backdrop-blur-md">
+          <CardHeader className="p-4 sm:p-6">
+            <CardTitle className="flex items-center space-x-2 text-lg sm:text-xl text-foreground dark:text-white">
+              <Zap className="w-5 h-5 text-yellow-500 dark:text-yellow-400" />
+              <span>Performance Overview</span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-4 sm:p-6 pt-0">
+            <PerformanceOverviewChart
+              series={analyticsSeries}
+              isLoading={isDataLoading && !hasLoadedOnceRef.current}
+            />
+          </CardContent>
+        </Card>
+      </motion.div>
+
+      {/* Recent Activity */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.8 }}
+        className="relative"
+      >
+        <Card className="premium-card relative bg-card/95 backdrop-blur-md">
+          <CardHeader className="p-4 sm:p-6">
+            <CardTitle className="flex items-center space-x-2 text-lg sm:text-xl text-foreground dark:text-white">
+              <Activity className="w-5 h-5 text-blue-500 dark:text-blue-400" />
+              <span>Recent Activity</span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-4 sm:p-6 pt-0 space-y-3">
+            {recentActivities.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                No recent activity yet. Upload a part image to get started.
+              </p>
+            ) : (
+              recentActivities.map((activity, index) => (
+                <motion.div
+                  key={`${activity.title}-${index}`}
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: 0.1 * index }}
+                  className="group flex items-start gap-3 rounded-xl border border-border/60 bg-muted/30 p-3 transition-colors hover:border-accent/30 hover:bg-muted/50 dark:border-white/10 dark:bg-black/20 dark:hover:border-white/20"
+                >
+                  <motion.div
+                    whileHover={{ scale: 1.05 }}
+                    className="flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-muted/80 shadow-sm group-hover:border-accent/40"
+                  >
+                    {activity.type === "upload" ? (
+                      <Upload className="w-4 h-4 text-primary" />
+                    ) : (
+                      <Search className="w-4 h-4 text-primary" />
+                    )}
+                  </motion.div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-sm font-medium truncate text-foreground dark:text-white">
+                        {activity.title}
+                      </p>
+                      {activity.confidence !== null && (
+                        <Badge
+                          variant="secondary"
+                          className="bg-emerald-50 text-emerald-600 border-emerald-200 text-[11px] px-2 py-0.5 dark:bg-emerald-600/20 dark:text-emerald-300 dark:border-emerald-500/40"
+                        >
+                          {activity.confidence}%
+                        </Badge>
+                      )}
+                    </div>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {activity.description}
+                    </p>
+                    <p className="mt-1 text-[11px] text-muted-foreground/80">
+                      {activity.time}
+                    </p>
+                  </div>
+                </motion.div>
+              ))
+            )}
+          </CardContent>
+        </Card>
+      </motion.div>
+    </motion.div>
+  );
+
+  if (inLayout) {
+    return (
+      <>
+        {dashboardContent}
+        <DashboardQuickActionsDock sidebarCollapsed={layoutSidebarCollapsed} />
+      </>
+    );
+  }
+
   return (
-    <div
+    <motion.div
       className={cn(
         "dashboard-premium min-h-screen flex w-full bg-background text-foreground",
         isSplitDashboard && "dashboard-theme-split"
@@ -886,7 +1024,7 @@ const Dashboard = () => {
       </motion.div>
 
       <DashboardQuickActionsDock sidebarCollapsed={isCollapsed} />
-    </div>
+    </motion.div>
   );
 };
 

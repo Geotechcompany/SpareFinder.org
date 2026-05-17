@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useState } from "react";
 import {
   DEFAULT_THEME,
   type AppTheme,
+  getThemeColorMeta,
   readStoredTheme,
   THEME_STORAGE_KEY,
 } from "@/lib/theme";
@@ -59,7 +60,15 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({
     }
 
     localStorage.setItem(THEME_STORAGE_KEY, theme);
-  }, [theme]);
+
+    const themeColor = getThemeColorMeta(theme, actualTheme);
+    document
+      .querySelector('meta[name="theme-color"]')
+      ?.setAttribute("content", themeColor);
+    document
+      .querySelector('meta[name="msapplication-TileColor"]')
+      ?.setAttribute("content", themeColor);
+  }, [theme, actualTheme]);
 
   const isSplitDashboard = theme === "split";
 

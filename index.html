@@ -31,8 +31,8 @@
     <link rel="manifest" href="/manifest.json" />
 
     <!-- Theme Color -->
-    <meta name="theme-color" content="#8F39BB" />
-    <meta name="msapplication-TileColor" content="#8F39BB" />
+    <meta name="theme-color" content="#F3F5F9" />
+    <meta name="msapplication-TileColor" content="#F3F5F9" />
 
     <!-- Open Graph / Facebook -->
     <meta property="og:type" content="website" />
@@ -56,7 +56,7 @@
     <!-- Additional Meta Tags -->
     <meta name="format-detection" content="telephone=no" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="SpareFinder" />
 
     <!-- Structured Data / Schema.org - Organization -->
@@ -145,6 +145,36 @@
                 }
             }
         }
+    </script>
+
+    <!-- Apply Studio (split) theme before paint; migrate legacy Light default -->
+    <script>
+        (function () {
+            try {
+                var key = "theme";
+                var migrationKey = "theme_studio_default_v1";
+                if (!localStorage.getItem(migrationKey)) {
+                    localStorage.setItem(migrationKey, "1");
+                    var legacy = localStorage.getItem(key);
+                    if (!legacy || legacy === "light") {
+                        localStorage.setItem(key, "split");
+                    }
+                }
+                var theme = localStorage.getItem(key) || "split";
+                var root = document.documentElement;
+                root.classList.remove("light", "dark");
+                root.removeAttribute("data-theme");
+                if (theme === "system") {
+                    var dark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+                    root.classList.add(dark ? "dark" : "light");
+                } else if (theme === "split") {
+                    root.classList.add("light");
+                    root.dataset.theme = "split";
+                } else {
+                    root.classList.add(theme);
+                }
+            } catch (e) {}
+        })();
     </script>
 
     <!-- Preconnect for Performance -->

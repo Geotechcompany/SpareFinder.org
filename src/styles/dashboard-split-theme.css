@@ -73,6 +73,11 @@
     color: hsl(var(--foreground));
 }
 
+/* Nested split wrappers (e.g. page content inside layout) must not paint the sidebar stripe */
+[data-theme="split"] .dashboard-docked-panel .dashboard-theme-split.dashboard-premium {
+    background: transparent;
+}
+
 [data-theme="split"] .dashboard-theme-split .dashboard-main-light {
     color: hsl(var(--foreground));
 }
