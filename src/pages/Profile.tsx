@@ -417,9 +417,9 @@ const Profile = () => {
         <div className="relative">
           <div className="absolute inset-0 rounded-3xl bg-gradient-to-r from-[#3A5AFE0A] via-[#8F39BB0A] to-transparent blur-xl opacity-80 dark:from-brand/10 dark:to-blue-600/10" />
           <div className="relative rounded-3xl border border-border bg-card shadow-soft-elevated backdrop-blur-xl dark:bg-black/30 dark:border-white/10">
-              <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 sm:gap-6">
-                <div className="flex flex-col sm:flex-row sm:items-center space-y-4 sm:space-y-0 sm:space-x-6">
-                  <div className="relative">
+            <motion.div className="flex flex-col gap-5 p-5 sm:flex-row sm:items-center sm:justify-between sm:gap-6 sm:p-6 lg:gap-8 lg:p-8">
+                <div className="flex min-w-0 flex-col gap-4 sm:flex-row sm:items-center sm:gap-6">
+                  <div className="relative shrink-0 self-start sm:self-center">
                     <Avatar className="w-24 h-24">
                       <AvatarImage src={profile?.avatar_url || ""} />
                       <AvatarFallback className="bg-gradient-to-r from-brand to-brand-dark">
@@ -431,7 +431,7 @@ const Profile = () => {
                       whileHover={{ scale: 1.1 }}
                       whileTap={{ scale: 0.9 }}
                       disabled={isUploadingAvatar}
-                      className="absolute -bottom-1 -right-1 w-8 h-8 bg-gradient-to-r from-brand-dark to-brand rounded-full flex items-center justify-center border-2 border-gray-900 disabled:opacity-60"
+                      className="absolute -bottom-1 -right-1 flex h-8 w-8 items-center justify-center rounded-full border-2 border-card bg-gradient-to-r from-brand-dark to-brand shadow-sm disabled:opacity-60"
                       onClick={handleAvatarPick}
                       aria-label="Upload profile photo"
                     >
@@ -526,21 +526,23 @@ const Profile = () => {
                   initial={{ opacity: 0, scale: 0.8 }}
                   animate={{ opacity: 1, scale: 1 }}
                   transition={{ delay: 0.4 }}
+                  className="shrink-0 sm:ml-2"
                 >
                   <motion.div
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
+                    className="w-full sm:w-auto"
                   >
                     <Button
                       onClick={handleEditProfile}
-                      className="bg-gradient-to-r from-brand to-brand-dark hover:from-brand-dark hover:to-brand-dark shadow-lg shadow-brand/25 h-12 px-6"
+                      className="h-12 w-full bg-gradient-to-r from-brand to-brand-dark px-6 shadow-lg shadow-brand/25 hover:from-brand-dark hover:to-brand-dark sm:w-auto"
                     >
                       <Edit className="w-4 h-4 mr-2" />
                       Edit Profile
                     </Button>
                   </motion.div>
                 </motion.div>
-              </div>
+              </motion.div>
             </div>
           </div>
 
@@ -842,9 +844,8 @@ const Profile = () => {
                 </div>
               </CardContent>
             </Card>
-          </motion.div>
-        </motion.div>
-      </motion.div>
+                </motion.div>
+            </motion.div>
     </div>
   );
 };
