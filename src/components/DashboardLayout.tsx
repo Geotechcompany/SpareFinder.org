@@ -3,13 +3,19 @@ import { motion } from "framer-motion";
 import DashboardSidebar from "@/components/DashboardSidebar";
 import MobileSidebar from "@/components/MobileSidebar";
 import { DashboardLayoutProvider } from "@/contexts/DashboardLayoutContext";
+import { WorkspaceSetupGuard } from "@/components/dashboard/WorkspaceSetupGuard";
+import { useDashboardChrome } from "@/hooks/use-dashboard-chrome";
+import { cn } from "@/lib/utils";
 import { Menu } from "lucide-react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import DashboardHeader from "@/components/DashboardHeader";
 import DashboardMobileTabs from "@/components/DashboardMobileTabs";
+import { useDashboardSidebarOffset } from "@/hooks/use-dashboard-sidebar-offset";
 
 const DashboardLayout: React.FC = () => {
+  const { isSplitDashboard } = useDashboardChrome();
   const [isCollapsed, setIsCollapsed] = useState(false);
+  useDashboardSidebarOffset(isCollapsed);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
@@ -45,8 +51,13 @@ const DashboardLayout: React.FC = () => {
   const handleToggleMobileMenu = () => setIsMobileMenuOpen(!isMobileMenuOpen);
 
   return (
-    <DashboardLayoutProvider>
-      <div className="dashboard-premium min-h-screen flex w-full relative overflow-hidden">
+    <DashboardLayoutProvider sidebarCollapsed={isCollapsed}>
+      <motion.div
+        className={cn(
+          "dashboard-premium flex min-h-screen w-full",
+            isSplitDashboard && "dashboard-theme-split"
+        )}
+      >
 
         {/* Desktop Sidebar */}
         <DashboardSidebar
@@ -75,15 +86,18 @@ const DashboardLayout: React.FC = () => {
           animate={{
             marginLeft: isCollapsed
               ? "var(--collapsed-sidebar-width, 80px)"
-              : "var(--expanded-sidebar-width, 320px)",
+              : "var(--expanded-sidebar-width, 300px)",
             width: isCollapsed
               ? "calc(100% - var(--collapsed-sidebar-width, 80px))"
-              : "calc(100% - var(--expanded-sidebar-width, 320px))",
+              : "calc(100% - var(--expanded-sidebar-width, 300px))",
           }}
           transition={{ duration: 0.3, ease: "easeInOut" }}
-          className="flex-1 px-3 pb-16 pt-3 sm:px-6 sm:pb-6 sm:pt-6 lg:px-8 lg:py-8 relative z-10 overflow-x-hidden md:overflow-x-visible"
+          className={cn(
+            "dashboard-main-light min-h-screen flex-1 overflow-y-auto overflow-x-hidden px-3 pb-16 pt-3 sm:px-6 sm:pb-6 sm:pt-6 lg:px-8 lg:py-8",
+            isSplitDashboard && "dashboard-docked-panel"
+          )}
         >
-          <div className="mx-auto flex h-full w-full max-w-[var(--dashboard-content-max-width)] flex-col">
+          <div className="mx-auto flex w-full max-w-[var(--dashboard-content-max-width)] flex-col">
             <DashboardHeader />
             <Outlet />
           </div>
@@ -91,7 +105,7 @@ const DashboardLayout: React.FC = () => {
 
         {/* Mobile bottom tabs */}
         <DashboardMobileTabs />
-      </div>
+      </motion.div>
     </DashboardLayoutProvider>
   );
 };

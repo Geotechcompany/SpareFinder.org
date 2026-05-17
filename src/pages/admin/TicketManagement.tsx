@@ -304,14 +304,14 @@ const TicketManagement = () => {
         initial={false}
         animate={mainMotion}
         transition={{ duration: 0.3, ease: "easeInOut" }}
-        className={`flex-1 overflow-x-auto bg-gradient-to-b from-background via-violet-50/30 to-sky-50/20 pb-10 dark:via-violet-950/20 dark:to-slate-950/40 ${ADMIN_MOBILE_TOP_PADDING}`}
+        className={`flex-1 overflow-x-auto bg-gradient-to-b from-background via-brand-50/30 to-sky-50/20 pb-10 dark:via-brand-dark/20 dark:to-slate-950/40 ${ADMIN_MOBILE_TOP_PADDING}`}
       >
         <div className="mx-auto max-w-6xl space-y-6 p-3 sm:p-6 lg:p-8">
           <AdminPageHeader
             breadcrumbPage="Support"
             title={
               <h1 className="flex items-center gap-3 text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
-                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-violet-600 to-indigo-600 text-white shadow-md shadow-violet-500/25">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-brand to-brand-dark text-white shadow-md shadow-brand/25">
                   <Ticket className="h-5 w-5" aria-hidden />
                 </span>
                 Support tickets
@@ -369,7 +369,7 @@ const TicketManagement = () => {
                         </div>
                         <Button
                           type="button"
-                          className="mt-4 h-11 w-full rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 text-white shadow-md shadow-violet-500/25 hover:from-violet-500 hover:to-indigo-500"
+                          className="mt-4 h-11 w-full rounded-xl bg-gradient-to-r from-brand to-brand-dark text-white shadow-md shadow-brand/25 hover:from-brand hover:to-brand"
                           onClick={() => openDetail(t.id)}
                         >
                           Open thread
@@ -416,7 +416,7 @@ const TicketManagement = () => {
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                className="rounded-lg text-violet-600 hover:bg-violet-500/10 hover:text-violet-700 dark:text-violet-400 dark:hover:text-violet-300"
+                                className="rounded-lg text-brand hover:bg-brand/10 hover:text-brand-dark dark:text-brand-light dark:hover:text-brand-light"
                                 onClick={() => openDetail(t.id)}
                               >
                                 View
@@ -460,12 +460,12 @@ const TicketManagement = () => {
         <DialogContent className="flex max-h-[90dvh] w-[calc(100vw-1rem)] max-w-3xl flex-col gap-0 overflow-hidden rounded-2xl border-border/60 p-0 shadow-2xl sm:w-full">
           {selectedTicket ? (
             <>
-              <div className="shrink-0 border-b border-border/60 bg-gradient-to-r from-violet-500/12 via-background to-sky-500/10 px-4 py-4 sm:px-6">
+              <div className="shrink-0 border-b border-border/60 bg-gradient-to-r from-brand/12 via-background to-sky-500/10 px-4 py-4 sm:px-6">
                 <DialogHeader className="space-y-2 text-left">
                   <DialogTitle className="pr-8 text-lg leading-snug sm:text-xl">{selectedTicket.subject}</DialogTitle>
                   <DialogDescription className="flex flex-wrap items-center gap-x-3 gap-y-2 text-foreground/80">
                     <span className="inline-flex items-center gap-1.5 text-sm">
-                      <User className="h-4 w-4 text-violet-600 dark:text-violet-400" />
+                      <User className="h-4 w-4 text-brand dark:text-brand-light" />
                       {selectedTicket.profile?.full_name || "—"}
                     </span>
                     <span className="inline-flex items-center gap-1.5 text-sm">
@@ -529,7 +529,7 @@ const TicketManagement = () => {
                                         "border border-amber-400/50 bg-amber-50/90 text-amber-950 shadow-amber-500/10 dark:border-amber-500/35 dark:bg-amber-950/30 dark:text-amber-50",
                                       !internal &&
                                         isAdmin &&
-                                        "rounded-tr-md border-0 bg-gradient-to-br from-violet-600 to-indigo-600 text-white shadow-lg shadow-violet-500/25",
+                                        "rounded-tr-md border-0 bg-gradient-to-br from-brand to-brand-dark text-white shadow-lg shadow-brand/25",
                                       !internal &&
                                         !isAdmin &&
                                         "rounded-tl-md border border-slate-200/90 bg-white text-foreground dark:border-slate-700 dark:bg-slate-800/90"

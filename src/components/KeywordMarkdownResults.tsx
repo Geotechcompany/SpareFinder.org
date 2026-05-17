@@ -23,7 +23,7 @@ const KeywordMarkdownResults: React.FC<KeywordMarkdownResultsProps> = ({ markdow
 
   return (
     <div className="space-y-6">
-      <div className="bg-gradient-to-r from-blue-900/20 to-purple-900/20 border border-blue-500/30 rounded-2xl p-6 backdrop-blur-sm">
+      <div className="bg-gradient-to-r from-blue-900/20 to-brand-dark/20 border border-blue-500/30 rounded-2xl p-6 backdrop-blur-sm">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-2xl font-bold text-white flex items-center space-x-3">
             <span className="text-2xl">🔍</span>

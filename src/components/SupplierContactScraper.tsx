@@ -344,7 +344,7 @@ export const SupplierContactScraper: React.FC<SupplierContactScraperProps> = ({
                       0 && (
                       <div className="space-y-3">
                         <Label className="text-gray-300 flex items-center">
-                          <Users className="w-4 h-4 mr-2 text-purple-400" />
+                          <Users className="w-4 h-4 mr-2 text-brand-light" />
                           Social Media
                         </Label>
                         <div className="flex flex-wrap gap-2">

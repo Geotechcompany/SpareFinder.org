@@ -1690,7 +1690,7 @@ const History = () => {
   // Show error state
   if (error && !isLoading && !inLayout) {
     return (
-      <div className="min-h-screen flex w-full bg-gradient-to-br from-background via-[#F0F2F5] to-[#E8EBF1] dark:from-gray-900 dark:via-purple-900/20 dark:to-blue-900/20 relative overflow-hidden">
+      <div className="min-h-screen flex w-full bg-gradient-to-br from-background via-[#F0F2F5] to-[#E8EBF1] dark:from-gray-900 dark:via-brand-dark/20 dark:to-blue-900/20 relative overflow-hidden">
         {/* Desktop Sidebar */}
         <div className="hidden md:block">
           <DashboardSidebar
@@ -1738,11 +1738,11 @@ const History = () => {
 
   // Main render
   return (
-    <div className="min-h-screen flex w-full bg-gradient-to-br from-background via-[#F0F2F5] to-[#E8EBF1] dark:from-gray-900 dark:via-purple-900/20 dark:to-blue-900/20 relative overflow-hidden">
+    <div className="min-h-screen flex w-full bg-gradient-to-br from-background via-[#F0F2F5] to-[#E8EBF1] dark:from-gray-900 dark:via-brand-dark/20 dark:to-blue-900/20 relative overflow-hidden">
       {/* Animated Background Elements (dark mode only to avoid blue tint in light theme) */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none hidden dark:block">
         <motion.div
-          className="absolute -top-20 md:-top-40 -left-20 md:-left-40 w-40 h-40 md:w-80 md:h-80 bg-purple-600/30 rounded-full blur-3xl opacity-70"
+          className="absolute -top-20 md:-top-40 -left-20 md:-left-40 w-40 h-40 md:w-80 md:h-80 bg-brand/30 rounded-full blur-3xl opacity-70"
           animate={{
             scale: [1, 1.2, 1],
             rotate: [0, 180, 360],
@@ -1794,13 +1794,13 @@ const History = () => {
         >
           {/* Header */}
           <div className="relative">
-            <div className="absolute inset-0 rounded-2xl md:rounded-3xl bg-gradient-to-r from-[#3A5AFE0A] via-[#8B5CF60A] to-transparent blur-xl opacity-80 dark:from-purple-600/10 dark:to-blue-600/10" />
+            <div className="absolute inset-0 rounded-2xl md:rounded-3xl bg-gradient-to-r from-[#3A5AFE0A] via-[#8F39BB0A] to-transparent blur-xl opacity-80 dark:from-brand/10 dark:to-blue-600/10" />
             <div className="relative rounded-2xl md:rounded-3xl border border-border bg-card shadow-soft-elevated backdrop-blur-xl dark:bg-black/30 dark:border-white/10">
               <div className="flex flex-col gap-3 md:gap-4 px-4 py-3 sm:px-6 sm:py-4">
                 <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 md:gap-4">
                   <div className="flex-1 min-w-0">
                     <motion.h1
-                      className="text-2xl md:text-3xl lg:text-4xl font-bold text-foreground dark:bg-gradient-to-r dark:from-white dark:via-purple-200 dark:to-blue-200 dark:bg-clip-text dark:text-transparent mb-2 md:mb-3"
+                      className="text-2xl md:text-3xl lg:text-4xl font-bold text-foreground dark:bg-gradient-to-r dark:from-white dark:via-brand-light dark:to-blue-200 dark:bg-clip-text dark:text-transparent mb-2 md:mb-3"
                       initial={{ opacity: 0, x: -20 }}
                       animate={{ opacity: 1, x: 0 }}
                       transition={{ delay: 0.2 }}
@@ -1824,7 +1824,7 @@ const History = () => {
                   >
                     <Button
                       onClick={handleExportHistory}
-                      className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 shadow-lg shadow-purple-500/25 text-sm md:text-base"
+                      className="bg-gradient-to-r from-brand to-brand-dark hover:from-brand-dark hover:to-brand-dark shadow-lg shadow-brand/25 text-sm md:text-base"
                       size="sm"
                     >
                       <Download className="w-3 h-3 md:w-4 md:h-4 mr-1 md:mr-2" />
@@ -1843,8 +1843,8 @@ const History = () => {
                 title: "Total Uploads",
                 value: stats.totalUploads.toString(),
                 icon: FileText,
-                color: "from-purple-600 to-blue-600",
-                bgColor: "from-purple-600/20 to-blue-600/20",
+                color: "from-brand to-brand-dark",
+                bgColor: "from-brand/20 to-blue-600/20",
               },
               {
                 title: "Completed",
@@ -1979,7 +1979,7 @@ const History = () => {
               <CardContent className="p-4 md:p-6 pt-0">
                 {filteredCrewJobs.length === 0 ? (
                   <div className="text-center py-6 md:py-8">
-                    <Sparkles className="mx-auto mb-3 h-8 w-8 text-purple-400/70 md:mb-4 md:h-12 md:w-12" />
+                    <Sparkles className="mx-auto mb-3 h-8 w-8 text-brand-light/70 md:mb-4 md:h-12 md:w-12" />
                     <p className="text-sm text-muted-foreground md:text-base dark:text-gray-400">
                       No SpareFinder Research jobs yet
                     </p>
@@ -2016,10 +2016,10 @@ const History = () => {
                               transition={{ duration: 0.3 }}
                               className="group"
                             >
-                              <Card className="bg-gradient-to-br from-purple-600/10 to-blue-600/10 backdrop-blur-xl border-purple-500/20 hover:border-purple-500/40 transition-all duration-300 overflow-hidden h-full">
+                              <Card className="bg-gradient-to-br from-brand/10 to-blue-600/10 backdrop-blur-xl border-brand/20 hover:border-brand/40 transition-all duration-300 overflow-hidden h-full">
                                 <CardContent className="p-0">
                                   {/* Image/Icon Header */}
-                                  <div className="relative h-32 bg-gradient-to-br from-purple-600/30 to-blue-600/30 flex items-center justify-center overflow-hidden">
+                                  <div className="relative h-32 bg-gradient-to-br from-brand/30 to-blue-600/30 flex items-center justify-center overflow-hidden">
                                     {job.image_url ? (
                                       <img
                                         src={job.image_url}
@@ -2031,7 +2031,7 @@ const History = () => {
                                         }`}
                                       />
                                     ) : (
-                                      <Sparkles className="w-16 h-16 text-purple-400/50" />
+                                      <Sparkles className="w-16 h-16 text-brand-light/50" />
                                     )}
 
                                     {/* Status Badge */}
@@ -2128,7 +2128,7 @@ const History = () => {
                                             onClick={() =>
                                               handleViewCrewAnalysis(job)
                                             }
-                                            className="flex-1 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
+                                            className="flex-1 bg-gradient-to-r from-brand to-brand-dark hover:from-brand-dark hover:to-brand-dark"
                                           >
                                             <Eye className="w-3 h-3 mr-1" />
                                             View
@@ -2140,7 +2140,7 @@ const History = () => {
                                                 handleDownloadPDF(job.pdf_url)
                                               }
                                               variant="outline"
-                                              className="border-purple-500/50 hover:bg-purple-500/20"
+                                              className="border-brand/50 hover:bg-brand/20"
                                             >
                                               <Download className="w-3 h-3" />
                                             </Button>

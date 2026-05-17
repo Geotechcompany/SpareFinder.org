@@ -347,7 +347,7 @@ const Landing = () => {
       >
         <div className="absolute inset-0 bg-gradient-to-b from-background via-muted/30 to-background" />
         <div className="absolute inset-0">
-          <div className="absolute top-1/4 left-1/4 h-96 w-96 rounded-full bg-[#3A5AFE1A] blur-3xl dark:bg-purple-500/10" />
+          <div className="absolute top-1/4 left-1/4 h-96 w-96 rounded-full bg-[#3A5AFE1A] blur-3xl dark:bg-brand/10" />
           <div className="absolute bottom-1/4 right-1/4 h-96 w-96 rounded-full bg-[#06B6D41A] blur-3xl dark:bg-blue-500/10" />
         </div>
 
@@ -364,7 +364,7 @@ const Landing = () => {
               transition={{ duration: 0.5 }}
               className="mb-8 inline-flex items-center rounded-full border border-border bg-card/80 px-4 py-2 text-xs font-medium text-muted-foreground backdrop-blur-xl"
             >
-              <Sparkles className="mr-2 h-4 w-4 text-primary dark:text-purple-400" />
+              <Sparkles className="mr-2 h-4 w-4 text-primary dark:text-brand-light" />
               <span>Powered by Advanced AI</span>
             </motion.div>
             <h2 className="mb-6 text-5xl font-bold tracking-tight text-foreground lg:text-6xl">
@@ -426,7 +426,7 @@ const Landing = () => {
         className="relative overflow-hidden bg-background py-24 px-4 sm:px-6 lg:px-8"
       >
         <div className="absolute inset-0">
-          <div className="absolute top-1/4 left-1/4 h-96 w-96 rounded-full bg-[#3A5AFE1A] blur-3xl dark:bg-purple-500/10" />
+          <div className="absolute top-1/4 left-1/4 h-96 w-96 rounded-full bg-[#3A5AFE1A] blur-3xl dark:bg-brand/10" />
           <div className="absolute bottom-1/4 right-1/4 h-96 w-96 rounded-full bg-[#06B6D41A] blur-3xl dark:bg-blue-500/10" />
         </div>
 
@@ -444,7 +444,7 @@ const Landing = () => {
               transition={{ duration: 0.5 }}
               className="mb-8 inline-flex items-center rounded-full border border-border bg-card/80 px-4 py-2 text-xs font-medium text-muted-foreground backdrop-blur-xl"
             >
-              <Sparkles className="mr-2 h-4 w-4 text-primary dark:text-purple-400" />
+              <Sparkles className="mr-2 h-4 w-4 text-primary dark:text-brand-light" />
               <span>Customer Reviews</span>
             </motion.div>
             <h2 className="mb-6 text-4xl font-bold tracking-tight text-foreground md:text-5xl ">
@@ -478,7 +478,7 @@ const Landing = () => {
             <Button
               asChild
               variant="outline"
-              className="border-border text-foreground hover:bg-muted dark:border-purple-500/50  dark:hover:bg-purple-500/10"
+              className="border-border text-foreground hover:bg-muted dark:border-brand/50  dark:hover:bg-brand/10"
             >
               <Link to="/reviews">View All Reviews</Link>
             </Button>
@@ -544,7 +544,7 @@ const Landing = () => {
                   >
                     {/* Plan Summary */}
                     <div className="rounded-xl border border-border bg-primary/10 p-4">
-                      <h3 className="mb-2 text-lg font-semibold text-primary dark:text-purple-300">
+                      <h3 className="mb-2 text-lg font-semibold text-primary dark:text-brand-light">
                         Plan Summary
                       </h3>
                       <div className="flex items-center justify-between text-muted-foreground ">
@@ -652,14 +652,14 @@ const Landing = () => {
                         By proceeding, you agree to our{" "}
                         <Link
                           to="/terms-of-service"
-                          className="underline hover:text-primary dark:hover:text-purple-400"
+                          className="underline hover:text-primary dark:hover:text-brand-light"
                         >
                           Terms of Use
                         </Link>{" "}
                         and acknowledge our{" "}
                         <Link
                           to="/privacy-policy"
-                          className="underline hover:text-primary dark:hover:text-purple-400"
+                          className="underline hover:text-primary dark:hover:text-brand-light"
                         >
                           Privacy Policy
                         </Link>

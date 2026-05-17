@@ -110,7 +110,7 @@ const Unauthorized = () => {
 
                 <Button
                   asChild
-                  className="w-full h-12 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white rounded-xl"
+                  className="w-full h-12 bg-gradient-to-r from-brand to-brand-dark hover:from-brand-dark hover:to-brand-dark text-white rounded-xl"
                 >
                   <Link to="/dashboard">
                     <Home className="w-5 h-5 mr-2" />
@@ -142,7 +142,7 @@ const Unauthorized = () => {
                   Need admin access?{' '}
                   <Link 
                     to="/contact" 
-                    className="text-purple-400 hover:text-purple-300 font-medium"
+                    className="text-brand-light hover:text-brand-light font-medium"
                   >
                     Contact Support
                   </Link>

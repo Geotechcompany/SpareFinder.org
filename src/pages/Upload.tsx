@@ -584,7 +584,7 @@ const generateAnalysisSections = (analysisResults: AnalysisResponse) => {
               lowercaseTitle.includes("compatibility") ||
               lowercaseTitle.includes("vehicle")
             )
-              return <Target className="w-5 h-5 text-purple-400" />;
+              return <Target className="w-5 h-5 text-brand-light" />;
             if (
               lowercaseTitle.includes("pricing") ||
               lowercaseTitle.includes("cost")
@@ -594,7 +594,7 @@ const generateAnalysisSections = (analysisResults: AnalysisResponse) => {
               lowercaseTitle.includes("where") ||
               lowercaseTitle.includes("buy")
             )
-              return <span className="text-purple-400">🌍</span>;
+              return <span className="text-brand-light">🌍</span>;
             if (
               lowercaseTitle.includes("confidence") ||
               lowercaseTitle.includes("score")
@@ -731,7 +731,7 @@ const generateAnalysisSections = (analysisResults: AnalysisResponse) => {
               lowercaseTitle.includes("where") ||
               lowercaseTitle.includes("buy")
             )
-              return <span className="text-purple-400">🌍</span>;
+              return <span className="text-brand-light">🌍</span>;
             if (
               lowercaseTitle.includes("confidence") ||
               lowercaseTitle.includes("score")
@@ -971,11 +971,11 @@ const Upload = () => {
       case "validating":
         return "from-cyan-500 to-teal-500";
       case "ai_analysis":
-        return "from-purple-500 to-pink-500";
+        return "from-brand to-pink-500";
       case "part_matching":
         return "from-red-500 to-rose-500";
       case "finalizing":
-        return "from-indigo-500 to-purple-500";
+        return "from-brand to-brand";
       case "complete":
         return "from-green-400 to-emerald-400";
       case "error":
@@ -2893,7 +2893,7 @@ const Upload = () => {
     return (
       <div className="space-y-6">
         {/* Header Section */}
-        <div className="bg-gradient-to-r from-blue-900/20 to-purple-900/20 border border-blue-500/30 rounded-2xl p-6 backdrop-blur-sm">
+        <div className="bg-gradient-to-r from-blue-900/20 to-brand-dark/20 border border-blue-500/30 rounded-2xl p-6 backdrop-blur-sm">
           <div className="flex items-center justify-between mb-4">
             <h1 className="text-3xl font-bold text-white flex items-center space-x-3">
               <span className="text-2xl">🔍</span>
@@ -3106,7 +3106,7 @@ const Upload = () => {
 
             {/* Right Column - Image Info */}
             <div className="space-y-3">
-              <h3 className="text-lg font-semibold text-purple-300 border-b border-purple-500/30 pb-1">
+              <h3 className="text-lg font-semibold text-brand-light border-b border-brand/30 pb-1">
                 🖼 Image Details
               </h3>
               <div className="space-y-2 text-sm">
@@ -3214,7 +3214,7 @@ const Upload = () => {
                       initial={{ opacity: 0, y: 20 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ delay: 0.2 }}
-                      className="relative bg-gradient-to-br from-blue-900/10 to-purple-900/10 border border-blue-500/30 rounded-2xl p-6 backdrop-blur-sm general-container"
+                      className="relative bg-gradient-to-br from-blue-900/10 to-brand-dark/10 border border-blue-500/30 rounded-2xl p-6 backdrop-blur-sm general-container"
                     >
                       <div className="flex items-center space-x-3 mb-6 pb-3 border-b border-blue-500/30">
                         <motion.div
@@ -3299,7 +3299,7 @@ const Upload = () => {
       {/* Animated Background Elements */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <motion.div
-          className="absolute -top-40 -right-40 w-80 h-80 rounded-full blur-3xl opacity-60 bg-[#3A5AFE1A] dark:bg-purple-600/20"
+          className="absolute -top-40 -right-40 w-80 h-80 rounded-full blur-3xl opacity-60 bg-[#3A5AFE1A] dark:bg-brand/20"
           animate={{
             scale: [1, 1.3, 1],
             rotate: [0, 180, 360],
@@ -3499,7 +3499,7 @@ const Upload = () => {
                 exit={{ opacity: 0, height: 0 }}
                 className="relative"
               >
-                <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-[#3A5AFE0A] via-[#8B5CF60A] to-transparent blur-xl opacity-80 dark:from-purple-600/10 dark:to-blue-600/10" />
+                <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-[#3A5AFE0A] via-[#8F39BB0A] to-transparent blur-xl opacity-80 dark:from-brand/10 dark:to-blue-600/10" />
                 <div className="relative rounded-2xl border border-border bg-card/95 px-4 py-4 shadow-soft-elevated backdrop-blur-xl dark:bg-black/30 dark:border-white/10 sm:px-5">
                   <div className="mb-3 flex items-center justify-between">
                     <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground sm:text-sm">
@@ -3589,18 +3589,18 @@ const Upload = () => {
                             className={cn(
                               "flex items-start gap-3 rounded-2xl p-3 sm:p-4 transition-all duration-300",
                               landingActiveStep === 1
-                                ? "bg-purple-500/15 dark:bg-purple-500/20 ring-2 ring-purple-500/40 shadow-[0_0_20px_rgba(139,92,246,0.25)]"
+                                ? "bg-brand/15 dark:bg-brand/20 ring-2 ring-brand/40 shadow-[0_0_20px_rgba(143,57,187,0.25)]"
                                 : "bg-muted/60 dark:bg-white/5"
                             )}
                             id="tour-step-upload-analyze"
                           >
                             <div className={cn(
                               "flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full ring-1",
-                              landingActiveStep === 1 ? "bg-purple-500/30 ring-purple-400/50" : "bg-primary/10 ring-primary/20"
+                              landingActiveStep === 1 ? "bg-brand/30 ring-brand-light/50" : "bg-primary/10 ring-primary/20"
                             )}>
                               <span className={cn(
                                 "text-sm font-bold",
-                                landingActiveStep === 1 ? "text-purple-400" : "text-primary"
+                                landingActiveStep === 1 ? "text-brand-light" : "text-primary"
                               )}>
                                 1
                               </span>
@@ -3619,18 +3619,18 @@ const Upload = () => {
                             className={cn(
                               "flex items-start gap-3 rounded-2xl p-3 sm:p-4 transition-all duration-300",
                               landingActiveStep === 2
-                                ? "bg-purple-500/15 dark:bg-purple-500/20 ring-2 ring-purple-500/40 shadow-[0_0_20px_rgba(139,92,246,0.25)]"
+                                ? "bg-brand/15 dark:bg-brand/20 ring-2 ring-brand/40 shadow-[0_0_20px_rgba(143,57,187,0.25)]"
                                 : "bg-muted/40 dark:bg-white/5"
                             )}
                             id="tour-step-get-results"
                           >
                             <div className={cn(
                               "flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full ring-1",
-                              landingActiveStep === 2 ? "bg-purple-500/30 ring-purple-400/50" : "bg-[#3A5AFE1A] ring-[#3A5AFE26]"
+                              landingActiveStep === 2 ? "bg-brand/30 ring-brand-light/50" : "bg-[#3A5AFE1A] ring-[#3A5AFE26]"
                             )}>
                               <span className={cn(
                                 "text-sm font-bold",
-                                landingActiveStep === 2 ? "text-purple-400" : "text-[#3A5AFE]"
+                                landingActiveStep === 2 ? "text-brand-light" : "text-[#3A5AFE]"
                               )}>
                                 2
                               </span>
@@ -3649,17 +3649,17 @@ const Upload = () => {
                             className={cn(
                               "flex items-start gap-3 rounded-2xl p-3 sm:p-4 transition-all duration-300",
                               landingActiveStep === 3
-                                ? "bg-purple-500/15 dark:bg-purple-500/20 ring-2 ring-purple-500/40 shadow-[0_0_20px_rgba(139,92,246,0.25)]"
+                                ? "bg-brand/15 dark:bg-brand/20 ring-2 ring-brand/40 shadow-[0_0_20px_rgba(143,57,187,0.25)]"
                                 : "bg-muted/20 dark:bg-white/5"
                             )}
                           >
                             <div className={cn(
                               "flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full ring-1",
-                              landingActiveStep === 3 ? "bg-purple-500/30 ring-purple-400/50" : "bg-emerald-500/10 ring-emerald-400/30"
+                              landingActiveStep === 3 ? "bg-brand/30 ring-brand-light/50" : "bg-emerald-500/10 ring-emerald-400/30"
                             )}>
                               <span className={cn(
                                 "text-sm font-bold",
-                                landingActiveStep === 3 ? "text-purple-400" : "text-emerald-500"
+                                landingActiveStep === 3 ? "text-brand-light" : "text-emerald-500"
                               )}>
                                 3
                               </span>
@@ -3684,7 +3684,7 @@ const Upload = () => {
                               id="tour-start-analyzing-button"
                               onClick={() => setWizardStep("selection")}
                               size="lg"
-                              className="group relative flex h-14 w-full items-center justify-center gap-2 overflow-hidden rounded-2xl bg-[#7540EA] text-base font-semibold text-white shadow-[0_18px_45px_rgba(117,64,234,0.4)] transition-all duration-200 hover:bg-[#6530d4] hover:scale-[1.01] hover:shadow-[0_22px_55px_rgba(117,64,234,0.5)] focus-visible:ring-2 focus-visible:ring-[#7540EA] focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                              className="group relative flex h-14 w-full items-center justify-center gap-2 overflow-hidden rounded-2xl bg-brand text-base font-semibold text-white shadow-[0_18px_45px_rgba(143,57,187,0.4)] transition-all duration-200 hover:bg-brand-dark hover:scale-[1.01] hover:shadow-[0_22px_55px_rgba(143,57,187,0.5)] focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                             >
                               <Zap className="mr-2 h-5 w-5" />
                               Start Analyzing Parts
@@ -3874,7 +3874,7 @@ const Upload = () => {
                     <span className="text-muted-foreground text-sm">
                       Analysis Mode:
                     </span>
-                    <Badge className="bg-purple-600/20 text-purple-300 border-purple-500/30">
+                    <Badge className="bg-brand/20 text-brand-light border-brand/30">
                       {selectedMode === "both"
                         ? "Image + Keywords"
                         : selectedMode === "image"
@@ -3976,7 +3976,7 @@ const Upload = () => {
                     transition={{ delay: 0.3 }}
                     className="relative mx-auto w-full max-w-xl"
                   >
-                    <div className="absolute inset-0 bg-gradient-to-r from-purple-600/10 to-blue-600/10 rounded-3xl blur-xl opacity-60" />
+                    <div className="absolute inset-0 bg-gradient-to-r from-brand/10 to-blue-600/10 rounded-3xl blur-xl opacity-60" />
                     <Card className="relative border border-border bg-card/95 shadow-soft-elevated backdrop-blur-xl dark:bg-black/30 dark:border-white/10 h-full">
                       <CardHeader>
                         <CardTitle className="text-foreground flex items-center justify-between">
@@ -4005,7 +4005,7 @@ const Upload = () => {
                           id="tour-upload-dropzone"
                           className={`relative border-2 border-dashed rounded-3xl p-6 sm:p-8 lg:p-12 text-center transition-all duration-300 ${
                             dragActive
-                              ? "border-purple-500 bg-purple-600/10"
+                              ? "border-brand bg-brand/10"
                               : uploadedFile
                               ? "border-green-500/50 bg-green-600/5"
                               : "border-border hover:border-muted-foreground/50"
@@ -4217,7 +4217,7 @@ const Upload = () => {
                                       </span>
                                     </div>
                                     <div className="flex items-center space-x-2">
-                                      <div className="w-2 h-2 bg-purple-400 rounded-full"></div>
+                                      <div className="w-2 h-2 bg-brand-light rounded-full"></div>
                                       <span className="text-gray-300">
                                         Mode:
                                       </span>
@@ -4366,7 +4366,7 @@ const Upload = () => {
                                       )}
                                       {analysisProgress.status ===
                                         "part_matching" && (
-                                        <div className="flex justify-between text-purple-300">
+                                        <div className="flex justify-between text-brand-light">
                                           <span>
                                             🔗 Matching against Manufacturing spares
                                             database...
@@ -4604,7 +4604,7 @@ const Upload = () => {
                   (wizardStep === "image" && !uploadedFile) ||
                   (wizardStep === "keywords" && savedKeywords.length === 0)
                 }
-                className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
+                className="bg-gradient-to-r from-brand to-brand-dark hover:from-brand-dark hover:to-brand-dark"
               >
                 Continue
               </Button>
@@ -4786,7 +4786,7 @@ const Upload = () => {
                     }
                   }}
                   disabled={!uploadedFile && selectedMode !== "keywords"}
-                  className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 shadow-lg shadow-purple-500/25 px-8 h-12"
+                  className="bg-gradient-to-r from-brand to-brand-dark hover:from-brand-dark hover:to-brand-dark shadow-lg shadow-brand/25 px-8 h-12"
                 >
                   <Brain className="w-5 h-5 mr-2" />
                   🤖 Analyze
@@ -4818,7 +4818,7 @@ const Upload = () => {
             {/* Loading Text */}
             <div className="space-y-2">
               <h3 className="text-2xl font-bold text-white flex items-center gap-3 justify-center">
-                <Sparkles className="w-6 h-6 text-purple-400 animate-pulse" />
+                <Sparkles className="w-6 h-6 text-brand-light animate-pulse" />
                 {isAnalyzing ? "Analyzing Your Image" : "Searching Our Catalog"}
               </h3>
               <p className="text-gray-400 text-lg">
@@ -4831,7 +4831,7 @@ const Upload = () => {
             {/* Progress Indicators */}
             <div className="flex gap-2 justify-center">
               <motion.div
-                className="w-2 h-2 rounded-full bg-purple-500"
+                className="w-2 h-2 rounded-full bg-brand"
                 animate={{ scale: [1, 1.5, 1] }}
                 transition={{ duration: 0.6, repeat: Infinity, delay: 0 }}
               />

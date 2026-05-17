@@ -2,7 +2,7 @@
     "name": "SpareFinder - AI-Powered Spare Parts Identification",
     "short_name": "SpareFinder",
     "description": "Instantly identify industrial spare parts with AI-powered vision. Upload a photo to get part name, specs and supplier options.",
-    "theme_color": "#8B5CF6",
+    "theme_color": "#8F39BB",
     "background_color": "#ffffff",
     "display": "standalone",
     "orientation": "portrait",

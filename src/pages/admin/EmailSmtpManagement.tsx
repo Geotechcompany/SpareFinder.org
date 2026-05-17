@@ -467,7 +467,7 @@ const EmailSmtpManagement = () => {
           }}
         />
         <motion.div
-          className="absolute -bottom-40 -left-40 w-96 h-96 bg-purple-600/10 rounded-full blur-3xl opacity-40"
+          className="absolute -bottom-40 -left-40 w-96 h-96 bg-brand/10 rounded-full blur-3xl opacity-40"
           animate={{
             scale: [1.2, 1, 1.2],
             x: [0, 50, 0],
@@ -522,11 +522,11 @@ const EmailSmtpManagement = () => {
             >
               {/* Quick Setup */}
               <div className="relative">
-                <div className="absolute inset-0 bg-gradient-to-r from-purple-600/5 to-pink-600/5 rounded-3xl blur-xl opacity-60" />
+                <div className="absolute inset-0 bg-gradient-to-r from-brand/5 to-pink-600/5 rounded-3xl blur-xl opacity-60" />
                 <Card className="relative bg-black/20 backdrop-blur-xl border-white/10">
                   <CardHeader>
                     <CardTitle className="text-white flex items-center space-x-2">
-                      <Zap className="w-5 h-5 text-purple-400" />
+                      <Zap className="w-5 h-5 text-brand-light" />
                       <span>Quick Setup</span>
                     </CardTitle>
                     <CardDescription className="text-gray-400">
@@ -566,7 +566,7 @@ const EmailSmtpManagement = () => {
 
               {/* SMTP Server Settings */}
               <div className="relative">
-                <div className="absolute inset-0 bg-gradient-to-r from-blue-600/5 to-purple-600/5 rounded-3xl blur-xl opacity-60" />
+                <div className="absolute inset-0 bg-gradient-to-r from-blue-600/5 to-brand/5 rounded-3xl blur-xl opacity-60" />
                 <Card className="relative bg-black/20 backdrop-blur-xl border-white/10">
                   <CardHeader>
                     <CardTitle className="text-white flex items-center space-x-2">
@@ -761,7 +761,7 @@ const EmailSmtpManagement = () => {
                           <Button
                             onClick={handleTestConnection}
                             disabled={testResult === "testing"}
-                            className="bg-purple-600 hover:bg-purple-700 rounded-xl"
+                            className="bg-brand hover:bg-brand-dark rounded-xl"
                           >
                             {testResult === "testing" ? (
                               <>
@@ -787,7 +787,7 @@ const EmailSmtpManagement = () => {
                               ? "bg-green-600/20 border border-green-500/30"
                               : testResult === "error"
                               ? "bg-red-600/20 border border-red-500/30"
-                              : "bg-purple-600/20 border border-purple-500/30"
+                              : "bg-brand/20 border border-brand/30"
                           }`}
                         >
                           <div className="flex items-center space-x-2">
@@ -796,7 +796,7 @@ const EmailSmtpManagement = () => {
                             ) : testResult === "error" ? (
                               <AlertTriangle className="w-4 h-4 text-red-400" />
                             ) : (
-                              <Clock className="w-4 h-4 text-purple-400 animate-spin" />
+                              <Clock className="w-4 h-4 text-brand-light animate-spin" />
                             )}
                             <span
                               className={`text-sm ${
@@ -804,7 +804,7 @@ const EmailSmtpManagement = () => {
                                   ? "text-green-300"
                                   : testResult === "error"
                                   ? "text-red-300"
-                                  : "text-purple-300"
+                                  : "text-brand-light"
                               }`}
                             >
                               {testResult === "success" &&
@@ -839,7 +839,7 @@ const EmailSmtpManagement = () => {
                         <Button
                           onClick={handleSaveSettings}
                           disabled={saving}
-                          className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 shadow-lg shadow-blue-500/25 rounded-xl"
+                          className="bg-gradient-to-r from-brand-dark to-brand hover:from-blue-700 hover:to-brand-dark shadow-lg shadow-blue-500/25 rounded-xl"
                         >
                           {saving ? (
                             <>

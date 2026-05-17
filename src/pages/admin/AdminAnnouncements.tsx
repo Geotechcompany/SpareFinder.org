@@ -123,7 +123,7 @@ const AdminAnnouncements = () => {
           <Card className="border-border/80 shadow-sm">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-lg">
-                <BellRing className="h-5 w-5 text-violet-500" />
+                <BellRing className="h-5 w-5 text-brand" />
                 Compose notification
               </CardTitle>
               <CardDescription>
@@ -215,7 +215,7 @@ const AdminAnnouncements = () => {
                 <Button
                   type="submit"
                   disabled={sending}
-                  className="h-11 w-full rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 font-medium shadow-md hover:from-violet-700 hover:to-indigo-700 sm:w-auto sm:min-w-[160px]"
+                  className="h-11 w-full rounded-xl bg-gradient-to-r from-brand to-brand-dark font-medium shadow-md hover:from-brand-dark hover:to-brand-dark sm:w-auto sm:min-w-[160px]"
                 >
                   {sending ? (
                     <>

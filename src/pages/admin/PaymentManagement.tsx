@@ -478,7 +478,7 @@ const PaymentManagement = () => {
   const getProviderColor = (provider: string) => {
     switch (provider.toLowerCase()) {
       case 'stripe':
-        return 'from-purple-600 to-indigo-600';
+        return 'from-brand to-brand-dark';
       case 'paypal':
         return 'from-blue-600 to-cyan-600';
       case 'square':
@@ -723,7 +723,7 @@ const PaymentManagement = () => {
                 label: 'Total Fees', 
                 value: `£${paymentStats.totalFees.toLocaleString()}`, 
                 icon: TrendingUp, 
-                color: 'from-purple-600 to-violet-600' 
+                color: 'from-brand to-brand' 
               },
               { 
                 label: 'Active Methods', 
@@ -931,7 +931,7 @@ const PaymentManagement = () => {
                           whileTap={{ scale: 0.9 }}
                           className="p-2 rounded-lg transition-colors hover:bg-muted dark:hover:bg-white/10"
                         >
-                          <Activity className="w-4 h-4 text-purple-400" />
+                          <Activity className="w-4 h-4 text-brand-light" />
                         </motion.button>
                         <AlertDialog>
                           <AlertDialogTrigger asChild>

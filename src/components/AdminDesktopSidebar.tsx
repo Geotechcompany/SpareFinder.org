@@ -450,7 +450,7 @@ const AdminDesktopSidebar: React.FC<AdminSidebarProps> = ({
                             className={cn(
                               "relative flex items-center gap-3 rounded-xl border px-3 py-2.5 transition-colors",
                               active
-                                ? "border-violet-500/30 bg-violet-500/10 text-foreground shadow-sm dark:border-violet-500/35 dark:bg-gradient-to-r dark:from-violet-600/20 dark:to-indigo-600/15 dark:text-zinc-50 admin-nav-link-active"
+                                ? "border-brand/30 bg-brand/10 text-foreground shadow-sm dark:border-brand/35 dark:bg-gradient-to-r dark:from-brand/20 dark:to-brand-dark/15 dark:text-zinc-50 admin-nav-link-active"
                                 : "border-transparent bg-muted/40 hover:bg-muted/70 dark:bg-white/[0.05] dark:hover:bg-white/[0.09]"
                             )}
                           >
@@ -458,7 +458,7 @@ const AdminDesktopSidebar: React.FC<AdminSidebarProps> = ({
                               className={cn(
                                 "flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ring-1 ring-border/60 dark:ring-white/10",
                                 active
-                                  ? "bg-gradient-to-br from-violet-500/35 to-cyan-500/15 text-primary shadow-[0_0_14px_-3px_rgba(139,92,246,0.4)]"
+                                  ? "bg-gradient-to-br from-brand/35 to-cyan-500/15 text-primary shadow-[0_0_14px_-3px_rgba(143,57,187,0.4)]"
                                   : "bg-background text-muted-foreground"
                               )}
                             >
@@ -495,7 +495,7 @@ const AdminDesktopSidebar: React.FC<AdminSidebarProps> = ({
                   <div className="flex items-center gap-3 rounded-xl border border-border bg-muted/40 p-3 dark:border-white/10">
                     <Avatar className="h-10 w-10">
                       <AvatarImage src={adminUser?.avatar_url} />
-                      <AvatarFallback className="bg-gradient-to-r from-blue-600 to-purple-600 text-white">
+                      <AvatarFallback className="bg-gradient-to-r from-brand-dark to-brand text-white">
                         {adminUser?.full_name?.charAt(0) ||
                           adminUser?.email?.charAt(0) ||
                           "A"}
@@ -534,7 +534,7 @@ const AdminDesktopSidebar: React.FC<AdminSidebarProps> = ({
       >
       {/* Header */}
       <div className="relative">
-        <div className="absolute inset-0 bg-gradient-to-r from-violet-200/50 via-fuchsia-100/30 to-cyan-200/40 opacity-80 dark:from-blue-900/30 dark:via-purple-900/15 dark:to-indigo-900/20 dark:opacity-70" />
+        <div className="absolute inset-0 bg-gradient-to-r from-brand-light/50 via-fuchsia-100/30 to-cyan-200/40 opacity-80 dark:from-blue-900/30 dark:via-brand-dark/15 dark:to-brand-dark/20 dark:opacity-70" />
         <div className="relative p-6 border-b border-sidebar-border/80 dark:border-blue-800/30">
           <AnimatePresence mode="wait">
             {!isCollapsed ? (
@@ -727,21 +727,21 @@ const AdminDesktopSidebar: React.FC<AdminSidebarProps> = ({
                       className={cn(
                         "group relative flex items-center gap-3 rounded-xl border px-3 py-2.5 transition-all duration-200",
                         active
-                          ? "border-violet-300/70 bg-gradient-to-r from-violet-500/12 via-white/90 to-cyan-500/12 text-sidebar-accent-foreground shadow-sm dark:border-violet-500/35 dark:from-violet-600/25 dark:via-indigo-600/15 dark:to-cyan-600/20 dark:text-blue-50 admin-nav-link-active"
-                          : "border-transparent text-sidebar-foreground/80 hover:bg-violet-500/[0.08] hover:text-sidebar-foreground dark:text-zinc-400 dark:hover:bg-white/[0.06] dark:hover:text-zinc-100"
+                          ? "border-brand-light/70 bg-gradient-to-r from-brand/12 via-white/90 to-cyan-500/12 text-sidebar-accent-foreground shadow-sm dark:border-brand/35 dark:from-brand/25 dark:via-brand-dark/15 dark:to-cyan-600/20 dark:text-blue-50 admin-nav-link-active"
+                          : "border-transparent text-sidebar-foreground/80 hover:bg-brand/[0.08] hover:text-sidebar-foreground dark:text-zinc-400 dark:hover:bg-white/[0.06] dark:hover:text-zinc-100"
                       )}
                     >
                       {/* Active indicator */}
                       {active ? (
-                        <span className="absolute left-0 top-1/2 h-6 w-1 -translate-y-1/2 rounded-r-full bg-gradient-to-b from-purple-500 to-blue-500" />
+                        <span className="absolute left-0 top-1/2 h-6 w-1 -translate-y-1/2 rounded-r-full bg-gradient-to-b from-brand to-blue-500" />
                       ) : null}
 
                       <div
                         className={cn(
                           "flex h-9 w-9 items-center justify-center rounded-xl ring-1 transition-colors",
                           active
-                            ? "bg-gradient-to-br from-violet-500/35 to-cyan-500/20 text-violet-950 ring-violet-400/40 shadow-[0_0_14px_-3px_rgba(139,92,246,0.25)] dark:text-cyan-50 dark:shadow-[0_0_18px_-4px_rgba(139,92,246,0.45)]"
-                            : "bg-muted text-muted-foreground ring-border/60 group-hover:bg-violet-500/[0.12] group-hover:text-violet-800 group-hover:ring-violet-300/50 dark:bg-white/[0.06] dark:text-zinc-400 dark:ring-white/10 dark:group-hover:bg-white/[0.1] dark:group-hover:text-violet-200"
+                            ? "bg-gradient-to-br from-brand/35 to-cyan-500/20 text-brand-dark ring-brand-light/40 shadow-[0_0_14px_-3px_rgba(143,57,187,0.25)] dark:text-cyan-50 dark:shadow-[0_0_18px_-4px_rgba(143,57,187,0.45)]"
+                            : "bg-muted text-muted-foreground ring-border/60 group-hover:bg-brand/[0.12] group-hover:text-brand-dark group-hover:ring-brand-light/50 dark:bg-white/[0.06] dark:text-zinc-400 dark:ring-white/10 dark:group-hover:bg-white/[0.1] dark:group-hover:text-brand-light"
                         )}
                       >
                         <item.icon className="h-4.5 w-4.5" />
@@ -768,7 +768,7 @@ const AdminDesktopSidebar: React.FC<AdminSidebarProps> = ({
                       )}
 
                       {isCollapsed && item.badge ? (
-                        <span className="absolute -top-1 -right-1 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-gradient-to-r from-purple-600 to-blue-600 px-1 text-[10px] font-semibold text-white shadow">
+                        <span className="absolute -top-1 -right-1 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-gradient-to-r from-brand to-brand-dark px-1 text-[10px] font-semibold text-white shadow">
                           {item.badge}
                         </span>
                       ) : null}
@@ -829,7 +829,7 @@ const AdminDesktopSidebar: React.FC<AdminSidebarProps> = ({
                 <div className="flex items-center space-x-3 p-3 rounded-xl bg-muted/80 border border-border/60 dark:bg-blue-900/30 dark:border-blue-800/40">
               <Avatar className="w-10 h-10">
                 <AvatarImage src={adminUser?.avatar_url} />
-                <AvatarFallback className="bg-gradient-to-r from-blue-600 to-purple-600 text-white">
+                <AvatarFallback className="bg-gradient-to-r from-brand-dark to-brand text-white">
                   {adminUser?.full_name?.charAt(0) ||
                     adminUser?.email?.charAt(0) ||
                     "A"}
@@ -866,7 +866,7 @@ const AdminDesktopSidebar: React.FC<AdminSidebarProps> = ({
             <div className="flex justify-center">
               <Avatar className="w-10 h-10">
                 <AvatarImage src={adminUser?.avatar_url} />
-                <AvatarFallback className="bg-gradient-to-r from-blue-600 to-purple-600 text-white">
+                <AvatarFallback className="bg-gradient-to-r from-brand-dark to-brand text-white">
                   {adminUser?.full_name?.charAt(0) ||
                     adminUser?.email?.charAt(0) ||
                     "A"}

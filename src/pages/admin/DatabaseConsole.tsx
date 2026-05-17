@@ -228,7 +228,7 @@ const DatabaseConsole = () => {
           }}
         />
         <motion.div
-          className="absolute -bottom-40 -left-40 w-96 h-96 bg-purple-600/10 rounded-full blur-3xl opacity-40"
+          className="absolute -bottom-40 -left-40 w-96 h-96 bg-brand/10 rounded-full blur-3xl opacity-40"
           animate={{
             scale: [1.2, 1, 1.2],
             x: [0, 50, 0],
@@ -278,7 +278,7 @@ const DatabaseConsole = () => {
               transition={{ delay: 0.6 }}
               className="relative"
             >
-              <div className="absolute inset-0 bg-gradient-to-r from-blue-600/5 to-purple-600/5 rounded-3xl blur-xl opacity-60" />
+              <div className="absolute inset-0 bg-gradient-to-r from-blue-600/5 to-brand/5 rounded-3xl blur-xl opacity-60" />
               <Card className="relative bg-black/20 backdrop-blur-xl border-white/10">
                 <CardHeader>
                   <CardTitle className="text-white flex items-center space-x-2">
@@ -305,7 +305,7 @@ const DatabaseConsole = () => {
                       whileHover={{ scale: 1.05 }}
                       whileTap={{ scale: 0.95 }}
                     >
-                      <Button className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 shadow-lg shadow-blue-500/25 rounded-xl">
+                      <Button className="bg-gradient-to-r from-brand-dark to-brand hover:from-blue-700 hover:to-brand-dark shadow-lg shadow-blue-500/25 rounded-xl">
                         <Play className="w-4 h-4 mr-2" />
                         Execute Query
                       </Button>
@@ -322,11 +322,11 @@ const DatabaseConsole = () => {
               transition={{ delay: 0.6 }}
               className="relative"
             >
-              <div className="absolute inset-0 bg-gradient-to-r from-purple-600/5 to-pink-600/5 rounded-3xl blur-xl opacity-60" />
+              <div className="absolute inset-0 bg-gradient-to-r from-brand/5 to-pink-600/5 rounded-3xl blur-xl opacity-60" />
               <Card className="relative bg-black/20 backdrop-blur-xl border-white/10">
                 <CardHeader>
                   <CardTitle className="text-white flex items-center space-x-2">
-                    <History className="w-5 h-5 text-purple-400" />
+                    <History className="w-5 h-5 text-brand-light" />
                     <span>Query History</span>
                   </CardTitle>
                   <CardDescription className="text-gray-400">

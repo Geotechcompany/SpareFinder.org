@@ -227,8 +227,8 @@ interface MetricCardProps {
               </div>
             )}
           </div>
-          <div className="p-3 rounded-lg bg-purple-600/20">
-            <Icon className="w-6 h-6 text-purple-400" />
+          <div className="p-3 rounded-lg bg-brand/20">
+            <Icon className="w-6 h-6 text-brand-light" />
           </div>
         </div>
       </CardContent>
@@ -238,7 +238,7 @@ interface MetricCardProps {
   if (loading && !metrics) {
     return (
       <div className="flex items-center justify-center min-h-96">
-        <RefreshCw className="w-8 h-8 animate-spin text-purple-400" />
+        <RefreshCw className="w-8 h-8 animate-spin text-brand-light" />
       </div>
     )
   }
@@ -455,9 +455,9 @@ interface MetricCardProps {
                     <Line 
                       type="monotone" 
                       dataKey="responseTime" 
-                      stroke="#8b5cf6" 
+                      stroke="#8F39BB" 
                       strokeWidth={2}
-                      dot={{ fill: '#8b5cf6', strokeWidth: 2 }}
+                      dot={{ fill: '#8F39BB', strokeWidth: 2 }}
                     />
                   </LineChart>
                 </ResponsiveContainer>
@@ -613,7 +613,7 @@ interface MetricCardProps {
           <Card className="bg-black/20 backdrop-blur-xl border-white/10">
             <CardHeader>
               <CardTitle className="text-white flex items-center gap-2">
-                <Settings className="w-5 h-5 text-purple-400" />
+                <Settings className="w-5 h-5 text-brand-light" />
                 Performance Optimization Recommendations
               </CardTitle>
               <CardDescription className="text-gray-400">
@@ -676,19 +676,19 @@ interface MetricCardProps {
                   </div>
                 </div>
 
-                <div className="bg-purple-600/10 border border-purple-500/20 rounded-lg p-4">
+                <div className="bg-brand/10 border border-brand/20 rounded-lg p-4">
                   <div className="flex items-start gap-3">
-                    <Zap className="w-5 h-5 text-purple-400 flex-shrink-0 mt-0.5" />
+                    <Zap className="w-5 h-5 text-brand-light flex-shrink-0 mt-0.5" />
                     <div>
-                      <h4 className="text-purple-300 font-medium mb-1">Memory Usage Optimization</h4>
-                      <p className="text-purple-200 text-sm mb-3">
+                      <h4 className="text-brand-light font-medium mb-1">Memory Usage Optimization</h4>
+                      <p className="text-brand-light text-sm mb-3">
                         AI model caching is consuming 78% of available memory. Consider implementing smart cache eviction.
                       </p>
                       <div className="flex items-center gap-2">
-                        <Button size="sm" className="bg-purple-600 hover:bg-purple-700">
+                        <Button size="sm" className="bg-brand hover:bg-brand-dark">
                           Optimize Memory Usage
                         </Button>
-                        <span className="text-purple-300 text-sm">Est. memory reduction: 30%</span>
+                        <span className="text-brand-light text-sm">Est. memory reduction: 30%</span>
                       </div>
                     </div>
                   </div>

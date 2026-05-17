@@ -47,19 +47,22 @@ export interface PlanFeature {
  */
 const TIER_FEATURES: Record<PlanTier, string[]> = {
   free: [
-    "20 analyses per month",
+    "20 analyses per month (shared across workspaces)",
+    "Up to 3 workspaces",
     "Basic search & match results",
     "Web portal access",
   ],
   pro: [
-    "500 analyses per month",
+    "500 analyses per month (shared across workspaces)",
+    "Up to 5 workspaces",
     "Catalogue storage (part lists, drawings)",
     "API access for ERP/CMMS",
     "Analytics dashboard",
     "Web portal access",
   ],
   enterprise: [
-    "Unlimited analyses",
+    "Unlimited analyses (shared across workspaces)",
+    "Unlimited workspaces",
     "Advanced AI customisation (train on your data)",
     "ERP/CMMS full integration",
     "Predictive demand analytics",
@@ -100,7 +103,7 @@ export const PLAN_CONFIG: Record<PlanTier, PlanFeature> = {
     description: "For SMEs managing spare parts more actively",
     features: TIER_FEATURES.pro,
     popular: true,
-    color: "from-purple-600 to-blue-600",
+    color: "from-brand to-brand-dark",
     icon: Zap,
     limits: {
       searches: 500,

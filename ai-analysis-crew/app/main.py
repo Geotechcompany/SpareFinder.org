@@ -81,6 +81,7 @@ from .api.routes_dashboard import router as dashboard_router
 from .api.routes_history import router as history_router
 from .api.routes_notifications import router as notifications_router
 from .api.routes_user import router as user_router
+from .api.routes_workspaces import router as workspaces_router
 from .api.routes_upload import router as upload_router
 from .api.routes_reviews import router as reviews_router
 from .api.routes_search import router as search_router
@@ -101,6 +102,7 @@ app.include_router(dashboard_router, prefix="/api")
 app.include_router(history_router, prefix="/api")
 app.include_router(notifications_router, prefix="/api")
 app.include_router(user_router, prefix="/api")
+app.include_router(workspaces_router, prefix="/api")
 app.include_router(upload_router, prefix="/api")
 app.include_router(reviews_router, prefix="/api")
 app.include_router(search_router, prefix="/api")

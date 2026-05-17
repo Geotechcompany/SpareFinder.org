@@ -195,7 +195,7 @@ const AIModelsManagement = () => {
           }}
         />
         <motion.div
-          className="absolute -bottom-40 -left-40 w-96 h-96 bg-purple-600/10 rounded-full blur-3xl opacity-40"
+          className="absolute -bottom-40 -left-40 w-96 h-96 bg-brand/10 rounded-full blur-3xl opacity-40"
           animate={{
             scale: [1.2, 1, 1.2],
             x: [0, 50, 0],
@@ -265,7 +265,7 @@ const AIModelsManagement = () => {
                 label: 'Avg Response Time', 
                 value: `${modelStats.avgResponseTime.toFixed(1)}s`, 
                 icon: Clock, 
-                color: 'from-purple-600 to-violet-600' 
+                color: 'from-brand to-brand' 
               },
               { 
                 label: 'Success Rate', 
@@ -316,12 +316,12 @@ const AIModelsManagement = () => {
                 whileHover={{ scale: 1.02, y: -2 }}
                 className="relative"
               >
-                <div className={`absolute inset-0 bg-gradient-to-r from-${model.provider === 'OpenAI' ? 'green' : model.provider === 'Anthropic' ? 'orange' : 'blue'}-600/10 to-${model.provider === 'OpenAI' ? 'emerald' : model.provider === 'Anthropic' ? 'red' : 'indigo'}-600/10 rounded-2xl blur-xl`} />
+                <div className={`absolute inset-0 bg-gradient-to-r from-${model.provider === 'OpenAI' ? 'green' : model.provider === 'Anthropic' ? 'orange' : 'blue'}-600/10 to-${model.provider === 'OpenAI' ? 'emerald' : model.provider === 'Anthropic' ? 'red' : 'brand'}-600/10 rounded-2xl blur-xl`} />
                 <Card className="relative bg-black/20 backdrop-blur-xl border-white/10 hover:border-white/20 transition-all duration-300">
                   <CardHeader className="pb-4">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center space-x-3">
-                        <div className={`w-12 h-12 rounded-xl bg-gradient-to-r from-${model.provider === 'OpenAI' ? 'green' : model.provider === 'Anthropic' ? 'orange' : 'blue'}-600 to-${model.provider === 'OpenAI' ? 'emerald' : model.provider === 'Anthropic' ? 'red' : 'indigo'}-600 flex items-center justify-center text-2xl`}>
+                        <div className={`w-12 h-12 rounded-xl bg-gradient-to-r from-${model.provider === 'OpenAI' ? 'green' : model.provider === 'Anthropic' ? 'orange' : 'blue'}-600 to-${model.provider === 'OpenAI' ? 'emerald' : model.provider === 'Anthropic' ? 'red' : 'brand'}-600 flex items-center justify-center text-2xl`}>
                           {model.provider === 'OpenAI' ? '🤖' : model.provider === 'Anthropic' ? '🧠' : '🎯'}
                         </div>
                         <div>
@@ -420,7 +420,7 @@ const AIModelsManagement = () => {
                           whileTap={{ scale: 0.9 }}
                           className="p-2 hover:bg-white/10 rounded-lg transition-colors"
                         >
-                          <BarChart3 className="w-4 h-4 text-purple-400" />
+                          <BarChart3 className="w-4 h-4 text-brand-light" />
                         </motion.button>
                       </div>
                       
@@ -454,11 +454,11 @@ const AIModelsManagement = () => {
             transition={{ delay: 1.2 }}
             className="relative"
           >
-            <div className="absolute inset-0 bg-gradient-to-r from-purple-600/5 to-blue-600/5 rounded-3xl blur-xl opacity-60" />
+            <div className="absolute inset-0 bg-gradient-to-r from-brand/5 to-blue-600/5 rounded-3xl blur-xl opacity-60" />
             <Card className="relative bg-black/20 backdrop-blur-xl border-white/10">
               <CardHeader>
                 <CardTitle className="text-white flex items-center space-x-2">
-                  <Bot className="w-5 h-5 text-purple-400" />
+                  <Bot className="w-5 h-5 text-brand-light" />
                   <span>Add New AI Model</span>
                 </CardTitle>
                 <CardDescription className="text-gray-400">
@@ -513,7 +513,7 @@ const AIModelsManagement = () => {
                       whileTap={{ scale: 0.95 }}
                       className="w-full"
                     >
-                      <Button className="w-full h-12 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 shadow-lg shadow-purple-500/25 rounded-xl">
+                      <Button className="w-full h-12 bg-gradient-to-r from-brand to-brand-dark hover:from-brand-dark hover:to-brand-dark shadow-lg shadow-brand/25 rounded-xl">
                         <Shield className="w-4 h-4 mr-2" />
                         Add Model
                       </Button>

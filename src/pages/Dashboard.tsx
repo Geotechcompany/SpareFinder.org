@@ -12,12 +12,8 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Upload,
-  FileText,
-  TrendingUp,
   AlertTriangle,
   Zap,
-  Eye,
-  Download,
   Search,
   Cpu,
   Database,
@@ -27,6 +23,8 @@ import {
 import DashboardSidebar from "@/components/DashboardSidebar";
 import MobileSidebar from "@/components/MobileSidebar";
 import { useDashboardLayout } from "@/contexts/DashboardLayoutContext";
+import { useDashboardChrome } from "@/hooks/use-dashboard-chrome";
+import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSubscription } from "@/contexts/SubscriptionContext";
 import { PlanRequiredCard } from "@/components/billing/PlanRequiredCard";
@@ -38,6 +36,8 @@ import DashboardSkeleton from "@/components/DashboardSkeleton";
 import { PerformanceOverviewChart } from "@/components/PerformanceOverviewChart";
 import { getCrewJobDisplayName } from "@/services/aiAnalysisCrew";
 import { DashboardWelcomeBanner } from "@/components/dashboard/DashboardWelcomeBanner";
+import { DashboardQuickActionsDock } from "@/components/dashboard/DashboardQuickActionsDock";
+import { useDashboardSidebarOffset } from "@/hooks/use-dashboard-sidebar-offset";
 import {
   DashboardOverviewStats,
   type DashboardOverviewMetrics,
@@ -90,9 +90,14 @@ function computeAnalyticsRollups(series: any[]) {
 }
 
 const Dashboard = () => {
-  const { inLayout } = useDashboardLayout();
+  const { inLayout, sidebarCollapsed: layoutSidebarCollapsed } =
+    useDashboardLayout();
+  const { isSplitDashboard } = useDashboardChrome();
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  useDashboardSidebarOffset(
+    inLayout ? layoutSidebarCollapsed : isCollapsed
+  );
   const { user, isLoading: authLoading, logout, isAuthenticated } = useAuth();
   const { isPlanActive, isLoading: subscriptionLoading } = useSubscription();
   const navigate = useNavigate();
@@ -690,7 +695,12 @@ const Dashboard = () => {
 
   if (!subscriptionLoading && !isPlanActive) {
     return (
-      <div className="dashboard-premium min-h-screen flex w-full bg-background">
+      <div
+        className={cn(
+          "dashboard-premium min-h-screen flex w-full bg-background",
+          isSplitDashboard && "dashboard-theme-split"
+        )}
+      >
         <PlanRequiredCard />
       </div>
     );
@@ -701,7 +711,12 @@ const Dashboard = () => {
   }
 
   return (
-    <div className="dashboard-premium min-h-screen flex w-full bg-background text-foreground">
+    <div
+      className={cn(
+        "dashboard-premium min-h-screen flex w-full bg-background text-foreground",
+        isSplitDashboard && "dashboard-theme-split"
+      )}
+    >
 
       {/* Sidebar and mobile menu handled by layout when inLayout */}
       {!inLayout && (
@@ -740,13 +755,16 @@ const Dashboard = () => {
               }
         }
         transition={{ duration: 0.3, ease: "easeInOut" }}
-        className="flex-1 px-3 pb-6 pt-3 sm:px-6 sm:pt-6 lg:px-8 lg:py-8 relative z-10 overflow-x-hidden md:overflow-x-visible"
+        className={cn(
+          "dashboard-main-light min-h-screen flex-1 overflow-y-auto overflow-x-hidden px-3 pb-28 pt-3 sm:px-6 sm:pt-6 sm:pb-24 lg:px-8 lg:py-8 lg:pb-32",
+          isSplitDashboard && "dashboard-docked-panel"
+        )}
       >
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
-          className="space-y-4 sm:space-y-6 lg:space-y-8"
+          className="relative z-10 space-y-4 sm:space-y-6 lg:space-y-8"
         >
           <DashboardWelcomeBanner
             fullName={user?.full_name}
@@ -788,13 +806,12 @@ const Dashboard = () => {
           </motion.div>
 
           {/* Recent Activity */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 lg:gap-8">
-            <motion.div
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.8 }}
-            >
-              <Card className="premium-card h-full bg-card/95 backdrop-blur-md">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.8 }}
+          >
+            <Card className="premium-card bg-card/95 backdrop-blur-md">
                 <CardHeader className="p-4 sm:p-6">
                   <CardTitle className="flex items-center space-x-2 text-lg sm:text-xl text-foreground dark:text-white">
                     <Activity className="w-5 h-5 text-primary" />
@@ -862,86 +879,13 @@ const Dashboard = () => {
                     ))
                   )}
                 </CardContent>
-              </Card>
-            </motion.div>
+            </Card>
+          </motion.div>
 
-            <motion.div
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.8 }}
-            >
-              <Card className="premium-card h-full bg-card/95 backdrop-blur-md">
-                <CardHeader className="p-4 sm:p-6">
-                  <CardTitle className="flex items-center space-x-2 text-lg sm:text-xl text-foreground dark:text-white">
-                    <TrendingUp className="w-5 h-5 text-emerald-500" />
-                    <span>Quick Actions</span>
-                  </CardTitle>
-                  <CardDescription className="text-sm text-muted-foreground">
-                    Frequently used features and tools
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-2 sm:space-y-3 p-4 sm:p-6">
-                  {[
-                    {
-                      label: "Upload New Part",
-                      icon: Upload,
-                      href: "/dashboard/upload",
-                      color: "bg-primary/20 text-primary",
-                    },
-                    {
-                      label: "View History",
-                      icon: FileText,
-                      href: "/dashboard/history",
-                      color: "bg-white/10 text-foreground",
-                    },
-                    {
-                      label: "View Profile",
-                      icon: Eye,
-                      href: "/dashboard/profile",
-                      color: "bg-[#2EE6A6]/20 text-[#2EE6A6]",
-                    },
-                    {
-                      label: "Settings",
-                      icon: Download,
-                      href: "/dashboard/settings",
-                      color: "bg-accent/20 text-accent",
-                    },
-                  ].map((action, index) => (
-                    <motion.div
-                      key={action.label}
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: 1 + index * 0.08 }}
-                      whileHover={{ y: -2, scale: 1.02 }}
-                      whileTap={{ scale: 0.98 }}
-                    >
-                      <button
-                        type="button"
-                        onClick={() => navigate(action.href)}
-                        className="flex w-full items-center justify-between rounded-2xl border border-border bg-background/80 px-3 py-2.5 text-left text-sm shadow-sm transition-all hover:border-primary/40 hover:bg-card hover:shadow-soft-elevated/60"
-                      >
-                        <div className="flex items-center gap-3">
-                          <div
-                            className={`flex h-9 w-9 items-center justify-center rounded-full ${action.color}`}
-                          >
-                            <action.icon className="w-4 h-4" />
-                          </div>
-                          <span className="font-medium text-foreground">
-                            {action.label}
-                          </span>
-                        </div>
-                        <span className="text-xs text-muted-foreground">
-                          Open
-                        </span>
-                      </button>
-                    </motion.div>
-                  ))}
-                </CardContent>
-              </Card>
-            </motion.div>
-          </div>
         </motion.div>
       </motion.div>
+
+      <DashboardQuickActionsDock sidebarCollapsed={isCollapsed} />
     </div>
   );
 };

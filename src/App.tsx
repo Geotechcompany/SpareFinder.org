@@ -8,6 +8,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { SubscriptionProvider } from "@/contexts/SubscriptionContext";
+import { WorkspaceProvider } from "@/contexts/WorkspaceContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import AdminProtectedRoute from "@/components/AdminProtectedRoute";
 import DebugEnv from "@/components/DebugEnv";
@@ -68,6 +69,7 @@ const queryClient = new QueryClient();
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <AuthProvider>
+      <WorkspaceProvider>
       <SubscriptionProvider>
         <ThemeProvider>
           <TooltipProvider>
@@ -330,6 +332,7 @@ const App = () => (
           </TooltipProvider>
         </ThemeProvider>
       </SubscriptionProvider>
+      </WorkspaceProvider>
     </AuthProvider>
   </QueryClientProvider>
 );

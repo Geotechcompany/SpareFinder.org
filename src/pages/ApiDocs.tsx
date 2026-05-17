@@ -26,7 +26,7 @@ const ApiDocs: React.FC = () => {
   const hasApiAccess = isPlanActive && (tier === "pro" || tier === "enterprise");
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-[#F0F2F5] to-[#E8EBF1] text-foreground dark:from-gray-950 dark:via-purple-900/10 dark:to-blue-900/10">
+    <div className="min-h-screen bg-gradient-to-br from-background via-[#F0F2F5] to-[#E8EBF1] text-foreground dark:from-gray-950 dark:via-brand-dark/10 dark:to-blue-900/10">
       <div className="mx-auto max-w-5xl px-4 py-10 sm:px-6 lg:px-8">
         <motion.div
           initial={{ opacity: 0, y: 14 }}
@@ -35,7 +35,7 @@ const ApiDocs: React.FC = () => {
           className="space-y-4"
         >
           <div className="flex flex-wrap items-center gap-2">
-            <Badge className="bg-purple-600/15 text-purple-700 border-purple-500/20 dark:text-purple-200 dark:border-purple-500/30">
+            <Badge className="bg-brand/15 text-brand-dark border-brand/20 dark:text-brand-light dark:border-brand/30">
               Developer API
             </Badge>
             <Badge className="bg-emerald-500/15 text-emerald-700 border-emerald-500/20 dark:text-emerald-200 dark:border-emerald-500/30">
@@ -43,7 +43,7 @@ const ApiDocs: React.FC = () => {
             </Badge>
           </div>
 
-          <h1 className="text-3xl font-bold tracking-tight dark:bg-gradient-to-r dark:from-white dark:via-purple-200 dark:to-blue-200 dark:bg-clip-text dark:text-transparent sm:text-4xl">
+          <h1 className="text-3xl font-bold tracking-tight dark:bg-gradient-to-r dark:from-white dark:via-brand-light dark:to-blue-200 dark:bg-clip-text dark:text-transparent sm:text-4xl">
             SpareFinder API Documentation
           </h1>
           <p className="text-muted-foreground dark:text-gray-300">
@@ -73,7 +73,7 @@ const ApiDocs: React.FC = () => {
               <Card className="rounded-3xl border border-border bg-card/95 shadow-soft-elevated backdrop-blur-xl dark:bg-black/20 dark:border-white/10">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <KeyRound className="h-5 w-5 text-[#8B5CF6]" />
+                <KeyRound className="h-5 w-5 text-[#8F39BB]" />
                 Authentication
               </CardTitle>
             </CardHeader>
@@ -189,7 +189,7 @@ const ApiDocs: React.FC = () => {
             <Card className="rounded-3xl border border-border bg-card/95 shadow-soft-elevated backdrop-blur-xl dark:bg-black/20 dark:border-white/10">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <KeyRound className="h-5 w-5 text-[#8B5CF6]" />
+                  <KeyRound className="h-5 w-5 text-[#8F39BB]" />
                   Authentication
                 </CardTitle>
               </CardHeader>

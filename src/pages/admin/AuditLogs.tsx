@@ -203,7 +203,7 @@ const AuditLogs = () => {
         return <Upload className="w-4 h-4 text-blue-400" />;
       case 'system':
       case 'database':
-        return <Database className="w-4 h-4 text-purple-400" />;
+        return <Database className="w-4 h-4 text-brand-light" />;
       case 'configuration':
       case 'settings':
         return <Settings className="w-4 h-4 text-green-400" />;
@@ -253,7 +253,7 @@ const AuditLogs = () => {
           }}
         />
         <motion.div
-          className="absolute -bottom-40 -left-40 w-96 h-96 bg-purple-600/10 rounded-full blur-3xl opacity-40"
+          className="absolute -bottom-40 -left-40 w-96 h-96 bg-brand/10 rounded-full blur-3xl opacity-40"
           animate={{
             scale: [1.2, 1, 1.2],
             x: [0, 50, 0],

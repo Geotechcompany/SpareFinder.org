@@ -155,7 +155,7 @@ export const ReviewModal: React.FC<ReviewModalProps> = ({
     <Dialog open={isOpen} onOpenChange={handleClose}>
       <DialogContent className="bg-background/95 backdrop-blur-xl border-border text-foreground max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 dark:from-purple-400 dark:to-blue-400 bg-clip-text text-transparent">
+          <DialogTitle className="text-2xl font-bold bg-gradient-to-r from-brand to-brand-dark dark:from-brand-light dark:to-blue-400 bg-clip-text text-transparent">
             Rate Your Analysis
           </DialogTitle>
           <DialogDescription className="text-muted-foreground">
@@ -248,7 +248,7 @@ export const ReviewModal: React.FC<ReviewModalProps> = ({
                       onClick={() => setFeedbackType(option.value)}
                       className={`${
                         feedbackType === option.value
-                          ? "bg-gradient-to-r from-purple-600 to-blue-600 border-purple-500/30 text-white"
+                          ? "bg-gradient-to-r from-brand to-brand-dark border-brand/30 text-white"
                           : "bg-card border-border hover:bg-accent"
                       }`}
                     >
@@ -271,7 +271,7 @@ export const ReviewModal: React.FC<ReviewModalProps> = ({
                       onClick={() => handleFeatureToggle(feature)}
                       className={`cursor-pointer transition-all ${
                         selectedFeatures.includes(feature)
-                          ? "bg-gradient-to-r from-purple-600 to-blue-600 border-purple-500/30 text-white hover:opacity-90"
+                          ? "bg-gradient-to-r from-brand to-brand-dark border-brand/30 text-white hover:opacity-90"
                           : "bg-muted/30 border-border text-foreground hover:bg-muted/50"
                       }`}
                     >
@@ -333,7 +333,7 @@ export const ReviewModal: React.FC<ReviewModalProps> = ({
                   type="button"
                   onClick={handleSubmit}
                   disabled={isSubmitting || rating === 0}
-                  className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
+                  className="bg-gradient-to-r from-brand to-brand-dark hover:from-brand-dark hover:to-brand-dark"
                 >
                   {isSubmitting ? (
                     <>

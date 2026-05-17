@@ -115,7 +115,7 @@ const Contact: React.FC = () => {
                 </p>
                 <Button
                   onClick={() => setIsSubmitted(false)}
-                  className="w-full bg-gradient-to-r from-[#3A5AFE] via-[#4C5DFF] to-[#06B6D4] text-white shadow-[0_14px_35px_rgba(15,23,42,0.35)] hover:from-[#324EDC] hover:via-[#3A5AFE] hover:to-[#0891B2] dark:from-purple-600 dark:to-blue-600 dark:hover:from-purple-700 dark:hover:to-blue-700"
+                  className="w-full bg-gradient-to-r from-[#3A5AFE] via-[#4C5DFF] to-[#06B6D4] text-white shadow-[0_14px_35px_rgba(15,23,42,0.35)] hover:from-[#324EDC] hover:via-[#3A5AFE] hover:to-[#0891B2] dark:from-brand dark:to-blue-600 dark:hover:from-brand-dark dark:hover:to-blue-700"
                 >
                   Send Another Message
                 </Button>
@@ -171,14 +171,14 @@ const Contact: React.FC = () => {
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="flex items-center gap-3 text-muted-foreground dark:text-gray-300">
-                    <Mail className="h-5 w-5 text-primary dark:text-purple-400" />
+                    <Mail className="h-5 w-5 text-primary dark:text-brand-light" />
                     <div>
                       <p className="font-medium text-foreground dark:text-white">
                         Email
                       </p>
                       <a
                         href={`mailto:${CONTACT_EMAIL}`}
-                        className="text-sm text-primary hover:underline dark:text-purple-300"
+                        className="text-sm text-primary hover:underline dark:text-brand-light"
                       >
                         {CONTACT_EMAIL}
                       </a>
@@ -389,7 +389,7 @@ const Contact: React.FC = () => {
                     <Button
                       type="submit"
                       disabled={isSubmitting}
-                      className="h-12 w-full border-none bg-gradient-to-r from-[#3A5AFE] via-[#4C5DFF] to-[#06B6D4] text-white shadow-[0_16px_40px_rgba(15,23,42,0.35)] transition-all duration-200 hover:from-[#324EDC] hover:via-[#3A5AFE] hover:to-[#0891B2] hover:shadow-purple-500/40 disabled:opacity-70 dark:from-purple-600 dark:to-blue-600 dark:hover:from-purple-700 dark:hover:to-blue-700"
+                      className="h-12 w-full border-none bg-gradient-to-r from-[#3A5AFE] via-[#4C5DFF] to-[#06B6D4] text-white shadow-[0_16px_40px_rgba(15,23,42,0.35)] transition-all duration-200 hover:from-[#324EDC] hover:via-[#3A5AFE] hover:to-[#0891B2] hover:shadow-brand/40 disabled:opacity-70 dark:from-brand dark:to-blue-600 dark:hover:from-brand-dark dark:hover:to-blue-700"
                     >
                       {isSubmitting ? (
                         <>

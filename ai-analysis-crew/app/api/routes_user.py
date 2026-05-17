@@ -5,11 +5,17 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any, Optional
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, File, Request, UploadFile
 from starlette.concurrency import run_in_threadpool
 
 from .auth_dependencies import CurrentUser, get_current_user
 from .responses import api_error, api_ok
+from .storage_uploads import (
+    build_avatar_storage_path,
+    normalize_image_content_type,
+    upload_public_image,
+    validate_profile_image,
+)
 from .supabase_admin import get_supabase_admin
 
 router = APIRouter(prefix="/user", tags=["user"])
@@ -141,6 +147,66 @@ async def update_user_profile(payload: dict[str, Any], user: CurrentUser = Depen
     except Exception as e:
         print(f"❌ Error updating user profile: {e}")
         return api_error("Failed to update user profile", status_code=500)
+
+
+@router.post("/avatar")
+async def upload_user_avatar(
+    image: UploadFile = File(...),
+    user: CurrentUser = Depends(get_current_user),
+):
+    """Upload profile photo to Supabase Storage and persist avatar_url on profiles."""
+    try:
+        image_data = await image.read()
+        content_type = normalize_image_content_type(image.content_type)
+        if not content_type:
+            return api_error("Only JPEG, PNG, or WebP images are allowed", status_code=400)
+
+        validation_error = validate_profile_image(image_data=image_data, content_type=content_type)
+        if validation_error:
+            return api_error(validation_error, status_code=400)
+
+        storage_path = build_avatar_storage_path(user.id, content_type)
+        if not storage_path:
+            return api_error("Invalid user id", status_code=400)
+
+        supabase = get_supabase_admin()
+        avatar_url, upload_error = await run_in_threadpool(
+            lambda: upload_public_image(
+                supabase=supabase,
+                storage_path=storage_path,
+                image_data=image_data,
+                content_type=content_type,
+            )
+        )
+        if upload_error or not avatar_url:
+            return api_error(upload_error or "Upload failed", status_code=500)
+
+        now = datetime.utcnow().isoformat()
+        await run_in_threadpool(
+            lambda: supabase.table("profiles")
+            .update({"avatar_url": avatar_url, "updated_at": now})
+            .eq("id", user.id)
+            .execute()
+        )
+
+        try:
+            from ..redis_client import cache_delete, is_redis_configured
+
+            if is_redis_configured():
+                cache_delete(f"user:id:{user.id}")
+                if user.clerk_user_id:
+                    cache_delete(f"user:clerk:{user.clerk_user_id}")
+        except Exception:
+            pass
+
+        res = await run_in_threadpool(
+            lambda: supabase.table("profiles").select("*").eq("id", user.id).single().execute()
+        )
+        profile = res.data if res and res.data else None
+        return api_ok(data={"avatar_url": avatar_url, "profile": profile})
+    except Exception as e:
+        print(f"❌ Error uploading avatar: {e}")
+        return api_error("Failed to upload avatar", status_code=500)
 
 
 @router.get("/region-preference")

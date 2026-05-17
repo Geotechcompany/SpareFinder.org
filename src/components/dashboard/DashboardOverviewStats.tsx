@@ -45,10 +45,10 @@ const ACCENT: Record<
   { bar: string; icon: string; glow: string; spark: string }
 > = {
   violet: {
-    bar: "from-violet-500 to-purple-400",
-    icon: "bg-violet-500/15 text-violet-600 dark:text-violet-300",
-    glow: "bg-violet-500/10",
-    spark: "stroke-violet-500",
+    bar: "from-brand to-brand-light",
+    icon: "bg-brand/15 text-brand dark:text-brand-light",
+    glow: "bg-brand/10",
+    spark: "stroke-brand",
   },
   emerald: {
     bar: "from-emerald-500 to-teal-400",

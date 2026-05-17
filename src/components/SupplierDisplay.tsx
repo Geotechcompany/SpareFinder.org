@@ -103,7 +103,7 @@ export const SupplierDisplay: React.FC<SupplierDisplayProps> = ({
           {allSuppliers.slice(0, 6).map((supplier, index) => (
             <div
               key={`${supplier.name}-${index}`}
-              className="border rounded-lg p-4 hover:shadow-md transition-shadow bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/10 dark:to-indigo-900/10"
+              className="border rounded-lg p-4 hover:shadow-md transition-shadow bg-gradient-to-r from-blue-50 to-brand-50 dark:from-blue-900/10 dark:to-brand-dark/10"
             >
               <div className="flex items-start justify-between mb-3">
                 <div className="flex-1">

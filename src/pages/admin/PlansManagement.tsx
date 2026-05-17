@@ -297,7 +297,7 @@ const PlansManagement = () => {
                 <Input
                   value={form.color ?? ""}
                   onChange={(e) => setForm((f) => ({ ...f, color: e.target.value }))}
-                  placeholder="from-purple-600 to-blue-600"
+                  placeholder="from-brand to-brand-dark"
                 />
               </div>
               <div className="flex items-center gap-2">

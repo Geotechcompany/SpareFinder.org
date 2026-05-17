@@ -101,6 +101,13 @@ export const setAuthFailureHandler = (handler: AuthFailureHandler | null) => {
   authFailureHandler = handler;
 };
 
+type WorkspaceIdProvider = () => string | null;
+let workspaceIdProvider: WorkspaceIdProvider | null = null;
+
+export const setWorkspaceIdProvider = (provider: WorkspaceIdProvider | null) => {
+  workspaceIdProvider = provider;
+};
+
 export const getAuthToken = async (): Promise<string | null> => {
   if (authTokenProvider) {
     try {
@@ -208,6 +215,12 @@ apiClient.interceptors.request.use(
         console.warn("⚠️ No token available for request:", config.url);
       }
     }
+
+    const workspaceId = workspaceIdProvider?.() ?? null;
+    if (workspaceId) {
+      config.headers["X-Workspace-Id"] = workspaceId;
+    }
+
     return config;
   },
   (error) => Promise.reject(error)
@@ -2062,6 +2075,16 @@ export const api = {
       referralSource: string;
       referralSourceOther?: string;
     }) => apiClient.post("/user/onboarding-survey", payload),
+    uploadAvatar: async (
+      file: File
+    ): Promise<ApiResponse<{ avatar_url: string; profile?: Record<string, unknown> }>> => {
+      const formData = new FormData();
+      formData.append("image", file);
+      const response = await apiClient.post("/user/avatar", formData, {
+        timeout: 60000,
+      });
+      return response.data;
+    },
     updateProfile: (profileData: {
       full_name?: string;
       company?: string;
@@ -2069,6 +2092,7 @@ export const api = {
       bio?: string;
       location?: string;
       website?: string;
+      avatar_url?: string | null;
         preferences?: {
         emailNotifications?: boolean;
         smsNotifications?: boolean;
@@ -2155,6 +2179,90 @@ export const api = {
       return response.data;
     },
   },
+  workspaces: {
+    list: async (options?: { bootstrap?: boolean }): Promise<
+      ApiResponse<{
+        workspaces: WorkspaceRecord[];
+        activeWorkspaceId: string | null;
+        activeWorkspace: WorkspaceRecord | null;
+        needsSetup: boolean;
+        quota?: WorkspaceQuota;
+      }>
+    > => {
+      const bootstrap = options?.bootstrap !== false;
+      const response = await apiClient.get(
+        `/workspaces${bootstrap ? "" : "?bootstrap=false"}`
+      );
+      return response.data;
+    },
+    create: async (name: string): Promise<
+      ApiResponse<{
+        workspace: WorkspaceRecord;
+        workspaces: WorkspaceRecord[];
+        activeWorkspaceId: string;
+        activeWorkspace: WorkspaceRecord;
+        quota?: WorkspaceQuota;
+      }>
+    > => {
+      const response = await apiClient.post("/workspaces", { name });
+      return response.data;
+    },
+    update: async (
+      workspaceId: string,
+      name: string
+    ): Promise<ApiResponse<{ workspace: WorkspaceRecord }>> => {
+      const response = await apiClient.patch(`/workspaces/${workspaceId}`, {
+        name,
+      });
+      return response.data;
+    },
+    activate: async (
+      workspaceId: string
+    ): Promise<
+      ApiResponse<{
+        activeWorkspaceId: string;
+        activeWorkspace: WorkspaceRecord;
+      }>
+    > => {
+      const response = await apiClient.post(
+        `/workspaces/${workspaceId}/activate`
+      );
+      return response.data;
+    },
+    uploadImage: async (
+      workspaceId: string,
+      file: File
+    ): Promise<ApiResponse<{ workspace: WorkspaceRecord; imageUrl: string }>> => {
+      const formData = new FormData();
+      formData.append("image", file);
+      const response = await apiClient.post(
+        `/workspaces/${encodeURIComponent(workspaceId)}/image`,
+        formData,
+        { timeout: 60000 }
+      );
+      return response.data;
+    },
+  },
+};
+
+export type WorkspaceRecord = {
+  id: string;
+  name: string;
+  slug: string;
+  role: "owner" | "admin" | "member" | string;
+  imageUrl?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+export type WorkspaceQuota = {
+  tier: string;
+  planName: string;
+  maxWorkspaces: number;
+  workspaceCount: number;
+  canCreateWorkspace: boolean;
+  sharedPlanLimits: boolean;
+  monthlyAnalysisLimit: number;
 };
 
 // Export individual APIs for backward compatibility

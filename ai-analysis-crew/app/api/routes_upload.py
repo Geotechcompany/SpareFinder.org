@@ -13,6 +13,13 @@ from fastapi import APIRouter, Depends, File, Form, UploadFile
 
 from .auth_dependencies import CurrentUser, get_current_user, require_roles
 from .plan_enforcement import check_upload_limit
+from .workspace_dependencies import (
+    WorkspaceScope,
+    get_workspace_scope,
+    workspace_delete,
+    workspace_select,
+    workspace_update,
+)
 from .responses import api_ok, api_error
 from .supabase_admin import get_supabase_admin
 
@@ -103,20 +110,16 @@ def _upload_ticket_image_to_storage(*, ticket_id: str, image_data: bytes, conten
 
 
 @router.get("/crew-analysis-jobs")
-async def get_crew_analysis_jobs(user: CurrentUser = Depends(get_current_user)):
+async def get_crew_analysis_jobs(scope: WorkspaceScope = Depends(get_workspace_scope)):
     """
     Get all crew analysis jobs for the current user.
     Returns jobs from the crew_analysis_jobs table.
     """
     try:
         supabase = get_supabase_admin()
-        user_id = user.id
 
-        # Fetch crew analysis jobs for this user
         result = (
-            supabase.table("crew_analysis_jobs")
-            .select("*")
-            .eq("user_id", user_id)
+            workspace_select(supabase, "crew_analysis_jobs", scope)
             .order("created_at", desc=True)
             .execute()
         )
@@ -139,21 +142,17 @@ async def get_crew_analysis_jobs(user: CurrentUser = Depends(get_current_user)):
 @router.get("/crew-analysis-jobs/{job_id}")
 async def get_crew_analysis_job(
     job_id: str,
-    user: CurrentUser = Depends(get_current_user)
+    scope: WorkspaceScope = Depends(get_workspace_scope),
 ):
     """
     Get a specific crew analysis job by ID.
     """
     try:
         supabase = get_supabase_admin()
-        user_id = user.id
 
-        # Fetch the specific job
         result = (
-            supabase.table("crew_analysis_jobs")
-            .select("*")
+            workspace_select(supabase, "crew_analysis_jobs", scope)
             .eq("id", job_id)
-            .eq("user_id", user_id)
             .single()
             .execute()
         )
@@ -174,7 +173,8 @@ async def create_crew_analysis_job(
     keywords: Optional[str] = Form(None),
     user_country: Optional[str] = Form(None),
     user_region: Optional[str] = Form(None),
-    user: CurrentUser = Depends(get_current_user)
+    scope: WorkspaceScope = Depends(get_workspace_scope),
+    user: CurrentUser = Depends(get_current_user),
 ):
     """
     Create a new crew analysis job and start analysis immediately.
@@ -185,16 +185,16 @@ async def create_crew_analysis_job(
     import uuid
     
     try:
-        # Enforce plan upload limit (strict: user cannot exceed their tier limit)
-        allowed, current, limit = await check_upload_limit(user.id, user.role)
+        allowed, current, limit = await check_upload_limit(scope, user.role)
         if not allowed:
             return api_error(
-                f"Upload limit reached for your plan ({current}/{limit} this period). Upgrade to get more analyses.",
+                f"Monthly analysis limit reached for your account ({current}/{limit} shared across all workspaces). Upgrade to get more analyses.",
                 status_code=403,
             )
 
         supabase = get_supabase_admin()
-        user_id = user.id
+        user_id = scope.user_id
+        workspace_id = scope.workspace_id
         user_email = user.email
 
         # Read image data
@@ -216,7 +216,7 @@ async def create_crew_analysis_job(
                 # Generate unique filename with job_id
                 file_ext = Path(image.filename).suffix or ".jpg"
                 storage_filename = f"crew_analysis_{job_id}{file_ext}"
-                storage_path = f"crew-analysis/{user_id}/{storage_filename}"
+                storage_path = f"crew-analysis/{workspace_id}/{storage_filename}"
                 bucket_name = "sparefinder"
                 
                 # Upload to Supabase Storage
@@ -264,6 +264,7 @@ async def create_crew_analysis_job(
         job_data = {
             "id": job_id,
             "user_id": user_id,
+            "workspace_id": workspace_id,
             "user_email": user_email,
             "image_url": image_url,
             "image_name": image.filename,
@@ -389,21 +390,17 @@ async def upload_user_ticket_message_image(
 @router.delete("/crew-analysis/{job_id}")
 async def delete_crew_analysis_job(
     job_id: str,
-    user: CurrentUser = Depends(get_current_user)
+    scope: WorkspaceScope = Depends(get_workspace_scope),
 ):
     """
     Delete a crew analysis job.
     """
     try:
         supabase = get_supabase_admin()
-        user_id = user.id
 
-        # Verify ownership before deleting
         check_result = (
-            supabase.table("crew_analysis_jobs")
-            .select("id")
+            workspace_select(supabase, "crew_analysis_jobs", scope, "id")
             .eq("id", job_id)
-            .eq("user_id", user_id)
             .single()
             .execute()
         )
@@ -411,12 +408,9 @@ async def delete_crew_analysis_job(
         if not check_result.data:
             return api_error("Job not found or unauthorized", status_code=404)
 
-        # Delete the job
         delete_result = (
-            supabase.table("crew_analysis_jobs")
-            .delete()
+            workspace_delete(supabase, "crew_analysis_jobs", scope)
             .eq("id", job_id)
-            .eq("user_id", user_id)
             .execute()
         )
 
@@ -433,21 +427,17 @@ async def delete_crew_analysis_job(
 async def update_crew_analysis_job(
     job_id: str,
     update_data: dict,
-    user: CurrentUser = Depends(get_current_user)
+    scope: WorkspaceScope = Depends(get_workspace_scope),
 ):
     """
     Update a crew analysis job (status, progress, etc.).
     """
     try:
         supabase = get_supabase_admin()
-        user_id = user.id
 
-        # Verify ownership
         check_result = (
-            supabase.table("crew_analysis_jobs")
-            .select("id")
+            workspace_select(supabase, "crew_analysis_jobs", scope, "id")
             .eq("id", job_id)
-            .eq("user_id", user_id)
             .single()
             .execute()
         )
@@ -455,12 +445,9 @@ async def update_crew_analysis_job(
         if not check_result.data:
             return api_error("Job not found or unauthorized", status_code=404)
 
-        # Update the job
         result = (
-            supabase.table("crew_analysis_jobs")
-            .update(update_data)
+            workspace_update(supabase, "crew_analysis_jobs", scope, update_data)
             .eq("id", job_id)
-            .eq("user_id", user_id)
             .execute()
         )
 

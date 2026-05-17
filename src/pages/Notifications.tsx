@@ -127,7 +127,7 @@ const Notifications = () => {
       title: "New Features",
       description: "Be first to know about new features",
       icon: Zap,
-      color: "from-purple-600 to-blue-600",
+      color: "from-brand to-brand-dark",
       enabled: false,
     },
     {
@@ -278,14 +278,14 @@ const Notifications = () => {
       className={
         inLayout
           ? "relative w-full overflow-x-hidden"
-          : "relative flex min-h-screen w-full overflow-hidden bg-gradient-to-br from-background via-[#F0F2F5] to-[#E8EBF1] dark:from-gray-900 dark:via-purple-900/20 dark:to-blue-900/20"
+          : "relative flex min-h-screen w-full overflow-hidden bg-gradient-to-br from-background via-[#F0F2F5] to-[#E8EBF1] dark:from-gray-900 dark:via-brand-dark/20 dark:to-blue-900/20"
       }
     >
       {/* Animated Background Elements */}
       {!inLayout && (
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <motion.div
-          className="absolute top-1/4 -right-40 w-80 h-80 bg-purple-600/15 rounded-full blur-3xl opacity-60"
+          className="absolute top-1/4 -right-40 w-80 h-80 bg-brand/15 rounded-full blur-3xl opacity-60"
           animate={{
             scale: [1, 1.3, 1],
             rotate: [0, 180, 360],
@@ -359,7 +359,7 @@ const Notifications = () => {
 
           {/* Header */}
           <div className="relative">
-            <div className="absolute inset-0 rounded-3xl bg-gradient-to-r from-[#3A5AFE0A] via-[#8B5CF60A] to-transparent blur-xl opacity-80 dark:from-purple-600/10 dark:to-blue-600/10" />
+            <div className="absolute inset-0 rounded-3xl bg-gradient-to-r from-[#3A5AFE0A] via-[#8F39BB0A] to-transparent blur-xl opacity-80 dark:from-brand/10 dark:to-blue-600/10" />
             <div className="relative rounded-3xl border border-border bg-card shadow-soft-elevated backdrop-blur-xl p-4 sm:p-6 dark:bg-black/20 dark:border-white/10">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div>
@@ -367,7 +367,7 @@ const Notifications = () => {
                     initial={{ opacity: 0, scale: 0.8 }}
                     animate={{ opacity: 1, scale: 1 }}
                     transition={{ delay: 0.2 }}
-                    className="inline-flex items-center px-4 py-2 bg-gradient-to-r from-purple-600/20 to-blue-600/20 rounded-full border border-purple-500/30 backdrop-blur-xl mb-4"
+                    className="inline-flex items-center px-4 py-2 bg-gradient-to-r from-brand/20 to-blue-600/20 rounded-full border border-brand/30 backdrop-blur-xl mb-4"
                   >
                     <motion.div
                       animate={{ rotate: [0, 360] }}
@@ -378,15 +378,15 @@ const Notifications = () => {
                       }}
                       className="mr-2"
                     >
-                      <Sparkles className="w-4 h-4 text-purple-400" />
+                      <Sparkles className="w-4 h-4 text-brand-light" />
                     </motion.div>
-                    <span className="text-purple-300 text-sm font-semibold">
+                    <span className="text-brand-light text-sm font-semibold">
                       Notifications Center
                     </span>
                   </motion.div>
                   <div className="flex items-center space-x-3 mb-3">
                     <motion.h1
-                      className="text-3xl lg:text-4xl font-bold text-foreground dark:bg-gradient-to-r dark:from-white dark:via-purple-200 dark:to-blue-200 dark:bg-clip-text dark:text-transparent"
+                      className="text-3xl lg:text-4xl font-bold text-foreground dark:bg-gradient-to-r dark:from-white dark:via-brand-light dark:to-blue-200 dark:bg-clip-text dark:text-transparent"
                       initial={{ opacity: 0, x: -20 }}
                       animate={{ opacity: 1, x: 0 }}
                       transition={{ delay: 0.3 }}
@@ -444,7 +444,7 @@ const Notifications = () => {
                     <Button
                       type="button"
                       onClick={() => navigate("/dashboard/settings")}
-                      className="w-full sm:w-auto bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 shadow-lg shadow-purple-500/25 h-12 px-6"
+                      className="w-full sm:w-auto bg-gradient-to-r from-brand to-brand-dark hover:from-brand-dark hover:to-brand-dark shadow-lg shadow-brand/25 h-12 px-6"
                     >
                       <Settings className="w-4 h-4 mr-2" />
                       Settings
@@ -462,7 +462,7 @@ const Notifications = () => {
             transition={{ delay: 0.6 }}
             className="relative"
           >
-            <div className="absolute inset-0 rounded-3xl bg-gradient-to-r from-[#6366F11A] via-[#8B5CF61A] to-transparent blur-xl opacity-80 dark:from-indigo-600/10 dark:to-purple-600/10" />
+            <div className="absolute inset-0 rounded-3xl bg-gradient-to-r from-[#8F39BB1A] via-[#8F39BB1A] to-transparent blur-xl opacity-80 dark:from-brand-dark/10 dark:to-brand/10" />
             <div className="relative overflow-x-auto rounded-3xl border border-border bg-card/95 p-2 backdrop-blur-xl shadow-soft-elevated dark:bg-black/20 dark:border-white/10">
               <div className="flex flex-nowrap gap-2 min-w-max sm:min-w-0 sm:flex-wrap">
                 {[
@@ -506,7 +506,7 @@ const Notifications = () => {
                     {selectedFilter === filter.id && (
                       <motion.div
                         layoutId="activeFilterTab"
-                        className="absolute inset-0 bg-gradient-to-r from-purple-600/30 to-blue-600/20 rounded-2xl border border-purple-500/30 backdrop-blur-xl"
+                        className="absolute inset-0 bg-gradient-to-r from-brand/30 to-blue-600/20 rounded-2xl border border-brand/30 backdrop-blur-xl"
                         initial={false}
                         transition={{
                           type: "spring",
@@ -539,12 +539,12 @@ const Notifications = () => {
               transition={{ delay: 0.8 }}
               className="order-2 relative lg:order-1 lg:col-span-2"
             >
-              <div className="absolute inset-0 rounded-3xl bg-gradient-to-r from-[#3A5AFE0A] via-[#8B5CF60A] to-transparent blur-xl opacity-80 dark:from-purple-600/5 dark:to-blue-600/5" />
+              <div className="absolute inset-0 rounded-3xl bg-gradient-to-r from-[#3A5AFE0A] via-[#8F39BB0A] to-transparent blur-xl opacity-80 dark:from-brand/5 dark:to-blue-600/5" />
               <Card className="relative border border-border bg-card text-foreground shadow-soft-elevated backdrop-blur-xl dark:bg-black/20 dark:border-white/10">
                 <CardHeader>
                   <CardTitle className="flex items-center justify-between text-foreground dark:text-white">
                     <span className="flex items-center space-x-2">
-                      <Bell className="w-5 h-5 text-[#8B5CF6]" />
+                      <Bell className="w-5 h-5 text-[#8F39BB]" />
                       <span>
                         Recent Notifications ({filteredNotifications.length})
                       </span>
@@ -707,7 +707,7 @@ const Notifications = () => {
                         <Switch
                           checked={setting.enabled}
                           onCheckedChange={() => {}}
-                          className="data-[state=checked]:bg-purple-600"
+                          className="data-[state=checked]:bg-brand"
                         />
                       </div>
                     </motion.div>
@@ -727,7 +727,7 @@ const Notifications = () => {
                         </div>
                         <Switch
                           checked={true}
-                          className="data-[state=checked]:bg-purple-600"
+                          className="data-[state=checked]:bg-brand"
                         />
                       </div>
                       <div className="flex items-center justify-between rounded-lg border border-border bg-card p-3 dark:bg-white/5 dark:border-white/10">
@@ -739,7 +739,7 @@ const Notifications = () => {
                         </div>
                         <Switch
                           checked={false}
-                          className="data-[state=checked]:bg-purple-600"
+                          className="data-[state=checked]:bg-brand"
                         />
                       </div>
                     </div>

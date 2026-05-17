@@ -148,7 +148,7 @@ const TestPayment = () => {
 
   if (paymentSuccess) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-background via-[#F0F2F5] to-[#E8EBF1] dark:from-gray-950 dark:via-purple-900/10 dark:to-blue-900/10 flex items-center justify-center p-4">
+      <div className="min-h-screen bg-gradient-to-br from-background via-[#F0F2F5] to-[#E8EBF1] dark:from-gray-950 dark:via-brand-dark/10 dark:to-blue-900/10 flex items-center justify-center p-4">
         <motion.div
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
@@ -198,7 +198,7 @@ const TestPayment = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-[#F0F2F5] to-[#E8EBF1] dark:from-gray-950 dark:via-purple-900/10 dark:to-blue-900/10 py-12 px-4">
+    <div className="min-h-screen bg-gradient-to-br from-background via-[#F0F2F5] to-[#E8EBF1] dark:from-gray-950 dark:via-brand-dark/10 dark:to-blue-900/10 py-12 px-4">
       <div className="max-w-4xl mx-auto">
         <Button
           variant="ghost"

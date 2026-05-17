@@ -122,7 +122,7 @@ export function PricingSection({
                     className={cn(
                       "h-10 w-full font-semibold",
                       plan.popular || plan.id === "enterprise"
-                        ? "bg-gradient-to-r from-purple-600 to-blue-600 text-white shadow-lg shadow-purple-500/25 transition-all duration-300 hover:from-purple-700 hover:to-blue-700 hover:shadow-purple-500/40"
+                        ? "bg-gradient-to-r from-brand to-brand-dark text-white shadow-lg shadow-brand/25 transition-all duration-300 hover:from-brand-dark hover:to-brand-dark hover:shadow-brand/40"
                         : "bg-muted text-foreground hover:bg-muted/80 border border-border dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-white"
                     )}
                     onClick={() => onSelectPlan(plan)}

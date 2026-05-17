@@ -26,10 +26,10 @@ export default function CoreValueStats({
     <section className="mx-auto max-w-7xl px-6 py-20 text-center">
       {/* Section header */}
       <div className="mb-12 space-y-4">
-        <p className="text-sm font-medium uppercase tracking-wide text-primary dark:text-purple-400">
+        <p className="text-sm font-medium uppercase tracking-wide text-primary dark:text-brand-light">
           {subtitle}
         </p>
-        <h2 className="text-3xl font-semibold leading-tight tracking-tight text-foreground md:text-5xl dark:bg-gradient-to-r dark:from-white dark:via-purple-200 dark:to-blue-200 dark:bg-clip-text dark:text-transparent">
+        <h2 className="text-3xl font-semibold leading-tight tracking-tight text-foreground md:text-5xl dark:bg-gradient-to-r dark:from-white dark:via-brand-light dark:to-blue-200 dark:bg-clip-text dark:text-transparent">
           {title}
         </h2>
         <p className="mx-auto max-w-3xl text-lg text-slate-600 dark:text-gray-300">
@@ -43,7 +43,7 @@ export default function CoreValueStats({
           const cardContent = (
             <CardContent className="relative z-10 flex h-full flex-col justify-end space-y-3 p-6 text-left">
               <div>
-                <h3 className="text-4xl font-bold drop-shadow-md text-foreground dark:bg-gradient-to-r dark:from-purple-400 dark:to-blue-400 dark:bg-clip-text dark:text-transparent">
+                <h3 className="text-4xl font-bold drop-shadow-md text-foreground dark:bg-gradient-to-r dark:from-brand-light dark:to-blue-400 dark:bg-clip-text dark:text-transparent">
                   {item.value}
                 </h3>
                 <p className="text-sm font-semibold uppercase tracking-wide text-muted-foreground dark:text-white">
@@ -57,8 +57,8 @@ export default function CoreValueStats({
                 variant="link"
                 className={`mt-2 px-0 text-sm font-medium ${
                   item.image
-                    ? "text-primary hover:text-primary/80 dark:text-white dark:hover:text-purple-300"
-                    : "text-primary hover:text-primary/80 dark:text-purple-400 dark:hover:text-purple-300"
+                    ? "text-primary hover:text-primary/80 dark:text-white dark:hover:text-brand-light"
+                    : "text-primary hover:text-primary/80 dark:text-brand-light dark:hover:text-brand-light"
                 }`}
               >
                 Learn more →
@@ -83,7 +83,7 @@ export default function CoreValueStats({
                 }}
                 className="perspective-1000 flex-shrink-0 w-[280px] sm:w-[45%] md:w-[45%] lg:w-[280px]"
               >
-                <Card className="relative h-64 overflow-hidden rounded-3xl border border-border bg-card/95 text-foreground shadow-soft-elevated backdrop-blur-sm hover:shadow-lg hover:shadow-purple-500/20 dark:border-purple-500/30 dark:bg-gray-900/50 dark:text-white">
+                <Card className="relative h-64 overflow-hidden rounded-3xl border border-border bg-card/95 text-foreground shadow-soft-elevated backdrop-blur-sm hover:shadow-lg hover:shadow-brand/20 dark:border-brand/30 dark:bg-gray-900/50 dark:text-white">
                   <img
                     src={item.image}
                     alt={item.label}
@@ -106,7 +106,7 @@ export default function CoreValueStats({
               viewport={{ once: true }}
               className="flex-shrink-0 w-[280px] sm:w-[45%] md:w-[45%] lg:w-[280px]"
             >
-              <Card className="relative h-64 overflow-hidden rounded-3xl border border-border bg-card/95 text-foreground shadow-soft-elevated backdrop-blur-sm hover:shadow-lg hover:shadow-purple-500/20 dark:border-gray-800 dark:bg-gray-900/50 dark:text-white dark:hover:border-purple-500/50">
+              <Card className="relative h-64 overflow-hidden rounded-3xl border border-border bg-card/95 text-foreground shadow-soft-elevated backdrop-blur-sm hover:shadow-lg hover:shadow-brand/20 dark:border-gray-800 dark:bg-gray-900/50 dark:text-white dark:hover:border-brand/50">
                 {cardContent}
               </Card>
             </motion.div>

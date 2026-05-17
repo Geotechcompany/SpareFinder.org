@@ -45,10 +45,10 @@ export const SubscriptionTrialModal: React.FC<SubscriptionTrialModalProps> = ({
         {/* Header with enhanced styling */}
         <div className="relative p-8 border-b border-white/10">
           {/* Background decoration */}
-          <div className="absolute inset-0 bg-gradient-to-r from-purple-600/10 via-blue-600/10 to-purple-600/10" />
+          <div className="absolute inset-0 bg-gradient-to-r from-brand/10 via-blue-600/10 to-brand/10" />
           <div className="relative flex flex-col items-center text-center space-y-4">
             {/* Icon */}
-            <div className="w-16 h-16 rounded-2xl bg-gradient-to-r from-purple-600 to-blue-600 flex items-center justify-center shadow-2xl shadow-purple-500/25">
+            <div className="w-16 h-16 rounded-2xl bg-gradient-to-r from-brand to-brand-dark flex items-center justify-center shadow-2xl shadow-brand/25">
               <Sparkles className="w-8 h-8 text-white" />
             </div>
             
@@ -172,7 +172,7 @@ export const SubscriptionTrialModal: React.FC<SubscriptionTrialModalProps> = ({
               <Button
                 onClick={() => onStartTrial(plan.tier)}
                 disabled={isProcessing}
-                className="flex-1 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white border-none shadow-lg shadow-purple-500/25 transition-all duration-200 hover:shadow-purple-500/40 hover:scale-[1.02]"
+                className="flex-1 bg-gradient-to-r from-brand to-brand-dark hover:from-brand-dark hover:to-brand-dark text-white border-none shadow-lg shadow-brand/25 transition-all duration-200 hover:shadow-brand/40 hover:scale-[1.02]"
               >
                 {isProcessing ? (
                   <div className="flex items-center gap-2">

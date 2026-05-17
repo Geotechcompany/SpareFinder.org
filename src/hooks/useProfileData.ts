@@ -64,7 +64,7 @@ const buildAchievementsFromStats = (statistics: any | null) => {
       title: "Accuracy Master",
       description: "Reach 90% average confidence",
       icon: "Target",
-      color: "from-purple-600 to-indigo-600",
+      color: "from-brand to-brand-dark",
       earned: avgConfidence >= 90,
     },
     {

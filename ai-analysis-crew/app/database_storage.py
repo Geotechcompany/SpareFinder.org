@@ -129,9 +129,12 @@ def store_crew_analysis_to_database(
             'updated_at': datetime.utcnow().isoformat()
         }
         
+        workspace_id = get_workspace_id_for_user(user_id) if user_id else None
         # Add user_id if available (now supported in schema)
         if user_id:
             job_data['user_id'] = user_id
+        if workspace_id:
+            job_data['workspace_id'] = workspace_id
         
         # Store in jobs table
         jobs_url = f"{SUPABASE_URL}/rest/v1/jobs"
@@ -151,6 +154,7 @@ def store_crew_analysis_to_database(
         search_data = {
             'id': analysis_id,
             'user_id': user_id,  # Add user_id for RLS
+            'workspace_id': workspace_id,
             'search_term': keywords or 'SpareFinder AI Research',
             'search_type': 'advanced',  # Use 'advanced' as per part_searches check constraint
             'part_name': part_name,
@@ -372,6 +376,33 @@ def _extract_pricing(report_text: str) -> Dict[str, str]:
     return pricing
 
 
+def get_workspace_id_for_user(user_id: str) -> Optional[str]:
+    """Resolve active workspace for a user (for background job creation)."""
+    try:
+        if not SUPABASE_URL or not SUPABASE_KEY or not user_id:
+            return None
+        url = f"{SUPABASE_URL}/rest/v1/profiles?id=eq.{user_id}&select=active_workspace_id"
+        response = requests.get(url, headers=SUPABASE_HEADERS)
+        if response.status_code == 200:
+            data = response.json()
+            if data and len(data) > 0:
+                wid = data[0].get("active_workspace_id")
+                if wid:
+                    return str(wid)
+        url = (
+            f"{SUPABASE_URL}/rest/v1/workspace_members?user_id=eq.{user_id}"
+            f"&select=workspace_id&order=joined_at.asc&limit=1"
+        )
+        response = requests.get(url, headers=SUPABASE_HEADERS)
+        if response.status_code == 200:
+            data = response.json()
+            if data and len(data) > 0:
+                return str(data[0].get("workspace_id") or "")
+    except Exception as e:
+        logger.warning(f"Failed to resolve workspace for user {user_id}: {e}")
+    return None
+
+
 def get_user_id_from_email(email: str) -> Optional[str]:
     """Get user ID from email address"""
     try:
@@ -421,6 +452,7 @@ def create_crew_job(
             return False
         
         # Create new job entry (matching actual crew_analysis_jobs table schema)
+        workspace_id = get_workspace_id_for_user(user_id)
         job_data = {
             'id': job_id,
             'user_id': user_id,
@@ -433,6 +465,8 @@ def create_crew_job(
             'created_at': datetime.utcnow().isoformat(),
             'updated_at': datetime.utcnow().isoformat()
         }
+        if workspace_id:
+            job_data['workspace_id'] = workspace_id
         
         url = f"{SUPABASE_URL}/rest/v1/crew_analysis_jobs"
         # Use fresh headers without Prefer to avoid schema cache issues

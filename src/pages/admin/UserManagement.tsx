@@ -434,7 +434,7 @@ const UserManagement = () => {
       case "super_admin":
         return "bg-yellow-600/20 text-yellow-400 border-yellow-500/30";
       case "admin":
-        return "bg-purple-600/20 text-purple-400 border-purple-500/30";
+        return "bg-brand/20 text-brand-light border-brand/30";
       default:
         return "bg-blue-600/20 text-blue-400 border-blue-500/30";
     }
@@ -449,7 +449,7 @@ const UserManagement = () => {
       {/* Animated Background Elements */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <motion.div
-          className="absolute top-1/4 -right-40 w-80 h-80 bg-purple-600/15 rounded-full blur-3xl opacity-60"
+          className="absolute top-1/4 -right-40 w-80 h-80 bg-brand/15 rounded-full blur-3xl opacity-60"
           animate={{
             scale: [1, 1.3, 1],
             rotate: [0, 180, 360],
@@ -547,7 +547,7 @@ const UserManagement = () => {
           <Card className="bg-card/95 backdrop-blur-xl border-border shadow-soft-elevated dark:bg-black/20 dark:border-white/10">
             <CardHeader>
               <CardTitle className="flex items-center space-x-2 text-foreground dark:text-white">
-                <Users className="w-5 h-5 text-purple-500 dark:text-purple-400" />
+                <Users className="w-5 h-5 text-brand dark:text-brand-light" />
                 <span>System Users</span>
               </CardTitle>
               <CardDescription className="text-muted-foreground">

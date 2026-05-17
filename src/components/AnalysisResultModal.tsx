@@ -137,7 +137,7 @@ export const AnalysisResultModal: React.FC<AnalysisResultModalProps> = ({
 
             {/* Keywords Badge for keyword-only searches */}
             {!analysis.image_url && analysis.keywords && (
-              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950 dark:to-indigo-950 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+              <div className="bg-gradient-to-r from-blue-50 to-brand-50 dark:from-blue-950 dark:to-brand-dark border border-blue-200 dark:border-blue-800 rounded-lg p-4">
                 <div className="flex items-center gap-3">
                   <div className="bg-blue-500 text-white rounded-full p-2">
                     <Search className="h-5 w-5" />
@@ -226,7 +226,7 @@ export const AnalysisResultModal: React.FC<AnalysisResultModalProps> = ({
                   <Package className="h-5 w-5" />
                   Alternative Options
                 </h3>
-                <div className="prose prose-sm max-w-none bg-purple-50 dark:bg-purple-950 p-4 rounded-lg">
+                <div className="prose prose-sm max-w-none bg-brand-50 dark:bg-brand-dark p-4 rounded-lg">
                   <pre className="whitespace-pre-wrap font-sans text-sm">
                     {alternatives}
                   </pre>
@@ -269,7 +269,7 @@ export const AnalysisResultModal: React.FC<AnalysisResultModalProps> = ({
                     ),
                     thead: ({ node, ...props }) => (
                       <thead
-                        className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white"
+                        className="bg-gradient-to-r from-brand-dark to-brand-dark text-white"
                         {...props}
                       />
                     ),

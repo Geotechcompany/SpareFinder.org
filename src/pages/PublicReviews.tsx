@@ -134,7 +134,7 @@ const PublicReviews = () => {
                 </div>
                 <Button
                   asChild
-                  className="mt-4 bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600"
+                  className="mt-4 bg-gradient-to-r from-brand to-blue-500 hover:from-brand hover:to-blue-600"
                 >
                   <a href="/login">Leave a review</a>
                 </Button>

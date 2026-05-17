@@ -611,7 +611,7 @@ export function AdminTicketReplyComposer({
             <span className="pl-1 sm:hidden">/ quick · photo icon</span>
             <span className="ml-auto flex flex-wrap items-center gap-x-2 tabular-nums sm:ml-0">
               {pendingImages.length > 0 ? (
-                <span className="text-[10px] font-medium text-violet-700 dark:text-violet-300">
+                <span className="text-[10px] font-medium text-brand-dark dark:text-brand-light">
                   {pendingImages.length} photo{pendingImages.length !== 1 ? "s" : ""} (sent with message)
                 </span>
               ) : null}
@@ -629,7 +629,7 @@ export function AdminTicketReplyComposer({
           <Button
             type="button"
             disabled={sendingReply || isUploadingTicketImages || !composedBody.trim()}
-            className="h-11 w-full rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 text-white shadow-lg shadow-violet-500/30 transition hover:from-violet-500 hover:to-indigo-500 disabled:opacity-50 sm:w-auto sm:min-w-[160px]"
+            className="h-11 w-full rounded-xl bg-gradient-to-r from-brand to-brand-dark text-white shadow-lg shadow-brand/30 transition hover:from-brand hover:to-brand disabled:opacity-50 sm:w-auto sm:min-w-[160px]"
             onClick={() => void handleSend()}
           >
             {sendingReply ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}

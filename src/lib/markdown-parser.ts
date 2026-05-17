@@ -258,7 +258,7 @@ export const parseAIResponse = (markdown: string): string => {
                   ${priceTrend
                     .map(p => {
                       const h = maxPrice ? Math.max(8, Math.round((p.price / maxPrice) * 100)) : 8;
-                      return `<div class="flex-1 min-w-[28px] sm:min-w-[36px] bg-purple-500/20 border border-purple-400/40 rounded-t-md relative" style="height:${h}%">
+                      return `<div class="flex-1 min-w-[28px] sm:min-w-[36px] bg-brand/20 border border-brand-light/40 rounded-t-md relative" style="height:${h}%">
                         <span class="absolute -top-5 left-1/2 -translate-x-1/2 text-[10px] text-gray-300">$${p.price.toLocaleString()}</span>
                       </div>`;
                     })
@@ -279,7 +279,7 @@ export const parseAIResponse = (markdown: string): string => {
                         <span>${d.value}%</span>
                       </div>
                       <div class="w-full h-2.5 bg-gray-700/70 rounded">
-                        <div class="h-2.5 rounded bg-gradient-to-r from-purple-500 to-blue-500" style="width:${Math.min(
+                        <div class="h-2.5 rounded bg-gradient-to-r from-brand to-blue-500" style="width:${Math.min(
                           100,
                           d.value
                         )}%"></div>
@@ -308,7 +308,7 @@ export const parseAIResponse = (markdown: string): string => {
                               <circle cx="18" cy="18" r="15.915" fill="none" stroke="url(#grad-${i})" stroke-width="3" stroke-dasharray="${d.value}, 100" stroke-linecap="round" transform="rotate(-90 18 18)"></circle>
                               <defs>
                                 <linearGradient id="grad-${i}" x1="0%" y1="0%" x2="100%" y2="0%">
-                                  <stop offset="0%" stop-color="#8b5cf6"/>
+                                  <stop offset="0%" stop-color="#8F39BB"/>
                                   <stop offset="100%" stop-color="#06b6d4"/>
                                 </linearGradient>
                               </defs>
@@ -473,7 +473,7 @@ export const MarkdownCard: React.FC<MarkdownCardProps> = (props) => {
       return 'bg-gradient-to-br from-blue-900/20 to-cyan-900/20 border-blue-500/30';
     }
     if (lowerTitle.includes('where') || lowerTitle.includes('buy') || emoji === '🌍') {
-      return 'bg-gradient-to-br from-purple-900/20 to-violet-900/20 border-purple-500/30';
+      return 'bg-gradient-to-br from-brand-dark/20 to-brand-dark/20 border-brand/30';
     }
     return 'bg-gray-800/50 border-gray-700/50';
   }, []);

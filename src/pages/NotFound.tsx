@@ -27,7 +27,7 @@ const NotFound = () => {
           <p className="mb-6 text-lg text-muted-foreground sm:text-xl">Oops! Page not found</p>
           <a
             href="/"
-            className="inline-flex items-center justify-center rounded-xl bg-gradient-to-r from-purple-600 to-blue-600 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-purple-500/25 transition-all duration-300 hover:from-purple-700 hover:to-blue-700 hover:shadow-purple-500/40 focus-visible:outline focus-visible:ring-2 focus-visible:ring-purple-500 focus-visible:ring-offset-2"
+            className="inline-flex items-center justify-center rounded-xl bg-gradient-to-r from-brand to-brand-dark px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-brand/25 transition-all duration-300 hover:from-brand-dark hover:to-brand-dark hover:shadow-brand/40 focus-visible:outline focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
           >
             Return to Home
           </a>

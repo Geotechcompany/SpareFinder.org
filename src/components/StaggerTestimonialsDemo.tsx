@@ -6,7 +6,7 @@ const StaggerTestimonialsDemo = () => {
     <section className="relative py-24 overflow-hidden bg-black w-full">
       {/* Background Effects */}
       <div className="absolute inset-0">
-        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-purple-500/5 rounded-full blur-3xl" />
+        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-brand/5 rounded-full blur-3xl" />
         <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-blue-500/5 rounded-full blur-3xl" />
       </div>
 
@@ -19,7 +19,7 @@ const StaggerTestimonialsDemo = () => {
               Success Stories
             </span>
           </div>
-          <h2 className="text-5xl lg:text-6xl font-bold bg-gradient-to-r from-white via-purple-200 to-blue-200 bg-clip-text text-transparent mb-6">
+          <h2 className="text-5xl lg:text-6xl font-bold bg-gradient-to-r from-white via-brand-light to-blue-200 bg-clip-text text-transparent mb-6">
             Trusted by Industry Leaders
           </h2>
           <p className="text-xl text-gray-400 max-w-3xl mx-auto leading-relaxed">

@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/select";
 import { api } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
+import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/components/ui/use-toast";
 import { AnimatePresence, motion } from "framer-motion";
@@ -105,6 +106,7 @@ const OnboardingProfile: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { user, isLoading, checkAuth } = useAuth();
+  const { refreshWorkspaces, needsSetup } = useWorkspace();
   const { toast } = useToast();
 
   const nextPath = useMemo(() => {
@@ -173,14 +175,14 @@ const OnboardingProfile: React.FC = () => {
     };
   }, [isLoading, user]);
 
-  // If already completed (company exists), skip.
+  // If workspace already exists, skip onboarding.
   useEffect(() => {
     if (isLoading) return;
     if (!user) return;
-    if (user.company && user.company.trim().length > 0) {
+    if (!needsSetup && user.company && user.company.trim().length > 0) {
       navigate(nextPath, { replace: true });
     }
-  }, [isLoading, user, nextPath, navigate]);
+  }, [isLoading, user, needsSetup, nextPath, navigate]);
 
   const toggleInterest = (interestId: string) => {
     setSelectedInterests((prev) =>
@@ -217,6 +219,8 @@ const OnboardingProfile: React.FC = () => {
         },
       });
 
+      await api.workspaces.create(trimmedCompany);
+
       // Store a dedicated record for admin analytics
       try {
         await api.user.submitOnboardingSurvey({
@@ -233,7 +237,8 @@ const OnboardingProfile: React.FC = () => {
         console.warn("Onboarding survey insert failed:", err);
       }
 
-      await checkAuth(); // refresh auth-context user.company (requires /auth/current-user to return company)
+      await checkAuth();
+      await refreshWorkspaces();
       navigate(nextPath, { replace: true });
       toast({ title: "All set", description: "Thanks — your preferences are saved." });
     } catch (err) {
@@ -275,7 +280,7 @@ const OnboardingProfile: React.FC = () => {
             </CardHeader>
             <CardContent className="flex min-h-0 flex-1 flex-col gap-0 px-4 pb-6 sm:px-6 lg:px-10 xl:px-14 2xl:px-20">
               <div className="flex shrink-0 items-center gap-3 rounded-2xl border border-border bg-background/60 p-4">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-r from-purple-600 to-blue-600 text-white">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-r from-brand to-brand-dark text-white">
                   {React.createElement(activeStep.icon, { className: "h-5 w-5" })}
                 </div>
                 <div className="min-w-0">
@@ -297,7 +302,7 @@ const OnboardingProfile: React.FC = () => {
                   {activeStep.id === "company" ? (
                     <>
                       <div className="space-y-2">
-                        <Label htmlFor="company">Company name</Label>
+                        <Label htmlFor="company">Workspace name</Label>
                         <Input
                           id="company"
                           placeholder="e.g. BQI Tech, SpareFinder Garage, FleetWorks Ltd"
@@ -488,7 +493,7 @@ const OnboardingProfile: React.FC = () => {
                   <Button
                     onClick={handleSubmit}
                     disabled={isCompleteDisabled}
-                    className="w-full sm:w-auto bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
+                    className="w-full sm:w-auto bg-gradient-to-r from-brand to-brand-dark hover:from-brand-dark hover:to-brand-dark"
                   >
                     {isSubmitting ? "Saving…" : "Finish & continue"}
                     <ArrowRight className="ml-2 h-4 w-4" />
@@ -498,7 +503,7 @@ const OnboardingProfile: React.FC = () => {
                     type="button"
                     onClick={() => setStepIndex((s) => Math.min(STEP_META.length - 1, s + 1))}
                     disabled={isSubmitting || isLoading || isPrefillLoading || !canGoNext()}
-                    className="w-full sm:w-auto bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
+                    className="w-full sm:w-auto bg-gradient-to-r from-brand to-brand-dark hover:from-brand-dark hover:to-brand-dark"
                   >
                     Next
                     <ArrowRight className="ml-2 h-4 w-4" />
@@ -511,7 +516,7 @@ const OnboardingProfile: React.FC = () => {
           {/* Right-side visuals: full viewport width on lg (50% grid column), edge-to-edge image */}
           <div className="relative hidden min-h-0 lg:flex lg:min-h-[100dvh]">
             <div className="relative h-full min-h-[100dvh] w-full overflow-hidden border-0 bg-card/80 lg:shadow-none">
-              <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-purple-500/10 via-transparent to-blue-500/10" />
+              <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-brand/10 via-transparent to-blue-500/10" />
 
               <div className="absolute inset-0 lg:p-0">
                 <div className="relative h-full min-h-[100dvh] overflow-hidden border-0 bg-background/60 lg:rounded-none">

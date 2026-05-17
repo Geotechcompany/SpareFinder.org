@@ -91,7 +91,7 @@ export const FlatPartAnalysisDisplay: React.FC<PartAnalysisDisplayProps> = ({
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Brain className="h-6 w-6 text-purple-600" />
+              <Brain className="h-6 w-6 text-brand" />
               Complete Analysis
             </CardTitle>
           </CardHeader>
@@ -110,7 +110,7 @@ export const FlatPartAnalysisDisplay: React.FC<PartAnalysisDisplayProps> = ({
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Brain className="h-6 w-6 text-purple-600" />
+              <Brain className="h-6 w-6 text-brand" />
               Analysis Summary
             </CardTitle>
           </CardHeader>
@@ -118,7 +118,7 @@ export const FlatPartAnalysisDisplay: React.FC<PartAnalysisDisplayProps> = ({
             <div className="space-y-4">
               {analysisData?.description && (
                 <div>
-                  <h3 className="font-semibold text-purple-400 mb-2">
+                  <h3 className="font-semibold text-brand-light mb-2">
                     Description
                   </h3>
                   <p className="text-gray-300">{analysisData.description}</p>
@@ -126,7 +126,7 @@ export const FlatPartAnalysisDisplay: React.FC<PartAnalysisDisplayProps> = ({
               )}
               {analysisData?.precise_part_name && (
                 <div>
-                  <h3 className="font-semibold text-purple-400 mb-2">Part</h3>
+                  <h3 className="font-semibold text-brand-light mb-2">Part</h3>
                   <p className="text-gray-300">
                     {analysisData.precise_part_name}
                   </p>
@@ -134,7 +134,7 @@ export const FlatPartAnalysisDisplay: React.FC<PartAnalysisDisplayProps> = ({
               )}
               {analysisData?.confidence_explanation && (
                 <div>
-                  <h3 className="font-semibold text-purple-400 mb-2">
+                  <h3 className="font-semibold text-brand-light mb-2">
                     Confidence
                   </h3>
                   <p className="text-gray-300">
@@ -146,7 +146,7 @@ export const FlatPartAnalysisDisplay: React.FC<PartAnalysisDisplayProps> = ({
                 !analysisData?.precise_part_name &&
                 !analysisData?.confidence_explanation && (
                   <div className="text-center text-gray-400">
-                    <Brain className="w-16 h-16 mx-auto mb-4 text-purple-400 opacity-50" />
+                    <Brain className="w-16 h-16 mx-auto mb-4 text-brand-light opacity-50" />
                     <p className="text-lg font-medium">
                       No detailed analysis available
                     </p>

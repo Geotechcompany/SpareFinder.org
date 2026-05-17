@@ -28,6 +28,12 @@ class CurrentUser(BaseModel):
     role: str = "user"
     clerk_user_id: str | None = None
     company: str | None = None
+    avatar_url: str | None = None
+
+
+def _avatar_from_profile(profile: dict[str, Any]) -> str | None:
+    v = profile.get("avatar_url")
+    return v.strip() if isinstance(v, str) and v.strip() else None
 
 
 def _safe_iso_now() -> str:
@@ -341,6 +347,7 @@ async def get_current_user(
                             role=profile.get("role", "user"),
                             clerk_user_id=clerk_user_id,
                             company=profile.get("company") if isinstance(profile.get("company"), str) else None,
+                            avatar_url=_avatar_from_profile(profile),
                         )
                         _cache_current_user(u)
                         _mark_online_and_notify(supabase=supabase, current_user=u)
@@ -391,6 +398,7 @@ async def get_current_user(
                     role=inserted.get("role", "user"),
                     clerk_user_id=clerk_user_id,
                     company=inserted.get("company") if isinstance(inserted.get("company"), str) else None,
+                    avatar_url=_avatar_from_profile(inserted),
                 )
                 _notify_new_signup(
                     supabase=supabase,
@@ -409,6 +417,7 @@ async def get_current_user(
                 role=profile.get("role", "user"),
                 clerk_user_id=clerk_user_id,
                 company=profile.get("company") if isinstance(profile.get("company"), str) else None,
+                avatar_url=_avatar_from_profile(profile),
             )
             _cache_current_user(u)
             _mark_online_and_notify(supabase=supabase, current_user=u)
@@ -431,6 +440,7 @@ async def get_current_user(
                     role=profile.get("role", "user"),
                     clerk_user_id=profile.get("clerk_user_id"),
                     company=profile.get("company") if isinstance(profile.get("company"), str) else None,
+                    avatar_url=_avatar_from_profile(profile),
                 )
                 _cache_current_user(u)
                 _mark_online_and_notify(supabase=supabase, current_user=u)
@@ -462,6 +472,7 @@ async def get_current_user(
                         role=profile.get("role", "user"),
                         clerk_user_id=profile.get("clerk_user_id"),
                         company=profile.get("company") if isinstance(profile.get("company"), str) else None,
+                        avatar_url=_avatar_from_profile(profile),
                     )
                     _cache_current_user(u)
                     return u
@@ -490,6 +501,7 @@ async def get_current_user(
                         role=inserted.get("role", "user"),
                         clerk_user_id=inserted.get("clerk_user_id"),
                         company=inserted.get("company") if isinstance(inserted.get("company"), str) else None,
+                        avatar_url=_avatar_from_profile(inserted),
                     )
                     _notify_new_signup(
                         supabase=supabase,

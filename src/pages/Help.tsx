@@ -78,7 +78,7 @@ const Help = () => {
       <main className="relative px-4 pb-20 pt-16 sm:px-6 lg:px-8">
         <div className="pointer-events-none absolute inset-0 overflow-hidden">
           <div className="pointer-events-none absolute -left-20 top-0 h-72 w-72 rounded-full bg-cyan-500/10 blur-3xl dark:bg-cyan-500/15" />
-          <div className="pointer-events-none absolute -right-10 top-40 h-80 w-80 rounded-full bg-indigo-400/10 blur-3xl dark:bg-indigo-500/15" />
+          <div className="pointer-events-none absolute -right-10 top-40 h-80 w-80 rounded-full bg-brand-light/10 blur-3xl dark:bg-brand/15" />
         </div>
 
         <section className="relative z-10 mx-auto max-w-5xl">
@@ -94,7 +94,7 @@ const Help = () => {
             </div>
             <h1 className="mt-5 text-3xl font-bold tracking-tight text-foreground sm:text-4xl dark:text-white">
               How to get the best results from{" "}
-              <span className="bg-gradient-to-r from-cyan-400 via-sky-400 to-indigo-400 bg-clip-text text-transparent">
+              <span className="bg-gradient-to-r from-cyan-400 via-sky-400 to-brand-light bg-clip-text text-transparent">
                 SpareFinder AI
               </span>
             </h1>
@@ -125,7 +125,7 @@ const Help = () => {
                 <div className="absolute inset-0 bg-gradient-to-br from-background via-background to-background opacity-80 dark:from-slate-950 dark:via-slate-950 dark:to-black" />
                 <div className="relative z-10">
                   <div className="mb-4 flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-cyan-500 to-indigo-500 text-white shadow-lg">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-cyan-500 to-brand text-white shadow-lg">
                       <step.icon className="h-5 w-5" />
                     </div>
                     <h2 className="text-base font-semibold text-foreground sm:text-lg dark:text-white">

@@ -93,18 +93,18 @@ const Feature = ({
       )}
     >
       {index < 3 ? (
-        <div className="opacity-0 group-hover/feature:opacity-100 transition duration-200 absolute inset-0 h-full w-full bg-gradient-to-t from-purple-900/20 via-transparent to-transparent pointer-events-none" />
+        <div className="opacity-0 group-hover/feature:opacity-100 transition duration-200 absolute inset-0 h-full w-full bg-gradient-to-t from-brand-dark/20 via-transparent to-transparent pointer-events-none" />
       ) : (
         <div className="opacity-0 group-hover/feature:opacity-100 transition duration-200 absolute inset-0 h-full w-full bg-gradient-to-b from-blue-900/20 via-transparent to-transparent pointer-events-none" />
       )}
 
-      <div className="relative z-10 mb-4 px-10 text-primary transition-colors duration-200 group-hover/feature:text-primary/80 dark:text-purple-400 dark:group-hover/feature:text-purple-300">
+      <div className="relative z-10 mb-4 px-10 text-primary transition-colors duration-200 group-hover/feature:text-primary/80 dark:text-brand-light dark:group-hover/feature:text-brand-light">
         <Icon className="w-8 h-8" />
       </div>
 
       <div className="relative z-10 mb-2 px-10 text-lg font-bold">
-        <div className="absolute inset-y-0 left-0 h-6 w-1 origin-center rounded-tr-full rounded-br-full bg-border transition-all duration-200 group-hover/feature:h-8 group-hover/feature:bg-gradient-to-b group-hover/feature:from-[#3A5AFE] group-hover/feature:to-[#8B5CF6] dark:bg-gray-700" />
-        <span className="inline-block translate-x-0 text-foreground transition duration-200 group-hover/feature:translate-x-2 group-hover/feature:bg-gradient-to-r group-hover/feature:from-[#3A5AFE] group-hover/feature:to-[#8B5CF6] group-hover/feature:bg-clip-text group-hover/feature:text-transparent dark:text-white">
+        <div className="absolute inset-y-0 left-0 h-6 w-1 origin-center rounded-tr-full rounded-br-full bg-border transition-all duration-200 group-hover/feature:h-8 group-hover/feature:bg-gradient-to-b group-hover/feature:from-[#3A5AFE] group-hover/feature:to-[#8F39BB] dark:bg-gray-700" />
+        <span className="inline-block translate-x-0 text-foreground transition duration-200 group-hover/feature:translate-x-2 group-hover/feature:bg-gradient-to-r group-hover/feature:from-[#3A5AFE] group-hover/feature:to-[#8F39BB] group-hover/feature:bg-clip-text group-hover/feature:text-transparent dark:text-white">
           {title}
         </span>
       </div>

@@ -14,6 +14,7 @@ import ThemeToggle from "@/components/ThemeToggle";
 import CreditsDisplay from "@/components/CreditsDisplay";
 import { NotificationBellDropdown } from "@/components/NotificationBellDropdown";
 import { useAuth } from "@/contexts/AuthContext";
+import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { cn } from "@/lib/utils";
 
 const pageMeta: Record<
@@ -85,8 +86,11 @@ export const DashboardHeader: React.FC = () => {
   const { pathname } = useLocation();
   const navigate = useNavigate();
   const { user, logout } = useAuth();
+  const { activeWorkspace } = useWorkspace();
 
   const meta = getPageMeta(pathname);
+  const workspaceLabel =
+    activeWorkspace?.name || user?.company || "SpareFinder";
 
   const handleLogout = async () => {
     try {
@@ -105,7 +109,7 @@ export const DashboardHeader: React.FC = () => {
               <span>{meta.section}</span>
               <span className="h-1 w-1 rounded-full bg-muted-foreground/40" />
               <span className="text-muted-foreground/80">
-                {user?.company || "SpareFinder"}
+                {workspaceLabel}
               </span>
             </div>
           )}
@@ -120,7 +124,7 @@ export const DashboardHeader: React.FC = () => {
         <div className="flex w-full flex-wrap items-center justify-end gap-2 md:w-auto md:gap-3">
           <div
             className={cn(
-              "inline-flex flex-wrap items-center gap-1 rounded-full border border-violet-200/50 bg-card/90 p-1 pl-2 shadow-sm backdrop-blur-md",
+              "inline-flex flex-wrap items-center gap-1 rounded-full border border-brand-light/50 bg-card/90 p-1 pl-2 shadow-sm backdrop-blur-md",
               "dark:border-white/[0.08] dark:bg-zinc-900/75"
             )}
           >
@@ -141,7 +145,7 @@ export const DashboardHeader: React.FC = () => {
               <button className="flex items-center gap-2 rounded-full border border-border bg-background/80 px-2 py-1 pl-1.5 text-left text-sm shadow-sm transition hover:bg-accent/60">
                 <Avatar className="h-8 w-8">
                   <AvatarImage src={user?.avatar_url} alt={user?.full_name} />
-                  <AvatarFallback className="bg-gradient-to-r from-purple-600 to-blue-600 text-xs font-semibold text-white">
+                  <AvatarFallback className="bg-gradient-to-r from-brand to-brand-dark text-xs font-semibold text-white">
                     {getUserInitials(user?.full_name, user?.email)}
                   </AvatarFallback>
                 </Avatar>
@@ -150,7 +154,7 @@ export const DashboardHeader: React.FC = () => {
                     {user?.full_name || user?.email?.split("@")[0] || "User"}
                   </span>
                   <span className="truncate text-[11px] text-muted-foreground">
-                    {user?.company || "Standard workspace"}
+                    {workspaceLabel}
                   </span>
                 </div>
                 <ChevronDown className="hidden h-3.5 w-3.5 text-muted-foreground md:inline" />
@@ -164,7 +168,7 @@ export const DashboardHeader: React.FC = () => {
                 <div className="flex items-center gap-2">
                   <Avatar className="h-7 w-7">
                     <AvatarImage src={user?.avatar_url} alt={user?.full_name} />
-                    <AvatarFallback className="bg-gradient-to-r from-purple-600 to-blue-600 text-[10px] font-semibold text-white">
+                    <AvatarFallback className="bg-gradient-to-r from-brand to-brand-dark text-[10px] font-semibold text-white">
                       {getUserInitials(user?.full_name, user?.email)}
                     </AvatarFallback>
                   </Avatar>

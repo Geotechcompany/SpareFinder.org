@@ -157,7 +157,7 @@ const SubscribersManagement: React.FC = () => {
       case "pro":
         return "bg-blue-100 text-blue-800";
       case "enterprise":
-        return "bg-purple-100 text-purple-800";
+        return "bg-brand-light text-brand-dark";
       default:
         return "bg-gray-100 text-gray-800";
     }

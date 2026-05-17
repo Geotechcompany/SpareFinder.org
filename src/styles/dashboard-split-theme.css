@@ -1,0 +1,166 @@
+/**
+ * Studio theme — dark sidebar chrome + light main workspace.
+ * Active when html[data-theme="split"] and .dashboard-theme-split is present.
+ */
+
+[data-theme="split"] .dashboard-theme-split.dashboard-premium {
+    --background: 218 22% 97%;
+    --foreground: 222.2 47.4% 11.2%;
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 47.4% 11.2%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 47.4% 11.2%;
+    --primary: 230 99% 61%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 216 20% 95%;
+    --secondary-foreground: 222.2 47.4% 11.2%;
+    --muted: 220 24% 93%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+    --accent: 280 53% 48%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 220 15% 89%;
+    --input: 220 15% 84%;
+    --ring: 234 100% 65%;
+    --radius: 0.75rem;
+    --chart-1: 142 71% 45%;
+    --chart-2: 173 81% 40%;
+    --chart-3: 187 92% 48%;
+    --chart-4: 48 96% 53%;
+    --chart-5: 280 53% 48%;
+    --dock-panel-radius: clamp(1.35rem, 3vw, 2rem);
+    --dock-cap-height: clamp(1.35rem, 3vw, 2rem);
+    --sidebar-chrome: 230 37% 8%;
+    /* Sidebar color behind the rounded corner */
+    background: linear-gradient(
+        to right,
+        hsl(var(--sidebar-chrome)) 0,
+        hsl(var(--sidebar-chrome)) var(--dashboard-sidebar-offset, 300px),
+        hsl(var(--background)) var(--dashboard-sidebar-offset, 300px),
+        hsl(var(--background)) 100%
+    );
+    color: hsl(var(--foreground));
+}
+
+[data-theme="split"] .dashboard-theme-split.dashboard-premium::before {
+    opacity: 0.02;
+    background-image: radial-gradient(hsl(222 47% 11% / 0.12) 0.4px, transparent 0.4px);
+}
+
+/* Sidebar top-right dock corner — dark chrome + light rounded face */
+[data-theme="split"] .sidebar-dock-corner-chrome {
+    background: hsl(var(--sidebar-chrome));
+}
+
+[data-theme="split"] .sidebar-dock-corner-surface {
+    background:
+        radial-gradient(ellipse 120% 80% at 0% 0%, hsl(280 53% 48% / 0.04), transparent 55%),
+        hsl(var(--background));
+    box-shadow:
+        inset 1px 0 0 hsl(var(--border) / 0.55),
+        0 1px 0 hsl(var(--border) / 0.25);
+}
+
+/* Scrollable main workspace */
+[data-theme="split"] .dashboard-theme-split .dashboard-docked-panel {
+    background:
+        radial-gradient(ellipse 90% 60% at 100% 0%, hsl(280 53% 48% / 0.06), transparent 55%),
+        radial-gradient(ellipse 70% 50% at 0% 100%, hsl(199 95% 93% / 0.35), transparent 50%),
+        hsl(var(--background));
+    /* Padding so content clears the sidebar dock corner */
+    padding-top: calc(var(--dock-cap-height) + 0.75rem) !important;
+    color: hsl(var(--foreground));
+}
+
+[data-theme="split"] .dashboard-theme-split .dashboard-main-light {
+    color: hsl(var(--foreground));
+}
+
+/* Dark sidebar island */
+[data-theme="split"] .dashboard-sidebar-dark {
+    color-scheme: dark;
+    --sidebar-background: 230 32% 7%;
+    --sidebar-foreground: 225 22% 92%;
+    --sidebar-primary: 280 53% 48%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 228 22% 16%;
+    --sidebar-accent-foreground: 225 22% 92%;
+    --sidebar-border: 0 0% 100% / 0.1;
+    --sidebar-ring: 280 53% 48%;
+    --background: 230 37% 10%;
+    --foreground: 225 22% 92%;
+    --muted-foreground: 225 11% 68%;
+    --card: 229 24% 15%;
+    --card-foreground: 225 22% 92%;
+    --border: 0 0% 100% / 0.08;
+    --primary: 280 53% 48%;
+    --primary-foreground: 0 0% 100%;
+    background: hsl(var(--sidebar-chrome) / 0.97);
+    color: hsl(var(--sidebar-foreground));
+    box-shadow: 4px 0 32px rgba(0, 0, 0, 0.35);
+    z-index: 30;
+}
+
+[data-theme="split"] .dashboard-sidebar-dark .sidebar-dark-show {
+    display: block;
+}
+
+[data-theme="split"] .dashboard-sidebar-dark .sidebar-dark-hide {
+    display: none;
+}
+
+[data-theme="split"] .dashboard-sidebar-dark .sidebar-nav-icon-idle {
+    background-color: rgb(255 255 255 / 0.06);
+    color: hsl(225 11% 72%);
+    --tw-ring-color: rgb(255 255 255 / 0.1);
+}
+
+[data-theme="split"] .dashboard-sidebar-dark .group:hover .sidebar-nav-icon-idle {
+    background-color: rgb(255 255 255 / 0.12);
+    color: hsl(225 22% 96%);
+}
+
+[data-theme="split"] .dashboard-sidebar-dark .sidebar-badge {
+    color: hsl(280 53% 68%);
+}
+
+[data-theme="split"] .dashboard-sidebar-dark .sidebar-search-icon {
+    color: hsl(280 53% 68%);
+}
+
+[data-theme="split"] .dashboard-sidebar-dark .sidebar-workspace-active {
+    color: hsl(280 53% 68%);
+}
+
+[data-theme="split"] .dashboard-sidebar-dark .sidebar-plan-card {
+    border-color: rgb(255 255 255 / 0.1);
+    background: rgb(24 24 27 / 0.9);
+}
+
+[data-theme="split"] .dashboard-sidebar-dark .sidebar-plan-track {
+    color: rgb(255 255 255 / 0.1);
+}
+
+[data-theme="split"] .dashboard-sidebar-dark .sidebar-mesh-gradient {
+    background: linear-gradient(
+        to bottom,
+        hsl(280 53% 22% / 0.14),
+        transparent,
+        hsl(195 75% 16% / 0.08)
+    );
+}
+
+[data-theme="split"] .dashboard-sidebar-dark .sidebar-mesh-dots {
+    opacity: 0.2;
+}
+
+@media (max-width: 768px) {
+    [data-theme="split"] .dashboard-theme-split.dashboard-premium {
+        background: hsl(var(--background));
+    }
+
+    [data-theme="split"] .dashboard-theme-split .dashboard-docked-panel {
+        padding-top: 0.75rem !important;
+    }
+}

@@ -382,11 +382,11 @@ const Support = () => {
   return (
     <div className="flex min-h-screen flex-col bg-background md:flex-row">
       <DashboardSidebar isCollapsed={isCollapsed} onToggle={() => setIsCollapsed(!isCollapsed)} />
-      <main className="flex-1 bg-gradient-to-b from-background via-violet-50/25 to-sky-50/15 pb-10 dark:via-violet-950/15 dark:to-slate-950/30">
+      <main className="flex-1 bg-gradient-to-b from-background via-brand-50/25 to-sky-50/15 pb-10 dark:via-brand-dark/15 dark:to-slate-950/30">
         <div className="mx-auto max-w-4xl space-y-6 p-3 sm:p-6 lg:p-8">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex min-w-0 items-start gap-3">
-              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-600 to-indigo-600 text-white shadow-lg shadow-violet-500/30">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-brand to-brand-dark text-white shadow-lg shadow-brand/30">
                 <Ticket className="h-5 w-5" />
               </div>
               <div className="min-w-0">
@@ -399,7 +399,7 @@ const Support = () => {
             <Button
               type="button"
               onClick={() => setCreateOpen(true)}
-              className="h-11 shrink-0 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 px-5 text-white shadow-lg shadow-violet-500/25 transition hover:from-violet-500 hover:to-indigo-500 sm:self-start"
+              className="h-11 shrink-0 rounded-xl bg-gradient-to-r from-brand to-brand-dark px-5 text-white shadow-lg shadow-brand/25 transition hover:from-brand hover:to-brand sm:self-start"
             >
               <MessageSquarePlus className="mr-2 h-4 w-4" />
               New ticket
@@ -430,7 +430,7 @@ const Support = () => {
             <CardContent className="p-3 sm:p-6">
               {loading ? (
                 <div className="flex items-center justify-center py-16">
-                  <Loader2 className="h-9 w-9 animate-spin text-violet-500" />
+                  <Loader2 className="h-9 w-9 animate-spin text-brand" />
                 </div>
               ) : tickets.length === 0 ? (
                 <p className="py-14 text-center text-muted-foreground">
@@ -443,7 +443,7 @@ const Support = () => {
                       <button
                         type="button"
                         onClick={() => openDetail(t.id)}
-                        className="flex min-h-[4.5rem] w-full items-center gap-3 rounded-2xl border border-transparent px-3 py-3 text-left transition hover:border-violet-200/60 hover:bg-violet-500/[0.06] active:scale-[0.99] dark:hover:border-violet-500/20 dark:hover:bg-violet-500/10 sm:min-h-0 sm:rounded-xl sm:px-2 sm:py-3"
+                        className="flex min-h-[4.5rem] w-full items-center gap-3 rounded-2xl border border-transparent px-3 py-3 text-left transition hover:border-brand-light/60 hover:bg-brand/[0.06] active:scale-[0.99] dark:hover:border-brand/20 dark:hover:bg-brand/10 sm:min-h-0 sm:rounded-xl sm:px-2 sm:py-3"
                       >
                         <div className="min-w-0 flex-1">
                           <p className="font-medium leading-snug text-foreground">{t.subject}</p>
@@ -555,7 +555,7 @@ const Support = () => {
               <Button
                 type="submit"
                 disabled={submitting}
-                className="h-11 w-full rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 text-white shadow-lg shadow-violet-500/25 hover:from-violet-500 hover:to-indigo-500 sm:w-auto sm:px-8"
+                className="h-11 w-full rounded-xl bg-gradient-to-r from-brand to-brand-dark text-white shadow-lg shadow-brand/25 hover:from-brand hover:to-brand sm:w-auto sm:px-8"
               >
                 {submitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                 Submit ticket
@@ -570,7 +570,7 @@ const Support = () => {
         <DialogContent className="flex max-h-[90dvh] w-[calc(100vw-1rem)] max-w-3xl flex-col gap-0 overflow-hidden rounded-2xl border-border/60 p-0 shadow-2xl sm:w-full">
           {detailTicket ? (
             <>
-              <div className="shrink-0 border-b border-border/60 bg-gradient-to-r from-violet-500/12 via-background to-sky-500/10 px-4 py-4 sm:px-6">
+              <div className="shrink-0 border-b border-border/60 bg-gradient-to-r from-brand/12 via-background to-sky-500/10 px-4 py-4 sm:px-6">
                 <DialogHeader>
                   <div className="flex items-start gap-2 sm:items-center">
                     <Button
@@ -628,7 +628,7 @@ const Support = () => {
                                       "max-w-[min(92vw,36rem)] rounded-2xl px-4 py-3.5 text-sm shadow-md",
                                       fromYou
                                         ? "rounded-tl-md border border-slate-200/90 bg-white dark:border-slate-700 dark:bg-slate-800/90"
-                                        : "rounded-tr-md border-0 bg-gradient-to-br from-violet-600 to-indigo-600 text-white shadow-lg shadow-violet-500/25"
+                                        : "rounded-tr-md border-0 bg-gradient-to-br from-brand to-brand-dark text-white shadow-lg shadow-brand/25"
                                     )}
                                   >
                                     <p
@@ -718,7 +718,7 @@ const Support = () => {
                   </div>
                   <Button
                     type="button"
-                    className="mt-3 h-11 w-full rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 text-white shadow-lg shadow-violet-500/25 hover:from-violet-500 hover:to-indigo-500 disabled:opacity-50"
+                    className="mt-3 h-11 w-full rounded-xl bg-gradient-to-r from-brand to-brand-dark text-white shadow-lg shadow-brand/25 hover:from-brand hover:to-brand disabled:opacity-50"
                     onClick={sendFollowUp}
                     disabled={followUpSending || isUploadingTicketImages || !buildComposedBody(followUp, pendingImages).trim()}
                   >

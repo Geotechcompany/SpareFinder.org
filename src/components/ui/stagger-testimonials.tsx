@@ -67,8 +67,8 @@ const TestimonialCard: React.FC<TestimonialCardProps> = ({
       className={cn(
         "absolute left-1/2 top-1/2 cursor-pointer border-2 p-8 transition-all duration-500 ease-in-out rounded-2xl",
         isCenter
-          ? "z-10 bg-gradient-to-br from-purple-600 to-blue-600 text-white border-purple-500 shadow-2xl shadow-purple-500/50"
-          : "z-0 bg-gray-900/80 backdrop-blur-sm text-white border-gray-800 hover:border-purple-500/50"
+          ? "z-10 bg-gradient-to-br from-brand to-brand-dark text-white border-brand shadow-2xl shadow-brand/50"
+          : "z-0 bg-gray-900/80 backdrop-blur-sm text-white border-gray-800 hover:border-brand/50"
       )}
       style={{
         width: cardSize,
@@ -88,7 +88,7 @@ const TestimonialCard: React.FC<TestimonialCardProps> = ({
       <span
         className={cn(
           "absolute block origin-top-right rotate-45",
-          isCenter ? "bg-purple-400" : "bg-gray-700"
+          isCenter ? "bg-brand-light" : "bg-gray-700"
         )}
         style={{
           right: -2,
@@ -180,7 +180,7 @@ export const StaggerTestimonials: React.FC = () => {
           onClick={() => handleMove(-1)}
           className={cn(
             "flex h-14 w-14 items-center justify-center text-2xl transition-all rounded-lg",
-            "bg-gray-900 border-2 border-gray-800 hover:bg-gradient-to-r hover:from-purple-600 hover:to-blue-600 hover:border-purple-500 text-white hover:shadow-lg hover:shadow-purple-500/50"
+            "bg-gray-900 border-2 border-gray-800 hover:bg-gradient-to-r hover:from-brand hover:to-blue-600 hover:border-brand text-white hover:shadow-lg hover:shadow-brand/50"
           )}
           aria-label="Previous testimonial"
         >
@@ -190,7 +190,7 @@ export const StaggerTestimonials: React.FC = () => {
           onClick={() => handleMove(1)}
           className={cn(
             "flex h-14 w-14 items-center justify-center text-2xl transition-all rounded-lg",
-            "bg-gray-900 border-2 border-gray-800 hover:bg-gradient-to-r hover:from-purple-600 hover:to-blue-600 hover:border-purple-500 text-white hover:shadow-lg hover:shadow-purple-500/50"
+            "bg-gray-900 border-2 border-gray-800 hover:bg-gradient-to-r hover:from-brand hover:to-blue-600 hover:border-brand text-white hover:shadow-lg hover:shadow-brand/50"
           )}
           aria-label="Next testimonial"
         >

@@ -255,7 +255,7 @@ const Reviews = () => {
                         {stats.totalReviews}
                       </p>
                     </div>
-                    <MessageSquare className="w-10 h-10 text-purple-400" />
+                    <MessageSquare className="w-10 h-10 text-brand-light" />
                   </div>
                 </CardContent>
               </Card>
@@ -432,7 +432,7 @@ const Reviews = () => {
                               <div className="flex-1">
                                 <div className="mb-2 flex items-center space-x-3">
                                   {renderStars(review.rating)}
-                                  <Badge className="border border-purple-200 bg-purple-50 text-purple-700 dark:bg-purple-600/20 dark:text-purple-400 dark:border-purple-500/30">
+                                  <Badge className="border border-brand-light bg-brand-50 text-brand-dark dark:bg-brand/20 dark:text-brand-light dark:border-brand/30">
                                     {review.job_type}
                                   </Badge>
                                   {review.feedback_type && (

@@ -214,7 +214,7 @@ const SystemAnalytics = () => {
           ? "warning"
           : "good",
       icon: Wifi,
-      color: "from-purple-600 to-violet-600",
+      color: "from-brand to-brand",
     },
   ];
 
@@ -386,7 +386,7 @@ const SystemAnalytics = () => {
           }}
         />
         <motion.div
-          className="absolute -bottom-40 -left-40 w-96 h-96 bg-purple-600/10 rounded-full blur-3xl opacity-40"
+          className="absolute -bottom-40 -left-40 w-96 h-96 bg-brand/10 rounded-full blur-3xl opacity-40"
           animate={{
             scale: [1.2, 1, 1.2],
             x: [0, 50, 0],
@@ -527,7 +527,7 @@ const SystemAnalytics = () => {
                     label: "Total Uploads",
                     value: systemMetrics.totalUploads.toLocaleString(),
                     icon: Upload,
-                    color: "from-purple-600 to-violet-600",
+                    color: "from-brand to-brand",
                   },
                   {
                     label: "Success Rate",
@@ -580,7 +580,7 @@ const SystemAnalytics = () => {
             >
               {/* System Performance */}
               <div className="relative">
-                <div className="absolute inset-0 bg-gradient-to-r from-blue-600/5 to-purple-600/5 rounded-3xl blur-xl opacity-60" />
+                <div className="absolute inset-0 bg-gradient-to-r from-blue-600/5 to-brand/5 rounded-3xl blur-xl opacity-60" />
                 <Card className="relative bg-card/95 backdrop-blur-xl border-border shadow-soft-elevated dark:bg-black/20 dark:border-white/10">
                   <CardHeader>
                     <CardTitle className="flex items-center space-x-2 text-foreground dark:text-white">
@@ -662,7 +662,7 @@ const SystemAnalytics = () => {
 
               {/* Traffic Statistics */}
               <div className="relative">
-                <div className="absolute inset-0 bg-gradient-to-r from-blue-600/5 to-purple-600/5 rounded-3xl blur-xl opacity-60" />
+                <div className="absolute inset-0 bg-gradient-to-r from-blue-600/5 to-brand/5 rounded-3xl blur-xl opacity-60" />
                 <Card className="relative bg-card/95 backdrop-blur-xl border-border shadow-soft-elevated dark:bg-black/20 dark:border-white/10">
                   <CardHeader>
                     <CardTitle className="flex items-center space-x-2 text-foreground dark:text-white">

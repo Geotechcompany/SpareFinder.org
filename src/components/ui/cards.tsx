@@ -24,7 +24,7 @@ export default function LatestBlogCards() {
           <h3 className="mt-3 text-base font-medium text-slate-900">
             Color Psychology in UI: How to Choose the Right Palette
           </h3>
-          <p className="mt-1 text-xs font-medium text-indigo-600">UI/UX design</p>
+          <p className="mt-1 text-xs font-medium text-brand-dark">UI/UX design</p>
         </div>
 
         <div className="w-full max-w-72 transition duration-300 hover:-translate-y-0.5">
@@ -37,7 +37,7 @@ export default function LatestBlogCards() {
           <h3 className="mt-3 text-base font-medium text-slate-900">
             Understanding Typography: Crafting a Visual Voice for Your Brand
           </h3>
-          <p className="mt-1 text-xs font-medium text-indigo-600">Branding</p>
+          <p className="mt-1 text-xs font-medium text-brand-dark">Branding</p>
         </div>
 
         <div className="w-full max-w-72 transition duration-300 hover:-translate-y-0.5">
@@ -50,7 +50,7 @@ export default function LatestBlogCards() {
           <h3 className="mt-3 text-base font-medium text-slate-900">
             Design Thinking in Practice: How to Solve Real User Problems
           </h3>
-          <p className="mt-1 text-xs font-medium text-indigo-600">
+          <p className="mt-1 text-xs font-medium text-brand-dark">
             Product Design
           </p>
         </div>

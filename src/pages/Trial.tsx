@@ -89,18 +89,18 @@ const Trial: React.FC = () => {
 
   const tiers: Array<{ tier: PlanTier; icon: typeof ShieldCheck; accent: string }> = [
     { tier: "free", icon: ShieldCheck, accent: "from-slate-700 to-slate-900" },
-    { tier: "pro", icon: Zap, accent: "from-purple-600 to-blue-600" },
+    { tier: "pro", icon: Zap, accent: "from-brand to-brand-dark" },
     { tier: "enterprise", icon: Crown, accent: "from-emerald-600 to-green-600" },
   ];
 
   return (
     <div className="min-h-[100dvh] flex items-center justify-center bg-gradient-to-b from-background via-[#F0F2F5] to-[#E8EBF1] dark:from-slate-950 dark:via-slate-950 dark:to-slate-900 p-4 sm:p-6">
       <div className="relative w-full max-w-6xl">
-        <div className="pointer-events-none absolute -top-24 -right-24 h-56 w-56 rounded-full bg-gradient-to-r from-purple-500/20 to-blue-500/15 blur-3xl" />
+        <div className="pointer-events-none absolute -top-24 -right-24 h-56 w-56 rounded-full bg-gradient-to-r from-brand/20 to-blue-500/15 blur-3xl" />
         <div className="pointer-events-none absolute -bottom-24 -left-24 h-56 w-56 rounded-full bg-gradient-to-r from-emerald-500/15 to-teal-500/10 blur-3xl" />
 
         <Card className="relative w-full border-border bg-card/90 backdrop-blur-xl shadow-soft-elevated">
-          <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-purple-500/5 via-transparent to-blue-500/5 dark:from-purple-500/10 dark:to-blue-500/10" />
+          <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-brand/5 via-transparent to-blue-500/5 dark:from-brand/10 dark:to-blue-500/10" />
 
           <CardHeader className="relative text-center space-y-3">
           <Button
@@ -111,7 +111,7 @@ const Trial: React.FC = () => {
           >
             Skip for now
           </Button>
-          <div className="mx-auto w-14 h-14 rounded-xl bg-gradient-to-r from-purple-600 to-blue-600 flex items-center justify-center">
+          <div className="mx-auto w-14 h-14 rounded-xl bg-gradient-to-r from-brand to-brand-dark flex items-center justify-center">
             <Sparkles className="w-7 h-7 text-white" />
           </div>
           <CardTitle className="text-2xl text-foreground">Choose your plan</CardTitle>
@@ -133,7 +133,7 @@ const Trial: React.FC = () => {
                   key={tier}
                   className="relative overflow-hidden rounded-2xl border border-border bg-background/70 p-5 backdrop-blur-xl shadow-sm dark:bg-white/5"
                 >
-                  <div className="pointer-events-none absolute -top-16 -right-16 h-32 w-32 rounded-full bg-gradient-to-r from-purple-500/10 to-blue-500/10 blur-2xl" />
+                  <div className="pointer-events-none absolute -top-16 -right-16 h-32 w-32 rounded-full bg-gradient-to-r from-brand/10 to-blue-500/10 blur-2xl" />
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex items-center gap-3">
                       <div
@@ -145,7 +145,7 @@ const Trial: React.FC = () => {
                         <div className="flex items-center gap-2">
                           <h3 className="text-lg font-bold text-foreground">{plan.name}</h3>
                           {tier === "pro" ? (
-                            <Badge className="bg-purple-600/15 text-purple-700 border-purple-500/30 dark:bg-purple-600/20 dark:text-purple-200">
+                            <Badge className="bg-brand/15 text-brand-dark border-brand/30 dark:bg-brand/20 dark:text-brand-light">
                               Popular
                             </Badge>
                           ) : null}
@@ -185,7 +185,7 @@ const Trial: React.FC = () => {
                         <Button
                           onClick={() => startCheckout({ tier, mode: "trial" })}
                           disabled={loadingTier !== null || trialUsedLoading}
-                          className="h-11 w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 shadow-lg shadow-purple-500/20"
+                          className="h-11 w-full bg-gradient-to-r from-brand to-brand-dark hover:from-brand-dark hover:to-brand-dark shadow-lg shadow-brand/20"
                         >
                           {isTrialLoading
                             ? "Redirecting…"

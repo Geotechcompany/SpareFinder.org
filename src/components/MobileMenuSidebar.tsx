@@ -137,7 +137,7 @@ export function MobileMenuSidebar({
             <a
               href="/register"
               onClick={onClose}
-              className="flex h-11 items-center justify-center rounded-lg bg-gradient-to-r from-purple-600 to-blue-600 text-sm font-semibold text-white shadow-md hover:from-purple-700 hover:to-blue-700"
+              className="flex h-11 items-center justify-center rounded-lg bg-gradient-to-r from-brand to-brand-dark text-sm font-semibold text-white shadow-md hover:from-brand-dark hover:to-brand-dark"
             >
               Get Started
             </a>

@@ -221,7 +221,7 @@ export const MigrateAccount: React.FC = () => {
               const nextEmail = normalizeEmail(email);
               navigate(`/register?migrate=1&email=${encodeURIComponent(nextEmail)}`);
             }}
-            className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
+            className="bg-gradient-to-r from-brand to-brand-dark hover:from-brand-dark hover:to-brand-dark"
           >
             Continue to create sign-in
             <ArrowRight className="ml-2 h-4 w-4" />

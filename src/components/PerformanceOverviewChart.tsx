@@ -118,7 +118,7 @@ export const PerformanceOverviewChart: React.FC<{
         <div className="relative h-[260px] overflow-hidden rounded-2xl border border-border bg-background/60 p-4 backdrop-blur">
           <div className="pointer-events-none absolute inset-0 opacity-60">
             <div className="absolute -left-20 -top-20 h-56 w-56 rounded-full bg-primary/15 blur-3xl" />
-            <div className="absolute -right-24 -bottom-24 h-72 w-72 rounded-full bg-purple-500/10 blur-3xl" />
+            <div className="absolute -right-24 -bottom-24 h-72 w-72 rounded-full bg-brand/10 blur-3xl" />
           </div>
 
           <motion.div

@@ -135,7 +135,7 @@ const OnboardingGuide: React.FC<OnboardingGuideProps> = ({
           >
             <CardHeader>
               <CardTitle className="flex items-center text-foreground dark:text-white">
-                <Sparkles className="w-4 h-4 mr-2 text-[#8B5CF6]" />
+                <Sparkles className="w-4 h-4 mr-2 text-[#8F39BB]" />
                 {welcomeTitle}
               </CardTitle>
             </CardHeader>
@@ -169,7 +169,7 @@ const OnboardingGuide: React.FC<OnboardingGuideProps> = ({
                   </Button>
                   <Button
                     size="sm"
-                    className="bg-gradient-to-r from-[#3A5AFE] to-[#8B5CF6] text-white shadow-sm hover:from-[#4C5DFF] hover:to-[#A855F7]"
+                    className="bg-gradient-to-r from-[#3A5AFE] to-[#8F39BB] text-white shadow-sm hover:from-[#4C5DFF] hover:to-[#A85CD0]"
                     onClick={() => {
                       setStarted(true);
                       onStart?.();
@@ -199,7 +199,7 @@ const OnboardingGuide: React.FC<OnboardingGuideProps> = ({
         <CardHeader>
           <CardTitle className="flex items-center justify-between text-foreground dark:text-white">
             <span className="flex items-center">
-              <Sparkles className="w-4 h-4 mr-2 text-[#8B5CF6]" />
+              <Sparkles className="w-4 h-4 mr-2 text-[#8F39BB]" />
               Getting Started
             </span>
           </CardTitle>
@@ -272,7 +272,7 @@ const OnboardingGuide: React.FC<OnboardingGuideProps> = ({
       >
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center font-semibold text-foreground dark:text-white">
-            <Sparkles className="w-4 h-4 mr-2 text-[#8B5CF6]" />{" "}
+            <Sparkles className="w-4 h-4 mr-2 text-[#8F39BB]" />{" "}
             {step?.title || "Step"}
           </div>
           <Button
@@ -314,7 +314,7 @@ const OnboardingGuide: React.FC<OnboardingGuideProps> = ({
             {stepIndex < steps.length - 1 ? (
               <Button
                 size="sm"
-                className="bg-gradient-to-r from-[#3A5AFE] to-[#8B5CF6] text-white shadow-sm hover:from-[#4C5DFF] hover:to-[#A855F7]"
+                className="bg-gradient-to-r from-[#3A5AFE] to-[#8F39BB] text-white shadow-sm hover:from-[#4C5DFF] hover:to-[#A85CD0]"
                 onClick={() =>
                   setStepIndex((i) => Math.min(steps.length - 1, i + 1))
                 }

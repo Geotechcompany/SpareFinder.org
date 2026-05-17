@@ -52,6 +52,8 @@ import { useDashboardLayout } from "@/contexts/DashboardLayoutContext";
 import { PageSkeleton } from "@/components/skeletons";
 import { useTheme } from "@/contexts/ThemeContext";
 import { FeatureLock } from "@/components/FeatureLock";
+import { ProfileImageUploader } from "@/components/profile/ProfileImageUploader";
+import { cn } from "@/lib/utils";
 
 // Define a type for API response
 interface ApiResponse {
@@ -142,7 +144,7 @@ const Settings = () => {
   >(null);
 
   const { toast } = useToast();
-  const { user, logout } = useAuth(); // Get Google profile data from auth context
+  const { user, logout, checkAuth } = useAuth();
   const { setTheme } = useTheme();
   const { user: clerkUser, isLoaded: isClerkLoaded } = useUser();
   const { openSignIn } = useClerk();
@@ -314,10 +316,6 @@ const Settings = () => {
             userRegion: userRegion ?? "",
           });
 
-          // Sync UI theme with stored preference when available
-          if (typeof prefs.darkMode === "boolean") {
-            setTheme(prefs.darkMode ? "dark" : "light");
-          }
         }
       } catch (settingsError) {
         console.log("Settings not found, using defaults");
@@ -344,9 +342,9 @@ const Settings = () => {
   const handlePreferenceChange = (field: string, value: boolean | string) => {
     setPreferences((prev) => ({ ...prev, [field]: value }));
 
-    // Immediately reflect dark-mode preference in the UI theme
+    // Studio theme: dark sidebar + light workspace
     if (field === "darkMode" && typeof value === "boolean") {
-      setTheme(value ? "dark" : "light");
+      setTheme(value ? "split" : "light");
     }
   };
 
@@ -455,6 +453,48 @@ const Settings = () => {
     }
   };
 
+  const handleAvatarUpload = async (file: File): Promise<string | null> => {
+    try {
+      const res = await api.user.uploadAvatar(file);
+      const avatarUrl =
+        (res as { data?: { avatar_url?: string } })?.data?.avatar_url ??
+        (res as { avatar_url?: string })?.avatar_url ??
+        null;
+      if (!res.success || !avatarUrl) {
+        throw new Error(
+          (res as { message?: string }).message || "Upload failed"
+        );
+      }
+      setFormData((prev) => ({ ...prev, avatar_url: avatarUrl }));
+      await checkAuth();
+      toast({
+        title: "Photo updated",
+        description: "Your profile picture has been saved.",
+      });
+      return avatarUrl;
+    } catch (err) {
+      toast({
+        variant: "destructive",
+        title: "Upload failed",
+        description:
+          err instanceof Error ? err.message : "Could not upload photo.",
+      });
+      return null;
+    }
+  };
+
+  const handleAvatarRemove = async () => {
+    const response = await api.user.updateProfile({ avatar_url: null });
+    const res = (response as { data?: { success?: boolean } }).data ?? response;
+    const ok = (res as { success?: boolean }).success === true;
+    if (!ok) {
+      throw new Error("Failed to remove photo");
+    }
+    setFormData((prev) => ({ ...prev, avatar_url: "" }));
+    await checkAuth();
+    toast({ title: "Photo removed" });
+  };
+
   const handleSave = async () => {
     try {
       setIsSaving(true);
@@ -463,6 +503,7 @@ const Settings = () => {
       // Update profile data
       const profileResponse = await api.user.updateProfile({
         full_name: formData.full_name,
+        avatar_url: formData.avatar_url || null,
       });
 
       // Update preferences within the profile
@@ -485,6 +526,7 @@ const Settings = () => {
       const profileOk = (profileResponse as any)?.data?.success ?? (profileResponse as any)?.success;
       const prefsOk = (preferencesResponse as any)?.data?.success ?? (preferencesResponse as any)?.success;
       if (profileOk && prefsOk) {
+        await checkAuth();
         toast({
           title: "Success",
           description: "Your settings have been saved successfully.",
@@ -663,7 +705,7 @@ const Settings = () => {
                     currentPassword: e.target.value,
                   }))
                 }
-                className="bg-white/5 border-white/10 text-white placeholder:text-gray-400 focus:border-purple-500/50 focus:ring-purple-500/20 h-12 pr-10"
+                className="bg-white/5 border-white/10 text-white placeholder:text-gray-400 focus:border-brand/50 focus:ring-brand/20 h-12 pr-10"
                 placeholder="Enter current password"
               />
               <button
@@ -700,7 +742,7 @@ const Settings = () => {
                     newPassword: e.target.value,
                   }))
                 }
-                className="bg-white/5 border-white/10 text-white placeholder:text-gray-400 focus:border-purple-500/50 focus:ring-purple-500/20 h-12 pr-10"
+                className="bg-white/5 border-white/10 text-white placeholder:text-gray-400 focus:border-brand/50 focus:ring-brand/20 h-12 pr-10"
                 placeholder="Enter new password"
               />
               <button
@@ -739,7 +781,7 @@ const Settings = () => {
                     confirmNewPassword: e.target.value,
                   }))
                 }
-                className="bg-white/5 border-white/10 text-white placeholder:text-gray-400 focus:border-purple-500/50 focus:ring-purple-500/20 h-12 pr-10"
+                className="bg-white/5 border-white/10 text-white placeholder:text-gray-400 focus:border-brand/50 focus:ring-brand/20 h-12 pr-10"
                 placeholder="Confirm new password"
               />
               <button
@@ -769,7 +811,7 @@ const Settings = () => {
         <Button
           onClick={handlePasswordChange}
           disabled={isChangingPassword}
-          className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 shadow-lg shadow-purple-500/25 h-12"
+          className="w-full bg-gradient-to-r from-brand to-brand-dark hover:from-brand-dark hover:to-brand-dark shadow-lg shadow-brand/25 h-12"
         >
           {isChangingPassword ? (
             <>
@@ -820,7 +862,7 @@ const Settings = () => {
   // Show error state
   if (error) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-[#F0F2F5] to-[#E8EBF1] dark:from-gray-900 dark:via-purple-900/20 dark:to-blue-900/20">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-[#F0F2F5] to-[#E8EBF1] dark:from-gray-900 dark:via-brand-dark/20 dark:to-blue-900/20">
         <div className="text-center">
           <AlertCircle className="w-10 h-10 text-red-500 mx-auto mb-4" />
           <p className="text-gray-400 mb-4">{error}</p>
@@ -833,11 +875,18 @@ const Settings = () => {
   }
 
   return (
-    <div className="min-h-screen flex w-full bg-gradient-to-br from-background via-[#F0F2F5] to-[#E8EBF1] dark:from-gray-900 dark:via-purple-900/20 dark:to-blue-900/20 relative overflow-hidden">
-      {/* Animated Background Elements */}
+    <motion.div
+      className={cn(
+        "relative w-full",
+        inLayout
+          ? ""
+          : "min-h-screen flex bg-gradient-to-br from-background via-[#F0F2F5] to-[#E8EBF1] dark:from-gray-900 dark:via-brand-dark/20 dark:to-blue-900/20 overflow-hidden"
+      )}
+    >
+      {!inLayout ? (
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <motion.div
-          className="absolute top-1/3 -right-40 w-80 h-80 bg-purple-600/15 rounded-full blur-3xl opacity-60"
+          className="absolute top-1/3 -right-40 w-80 h-80 bg-brand/15 rounded-full blur-3xl opacity-60"
           animate={{
             scale: [1, 1.3, 1],
             rotate: [0, 180, 360],
@@ -862,6 +911,7 @@ const Settings = () => {
           }}
         />
       </div>
+      ) : null}
 
       {/* Sidebar and mobile menu handled by layout when inLayout */}
       {!inLayout && (
@@ -909,7 +959,7 @@ const Settings = () => {
         >
           {/* Header */}
           <div className="relative">
-            <div className="absolute inset-0 rounded-2xl sm:rounded-3xl bg-gradient-to-r from-[#3A5AFE0A] via-[#8B5CF60A] to-transparent blur-xl opacity-80 dark:from-purple-600/10 dark:to-blue-600/10" />
+            <div className="absolute inset-0 rounded-2xl sm:rounded-3xl bg-gradient-to-r from-[#3A5AFE0A] via-[#8F39BB0A] to-transparent blur-xl opacity-80 dark:from-brand/10 dark:to-blue-600/10" />
             <div className="relative rounded-2xl sm:rounded-3xl border border-border bg-card shadow-soft-elevated backdrop-blur-xl p-4 sm:p-6 dark:bg-black/20 dark:border-white/10">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
                 <div>
@@ -917,7 +967,7 @@ const Settings = () => {
                     initial={{ opacity: 0, scale: 0.8 }}
                     animate={{ opacity: 1, scale: 1 }}
                     transition={{ delay: 0.2 }}
-                    className="inline-flex items-center px-3 sm:px-4 py-2 bg-gradient-to-r from-purple-600/20 to-blue-600/20 rounded-full border border-purple-500/30 backdrop-blur-xl mb-3 sm:mb-4"
+                    className="inline-flex items-center px-3 sm:px-4 py-2 bg-gradient-to-r from-brand/20 to-blue-600/20 rounded-full border border-brand/30 backdrop-blur-xl mb-3 sm:mb-4"
                   >
                     <motion.div
                       animate={{ rotate: [0, 360] }}
@@ -928,14 +978,14 @@ const Settings = () => {
                       }}
                       className="mr-2"
                     >
-                      <Sparkles className="w-4 h-4 text-purple-400" />
+                      <Sparkles className="w-4 h-4 text-brand-light" />
                     </motion.div>
-                    <span className="text-purple-300 text-sm font-semibold">
+                    <span className="text-brand-light text-sm font-semibold">
                       Account Settings
                     </span>
                   </motion.div>
                   <motion.h1
-                    className="mb-3 text-3xl font-bold text-foreground dark:bg-gradient-to-r dark:from-white dark:via-purple-200 dark:to-blue-200 dark:bg-clip-text dark:text-transparent lg:text-4xl"
+                    className="mb-3 text-3xl font-bold text-foreground dark:bg-gradient-to-r dark:from-white dark:via-brand-light dark:to-blue-200 dark:bg-clip-text dark:text-transparent lg:text-4xl"
                     initial={{ opacity: 0, x: -20 }}
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: 0.3 }}
@@ -962,7 +1012,7 @@ const Settings = () => {
                   >
                     <Button
                       onClick={handleSave}
-                      className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 shadow-lg shadow-purple-500/25 h-12 px-6"
+                      className="bg-gradient-to-r from-brand to-brand-dark hover:from-brand-dark hover:to-brand-dark shadow-lg shadow-brand/25 h-12 px-6"
                       disabled={isSaving}
                     >
                       {isSaving ? (
@@ -990,7 +1040,7 @@ const Settings = () => {
             transition={{ delay: 0.6 }}
             className="relative"
           >
-            <div className="absolute inset-0 rounded-2xl sm:rounded-3xl bg-gradient-to-r from-[#6366F11A] via-[#8B5CF61A] to-transparent blur-xl opacity-80 dark:from-indigo-600/10 dark:to-purple-600/10" />
+            <div className="absolute inset-0 rounded-2xl sm:rounded-3xl bg-gradient-to-r from-[#8F39BB1A] via-[#8F39BB1A] to-transparent blur-xl opacity-80 dark:from-brand-dark/10 dark:to-brand/10" />
             <div className="relative overflow-x-auto rounded-2xl border border-border bg-card/95 p-2 backdrop-blur-xl shadow-soft-elevated sm:rounded-3xl dark:bg-black/20 dark:border-white/10">
               <div className="flex flex-nowrap min-w-max sm:min-w-0 sm:flex-wrap gap-2">
                 {tabs.map((tab, index) => (
@@ -1011,7 +1061,7 @@ const Settings = () => {
                     {activeTab === tab.id && (
                       <motion.div
                         layoutId="activeSettingsTab"
-                        className="absolute inset-0 bg-gradient-to-r from-purple-600/30 to-blue-600/20 rounded-2xl border border-purple-500/30 backdrop-blur-xl"
+                        className="absolute inset-0 bg-gradient-to-r from-brand/30 to-blue-600/20 rounded-2xl border border-brand/30 backdrop-blur-xl"
                         initial={false}
                         transition={{
                           type: "spring",
@@ -1049,11 +1099,11 @@ const Settings = () => {
                 >
                   {/* Personal Information */}
                   <div className="relative">
-                    <div className="absolute inset-0 rounded-3xl bg-gradient-to-r from-[#3A5AFE0A] via-[#8B5CF60A] to-transparent blur-xl opacity-80 dark:from-purple-600/10 dark:to-blue-600/10" />
+                    <div className="absolute inset-0 rounded-3xl bg-gradient-to-r from-[#3A5AFE0A] via-[#8F39BB0A] to-transparent blur-xl opacity-80 dark:from-brand/10 dark:to-blue-600/10" />
                     <Card className="relative h-full rounded-3xl border border-border bg-card text-foreground shadow-soft-elevated backdrop-blur-xl dark:bg-black/20 dark:border-white/10">
                       <CardHeader>
                         <CardTitle className="flex items-center space-x-2 text-foreground dark:text-white">
-                          <User className="w-5 h-5 text-[#8B5CF6]" />
+                          <User className="w-5 h-5 text-[#8F39BB]" />
                           <span>Personal Information</span>
                         </CardTitle>
                         <CardDescription className="text-muted-foreground dark:text-gray-400">
@@ -1115,7 +1165,7 @@ const Settings = () => {
                               onChange={(e) =>
                                 handleInputChange("full_name", e.target.value)
                               }
-                              className="bg-white/5 border-white/10 text-white placeholder:text-gray-400 focus:border-purple-500/50 focus:ring-purple-500/20 h-12"
+                              className="bg-white/5 border-white/10 text-white placeholder:text-gray-400 focus:border-brand/50 focus:ring-brand/20 h-12"
                             />
                           </div>
                         </div>
@@ -1380,16 +1430,13 @@ const Settings = () => {
                             className="flex items-center space-x-2 text-muted-foreground dark:text-gray-200"
                           >
                             <User className="w-4 h-4" />
-                            <span>Avatar URL</span>
+                            <span>Profile photo</span>
                           </Label>
-                          <Input
-                            id="avatarUrl"
-                            value={formData.avatar_url || ""}
-                            onChange={(e) =>
-                              handleInputChange("avatar_url", e.target.value)
-                            }
-                            className="h-12 border border-border bg-card text-foreground placeholder:text-muted-foreground focus:border-[#C7D2FE] focus:ring-[#C7D2FE33] dark:bg-white/5 dark:border-white/10 dark:text-white dark:placeholder:text-gray-400"
-                            placeholder="https://example.com/avatar.jpg"
+                          <ProfileImageUploader
+                            imageUrl={formData.avatar_url}
+                            fallbackLabel={formData.full_name || user?.email || "?"}
+                            onUpload={handleAvatarUpload}
+                            onRemove={handleAvatarRemove}
                           />
                         </div>
                       </CardContent>
@@ -1489,11 +1536,11 @@ const Settings = () => {
                   transition={{ duration: 0.3 }}
                 >
                   <div className="relative">
-                    <div className="absolute inset-0 rounded-3xl bg-gradient-to-r from-[#3A5AFE0A] via-[#8B5CF60A] to-transparent blur-xl opacity-80 dark:from-purple-600/10 dark:to-blue-600/10" />
+                    <div className="absolute inset-0 rounded-3xl bg-gradient-to-r from-[#3A5AFE0A] via-[#8F39BB0A] to-transparent blur-xl opacity-80 dark:from-brand/10 dark:to-blue-600/10" />
                     <Card className="relative rounded-3xl border border-border bg-card text-foreground shadow-soft-elevated backdrop-blur-xl dark:bg-black/20 dark:border-white/10">
                       <CardHeader>
                         <CardTitle className="flex items-center space-x-2 text-foreground dark:text-white">
-                          <Bell className="w-5 h-5 text-[#8B5CF6]" />
+                          <Bell className="w-5 h-5 text-[#8F39BB]" />
                           <span>Notification Preferences</span>
                         </CardTitle>
                         <CardDescription className="text-muted-foreground dark:text-gray-400">
@@ -1521,7 +1568,7 @@ const Settings = () => {
                             title: "Auto Save",
                             description: "Automatically save your work",
                             icon: Save,
-                            color: "from-purple-600 to-blue-600",
+                            color: "from-brand to-brand-dark",
                           },
                           {
                             key: "analytics",
@@ -1535,7 +1582,7 @@ const Settings = () => {
                             title: "Marketing Emails",
                             description: "Receive updates about new features",
                             icon: Globe,
-                            color: "from-pink-600 to-purple-600",
+                            color: "from-pink-600 to-brand",
                           },
                         ].map((setting) => (
                           <div
@@ -1567,7 +1614,7 @@ const Settings = () => {
                                 onCheckedChange={(checked) =>
                                   handlePreferenceChange(setting.key, checked)
                                 }
-                                className="data-[state=checked]:bg-purple-600"
+                                className="data-[state=checked]:bg-brand"
                               />
                             </div>
                           </div>
@@ -1578,7 +1625,7 @@ const Settings = () => {
                     <Card className="relative mt-6 rounded-3xl border border-border bg-card text-foreground shadow-soft-elevated backdrop-blur-xl dark:bg-black/20 dark:border-white/10">
                       <CardHeader>
                         <CardTitle className="flex items-center space-x-2 text-foreground dark:text-white">
-                          <MapPin className="w-5 h-5 text-[#8B5CF6]" />
+                          <MapPin className="w-5 h-5 text-[#8F39BB]" />
                           <span>Supplier region</span>
                         </CardTitle>
                         <CardDescription className="text-muted-foreground dark:text-gray-400">
@@ -1602,7 +1649,7 @@ const Settings = () => {
                               if (checked) handleDetectLocation();
                               scheduleSaveRegionPreference();
                             }}
-                            className="data-[state=checked]:bg-purple-600"
+                            className="data-[state=checked]:bg-brand"
                           />
                         </div>
                         {preferences.useRegionalSuppliers && (
@@ -1697,7 +1744,7 @@ const Settings = () => {
                   transition={{ duration: 0.3 }}
                 >
                   <div className="relative">
-                    <div className="absolute inset-0 rounded-3xl bg-gradient-to-r from-[#3A5AFE0A] via-[#8B5CF60A] to-transparent blur-xl opacity-80 dark:from-purple-600/10 dark:to-blue-600/10" />
+                    <div className="absolute inset-0 rounded-3xl bg-gradient-to-r from-[#3A5AFE0A] via-[#8F39BB0A] to-transparent blur-xl opacity-80 dark:from-brand/10 dark:to-blue-600/10" />
                     <Card className="relative rounded-3xl border border-border bg-card text-foreground shadow-soft-elevated backdrop-blur-xl dark:bg-black/20 dark:border-white/10">
                       <CardHeader>
                         <CardTitle className="flex items-center space-x-2 text-foreground dark:text-white">
@@ -1754,7 +1801,7 @@ const Settings = () => {
                                   onCheckedChange={(checked) =>
                                     handlePreferenceChange("marketing", checked)
                                   }
-                                  className="data-[state=checked]:bg-purple-600"
+                                  className="data-[state=checked]:bg-brand"
                                 />
                               </div>
                             </div>
@@ -1829,7 +1876,7 @@ const Settings = () => {
                   transition={{ duration: 0.3 }}
                 >
                   <div className="relative">
-                    <div className="absolute inset-0 rounded-3xl bg-gradient-to-r from-[#3A5AFE0A] via-[#8B5CF60A] to-transparent blur-xl opacity-80 dark:from-purple-600/10 dark:to-blue-600/10" />
+                    <div className="absolute inset-0 rounded-3xl bg-gradient-to-r from-[#3A5AFE0A] via-[#8F39BB0A] to-transparent blur-xl opacity-80 dark:from-brand/10 dark:to-blue-600/10" />
                     <Card className="relative rounded-3xl border border-border bg-card text-foreground shadow-soft-elevated backdrop-blur-xl dark:bg-black/20 dark:border-white/10">
                       <CardHeader>
                         <CardTitle className="flex items-center space-x-2 text-foreground dark:text-white">
@@ -1847,19 +1894,19 @@ const Settings = () => {
                               Theme preferences
                             </h3>
                             <p className="text-sm text-muted-foreground dark:text-gray-400">
-                              SpareFinder is optimized for a dark interface. Your
-                              preference is saved to your profile and will be used across
-                              devices.
+                              Studio is SpareFinder&apos;s recommended theme — a dark
+                              sidebar with a bright workspace. Your preference is saved to
+                              your profile and syncs across devices.
                             </p>
-                            <div className="relative mt-4 overflow-hidden rounded-2xl border border-border bg-gradient-to-br from-slate-50 via-purple-50 to-blue-50 dark:border-white/10 dark:from-slate-900 dark:via-purple-900/60 dark:to-blue-900/60">
+                            <div className="relative mt-4 overflow-hidden rounded-2xl border border-border bg-gradient-to-br from-slate-50 via-brand-50 to-blue-50 dark:border-white/10 dark:from-slate-900 dark:via-brand-dark/60 dark:to-blue-900/60">
                               <div className="absolute inset-0 opacity-40 bg-[radial-gradient(circle_at_top,_rgba(244,114,182,0.3)_0,_transparent_45%),radial-gradient(circle_at_bottom,_rgba(56,189,248,0.25)_0,_transparent_45%)]" />
                               <div className="relative p-5 space-y-3">
                                 <div className="flex items-center justify-between">
-                                  <span className="text-xs font-medium uppercase tracking-wide text-purple-700 dark:text-purple-200">
+                                  <span className="text-xs font-medium uppercase tracking-wide text-brand-dark dark:text-brand-light">
                                     Preview
                                   </span>
-                                  <Badge className="bg-purple-100 text-xs text-purple-700 border-purple-200 dark:bg-white/10 dark:text-purple-100 dark:border-white/20">
-                                    Dark mode
+                                  <Badge className="bg-brand-light text-xs text-brand-dark border-brand-light dark:bg-white/10 dark:text-brand-light dark:border-white/20">
+                                    Studio
                                   </Badge>
                                 </div>
                                 <div className="h-20 rounded-xl border border-border bg-card flex items-center justify-center text-xs text-muted-foreground dark:bg-black/30 dark:border-white/10 dark:text-gray-300">
@@ -1873,11 +1920,11 @@ const Settings = () => {
                             <div className="flex items-start justify-between gap-4">
                               <div>
                                 <p className="flex items-center space-x-2 font-medium text-foreground dark:text-white">
-                                  <span>Dark mode</span>
+                                  <span>Studio theme</span>
                                 </p>
                                 <p className="text-sm text-muted-foreground dark:text-gray-400">
-                                  When enabled, SpareFinder will use a dark theme wherever
-                                  supported.
+                                  Dark navigation with a light workspace — the default
+                                  SpareFinder experience.
                                 </p>
                               </div>
                               <Switch
@@ -1885,7 +1932,7 @@ const Settings = () => {
                                 onCheckedChange={(checked) =>
                                   handlePreferenceChange("darkMode", checked)
                                 }
-                                className="data-[state=checked]:bg-purple-600"
+                                className="data-[state=checked]:bg-brand"
                               />
                             </div>
                             <Separator className="bg-border/60 dark:bg-white/10" />
@@ -1928,11 +1975,11 @@ const Settings = () => {
                         description="Generate secure API keys for ERP/CMMS integrations. Available in Professional and Enterprise plans."
                         showContent={true}
                       >
-                        <div className="absolute inset-0 rounded-3xl bg-gradient-to-r from-[#3A5AFE0A] via-[#8B5CF60A] to-transparent blur-xl opacity-80 dark:from-purple-600/10 dark:to-blue-600/10" />
+                        <div className="absolute inset-0 rounded-3xl bg-gradient-to-r from-[#3A5AFE0A] via-[#8F39BB0A] to-transparent blur-xl opacity-80 dark:from-brand/10 dark:to-blue-600/10" />
                         <Card className="relative rounded-3xl border border-border bg-card text-foreground shadow-soft-elevated backdrop-blur-xl dark:bg-black/20 dark:border-white/10">
                           <CardHeader>
                             <CardTitle className="flex items-center gap-2 text-foreground dark:text-white">
-                              <KeyRound className="h-5 w-5 text-[#8B5CF6]" />
+                              <KeyRound className="h-5 w-5 text-[#8F39BB]" />
                               <span>API Keys</span>
                               <Badge className="bg-emerald-500/15 text-emerald-700 border-emerald-500/20 dark:bg-emerald-500/15 dark:text-emerald-300 dark:border-emerald-500/30">
                                 {tier === "enterprise" ? "Enterprise" : "Pro"}
@@ -1951,11 +1998,11 @@ const Settings = () => {
                       </FeatureLock>
                     ) : (
                       <>
-                        <div className="absolute inset-0 rounded-3xl bg-gradient-to-r from-[#3A5AFE0A] via-[#8B5CF60A] to-transparent blur-xl opacity-80 dark:from-purple-600/10 dark:to-blue-600/10" />
+                        <div className="absolute inset-0 rounded-3xl bg-gradient-to-r from-[#3A5AFE0A] via-[#8F39BB0A] to-transparent blur-xl opacity-80 dark:from-brand/10 dark:to-blue-600/10" />
                         <Card className="relative rounded-3xl border border-border bg-card text-foreground shadow-soft-elevated backdrop-blur-xl dark:bg-black/20 dark:border-white/10">
                           <CardHeader>
                           <CardTitle className="flex items-center gap-2 text-foreground dark:text-white">
-                            <KeyRound className="h-5 w-5 text-[#8B5CF6]" />
+                            <KeyRound className="h-5 w-5 text-[#8F39BB]" />
                             <span>API Keys</span>
                             <Badge className="bg-emerald-500/15 text-emerald-700 border-emerald-500/20 dark:bg-emerald-500/15 dark:text-emerald-300 dark:border-emerald-500/30">
                               {tier === "enterprise" ? "Enterprise" : "Pro"}
@@ -2013,7 +2060,7 @@ const Settings = () => {
                           </div>
                           <Button
                             type="button"
-                            className="h-12 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 shadow-lg shadow-purple-500/25"
+                            className="h-12 bg-gradient-to-r from-brand to-brand-dark hover:from-brand-dark hover:to-brand-dark shadow-lg shadow-brand/25"
                             disabled={
                               apiKeysLoading ||
                               isSubscriptionLoading ||
@@ -2194,7 +2241,7 @@ const Settings = () => {
           </motion.div>
         </motion.div>
       </motion.div>
-    </div>
+    </motion.div>
   );
 };
 

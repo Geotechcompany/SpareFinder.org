@@ -53,7 +53,7 @@ export function DashboardWelcomeBanner({
           decoding="async"
         />
         <motion.div
-          className="absolute inset-0 bg-gradient-to-br from-slate-950/92 via-slate-900/78 to-violet-950/65"
+          className="absolute inset-0 bg-gradient-to-br from-slate-950/92 via-slate-900/78 to-brand-dark/65"
           aria-hidden
         />
         <div
@@ -61,7 +61,7 @@ export function DashboardWelcomeBanner({
           aria-hidden
         />
         <div
-          className="pointer-events-none absolute -right-16 -top-16 h-56 w-56 rounded-full bg-violet-500/25 blur-3xl"
+          className="pointer-events-none absolute -right-16 -top-16 h-56 w-56 rounded-full bg-brand/25 blur-3xl"
           aria-hidden
         />
         <motion.div
@@ -85,7 +85,7 @@ export function DashboardWelcomeBanner({
             <PeriodIcon className="h-3.5 w-3.5 text-amber-300" aria-hidden />
             {todayLabel}
           </span>
-          <span className="inline-flex items-center rounded-full border border-violet-300/25 bg-violet-500/20 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-violet-100">
+          <span className="inline-flex items-center rounded-full border border-brand-light/25 bg-brand/20 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-brand-light">
             Industrial workspace
           </span>
         </motion.div>
@@ -93,7 +93,7 @@ export function DashboardWelcomeBanner({
         <motion.div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
           <motion.div className="max-w-2xl space-y-2">
             <motion.p
-              className="text-sm font-medium text-violet-200/90 sm:text-base"
+              className="text-sm font-medium text-brand-light/90 sm:text-base"
               initial={{ opacity: 0, x: -12 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: 0.1 }}
@@ -127,10 +127,10 @@ export function DashboardWelcomeBanner({
             <Button
               type="button"
               onClick={onNewUpload}
-              className="h-11 w-full rounded-xl border-0 bg-white text-sm font-semibold text-violet-950 shadow-lg shadow-black/20 hover:bg-white/95 sm:w-auto"
+              className="h-11 w-full rounded-xl border-0 bg-white text-sm font-semibold text-brand-dark shadow-lg shadow-black/20 hover:bg-white/95 sm:w-auto"
             >
               <Upload className="mr-2 h-4 w-4" aria-hidden />
-              New Upload
+              New Analysis
             </Button>
             <Button
               type="button"

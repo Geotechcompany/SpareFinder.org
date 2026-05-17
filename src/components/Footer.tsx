@@ -6,9 +6,9 @@ import { CONTACT_EMAIL } from '@/lib/config';
 const Footer = () => {
   return (
     <footer className="relative overflow-hidden border-t border-border bg-background text-foreground dark:border-gray-800/50 dark:bg-gradient-to-br dark:from-black dark:via-gray-900/80 dark:to-black">
-      <div className="absolute inset-0 bg-gradient-to-t from-[#3A5AFE0A] via-transparent to-[#06B6D40A] dark:from-purple-900/5 dark:to-blue-900/5" />
+      <div className="absolute inset-0 bg-gradient-to-t from-[#3A5AFE0A] via-transparent to-[#06B6D40A] dark:from-brand-dark/5 dark:to-blue-900/5" />
       <div className="absolute inset-0">
-        <div className="absolute top-1/4 left-1/6 h-96 w-96 rounded-full bg-[#3A5AFE14] blur-3xl dark:bg-purple-500/5" />
+        <div className="absolute top-1/4 left-1/6 h-96 w-96 rounded-full bg-[#3A5AFE14] blur-3xl dark:bg-brand/5" />
         <div className="absolute bottom-1/4 right-1/6 h-96 w-96 rounded-full bg-[#06B6D414] blur-3xl dark:bg-blue-500/5" />
       </div>
       
@@ -49,7 +49,7 @@ const Footer = () => {
             className="space-y-6"
           >
             <p className="mb-6 flex items-center gap-2 text-xl font-bold text-foreground dark:text-white">
-              <span className="h-8 w-2 rounded-full bg-gradient-to-b from-purple-500 to-blue-500" aria-hidden />
+              <span className="h-8 w-2 rounded-full bg-gradient-to-b from-brand to-blue-500" aria-hidden />
               Solutions
             </p>
             <ul className="space-y-4">
@@ -167,7 +167,7 @@ const Footer = () => {
                   placeholder="Enter your email"
                   className="w-full rounded-xl border border-border bg-card py-4 px-5 text-sm text-foreground placeholder:text-muted-foreground shadow-soft-elevated backdrop-blur-xl focus:border-primary/60 focus:outline-none focus:ring-2 focus:ring-primary/40 dark:border-gray-700/50 dark:bg-gray-900/50 dark:text-white dark:placeholder:text-gray-500"
                 />
-                <Button className="absolute right-2 top-2 rounded-lg bg-gradient-to-r from-[#3A5AFE] via-[#4C5DFF] to-[#06B6D4] px-6 py-2 text-sm font-semibold text-white transition-all duration-300 hover:scale-105 hover:from-[#324EDC] hover:via-[#3A5AFE] hover:to-[#0891B2] dark:from-purple-600 dark:to-blue-600 dark:hover:from-purple-700 dark:hover:to-blue-700">
+                <Button className="absolute right-2 top-2 rounded-lg bg-gradient-to-r from-[#3A5AFE] via-[#4C5DFF] to-[#06B6D4] px-6 py-2 text-sm font-semibold text-white transition-all duration-300 hover:scale-105 hover:from-[#324EDC] hover:via-[#3A5AFE] hover:to-[#0891B2] dark:from-brand dark:to-blue-600 dark:hover:from-brand-dark dark:hover:to-blue-700">
                   Subscribe
                 </Button>
               </div>
@@ -209,7 +209,7 @@ const Footer = () => {
                   { name: 'LinkedIn', href: 'https://www.linkedin.com/company/sparefinder', icon: '💼', color: 'from-blue-700 to-blue-800' },
                   { name: 'Twitter', href: 'https://twitter.com/SpareFinder', icon: '🐦', color: 'from-cyan-500 to-blue-500' },
                   { name: 'GitHub', href: '#', icon: '🔗', color: 'from-gray-600 to-gray-700' },
-                  { name: 'Discord', href: '#', icon: '💬', color: 'from-indigo-600 to-purple-600' }
+                  { name: 'Discord', href: '#', icon: '💬', color: 'from-brand-dark to-brand' }
                 ].map((social) => (
                   <motion.a
                     key={social.name}
@@ -236,7 +236,7 @@ const Footer = () => {
           </div>
           <div className="relative flex justify-center">
             <div className="bg-background px-4 dark:bg-black">
-              <div className="h-px w-12 bg-gradient-to-r from-[#3A5AFE] to-[#8B5CF6] dark:from-purple-500 dark:to-blue-500" />
+              <div className="h-px w-12 bg-gradient-to-r from-[#3A5AFE] to-[#8F39BB] dark:from-brand dark:to-blue-500" />
             </div>
           </div>
         </div>
@@ -255,25 +255,25 @@ const Footer = () => {
             <div className="flex space-x-6">
               <Link
                 to="/privacy-policy"
-                className="text-sm font-medium text-muted-foreground transition-colors duration-300 hover:text-primary dark:text-gray-500 dark:hover:text-purple-400"
+                className="text-sm font-medium text-muted-foreground transition-colors duration-300 hover:text-primary dark:text-gray-500 dark:hover:text-brand-light"
               >
                 Privacy Policy
               </Link>
               <Link
                 to="/terms-of-service"
-                className="text-sm font-medium text-muted-foreground transition-colors duration-300 hover:text-primary dark:text-gray-500 dark:hover:text-purple-400"
+                className="text-sm font-medium text-muted-foreground transition-colors duration-300 hover:text-primary dark:text-gray-500 dark:hover:text-brand-light"
               >
                 Terms of Service
               </Link>
               <Link
                 to="/security"
-                className="text-sm font-medium text-muted-foreground transition-colors duration-300 hover:text-primary dark:text-gray-500 dark:hover:text-purple-400"
+                className="text-sm font-medium text-muted-foreground transition-colors duration-300 hover:text-primary dark:text-gray-500 dark:hover:text-brand-light"
               >
                 Security
               </Link>
               <Link
                 to="/api-docs"
-                className="text-sm font-medium text-muted-foreground transition-colors duration-300 hover:text-primary dark:text-gray-500 dark:hover:text-purple-400"
+                className="text-sm font-medium text-muted-foreground transition-colors duration-300 hover:text-primary dark:text-gray-500 dark:hover:text-brand-light"
               >
                 API Docs
               </Link>
@@ -294,7 +294,7 @@ const Footer = () => {
                 <motion.div
                   key={cert}
                   className="rounded-lg border border-border bg-card px-3 py-1 text-xs font-semibold text-muted-foreground shadow-sm dark:border-gray-700/30 dark:bg-gray-800/50 dark:text-gray-400"
-                  whileHover={{ scale: 1.05, borderColor: '#8B5CF6' }}
+                  whileHover={{ scale: 1.05, borderColor: '#8F39BB' }}
                   transition={{ duration: 0.2 }}
                 >
                   {cert}

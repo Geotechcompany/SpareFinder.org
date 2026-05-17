@@ -379,7 +379,7 @@ const AdminDashboardLayout = () => {
     return (
       <div className="dashboard-premium admin-console-neo min-h-screen flex items-center justify-center bg-background">
         <div className="text-center">
-          <AlertCircle className="w-10 h-10 text-purple-500 mx-auto mb-4" />
+          <AlertCircle className="w-10 h-10 text-brand mx-auto mb-4" />
           <p className="text-muted-foreground mb-4">{error}</p>
           <div className="space-x-2">
             <Button onClick={handleTryAgain} variant="outline">
@@ -402,7 +402,7 @@ const AdminDashboardLayout = () => {
       subtitle: `+${stats?.new_users_today || 0} joined today`,
       icon: Users,
       iconClassName:
-        "bg-violet-500/[0.11] text-violet-600 ring-violet-500/15 dark:text-violet-400",
+        "bg-brand/[0.11] text-brand ring-brand/15 dark:text-brand-light",
       animation: { target: stats?.total_users ?? 0, kind: "integer" as const },
     },
     {
@@ -516,7 +516,7 @@ const AdminDashboardLayout = () => {
       title: "Disk space used",
       value: `${stats?.disk_usage || 0}%`,
       icon: Database,
-      color: "text-purple-400",
+      color: "text-brand-light",
     },
   ];
 
@@ -548,7 +548,7 @@ const AdminDashboardLayout = () => {
       subtitle: "Free and paid plans combined",
       icon: Users,
       iconClassName:
-        "bg-violet-500/[0.11] text-violet-600 ring-violet-500/15 dark:text-violet-400",
+        "bg-brand/[0.11] text-brand ring-brand/15 dark:text-brand-light",
       animation: {
         target: subscriptionStats?.total ?? 0,
         kind: "integer" as const,
@@ -633,7 +633,7 @@ const AdminDashboardLayout = () => {
   return (
     <div className="dashboard-premium admin-console-neo min-h-screen flex w-full bg-background relative overflow-hidden">
       <div className="admin-neo-ambient" aria-hidden>
-        <div className="admin-neo-ambient__orb admin-neo-ambient__orb--violet" />
+        <div className="admin-neo-ambient__orb admin-neo-ambient__orb--brand" />
         <div className="admin-neo-ambient__orb admin-neo-ambient__orb--cyan" />
         <div className="admin-neo-ambient__orb admin-neo-ambient__orb--rose" />
       </div>
@@ -802,7 +802,7 @@ const AdminDashboardLayout = () => {
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <CardTitle className="flex items-center gap-2 text-foreground">
-                        <TrendingUp className="h-5 w-5 text-purple-500 dark:text-purple-400" />
+                        <TrendingUp className="h-5 w-5 text-brand dark:text-brand-light" />
                         Growth — last 30 days
                       </CardTitle>
                       <CardDescription className="text-muted-foreground">
@@ -824,8 +824,8 @@ const AdminDashboardLayout = () => {
                         <AreaChart data={timeSeries} margin={{ top: 10, right: 12, left: 0, bottom: 0 }}>
                           <defs>
                             <linearGradient id="gradSearches" x1="0" y1="0" x2="0" y2="1">
-                              <stop offset="0%" stopColor="#8b5cf6" stopOpacity={0.35} />
-                              <stop offset="100%" stopColor="#8b5cf6" stopOpacity={0.02} />
+                              <stop offset="0%" stopColor="#8F39BB" stopOpacity={0.35} />
+                              <stop offset="100%" stopColor="#8F39BB" stopOpacity={0.02} />
                             </linearGradient>
                             <linearGradient id="gradRegs" x1="0" y1="0" x2="0" y2="1">
                               <stop offset="0%" stopColor="#60a5fa" stopOpacity={0.30} />
@@ -847,7 +847,7 @@ const AdminDashboardLayout = () => {
                           <Area
                             type="monotone"
                             dataKey="searches"
-                            stroke="#8b5cf6"
+                            stroke="#8F39BB"
                             strokeWidth={2}
                             fill="url(#gradSearches)"
                             name="Lookups"
@@ -998,7 +998,7 @@ const AdminDashboardLayout = () => {
               <Card className="premium-card relative h-full bg-card/95 backdrop-blur-md">
                 <CardHeader>
                   <CardTitle className="flex items-center space-x-2 text-foreground">
-                    <Server className="w-5 h-5 text-purple-500 dark:text-purple-400" />
+                    <Server className="w-5 h-5 text-brand dark:text-brand-light" />
                     <span>How the servers are doing</span>
                   </CardTitle>
                   <CardDescription className="text-muted-foreground">
@@ -1037,7 +1037,7 @@ const AdminDashboardLayout = () => {
               <Card className="premium-card relative h-full bg-card/95 backdrop-blur-md">
                 <CardHeader>
                   <CardTitle className="flex items-center space-x-2 text-foreground">
-                    <Activity className="w-5 h-5 text-purple-500 dark:text-purple-400" />
+                    <Activity className="w-5 h-5 text-brand dark:text-brand-light" />
                     <span>Latest part lookups</span>
                   </CardTitle>
                   <CardDescription className="text-muted-foreground">

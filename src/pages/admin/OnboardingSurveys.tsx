@@ -124,7 +124,7 @@ const OnboardingSurveys = () => {
     <div className="min-h-screen flex w-full bg-gradient-to-br from-background via-[#F0F2F5] to-[#E8EBF1] dark:from-[#0B1026] dark:via-[#1A1033] dark:to-[#0C1226] relative overflow-hidden">
       {/* Background accents */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-1/4 -right-40 w-80 h-80 bg-purple-600/10 rounded-full blur-3xl opacity-60" />
+        <div className="absolute top-1/4 -right-40 w-80 h-80 bg-brand/10 rounded-full blur-3xl opacity-60" />
         <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-blue-600/10 rounded-full blur-3xl opacity-40" />
       </div>
 

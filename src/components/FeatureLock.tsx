@@ -25,7 +25,7 @@ const tierDisplayNames: Record<PlanTier, string> = {
 
 const tierColors: Record<PlanTier, string> = {
   free: "from-gray-600 to-gray-700",
-  pro: "from-purple-600 to-blue-600",
+  pro: "from-brand to-brand-dark",
   enterprise: "from-emerald-600 to-green-600",
 };
 
@@ -119,7 +119,7 @@ export const FeatureLock: React.FC<FeatureLockProps> = ({
             <div className="space-y-3">
               <Button
                 onClick={handleUpgrade}
-                className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white shadow-lg shadow-purple-500/25"
+                className="w-full bg-gradient-to-r from-brand to-brand-dark hover:from-brand-dark hover:to-brand-dark text-white shadow-lg shadow-brand/25"
                 size="lg"
               >
                 <ArrowUpRight className="w-4 h-4 mr-2" />

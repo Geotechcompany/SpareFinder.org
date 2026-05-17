@@ -160,7 +160,7 @@ export function NotificationBellDropdown({
         >
           <Bell className="h-4 w-4" />
           {unread > 0 ? (
-            <span className="pointer-events-none absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-gradient-to-r from-violet-500 to-fuchsia-500 px-1 text-[10px] font-semibold text-white shadow-sm">
+            <span className="pointer-events-none absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-gradient-to-r from-brand to-fuchsia-500 px-1 text-[10px] font-semibold text-white shadow-sm">
               {unread > 99 ? "99+" : unread}
             </span>
           ) : null}

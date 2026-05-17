@@ -142,7 +142,7 @@ export function Header() {
             href="/register"
             className={cn(
               buttonVariants({}),
-              "bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white shadow-lg shadow-purple-500/25 hover:shadow-purple-500/40 transition-all duration-300"
+              "bg-gradient-to-r from-brand to-brand-dark hover:from-brand-dark hover:to-brand-dark text-white shadow-lg shadow-brand/25 hover:shadow-brand/40 transition-all duration-300"
             )}
           >
             Get Started

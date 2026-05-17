@@ -148,7 +148,7 @@ const SharedAnalysis = () => {
 
           {/* Keywords Badge */}
           {analysis.keywords && (
-            <div className="bg-gradient-to-r from-blue-500/10 to-indigo-500/10 border border-blue-500/30 rounded-lg p-4 mt-4">
+            <div className="bg-gradient-to-r from-blue-500/10 to-brand/10 border border-blue-500/30 rounded-lg p-4 mt-4">
               <div className="flex items-center gap-3">
                 <div className="bg-blue-500 text-white rounded-full p-2">
                   <Search className="h-5 w-5" />
@@ -200,7 +200,7 @@ const SharedAnalysis = () => {
                   </div>
                 ),
                 thead: ({ node, ...props }) => (
-                  <thead className="bg-gradient-to-r from-blue-600 to-indigo-600" {...props} />
+                  <thead className="bg-gradient-to-r from-brand-dark to-brand-dark" {...props} />
                 ),
                 tbody: ({ node, ...props }) => (
                   <tbody className="bg-gray-800 divide-y divide-gray-700" {...props} />

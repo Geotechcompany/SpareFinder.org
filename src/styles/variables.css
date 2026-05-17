@@ -1,7 +1,14 @@
 :root {
     --collapsed-sidebar-width: 80px;
-    --expanded-sidebar-width: 320px;
+    --expanded-sidebar-width: 300px;
+    --dashboard-sidebar-offset: 300px;
     --dashboard-content-max-width: 1240px;
+
+    /* SpareFinder logo / brand purple #8F39BB */
+    --brand: 280 53% 48%;
+    --brand-dark: 280 53% 38%;
+    --brand-light: 280 53% 58%;
+    --brand-hex: #8F39BB;
 }
 
 

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
@@ -83,7 +83,9 @@ const Profile = () => {
 
   const { toast } = useToast();
   const navigate = useNavigate();
-  const { user } = useAuth(); // Get Google profile data from auth context
+  const { user, checkAuth } = useAuth();
+  const avatarInputRef = useRef<HTMLInputElement>(null);
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const {
     achievements,
     activities,
@@ -94,8 +96,8 @@ const Profile = () => {
   } = useProfileData();
 
   useEffect(() => {
-    fetchUserProfile();
-  }, []);
+    void fetchUserProfile();
+  }, [user?.id, user?.avatar_url]);
 
   useEffect(() => {
     if (profile) {
@@ -218,6 +220,43 @@ const Profile = () => {
     navigate("/dashboard/settings");
   };
 
+  const handleAvatarPick = () => {
+    avatarInputRef.current?.click();
+  };
+
+  const handleAvatarFile = async (file: File | null) => {
+    if (!file) return;
+    setIsUploadingAvatar(true);
+    try {
+      const res = await api.user.uploadAvatar(file);
+      const avatarUrl =
+        (res as { data?: { avatar_url?: string } })?.data?.avatar_url ??
+        (res as { avatar_url?: string })?.avatar_url ??
+        null;
+      if (!res.success || !avatarUrl) {
+        throw new Error(
+          (res as { message?: string }).message || "Upload failed"
+        );
+      }
+      setProfile((prev) => (prev ? { ...prev, avatar_url: avatarUrl } : prev));
+      await checkAuth();
+      toast({
+        title: "Photo updated",
+        description: "Your profile picture has been saved.",
+      });
+    } catch (err) {
+      toast({
+        variant: "destructive",
+        title: "Upload failed",
+        description:
+          err instanceof Error ? err.message : "Could not upload photo.",
+      });
+    } finally {
+      setIsUploadingAvatar(false);
+      if (avatarInputRef.current) avatarInputRef.current.value = "";
+    }
+  };
+
   // Show loading state
   if (isLoading) {
     return (
@@ -232,7 +271,7 @@ const Profile = () => {
   // Show error state
   if (error) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-[#F0F2F5] to-[#E8EBF1] dark:from-gray-900 dark:via-purple-900/20 dark:to-blue-900/20">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-[#F0F2F5] to-[#E8EBF1] dark:from-gray-900 dark:via-brand-dark/20 dark:to-blue-900/20">
         <div className="text-center">
           <AlertCircle className="w-10 h-10 text-red-500 mx-auto mb-4" />
           <p className="text-gray-400 mb-4">{error}</p>
@@ -258,11 +297,11 @@ const Profile = () => {
   };
 
   return (
-    <div className="min-h-screen flex w-full bg-gradient-to-br from-background via-[#F0F2F5] to-[#E8EBF1] dark:from-gray-900 dark:via-purple-900/20 dark:to-blue-900/20 relative overflow-hidden">
+    <div className="min-h-screen flex w-full bg-gradient-to-br from-background via-[#F0F2F5] to-[#E8EBF1] dark:from-gray-900 dark:via-brand-dark/20 dark:to-blue-900/20 relative overflow-hidden">
       {/* Animated Background Elements */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <motion.div
-          className="absolute top-1/4 -right-40 w-80 h-80 bg-purple-600/15 rounded-full blur-3xl opacity-60"
+          className="absolute top-1/4 -right-40 w-80 h-80 bg-brand/15 rounded-full blur-3xl opacity-60"
           animate={{
             scale: [1, 1.3, 1],
             rotate: [0, 180, 360],
@@ -334,32 +373,46 @@ const Profile = () => {
         >
         {/* Header */}
         <div className="relative">
-          <div className="absolute inset-0 rounded-3xl bg-gradient-to-r from-[#3A5AFE0A] via-[#8B5CF60A] to-transparent blur-xl opacity-80 dark:from-purple-600/10 dark:to-blue-600/10" />
+          <div className="absolute inset-0 rounded-3xl bg-gradient-to-r from-[#3A5AFE0A] via-[#8F39BB0A] to-transparent blur-xl opacity-80 dark:from-brand/10 dark:to-blue-600/10" />
           <div className="relative rounded-3xl border border-border bg-card shadow-soft-elevated backdrop-blur-xl dark:bg-black/30 dark:border-white/10">
               <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 sm:gap-6">
                 <div className="flex flex-col sm:flex-row sm:items-center space-y-4 sm:space-y-0 sm:space-x-6">
                   <div className="relative">
                     <Avatar className="w-24 h-24">
                       <AvatarImage src={profile?.avatar_url || ""} />
-                      <AvatarFallback className="bg-gradient-to-r from-purple-600 to-blue-600">
+                      <AvatarFallback className="bg-gradient-to-r from-brand to-brand-dark">
                         <User className="w-12 h-12 text-white" />
                       </AvatarFallback>
                     </Avatar>
                     <motion.button
+                      type="button"
                       whileHover={{ scale: 1.1 }}
                       whileTap={{ scale: 0.9 }}
-                      className="absolute -bottom-1 -right-1 w-8 h-8 bg-gradient-to-r from-blue-600 to-purple-600 rounded-full flex items-center justify-center border-2 border-gray-900"
-                      onClick={handleEditProfile}
+                      disabled={isUploadingAvatar}
+                      className="absolute -bottom-1 -right-1 w-8 h-8 bg-gradient-to-r from-brand-dark to-brand rounded-full flex items-center justify-center border-2 border-gray-900 disabled:opacity-60"
+                      onClick={handleAvatarPick}
+                      aria-label="Upload profile photo"
                     >
-                      <Camera className="w-4 h-4 text-white" />
+                      {isUploadingAvatar ? (
+                        <Loader2 className="w-4 h-4 text-white animate-spin" />
+                      ) : (
+                        <Camera className="w-4 h-4 text-white" />
+                      )}
                     </motion.button>
+                    <input
+                      ref={avatarInputRef}
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      className="hidden"
+                      onChange={(e) => void handleAvatarFile(e.target.files?.[0] ?? null)}
+                    />
                   </div>
                   <div>
                     <motion.div
                       initial={{ opacity: 0, scale: 0.8 }}
                       animate={{ opacity: 1, scale: 1 }}
                       transition={{ delay: 0.2 }}
-                      className="inline-flex items-center px-3 py-1 rounded-full border border-border bg-gradient-to-r from-[#E0E7FF] via-[#EEF2FF] to-[#F5F3FF] text-xs font-semibold text-[#4C1D95] shadow-soft-elevated dark:border-purple-500/30 dark:from-purple-600/20 dark:to-blue-600/20 dark:text-purple-200 backdrop-blur-xl mb-2"
+                      className="inline-flex items-center px-3 py-1 rounded-full border border-border bg-gradient-to-r from-[#E0E7FF] via-[#EEF2FF] to-[#F5F3FF] text-xs font-semibold text-[#4C1D95] shadow-soft-elevated dark:border-brand/30 dark:from-brand/20 dark:to-blue-600/20 dark:text-brand-light backdrop-blur-xl mb-2"
                     >
                       <motion.div
                         animate={{ rotate: [0, 360] }}
@@ -370,12 +423,12 @@ const Profile = () => {
                         }}
                         className="mr-2"
                       >
-                        <Sparkles className="w-3 h-3 text-[#8B5CF6]" />
+                        <Sparkles className="w-3 h-3 text-[#8F39BB]" />
                       </motion.div>
                       <span>Pro Member</span>
                     </motion.div>
                     <div className="flex items-center gap-3 flex-wrap">
-                      <h1 className="text-3xl lg:text-4xl font-bold text-foreground dark:bg-gradient-to-r dark:from-white dark:via-purple-200 dark:to-blue-200 dark:bg-clip-text dark:text-transparent">
+                      <h1 className="text-3xl lg:text-4xl font-bold text-foreground dark:bg-gradient-to-r dark:from-white dark:via-brand-light dark:to-blue-200 dark:bg-clip-text dark:text-transparent">
                         {profile?.full_name || "Anonymous User"}
                       </h1>
                       {user?.avatar_url && (
@@ -436,7 +489,7 @@ const Profile = () => {
                   >
                     <Button
                       onClick={handleEditProfile}
-                      className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 shadow-lg shadow-purple-500/25 h-12 px-6"
+                      className="bg-gradient-to-r from-brand to-brand-dark hover:from-brand-dark hover:to-brand-dark shadow-lg shadow-brand/25 h-12 px-6"
                     >
                       <Edit className="w-4 h-4 mr-2" />
                       Edit Profile
@@ -454,7 +507,7 @@ const Profile = () => {
                 title: "Total Uploads",
                 value: userStats.totalUploads.toLocaleString(),
                 icon: TrendingUp,
-                color: "from-purple-600 to-blue-600",
+                color: "from-brand to-brand-dark",
                 change: "+15%",
               },
               {
@@ -511,7 +564,7 @@ const Profile = () => {
                         </p>
                       </div>
                       <div
-                        className={`p-3 rounded-xl bg-gradient-to-r ${stat.color} shadow-lg shadow-purple-500/20`}
+                        className={`p-3 rounded-xl bg-gradient-to-r ${stat.color} shadow-lg shadow-brand/20`}
                       >
                         <stat.icon className="w-6 h-6 text-white" />
                       </div>
@@ -530,7 +583,7 @@ const Profile = () => {
               transition={{ delay: 0.6 }}
               className="relative"
             >
-              <div className="absolute inset-0 rounded-3xl bg-gradient-to-r from-[#3A5AFE0D] via-[#8B5CF60D] to-transparent blur-xl opacity-80 dark:from-purple-600/10 dark:to-blue-600/10" />
+              <div className="absolute inset-0 rounded-3xl bg-gradient-to-r from-[#3A5AFE0D] via-[#8F39BB0D] to-transparent blur-xl opacity-80 dark:from-brand/10 dark:to-blue-600/10" />
               <Card className="relative h-full border border-border bg-card text-foreground shadow-soft-elevated backdrop-blur-xl dark:bg-black/20 dark:border-white/10">
                 <CardHeader>
                   <CardTitle className="flex items-center space-x-2 text-foreground dark:text-white">
@@ -587,7 +640,7 @@ const Profile = () => {
                               <div
                                 className={`flex h-12 w-12 items-center justify-center rounded-xl ${
                                   achievement.earned
-                                    ? `bg-gradient-to-r ${achievement.color} shadow-md shadow-purple-500/20`
+                                    ? `bg-gradient-to-r ${achievement.color} shadow-md shadow-brand/20`
                                     : "bg-muted dark:bg-gray-600/30"
                                 }`}
                               >
@@ -738,11 +791,11 @@ const Profile = () => {
             transition={{ delay: 0.8 }}
             className="relative"
           >
-            <div className="absolute inset-0 rounded-3xl bg-gradient-to-r from-[#3B82F614] via-[#8B5CF614] to-transparent blur-xl opacity-80 dark:from-indigo-600/10 dark:to-purple-600/10" />
+            <div className="absolute inset-0 rounded-3xl bg-gradient-to-r from-[#3B82F614] via-[#8F39BB14] to-transparent blur-xl opacity-80 dark:from-brand-dark/10 dark:to-brand/10" />
             <Card className="relative border border-border bg-card text-foreground shadow-soft-elevated backdrop-blur-xl dark:bg-black/20 dark:border-white/10">
               <CardHeader>
                 <CardTitle className="flex items-center space-x-2 text-foreground dark:text-white">
-                  <User className="w-5 h-5 text-[#8B5CF6]" />
+                  <User className="w-5 h-5 text-[#8F39BB]" />
                   <span>Contact Information</span>
                 </CardTitle>
                 <CardDescription className="text-muted-foreground dark:text-gray-400">
@@ -766,8 +819,8 @@ const Profile = () => {
                       </div>
                     </div>
                     <div className="flex items-center space-x-3">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-border bg-gradient-to-r from-[#F5F3FF] to-[#E9D5FF] dark:border-white/10 dark:from-purple-600/20 dark:to-pink-600/20">
-                        <User className="w-5 h-5 text-[#8B5CF6]" />
+                      <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-border bg-gradient-to-r from-[#F5F3FF] to-[#E9D5FF] dark:border-white/10 dark:from-brand/20 dark:to-pink-600/20">
+                        <User className="w-5 h-5 text-[#8F39BB]" />
                       </div>
                       <div>
                         <p className="text-sm text-muted-foreground dark:text-gray-400">
@@ -781,8 +834,8 @@ const Profile = () => {
                   </div>
                   <div className="space-y-4">
                     <div className="flex items-center space-x-3">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-border bg-gradient-to-r from-[#EEF2FF] to-[#E0F2FE] dark:border-white/10 dark:from-purple-600/20 dark:to-pink-600/20">
-                        <Building className="w-5 h-5 text-[#6366F1]" />
+                      <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-border bg-gradient-to-r from-[#EEF2FF] to-[#E0F2FE] dark:border-white/10 dark:from-brand/20 dark:to-pink-600/20">
+                        <Building className="w-5 h-5 text-[#8F39BB]" />
                       </div>
                       <div>
                         <p className="text-sm text-muted-foreground dark:text-gray-400">

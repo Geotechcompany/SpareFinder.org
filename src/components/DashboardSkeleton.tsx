@@ -137,7 +137,7 @@ const DashboardSkeleton: React.FC<DashboardSkeletonProps> = ({
 
   const ActivitySkeleton = () => (
     <Card className="relative overflow-hidden group">
-      <div className="absolute inset-0 bg-gradient-to-r from-transparent via-purple-500/5 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1600 ease-out" />
+      <div className="absolute inset-0 bg-gradient-to-r from-transparent via-brand/5 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1600 ease-out" />
       <CardHeader>
         <Skeleton className="h-5 w-32 bg-gradient-to-r from-gray-200 via-gray-300 to-gray-200 dark:from-gray-700 dark:via-gray-600 dark:to-gray-700 skeleton-shimmer" />
       </CardHeader>
@@ -152,7 +152,7 @@ const DashboardSkeleton: React.FC<DashboardSkeletonProps> = ({
                 <div className="pointer-events-none absolute left-4 top-7 bottom-0 w-px bg-gray-200/70 dark:bg-gray-700/70" />
               )}
               <div className="absolute left-0 top-3 flex h-3 w-3 -translate-x-1/2 items-center justify-center rounded-full bg-white dark:bg-gray-900 ring-4 ring-gray-100 dark:ring-gray-800">
-                <span className="block h-2 w-2 rounded-full bg-indigo-400" />
+                <span className="block h-2 w-2 rounded-full bg-brand-light" />
               </div>
               <Skeleton className="h-8 w-8 rounded-full flex-shrink-0 bg-gradient-to-r from-gray-200 via-gray-300 to-gray-200 dark:from-gray-700 dark:via-gray-600 dark:to-gray-700 skeleton-pulse-glow" />
               <div className="flex-1 space-y-2">
@@ -167,30 +167,17 @@ const DashboardSkeleton: React.FC<DashboardSkeletonProps> = ({
     </Card>
   );
 
-  const QuickActionsSkeleton = () => (
-    <Card className="relative overflow-hidden group">
-      <div className="absolute inset-0 bg-gradient-to-r from-transparent via-blue-500/5 to-transparent -translate-y-full group-hover:translate-y-0 transition-transform duration-1600 ease-out" />
-      <CardHeader>
-        <Skeleton className="h-5 w-32 bg-gradient-to-r from-gray-200 via-gray-300 to-gray-200 dark:from-gray-700 dark:via-gray-600 dark:to-gray-700 skeleton-shimmer" />
-        <Skeleton className="h-3 w-40 mt-2 bg-gradient-to-r from-gray-200 via-gray-300 to-gray-200 dark:from-gray-700 dark:via-gray-600 dark:to-gray-700 skeleton-shimmer" />
-      </CardHeader>
-      <CardContent>
-        <div className="space-y-3">
-          {[...Array(4)].map((_, i) => (
-            <div
-              key={i}
-              className="flex items-center justify-between rounded-2xl border border-gray-200/70 dark:border-gray-700/70 bg-gray-50/70 dark:bg-gray-900/40 px-3 py-2.5 shadow-sm"
-            >
-              <div className="flex items-center gap-3">
-                <Skeleton className="h-9 w-9 rounded-full bg-gradient-to-r from-indigo-300 via-blue-300 to-sky-300 dark:from-gray-700 dark:via-gray-600 dark:to-gray-700 skeleton-pulse-glow" />
-                <Skeleton className="h-4 w-28 bg-gradient-to-r from-gray-200 via-gray-300 to-gray-200 dark:from-gray-700 dark:via-gray-600 dark:to-gray-700 skeleton-shimmer" />
-              </div>
-              <Skeleton className="h-3 w-10 bg-gradient-to-r from-gray-200 via-gray-300 to-gray-200 dark:from-gray-700 dark:via-gray-600 dark:to-gray-700 skeleton-shimmer" />
-            </div>
-          ))}
-        </div>
-      </CardContent>
-    </Card>
+  const FloatingDockSkeleton = () => (
+    <motion.div className="pointer-events-none fixed bottom-6 z-[70] hidden justify-center px-4 left-[var(--dashboard-sidebar-offset,var(--expanded-sidebar-width,300px))] right-0 md:flex">
+      <div className="flex h-16 items-end gap-3 rounded-2xl border border-gray-200/70 bg-white/90 px-5 pb-3 shadow-lg dark:border-gray-700/70 dark:bg-gray-900/90">
+        {[...Array(4)].map((_, i) => (
+          <Skeleton
+            key={i}
+            className="h-10 w-10 rounded-full bg-gradient-to-r from-brand-light via-blue-300 to-sky-300 dark:from-gray-700 dark:via-gray-600 dark:to-gray-700 skeleton-pulse-glow"
+          />
+        ))}
+      </div>
+    </motion.div>
   );
 
   const SidebarSkeleton = () => (
@@ -340,8 +327,8 @@ const DashboardSkeleton: React.FC<DashboardSkeletonProps> = ({
   );
 
   const renderUserMain = () => (
-    <main className="py-6">
-      <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8 space-y-6 lg:space-y-8">
+    <main className="relative py-6 pb-28 lg:pb-32">
+      <motion.div className="relative mx-auto max-w-6xl space-y-6 px-4 sm:px-6 lg:space-y-8 lg:px-8">
         {/* Welcome header card */}
         {showHeader && (
           <motion.div variants={itemVariants}>
@@ -367,18 +354,15 @@ const DashboardSkeleton: React.FC<DashboardSkeletonProps> = ({
           </motion.div>
         )}
 
-        {/* Recent activity + quick actions */}
+        {/* Recent activity */}
         {showActivity && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 lg:gap-8">
-            <motion.div variants={itemVariants}>
-              <ActivitySkeleton />
-            </motion.div>
-            <motion.div variants={itemVariants}>
-              <QuickActionsSkeleton />
-            </motion.div>
-          </div>
+          <motion.div variants={itemVariants}>
+            <ActivitySkeleton />
+          </motion.div>
         )}
-      </div>
+
+        {showActivity && <FloatingDockSkeleton />}
+      </motion.div>
     </main>
   );
 

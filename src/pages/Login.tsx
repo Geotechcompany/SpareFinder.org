@@ -1,9 +1,10 @@
-import React, { useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
-import { useClerk, useSignIn } from "@clerk/clerk-react";
+import { useAuth as useClerkAuth, useClerk, useSignIn } from "@clerk/clerk-react";
 import { Sparkles, ArrowRight, Eye, EyeOff } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { AuthShell } from "@/components/auth/auth-shell";
+import { SpinningLogoLoader } from "@/components/brand/spinning-logo-loader";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,12 +24,33 @@ type ClerkRedirectStrategy = Parameters<
 >[0]["strategy"];
 type OAuthStrategy = Extract<ClerkRedirectStrategy, `oauth_${string}`>;
 
+const isSessionExistsError = (err: unknown) => {
+  const clerkCode = (err as any)?.errors?.[0]?.code as string | undefined;
+  const clerkMsg = (err as any)?.errors?.[0]?.message as string | undefined;
+  if (clerkCode === "session_exists") return true;
+  if (clerkMsg?.toLowerCase().includes("session already exists")) return true;
+  const serialized = String(err ?? "").toLowerCase();
+  return (
+    serialized.includes("session_exists") ||
+    serialized.includes("session already exists")
+  );
+};
+
+const getSessionIdFromClerkError = (err: unknown): string | undefined => {
+  const meta = (err as any)?.errors?.[0]?.meta as { session_id?: string } | undefined;
+  return meta?.session_id;
+};
+
 const Login = () => {
-  const { isLoading, isAuthenticated, user } = useAuth();
+  const { isLoading, user, checkAuth } = useAuth();
+  const { isSignedIn: isClerkSignedIn, userId: clerkUserId, sessionId: clerkSessionId } =
+    useClerkAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const { isLoaded, signIn, setActive } = useSignIn();
   const clerk = useClerk();
+  const autoRedirectStarted = useRef(false);
+  const redirectingRef = useRef(false);
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -42,6 +64,11 @@ const Login = () => {
   const [secondFactorSafeIdentifier, setSecondFactorSafeIdentifier] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [infoMessage, setInfoMessage] = useState<string | null>(null);
+  const [isRedirecting, setIsRedirecting] = useState(false);
+
+  const hasClerkSession = Boolean(
+    isClerkSignedIn || clerkUserId || clerkSessionId || clerk.session?.id || clerk.user?.id
+  );
 
   const redirectTo = useMemo(
     () => (location.state as any)?.from?.pathname || "/dashboard",
@@ -64,11 +91,50 @@ const Login = () => {
     return Array.from(new Set(fromSignIn)) as OAuthStrategy[];
   }, [isLoaded, signIn]);
 
-  // Match ProtectedRoute: dashboard requires backend `user`, not only Clerk session.
-  // Redirecting on `isSignedIn` alone caused /dashboard → /login loops after reset when profile was slow/failed.
-  if (!isLoading && isAuthenticated && user) {
-    return <Navigate to="/dashboard" replace />;
-  }
+  const redirectWithExistingSession = useCallback(
+    async (preferredSessionId?: string) => {
+      redirectingRef.current = true;
+      setIsRedirecting(true);
+      setErrorMessage(null);
+
+      const sessionId =
+        preferredSessionId ??
+        clerkSessionId ??
+        clerk.session?.id ??
+        undefined;
+
+      if (sessionId) {
+        try {
+          await setActive({ session: sessionId });
+        } catch {
+          // Session may already be active; continue to profile sync + redirect.
+        }
+      }
+
+      try {
+        await checkAuth();
+      } catch {
+        // Profile sync can fail transiently; still send user to the app shell.
+      }
+
+      navigate(redirectTo, { replace: true });
+    },
+    [checkAuth, clerk.session?.id, clerkSessionId, navigate, redirectTo, setActive]
+  );
+
+  // Auto-redirect when Clerk already has an active session (no manual banner).
+  useEffect(() => {
+    if (!isLoaded || isLoading || user || !hasClerkSession) return;
+    if (autoRedirectStarted.current) return;
+    autoRedirectStarted.current = true;
+    void redirectWithExistingSession();
+  }, [isLoaded, isLoading, user, hasClerkSession, redirectWithExistingSession]);
+
+  useEffect(() => {
+    if (!hasClerkSession) {
+      autoRedirectStarted.current = false;
+    }
+  }, [hasClerkSession]);
 
   const formatStrategyLabel = (strategy: OAuthStrategy) => {
     const raw = strategy.replace(/^oauth_/, "");
@@ -85,6 +151,7 @@ const Login = () => {
       return;
     }
     await setActive({ session: createdSessionId });
+    await checkAuth();
     navigate(redirectTo, { replace: true });
   };
 
@@ -128,9 +195,31 @@ const Login = () => {
     setInfoMessage(null);
 
     try {
+      if (hasClerkSession) {
+        await redirectWithExistingSession();
+        return;
+      }
+
       // Use the canonical multi-step flow so we can handle MFA / email-code states properly.
-      await signIn.create({ identifier: normalizedEmail });
-      const result = await signIn.attemptFirstFactor({ strategy: "password", password });
+      try {
+        await signIn.create({ identifier: normalizedEmail });
+      } catch (createErr: unknown) {
+        if (isSessionExistsError(createErr)) {
+          await redirectWithExistingSession(getSessionIdFromClerkError(createErr));
+          return;
+        }
+        throw createErr;
+      }
+      let result;
+      try {
+        result = await signIn.attemptFirstFactor({ strategy: "password", password });
+      } catch (factorErr: unknown) {
+        if (isSessionExistsError(factorErr)) {
+          await redirectWithExistingSession(getSessionIdFromClerkError(factorErr));
+          return;
+        }
+        throw factorErr;
+      }
 
       if (result.status === "complete") {
         await completeSignIn({ createdSessionId: result.createdSessionId });
@@ -236,6 +325,15 @@ const Login = () => {
     } catch (err: any) {
       const { clerkCode, clerkMsg } = getClerkError(err);
 
+      if (isSessionExistsError(err)) {
+        try {
+          await redirectWithExistingSession(getSessionIdFromClerkError(err));
+        } catch {
+          window.location.replace(redirectTo);
+        }
+        return;
+      }
+
       // If Clerk can't find the account, check if the email exists in our legacy DB
       // and redirect the user into migration automatically.
       if (clerkCode === "form_identifier_not_found" || clerkMsg?.includes("Couldn't find your account")) {
@@ -262,7 +360,9 @@ const Login = () => {
             : "Unable to sign in. Please try again.")
       );
     } finally {
-      setIsSubmitting(false);
+      if (!redirectingRef.current) {
+        setIsSubmitting(false);
+      }
     }
   };
 
@@ -346,47 +446,62 @@ const Login = () => {
     setErrorMessage(null);
   };
 
-  return (
-    <AuthShell
-      backHref="/"
-      backLabel="Back home"
-      logoSrc="/sparefinderlogo.png"
-      badge={
-        <>
-                <Sparkles className="mr-1.5 h-3.5 w-3.5 text-primary" />
-          Purpose-built for Engineering spares parts teams
-        </>
-      }
-      title={
-        <>
-                Sign in to{" "}
-                <span className="bg-gradient-to-r from-primary via-blue-400 to-cyan-300 bg-clip-text text-transparent">
-                  SpareFinder
-                </span>
-        </>
-      }
-      description="Log in to your AI-powered spare parts workspace. Upload photos, identify components, and keep your catalog always in sync."
-      rightImage={{
-        src: "/registerphoto.png",
-        alt: "AI-powered spare parts identification visual",
-      }}
-      rightContent={
-          <div className="space-y-4">
-            <div className="inline-flex items-center rounded-full bg-black/40 px-3 py-1 text-xs font-medium text-slate-200 ring-1 ring-white/15 backdrop-blur">
-              <span className="mr-1 inline-block h-1.5 w-1.5 rounded-full bg-emerald-400" />
-              Live identification pipeline
-            </div>
-            <h2 className="max-w-md text-balance text-2xl font-semibold tracking-tight text-slate-50">
-              See every part, every match,{" "}
-              <span className="text-emerald-300">in one clean view.</span>
-            </h2>
-            <p className="max-w-md text-sm text-slate-300">
-            SpareFinder ingests workshop photos, matches OEM references, and keeps your team aligned on the
-            exact part every single time.
-          </p>
+  const authShellProps = {
+    backHref: "/" as const,
+    backLabel: "Back home",
+    logoSrc: "/sparefinderlogo.png",
+    badge: (
+      <>
+        <Sparkles className="mr-1.5 h-3.5 w-3.5 text-primary" />
+        Purpose-built for Engineering spares parts teams
+      </>
+    ),
+    title: (
+      <>
+        Sign in to{" "}
+        <span className="bg-gradient-to-r from-primary via-blue-400 to-cyan-300 bg-clip-text text-transparent">
+          SpareFinder
+        </span>
+      </>
+    ),
+    description:
+      "Log in to your AI-powered spare parts workspace. Upload photos, identify components, and keep your catalog always in sync.",
+    rightImage: {
+      src: "/registerphoto.png",
+      alt: "AI-powered spare parts identification visual",
+    },
+    rightContent: (
+      <div className="space-y-4">
+        <div className="inline-flex items-center rounded-full bg-black/40 px-3 py-1 text-xs font-medium text-slate-200 ring-1 ring-white/15 backdrop-blur">
+          <span className="mr-1 inline-block h-1.5 w-1.5 rounded-full bg-emerald-400" />
+          Live identification pipeline
         </div>
-      }
-    >
+        <h2 className="max-w-md text-balance text-2xl font-semibold tracking-tight text-slate-50">
+          See every part, every match,{" "}
+          <span className="text-emerald-300">in one clean view.</span>
+        </h2>
+        <p className="max-w-md text-sm text-slate-300">
+          SpareFinder ingests workshop photos, matches OEM references, and keeps your team aligned on the
+          exact part every single time.
+        </p>
+      </div>
+    ),
+  };
+
+  if (!isLoading && user) {
+    return <Navigate to={redirectTo} replace />;
+  }
+
+  if (isRedirecting || (isLoaded && hasClerkSession && !user)) {
+    return (
+      <AuthShell {...authShellProps}>
+        <SpinningLogoLoader label="Taking you to your dashboard…" />
+      </AuthShell>
+    );
+  }
+
+  return (
+    <AuthShell {...authShellProps}>
       <div className="space-y-4">
         {oauthStrategies.length ? (
         <div className="grid gap-2">

@@ -636,11 +636,11 @@ const Billing = () => {
   const trialActive = isStarter && trialDaysLeft > 0;
 
   return (
-    <div className="min-h-screen flex w-full bg-gradient-to-br from-background via-[#F0F2F5] to-[#E8EBF1] dark:from-gray-900 dark:via-purple-900/20 dark:to-blue-900/20 relative overflow-hidden">
+    <div className="min-h-screen flex w-full bg-gradient-to-br from-background via-[#F0F2F5] to-[#E8EBF1] dark:from-gray-900 dark:via-brand-dark/20 dark:to-blue-900/20 relative overflow-hidden">
       {/* Animated Background Elements */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <motion.div
-          className="absolute top-1/3 -right-40 w-80 h-80 bg-purple-600/15 rounded-full blur-3xl opacity-60"
+          className="absolute top-1/3 -right-40 w-80 h-80 bg-brand/15 rounded-full blur-3xl opacity-60"
           animate={{
             scale: [1, 1.3, 1],
             rotate: [0, 180, 360],
@@ -781,7 +781,7 @@ const Billing = () => {
 
             {/* Header */}
             <div className="relative">
-              <div className="absolute inset-0 rounded-3xl bg-gradient-to-r from-[#3A5AFE0A] via-[#8B5CF60A] to-transparent blur-xl opacity-80 dark:from-purple-600/10 dark:to-blue-600/10" />
+              <div className="absolute inset-0 rounded-3xl bg-gradient-to-r from-[#3A5AFE0A] via-[#8F39BB0A] to-transparent blur-xl opacity-80 dark:from-brand/10 dark:to-blue-600/10" />
               <div className="relative rounded-3xl border border-border bg-card shadow-soft-elevated backdrop-blur-xl p-6 dark:bg-black/20 dark:border-white/10">
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                   <div>
@@ -789,7 +789,7 @@ const Billing = () => {
                       initial={{ opacity: 0, scale: 0.8 }}
                       animate={{ opacity: 1, scale: 1 }}
                       transition={{ delay: 0.2 }}
-                      className="inline-flex items-center px-4 py-2 bg-gradient-to-r from-purple-600/20 to-blue-600/20 rounded-full border border-purple-500/30 backdrop-blur-xl mb-4"
+                      className="inline-flex items-center px-4 py-2 bg-gradient-to-r from-brand/20 to-blue-600/20 rounded-full border border-brand/30 backdrop-blur-xl mb-4"
                     >
                       <motion.div
                         animate={{ rotate: [0, 360] }}
@@ -800,14 +800,14 @@ const Billing = () => {
                         }}
                         className="mr-2"
                       >
-                        <Sparkles className="w-4 h-4 text-purple-400" />
+                        <Sparkles className="w-4 h-4 text-brand-light" />
                       </motion.div>
-                      <span className="text-purple-300 text-sm font-semibold">
+                      <span className="text-brand-light text-sm font-semibold">
                         Billing & Subscription
                       </span>
                     </motion.div>
                     <motion.h1
-                      className="mb-3 text-3xl font-bold text-foreground dark:bg-gradient-to-r dark:from-white dark:via-purple-200 dark:to-blue-200 dark:bg-clip-text dark:text-transparent lg:text-4xl"
+                      className="mb-3 text-3xl font-bold text-foreground dark:bg-gradient-to-r dark:from-white dark:via-brand-light dark:to-blue-200 dark:bg-clip-text dark:text-transparent lg:text-4xl"
                       initial={{ opacity: 0, x: -20 }}
                       animate={{ opacity: 1, x: 0 }}
                       transition={{ delay: 0.3 }}
@@ -832,7 +832,7 @@ const Billing = () => {
                       whileHover={{ scale: 1.05 }}
                       whileTap={{ scale: 0.95 }}
                     >
-                      <Button className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 shadow-lg shadow-purple-500/25 h-12 px-6">
+                      <Button className="bg-gradient-to-r from-brand to-brand-dark hover:from-brand-dark hover:to-brand-dark shadow-lg shadow-brand/25 h-12 px-6">
                         <Download className="w-4 h-4 mr-2" />
                         Download Invoice
                       </Button>
@@ -852,7 +852,7 @@ const Billing = () => {
               >
                 {/* Current Subscription */}
                 <div className="relative">
-                  <div className="absolute inset-0 rounded-3xl bg-gradient-to-r from-[#3A5AFE0A] via-[#8B5CF60A] to-transparent blur-xl opacity-80 dark:from-purple-600/10 dark:to-blue-600/10" />
+                  <div className="absolute inset-0 rounded-3xl bg-gradient-to-r from-[#3A5AFE0A] via-[#8F39BB0A] to-transparent blur-xl opacity-80 dark:from-brand/10 dark:to-blue-600/10" />
                   <Card className="relative rounded-3xl border border-border bg-card text-foreground shadow-soft-elevated backdrop-blur-xl dark:bg-black/20 dark:border-white/10">
                     <CardHeader>
                       <CardTitle className="flex items-center space-x-2 text-foreground dark:text-white">
@@ -983,7 +983,7 @@ const Billing = () => {
                           </div>
                         </div>
                         <div className="text-center">
-                          <div className="text-2xl font-bold text-purple-500 dark:text-purple-400">
+                          <div className="text-2xl font-bold text-brand dark:text-brand-light">
                             {usageStats.uploadsLimit === "Unlimited"
                               ? "∞"
                               : usageStats.uploadsLimit.replace("/month", "")}
@@ -1000,7 +1000,7 @@ const Billing = () => {
                 {/* Pricing Plans */}
                 <div id="plans-section" />
                 <div className="relative">
-                  <div className="absolute inset-0 rounded-3xl bg-gradient-to-r from-[#6366F11A] via-[#8B5CF61A] to-transparent blur-xl opacity-80 dark:from-indigo-600/10 dark:to-purple-600/10" />
+                  <div className="absolute inset-0 rounded-3xl bg-gradient-to-r from-[#8F39BB1A] via-[#8F39BB1A] to-transparent blur-xl opacity-80 dark:from-brand-dark/10 dark:to-brand/10" />
                   <Card className="relative rounded-3xl border border-border bg-card text-foreground shadow-soft-elevated backdrop-blur-xl dark:bg-black/20 dark:border-white/10">
                     <CardHeader>
                       <CardTitle className="text-foreground dark:text-white">
@@ -1021,7 +1021,7 @@ const Billing = () => {
                             whileHover={{ scale: 1.02, y: -2 }}
                             className={`relative p-6 rounded-2xl border transition-all duration-300 ${
                               plan.popular
-                                ? "bg-gradient-to-r from-purple-600/10 to-blue-600/10 border-purple-500/30"
+                                ? "bg-gradient-to-r from-brand/10 to-blue-600/10 border-brand/30"
                                 : currentPlan === plan.id
                                 ? "bg-gradient-to-r from-green-600/10 to-emerald-600/10 border-green-500/30"
                                 : "bg-white/5 border-white/10 hover:border-white/20 hover:bg-white/10"
@@ -1035,7 +1035,7 @@ const Billing = () => {
                                     Current Plan
                                   </Badge>
                                 ) : (
-                                  <Badge className="bg-gradient-to-r from-purple-600 to-blue-600 text-white border-purple-500/30">
+                                  <Badge className="bg-gradient-to-r from-brand to-brand-dark text-white border-brand/30">
                                     <Star className="w-3 h-3 mr-1" />
                                     Most Popular
                                   </Badge>
@@ -1136,13 +1136,13 @@ const Billing = () => {
                                       {isLocked && isCurrentPlan && (
                                         <TooltipContent 
                                           side="top" 
-                                          className="bg-gradient-to-r from-purple-600 to-blue-600 text-white border-0 shadow-lg max-w-xs"
+                                          className="bg-gradient-to-r from-brand to-brand-dark text-white border-0 shadow-lg max-w-xs"
                                         >
                                           <div className="flex items-center space-x-2">
                                             <ArrowUpRight className="w-4 h-4" />
                                             <div>
                                               <p className="font-semibold">Upgrade Required</p>
-                                              <p className="text-xs text-purple-100">
+                                              <p className="text-xs text-brand-light">
                                                 This feature is available in the {requiredPlanName} plan
                                               </p>
                                             </div>
@@ -1168,7 +1168,7 @@ const Billing = () => {
                                   currentPlan === plan.id
                                     ? "cursor-not-allowed bg-muted text-muted-foreground dark:bg-gray-600/50 dark:text-gray-400"
                                     : plan.popular
-                                    ? "bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 shadow-lg shadow-purple-500/25"
+                                    ? "bg-gradient-to-r from-brand to-brand-dark hover:from-brand-dark hover:to-brand-dark shadow-lg shadow-brand/25"
                                     : "border border-border bg-card text-foreground hover:bg-muted dark:bg-white/10 dark:text-white dark:border-white/20 dark:hover:bg-white/20 dark:hover:border-white/30"
                                 }`}
                                 disabled={currentPlan === plan.id}

@@ -17,10 +17,10 @@ const PrivacyPolicy = () => {
 
       {/* Hero */}
       <section className="relative py-20 px-4 sm:px-6 lg:px-8 overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-br from-blue-500/10 via-background to-purple-500/10 dark:from-blue-900/20 dark:via-background dark:to-purple-900/20" />
+        <div className="absolute inset-0 bg-gradient-to-br from-blue-500/10 via-background to-brand/10 dark:from-blue-900/20 dark:via-background dark:to-brand-dark/20" />
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_50%_at_50%_-20%,hsl(var(--primary)/0.12),transparent)]" />
         <div className="absolute top-1/4 left-1/4 h-72 w-72 rounded-full bg-blue-500/10 blur-3xl" />
-        <div className="absolute bottom-1/4 right-1/4 h-72 w-72 rounded-full bg-purple-500/10 blur-3xl" />
+        <div className="absolute bottom-1/4 right-1/4 h-72 w-72 rounded-full bg-brand/10 blur-3xl" />
         <div className="relative z-10 max-w-4xl mx-auto text-center">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -443,7 +443,7 @@ const PrivacyPolicy = () => {
           <div className="mt-8 flex flex-col gap-4 sm:flex-row sm:justify-center">
             <a
               href="mailto:email@sparefinder.org"
-              className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-purple-600 px-6 py-3 font-semibold text-white shadow-lg shadow-purple-500/25 transition hover:from-blue-700 hover:to-purple-700 hover:shadow-purple-500/30"
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-brand-dark to-brand px-6 py-3 font-semibold text-white shadow-lg shadow-brand/25 transition hover:from-blue-700 hover:to-brand-dark hover:shadow-brand/30"
             >
               <Mail className="h-5 w-5" />
               email@sparefinder.org

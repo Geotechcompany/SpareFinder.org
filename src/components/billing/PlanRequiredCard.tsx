@@ -18,15 +18,15 @@ export const PlanRequiredCard: React.FC<{
   return (
     <div className="min-h-[70dvh] flex items-center justify-center px-4 py-10">
       <div className="relative w-full max-w-2xl">
-        <div className="pointer-events-none absolute -top-24 -right-24 h-56 w-56 rounded-full bg-gradient-to-r from-purple-500/20 to-blue-500/15 blur-3xl" />
+        <div className="pointer-events-none absolute -top-24 -right-24 h-56 w-56 rounded-full bg-gradient-to-r from-brand/20 to-blue-500/15 blur-3xl" />
         <div className="pointer-events-none absolute -bottom-24 -left-24 h-56 w-56 rounded-full bg-gradient-to-r from-emerald-500/15 to-teal-500/10 blur-3xl" />
 
         <Card className="relative overflow-hidden border-border bg-card/90 backdrop-blur-xl shadow-soft-elevated">
-          <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-purple-500/5 via-transparent to-blue-500/5 dark:from-purple-500/10 dark:to-blue-500/10" />
+          <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-brand/5 via-transparent to-blue-500/5 dark:from-brand/10 dark:to-blue-500/10" />
           <CardHeader className="space-y-3">
             <div className="flex items-start justify-between gap-4">
               <div className="flex items-center gap-3">
-                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-r from-purple-600 to-blue-600 text-white shadow-lg shadow-purple-500/20">
+                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-r from-brand to-brand-dark text-white shadow-lg shadow-brand/20">
                   <Sparkles className="h-5 w-5" />
                 </div>
                 <div>
@@ -52,7 +52,7 @@ export const PlanRequiredCard: React.FC<{
                       : "/onboarding/trial"
                   );
                 }}
-                className="w-full sm:w-auto bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 shadow-lg shadow-purple-500/20"
+                className="w-full sm:w-auto bg-gradient-to-r from-brand to-brand-dark hover:from-brand-dark hover:to-brand-dark shadow-lg shadow-brand/20"
               >
                 Select a plan
                 <ArrowRight className="ml-2 h-4 w-4" />
