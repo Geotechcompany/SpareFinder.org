@@ -282,4 +282,31 @@ WHERE NOT EXISTS (
     SELECT 1 FROM subscriptions WHERE subscriptions.user_id = auth.users.id
 );
 
-SELECT 'Database tables created and configured successfully!' as status; 
+-- =============================================
+-- Referrals / invite rewards (fixes /api/referrals/me)
+-- =============================================
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS referral_code TEXT;
+
+CREATE UNIQUE INDEX IF NOT EXISTS profiles_referral_code_key
+  ON profiles (referral_code)
+  WHERE referral_code IS NOT NULL;
+
+CREATE TABLE IF NOT EXISTS referrals (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    referrer_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+    referred_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+    credits_awarded INTEGER NOT NULL DEFAULT 0,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE(referred_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_referrals_referrer_id ON referrals(referrer_id);
+CREATE INDEX IF NOT EXISTS idx_referrals_referred_id ON referrals(referred_id);
+
+ALTER TABLE referrals ENABLE ROW LEVEL SECURITY;
+
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS credits INTEGER DEFAULT 0;
+
+NOTIFY pgrst, 'reload schema';
+
+SELECT 'Database tables created and configured successfully!' as status;

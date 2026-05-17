@@ -22,6 +22,28 @@ REFERRAL_CREDITS = 2
 REFERRAL_CODE_LENGTH = 8
 ALPHABET = string.ascii_uppercase + string.digits
 
+_REFERRAL_SCHEMA_MISSING = (
+    "Referral tables are not set up. Run docs/sql/create_referrals_invite_rewards.sql "
+    "in the Supabase SQL Editor, then retry."
+)
+
+
+def _is_missing_referral_column_error(exc: BaseException) -> bool:
+    parts = [str(exc)]
+    for attr in ("message", "code", "details"):
+        val = getattr(exc, attr, None)
+        if val is not None:
+            parts.append(str(val))
+    if isinstance(exc, dict):
+        parts.extend(str(exc.get(k, "")) for k in ("message", "code", "details"))
+    combined = " ".join(parts).lower()
+    return "referral_code" in combined and (
+        "42703" in combined
+        or "pgrst204" in combined
+        or "does not exist" in combined
+        or "schema cache" in combined
+    )
+
 
 def _generate_referral_code() -> str:
     return "".join(secrets.choice(ALPHABET) for _ in range(REFERRAL_CODE_LENGTH))
@@ -42,6 +64,8 @@ def _ensure_referral_code(supabase, user_id: str) -> str:
             if code:
                 return code
     except Exception as e:
+        if _is_missing_referral_column_error(e):
+            raise RuntimeError(_REFERRAL_SCHEMA_MISSING) from e
         logger.warning("ensure_referral_code select: %s", e)
     for _ in range(10):
         code = _generate_referral_code()
@@ -49,6 +73,8 @@ def _ensure_referral_code(supabase, user_id: str) -> str:
             supabase.table("profiles").update({"referral_code": code}).eq("id", user_id).execute()
             return code
         except Exception as e:
+            if _is_missing_referral_column_error(e):
+                raise RuntimeError(_REFERRAL_SCHEMA_MISSING) from e
             if "unique" in str(e).lower() or "duplicate" in str(e).lower():
                 continue
             logger.warning("ensure_referral_code update: %s", e)
@@ -113,6 +139,11 @@ async def get_my_referral(
                 "credits_earned": credits_earned,
             }
         )
+    except RuntimeError as e:
+        if str(e) == _REFERRAL_SCHEMA_MISSING:
+            logger.error("%s", e)
+            return api_error(str(e), status_code=503)
+        raise
     except Exception as e:
         logger.exception("get_my_referral: %s", e)
         return api_error("Failed to load referral info", status_code=500)
