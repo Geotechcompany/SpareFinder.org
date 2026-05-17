@@ -104,6 +104,9 @@ interface CheckoutResponse {
   data?: {
     checkout_url: string;
     session_id: string;
+    trial_applied?: boolean;
+    trial_denied?: boolean;
+    trial_used?: boolean;
   };
   error?: string;
 }
@@ -441,6 +444,15 @@ const Billing = () => {
         })) as CheckoutResponse;
 
         if (checkoutResponse.success && checkoutResponse.data?.checkout_url) {
+          if ((checkoutResponse.data as { trial_denied?: boolean }).trial_denied) {
+            toast({
+              title: "Free trial already used",
+              description:
+                "Your account has already used the free trial. Subscribe now to continue.",
+            });
+            setTrialUsed(true);
+            return;
+          }
           window.location.href = checkoutResponse.data.checkout_url;
         } else {
           throw new Error("Failed to start Starter trial");

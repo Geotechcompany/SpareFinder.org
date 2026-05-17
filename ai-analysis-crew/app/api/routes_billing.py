@@ -66,6 +66,91 @@ PLAN_PRICING = {
 }
 
 
+def _mark_trial_used(supabase, user_id: str) -> None:
+    """Persist one-trial-per-user flag (best-effort if column missing)."""
+    try:
+        supabase.table("profiles").update({"trial_used": True}).eq("id", user_id).execute()
+    except Exception as e:
+        print(f"⚠️ Could not set trial_used for user {user_id}: {e}")
+
+
+def _stripe_customer_had_trial(stripe_customer_id: str | None) -> bool:
+    """True if any Stripe subscription for this customer included a trial period."""
+    if not stripe_customer_id:
+        return False
+    stripe_secret = os.getenv("STRIPE_SECRET_KEY") or os.getenv("STRIPE_API_KEY")
+    if not stripe_secret:
+        return False
+    try:
+        stripe.api_key = stripe_secret
+        listed = stripe.Subscription.list(customer=stripe_customer_id, status="all", limit=50)
+        for sub in listed.data or []:
+            if sub.get("trial_start") or sub.get("trial_end"):
+                return True
+    except Exception as e:
+        print(f"⚠️ Stripe trial history check failed for {stripe_customer_id}: {e}")
+    return False
+
+
+def _user_has_used_trial(supabase, user_id: str) -> bool:
+    """
+    One free trial per account: profiles.trial_used, local trialing history,
+    or any past Stripe subscription with a trial period.
+    """
+    stripe_customer_id: str | None = None
+
+    try:
+        profile_row = (
+            supabase.table("profiles")
+            .select("trial_used")
+            .eq("id", user_id)
+            .limit(1)
+            .execute()
+        )
+        if profile_row.data and len(profile_row.data) > 0:
+            if profile_row.data[0].get("trial_used"):
+                return True
+    except Exception as e:
+        err = str(e).lower()
+        if "trial_used" not in err and "42703" not in err:
+            print(f"⚠️ profiles.trial_used check failed: {e}")
+
+    try:
+        sub_rows = (
+            supabase.table("subscriptions")
+            .select("status, stripe_subscription_id, stripe_customer_id")
+            .eq("user_id", user_id)
+            .execute()
+        )
+        for row in sub_rows.data or []:
+            if (row.get("status") or "").lower() == "trialing":
+                _mark_trial_used(supabase, user_id)
+                return True
+            cid = (row.get("stripe_customer_id") or "").strip()
+            if cid:
+                stripe_customer_id = stripe_customer_id or cid
+            sid = (row.get("stripe_subscription_id") or "").strip()
+            if sid:
+                stripe_secret = os.getenv("STRIPE_SECRET_KEY") or os.getenv("STRIPE_API_KEY")
+                if stripe_secret:
+                    try:
+                        stripe.api_key = stripe_secret
+                        sub = stripe.Subscription.retrieve(sid)
+                        if sub.get("trial_start") or sub.get("trial_end"):
+                            _mark_trial_used(supabase, user_id)
+                            return True
+                    except stripe.error.StripeError as e:
+                        print(f"⚠️ Could not retrieve subscription {sid} for trial check: {e}")
+    except Exception as e:
+        print(f"⚠️ subscriptions trial check failed: {e}")
+
+    if stripe_customer_id and _stripe_customer_had_trial(stripe_customer_id):
+        _mark_trial_used(supabase, user_id)
+        return True
+
+    return False
+
+
 @router.get("", name="get_billing_info")
 @router.get("/", name="get_billing_info_slash")  # Also handle trailing slash
 async def get_billing_info(user: CurrentUser = Depends(get_current_user)):
@@ -123,19 +208,7 @@ async def get_billing_info(user: CurrentUser = Depends(get_current_user)):
             }
 
         # Whether user has already used a free trial (prevents second trial)
-        trial_used = False
-        try:
-            profile_row = (
-                supabase.table("profiles")
-                .select("trial_used")
-                .eq("id", user_id)
-                .limit(1)
-                .execute()
-            )
-            if profile_row.data and len(profile_row.data) > 0 and profile_row.data[0].get("trial_used"):
-                trial_used = True
-        except Exception:
-            pass
+        trial_used = _user_has_used_trial(supabase, user_id)
 
         # Usage data
         user_usage = usage or {
@@ -314,23 +387,16 @@ async def create_checkout_session(
             )
 
         stripe.api_key = stripe_secret_key
+        supabase = get_supabase_admin()
 
         # Enforce one trial per user: if they already used a trial, do not grant another
-        trial_days = payload.trial_days or 0
+        trial_requested = int(payload.trial_days or 0)
+        trial_days = trial_requested
+        trial_used = False
         if trial_days > 0:
-            try:
-                profile_row = (
-                    get_supabase_admin()
-                    .table("profiles")
-                    .select("trial_used")
-                    .eq("id", user.id)
-                    .limit(1)
-                    .execute()
-                )
-                if profile_row.data and len(profile_row.data) > 0 and profile_row.data[0].get("trial_used"):
-                    trial_days = 0
-            except Exception:
-                pass
+            trial_used = _user_has_used_trial(supabase, user.id)
+            if trial_used:
+                trial_days = 0
 
         # Calculate price in pence/cents (Stripe uses smallest currency unit)
         amount_in_cents = int(payload.amount * 100)
@@ -405,6 +471,7 @@ async def create_checkout_session(
                     "tier": tier,
                     "billing_cycle": payload.billing_cycle,
                     "payment_type": "subscription",
+                    "trial_days": str(trial_days),
                 },
                 subscription_data={
                     "metadata": {
@@ -420,6 +487,9 @@ async def create_checkout_session(
             data={
                 "checkout_url": checkout_session.url,
                 "session_id": checkout_session.id,
+                "trial_applied": trial_days > 0,
+                "trial_denied": trial_requested > 0 and trial_days == 0,
+                "trial_used": trial_used,
             }
         )
 
@@ -630,22 +700,29 @@ async def stripe_webhook(request: Request):
         period_end = datetime(now.year, now.month, now.day) + timedelta(days=30)
         status = "active"
         subscription_id = session.get("subscription")
+        session_meta = session.get("metadata") or {}
+        trial_days_meta = 0
+        try:
+            trial_days_meta = int(session_meta.get("trial_days") or 0)
+        except (TypeError, ValueError):
+            trial_days_meta = 0
         if subscription_id:
             try:
                 sub = stripe.Subscription.retrieve(subscription_id)
-                if sub.get("trial_end"):
+                if sub.get("trial_end") or sub.get("trial_start"):
                     status = "trialing"
                     if sub.get("current_period_start"):
                         period_start = datetime.utcfromtimestamp(sub["current_period_start"])
                     if sub.get("current_period_end"):
                         period_end = datetime.utcfromtimestamp(sub["current_period_end"])
-                    # Mark trial as used so user cannot start another trial
-                    try:
-                        supabase.table("profiles").update({"trial_used": True}).eq("id", user_id).execute()
-                    except Exception as e:
-                        print(f"⚠️ Could not set trial_used for user {user_id}: {e}")
+                if sub.get("trial_start") or sub.get("trial_end") or trial_days_meta > 0:
+                    _mark_trial_used(supabase, user_id)
             except stripe.error.StripeError as e:
                 print(f"⚠️ Could not retrieve subscription for trial check: {e}")
+                if trial_days_meta > 0:
+                    _mark_trial_used(supabase, user_id)
+        elif trial_days_meta > 0:
+            _mark_trial_used(supabase, user_id)
         payload = {
             "user_id": user_id,
             "tier": tier,
@@ -795,6 +872,29 @@ async def stripe_webhook(request: Request):
                 send_payment_failed_email(to_email=customer_email, amount_due=amount_due_str)
             except Exception as mail_err:
                 print(f"⚠️ Payment failed email error: {mail_err}")
+        return api_ok(data={"received": True})
+
+    if event.type in ("customer.subscription.created", "customer.subscription.updated"):
+        subscription = event["data"]["object"]
+        if subscription.get("trial_start") or subscription.get("trial_end"):
+            user_id = (subscription.get("metadata") or {}).get("user_id")
+            if not user_id:
+                customer_id = subscription.get("customer")
+                if customer_id:
+                    try:
+                        r = (
+                            supabase.table("subscriptions")
+                            .select("user_id")
+                            .eq("stripe_customer_id", customer_id)
+                            .limit(1)
+                            .execute()
+                        )
+                        if r.data and len(r.data) > 0:
+                            user_id = r.data[0].get("user_id")
+                    except Exception:
+                        pass
+            if user_id:
+                _mark_trial_used(supabase, user_id)
         return api_ok(data={"received": True})
 
     if event.type == "customer.subscription.deleted":

@@ -307,6 +307,9 @@ ALTER TABLE referrals ENABLE ROW LEVEL SECURITY;
 
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS credits INTEGER DEFAULT 0;
 
+-- One free trial per user (Stripe checkout enforcement)
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS trial_used BOOLEAN DEFAULT FALSE;
+
 NOTIFY pgrst, 'reload schema';
 
 SELECT 'Database tables created and configured successfully!' as status;

@@ -13,10 +13,12 @@ import { Sparkles, Shield, CheckCircle2, Crown, Zap, ShieldCheck } from "lucide-
 import { api } from "@/lib/api";
 import { PLAN_CONFIG, type PlanTier, isUnlimited } from "@/lib/plans";
 import { useAuth } from "@/contexts/AuthContext";
+import { useToast } from "@/components/ui/use-toast";
 
 const Trial: React.FC = () => {
   const navigate = useNavigate();
   const { user, isLoading } = useAuth();
+  const { toast } = useToast();
   const [loadingTier, setLoadingTier] = useState<PlanTier | null>(null);
   const [loadingMode, setLoadingMode] = useState<"trial" | "paid" | null>(null);
   const [trialUsed, setTrialUsed] = useState(false);
@@ -73,10 +75,20 @@ const Trial: React.FC = () => {
         cancel_url: `${window.location.origin}/onboarding/trial?payment_cancelled=true`,
       })) as {
         success: boolean;
-        data?: { checkout_url?: string };
+        data?: { checkout_url?: string; trial_denied?: boolean };
         error?: string;
       };
       if (resp.success && resp.data?.checkout_url) {
+        if (args.mode === "trial" && resp.data?.trial_denied) {
+          setTrialUsed(true);
+          toast({
+            variant: "destructive",
+            title: "Free trial already used",
+            description:
+              "Your account has already used the free trial. Subscribe without a trial to continue.",
+          });
+          return;
+        }
         window.location.href = resp.data.checkout_url;
       } else {
         navigate("/dashboard");
