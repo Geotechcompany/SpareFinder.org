@@ -1,5 +1,5 @@
 exports.handler = async (event, context) => {
-    const AI_SERVICE_URL = process.env.VITE_AI_SERVICE_URL || 'https://ai-sparefinder-com.onrender.com';
+    const AI_SERVICE_URL = process.env.VITE_AI_SERVICE_URL || 'https://aiagent-sparefinder-org.onrender.com';
 
     try {
         console.log('Pinging AI service for keep-alive...');

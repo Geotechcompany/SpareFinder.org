@@ -2,7 +2,7 @@
 
 These FastAPI routes are **intentionally unauthenticated** (no `CRON_TOKEN`). Protect them at your reverse proxy or hosting layer (IP allowlist, WAF, private network) if the API is on the public internet.
 
-Base URL: your AI API origin (e.g. `https://<your-render-service>.onrender.com`).
+Base URL: your AI API origin (production: `https://aiagent-sparefinder-org.onrender.com`).
 
 ## In-process automation (single API instance)
 
@@ -37,7 +37,20 @@ Run `docs/sql/marketing_sends_tracking.sql` on Supabase so `marketing_sends` sto
 | `/api/track/mopen/{token}` | GET, HEAD | Returns a 1×1 GIF and records an open for the send row with that `tracking_token`. |
 | `/api/track/mclk/{token}?u={url}` | GET | Records a click, then **302** to `u` (`http`/`https` only). |
 
-Use **`MARKETING_LINK_BASE_URL`** or **`API_PUBLIC_URL`** as the **public origin of this FastAPI app** so pixel and click URLs resolve (same base as unsubscribe links). If it points at the frontend only, tracking will not hit the API.
+Use **`MARKETING_LINK_BASE_URL`** or **`API_PUBLIC_URL`** as the **public origin** for pixel and click URLs (same base as unsubscribe links).
+
+### Netlify (sparefinder.org)
+
+Marketing emails often use `https://sparefinder.org/api/track/...`. The static site must **proxy** `/api/*` and `/unsubscribe/*` to your Render FastAPI service — otherwise Netlify serves `index.html` and users see the **site 404 page** (opens/clicks are not recorded).
+
+1. Set **`VITE_API_URL`** in `netlify.toml` (or Netlify UI) to your live **ai-analysis-crew** Render URL.
+2. Build generates `dist/_redirects` via `scripts/generate-netlify-redirects.mjs` (runs in `npm run build`).
+3. On Render, set **`MARKETING_LINK_BASE_URL=https://sparefinder.org`** (or leave default) so links stay on your domain; Netlify forwards them to the API.
+4. Redeploy **both** Netlify and Render after adding tracking routes (`/api/track/mopen`, `/api/track/mclk`). Verify:
+   - `curl -sI "https://sparefinder.org/api/track/mopen/test12345678"` → `image/gif` (not HTML)
+   - `curl -sI "https://YOUR-RENDER-URL/api/track/mclk/test12345678?u=https%3A%2F%2Fsparefinder.org"` → `302` or `400` (not `404 Not Found` JSON from missing route)
+
+If **`VITE_API_URL`** points at a dead or old Render service (no `/api/track/*` in OpenAPI), fix the deploy before expecting open/click stats.
 
 | Endpoint | Method | Purpose |
 |----------|--------|---------|

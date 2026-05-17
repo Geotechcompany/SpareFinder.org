@@ -8,10 +8,11 @@
   NODE_VERSION = "18.18.0"
   NPM_VERSION = "9"
   NPM_CONFIG_PRODUCTION = "false"
-  # Backend API URL for production
-  VITE_API_URL = "https://sparefinder-org-pp8y.onrender.com"
-  # AI Service URL
-  VITE_AI_SERVICE_URL = "https://ai-sparefinder-com.onrender.com"
+  # Backend API URL — must be the live ai-analysis-crew FastAPI service (not the static site).
+  # Used by the app and by scripts/generate-netlify-redirects.mjs to proxy /api/* on sparefinder.org.
+  # Update this when you redeploy Render; verify: curl "$VITE_API_URL/health"
+  VITE_API_URL = "https://aiagent-sparefinder-org.onrender.com"
+  VITE_AI_SERVICE_URL = "https://aiagent-sparefinder-org.onrender.com"
   VITE_AI_SERVICE_API_KEY = "geotech-dev-key-2024"
   # Supabase
   VITE_SUPABASE_URL = "https://bharlmgxoqdafjeeknmk.supabase.co"
@@ -20,10 +21,8 @@
   VITE_APP_NAME = "SpareFinder"
   VITE_APP_URL = "https://sparefinder.org"
 
-[[redirects]]
-  from = "/*"
-  to = "/index.html"
-  status = 200
+# SPA + API proxy rules are generated at build time into dist/_redirects
+# (see scripts/generate-netlify-redirects.mjs). Do not add a catch-all here.
 
 [context.production.environment]
   NODE_ENV = "production"
