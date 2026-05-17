@@ -891,19 +891,19 @@ const Dashboard = () => {
                     {
                       label: "View History",
                       icon: FileText,
-                      href: "/history",
+                      href: "/dashboard/history",
                       color: "bg-white/10 text-foreground",
                     },
                     {
                       label: "View Profile",
                       icon: Eye,
-                      href: "/profile",
+                      href: "/dashboard/profile",
                       color: "bg-[#2EE6A6]/20 text-[#2EE6A6]",
                     },
                     {
                       label: "Settings",
                       icon: Download,
-                      href: "/settings",
+                      href: "/dashboard/settings",
                       color: "bg-accent/20 text-accent",
                     },
                   ].map((action, index) => (
