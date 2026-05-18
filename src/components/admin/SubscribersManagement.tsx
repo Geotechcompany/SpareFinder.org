@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { adminApi } from "../../lib/api";
-import AdminDesktopSidebar from "../AdminDesktopSidebar";
 import { AdminPageHeader, AdminPageHeaderToolbar } from "@/components/admin/AdminPageHeader";
-import { ADMIN_MOBILE_TOP_PADDING, useAdminMainMotion } from "@/lib/admin-layout";
+import { AdminPageContent } from "@/components/admin/AdminPageContent";
 import {
   Card,
   CardContent,
@@ -89,9 +88,7 @@ const SubscribersManagement: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
-  const [totalCount, setTotalCount] = useState(0);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const mainMotion = useAdminMainMotion(sidebarCollapsed);
+  const [totalCount, setTotalCount] = useState(0);
   const [selectedSubscriber, setSelectedSubscriber] =
     useState<Subscriber | null>(null);
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
@@ -201,71 +198,27 @@ const SubscribersManagement: React.FC = () => {
   });
 
   if (loading) {
-    console.log("📊 Rendering skeleton loader");
     return (
-      <div className="flex min-h-screen bg-gradient-to-br from-background via-[#F0F2F5] to-[#E8EBF1] dark:from-[#0B1026] dark:via-[#1A1033] dark:to-[#0C1226]">
-        <AdminDesktopSidebar
-          isCollapsed={sidebarCollapsed}
-          onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
+      <AdminPageContent>
+        <AdminPageHeader
+          breadcrumbPage="Subscribers"
+          title="Subscriptions & billing"
+          description="Plans, renewals, and subscriber activity in one place."
         />
-        <motion.div
-          className={`flex flex-1 flex-col ${ADMIN_MOBILE_TOP_PADDING}`}
-          initial={false}
-          animate={mainMotion}
-          transition={{ duration: 0.3, ease: "easeInOut" }}
-        >
-          <div className="p-4 sm:p-6">
-            <AdminPageHeader
-              breadcrumbPage="Subscribers"
-              title="Subscriptions & billing"
-              description="Plans, renewals, and subscriber activity in one place."
-              actions={
-                <AdminPageHeaderToolbar>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="h-9 gap-2 rounded-xl px-3 text-muted-foreground hover:bg-muted/80 hover:text-foreground"
-                    onClick={fetchSubscribers}
-                    disabled={loading}
-                  >
-                    <RefreshCw className={`h-4 w-4 shrink-0 ${loading ? "animate-spin" : ""}`} />
-                    <span className="hidden sm:inline">Update</span>
-                  </Button>
-                </AdminPageHeaderToolbar>
-              }
-            />
-          </div>
-
-          <div className="flex-1 space-y-6 p-4 sm:p-6">
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
-              {Array.from({ length: 4 }, (_, index) => (
-                <CardSkeleton key={index} variant="stats" />
-              ))}
-            </div>
-            <div className="p-2 sm:p-6">
-              <TableSkeleton variant="detailed" rows={5} />
-            </div>
-          </div>
+        <motion.div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+          {Array.from({ length: 4 }, (_, index) => (
+            <CardSkeleton key={index} variant="stats" />
+          ))}
         </motion.div>
-      </div>
+        <TableSkeleton variant="detailed" rows={5} />
+      </AdminPageContent>
     );
   }
 
   console.log("📊 Rendering main content");
   return (
-    <div className="flex min-h-screen bg-gradient-to-br from-background via-[#F0F2F5] to-[#E8EBF1] dark:from-[#0B1026] dark:via-[#1A1033] dark:to-[#0C1226]">
-      <AdminDesktopSidebar
-        isCollapsed={sidebarCollapsed}
-        onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
-      />
-      <motion.div
-        initial={false}
-        animate={mainMotion}
-        transition={{ duration: 0.3, ease: "easeInOut" }}
-        className={`flex flex-1 flex-col ${ADMIN_MOBILE_TOP_PADDING}`}
-      >
-        <div className="p-4 sm:p-6">
+    <AdminPageContent>
+<div className="p-4 sm:p-6">
           <AdminPageHeader
             breadcrumbPage="Subscribers"
             title="Subscriptions & billing"

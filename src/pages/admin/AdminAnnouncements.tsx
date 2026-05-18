@@ -1,11 +1,10 @@
 import React, { useState } from "react";
+import { AdminPageContent } from "@/components/admin/AdminPageContent";
 import { motion } from "framer-motion";
-import AdminDesktopSidebar from "@/components/AdminDesktopSidebar";
 import {
   AdminPageHeader,
   AdminPageHeaderToolbar,
 } from "@/components/admin/AdminPageHeader";
-import { ADMIN_MOBILE_TOP_PADDING, useAdminMainMotion } from "@/lib/admin-layout";
 import {
   Card,
   CardContent,
@@ -29,8 +28,6 @@ import { useToast } from "@/components/ui/use-toast";
 import { BellRing, Loader2, Send, Users } from "lucide-react";
 
 const AdminAnnouncements = () => {
-  const [isCollapsed, setIsCollapsed] = useState(false);
-  const mainMotion = useAdminMainMotion(isCollapsed);
   const { toast } = useToast();
   const [title, setTitle] = useState("");
   const [message, setMessage] = useState("");
@@ -97,13 +94,9 @@ const AdminAnnouncements = () => {
 
   return (
     <div className="flex min-h-screen w-full bg-background">
-      <AdminDesktopSidebar
-        isCollapsed={isCollapsed}
-        onToggle={() => setIsCollapsed(!isCollapsed)}
-      />
       <motion.main
         {...mainMotion}
-        className={`flex-1 ${ADMIN_MOBILE_TOP_PADDING} px-3 pb-10 pt-4 sm:px-6 sm:pt-6 lg:px-8`}
+        className={`flex-1 px-3 pb-10 pt-4 sm:px-6 sm:pt-6 lg:px-8`}
       >
         <div className="mx-auto flex max-w-3xl flex-col gap-6">
           <AdminPageHeader

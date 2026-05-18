@@ -36,9 +36,8 @@ import { Separator } from "@/components/ui/separator";
 import { api } from "@/lib/api";
 import { AdminTicketReplyComposer } from "@/components/admin/AdminTicketReplyComposer";
 import { TicketMessageRichBody } from "@/components/admin/ticketMessageRichBody";
-import AdminDesktopSidebar from "@/components/AdminDesktopSidebar";
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
-import { ADMIN_MOBILE_TOP_PADDING, useAdminMainMotion } from "@/lib/admin-layout";
+import { AdminPageContent } from "@/components/admin/AdminPageContent";
 import { TableSkeleton } from "@/components/skeletons";
 import { Ticket, Mail, User, Lock } from "lucide-react";
 import { toast } from "sonner";
@@ -95,8 +94,7 @@ const TicketManagement = () => {
   const [pagination, setPagination] = useState({ page: 1, limit: 20, total: 0, pages: 0 });
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [loading, setLoading] = useState(true);
-  const [isCollapsed, setIsCollapsed] = useState(false);
-  const mainMotion = useAdminMainMotion(isCollapsed);
+
   const [selectedTicket, setSelectedTicket] = useState<TicketDetail | null>(null);
   /** Bumped when the detail dialog closes or a new ticket is opened — ignores stale getTicket responses. */
   const detailFetchGen = useRef(0);
@@ -298,15 +296,8 @@ const TicketManagement = () => {
   };
 
   return (
-    <div className="flex min-h-screen flex-col bg-background md:flex-row">
-      <AdminDesktopSidebar isCollapsed={isCollapsed} onToggle={() => setIsCollapsed(!isCollapsed)} />
-      <motion.main
-        initial={false}
-        animate={mainMotion}
-        transition={{ duration: 0.3, ease: "easeInOut" }}
-        className={`flex-1 overflow-x-auto bg-gradient-to-b from-background via-brand-50/30 to-sky-50/20 pb-10 dark:via-brand-dark/20 dark:to-slate-950/40 ${ADMIN_MOBILE_TOP_PADDING}`}
-      >
-        <div className="mx-auto max-w-6xl space-y-6 p-3 sm:p-6 lg:p-8">
+    <AdminPageContent className="max-w-6xl">
+
           <AdminPageHeader
             breadcrumbPage="Support"
             title={
@@ -453,9 +444,6 @@ const TicketManagement = () => {
               )}
             </CardContent>
           </Card>
-        </div>
-      </motion.main>
-
       <Dialog open={!!selectedTicket} onOpenChange={(open) => !open && closeTicketDetail()}>
         <DialogContent className="flex max-h-[90dvh] w-[calc(100vw-1rem)] max-w-3xl flex-col gap-0 overflow-hidden rounded-2xl border-border/60 p-0 shadow-2xl sm:w-full">
           {selectedTicket ? (
@@ -620,7 +608,7 @@ const TicketManagement = () => {
           ) : null}
         </DialogContent>
       </Dialog>
-    </div>
+    </AdminPageContent>
   );
 };
 

@@ -13,8 +13,6 @@ import { useToast } from "@/components/ui/use-toast";
 import { api } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate, Link } from "react-router-dom";
-import AdminDesktopSidebar from "@/components/AdminDesktopSidebar";
-import { ADMIN_MOBILE_TOP_PADDING, useAdminMainMotion } from "@/lib/admin-layout";
 import {
   PageSkeleton,
   CardSkeleton,
@@ -67,6 +65,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { AdminPageHeader, AdminPageHeaderToolbar } from "@/components/admin/AdminPageHeader";
+import { AdminPageContent } from "@/components/admin/AdminPageContent";
 import { AdminKpiStatCard } from "@/components/admin/AdminKpiStatCard";
 
 interface AdminStats {
@@ -143,8 +142,7 @@ const AdminDashboardLayout = () => {
     useState<SubscriptionStatistics | null>(null);
   const [estimatedRevenue, setEstimatedRevenue] = useState<number | null>(null);
   const [adminUser, setAdminUser] = useState<AdminUser | null>(null);
-  const [isCollapsed, setIsCollapsed] = useState(false);
-  const mainMotion = useAdminMainMotion(isCollapsed);
+
   const [analytics, setAnalytics] = useState<AdminAnalytics | null>(null);
   const [onboardingSummary, setOnboardingSummary] = useState<OnboardingSummary | null>(null);
   const [marketingDashboard, setMarketingDashboard] = useState<Record<string, unknown> | null>(null);
@@ -318,10 +316,6 @@ const AdminDashboardLayout = () => {
     }
   };
 
-  const handleToggleSidebar = () => {
-    setIsCollapsed(!isCollapsed);
-  };
-
   const handleRefresh = () => {
     if (!isAuthenticated) {
       toast({
@@ -377,8 +371,8 @@ const AdminDashboardLayout = () => {
 
   if (error) {
     return (
-      <div className="dashboard-premium admin-console-neo min-h-screen flex items-center justify-center bg-background">
-        <div className="text-center">
+      <AdminPageContent>
+        <div className="text-center py-12">
           <AlertCircle className="w-10 h-10 text-brand mx-auto mb-4" />
           <p className="text-muted-foreground mb-4">{error}</p>
           <div className="space-x-2">
@@ -390,7 +384,7 @@ const AdminDashboardLayout = () => {
             </Button>
           </div>
         </div>
-      </div>
+      </AdminPageContent>
     );
   }
 
@@ -631,26 +625,8 @@ const AdminDashboardLayout = () => {
   };
 
   return (
-    <div className="dashboard-premium admin-console-neo min-h-screen flex w-full bg-background relative overflow-hidden">
-      <div className="admin-neo-ambient" aria-hidden>
-        <div className="admin-neo-ambient__orb admin-neo-ambient__orb--brand" />
-        <div className="admin-neo-ambient__orb admin-neo-ambient__orb--cyan" />
-        <div className="admin-neo-ambient__orb admin-neo-ambient__orb--rose" />
-      </div>
-
-      <AdminDesktopSidebar
-        isCollapsed={isCollapsed}
-        onToggle={handleToggleSidebar}
-      />
-
-      {/* Main Content */}
+    <AdminPageContent>
       <motion.div
-        initial={false}
-        animate={mainMotion}
-        transition={{ duration: 0.3, ease: "easeInOut" }}
-        className={`flex-1 p-2 sm:p-4 lg:p-8 relative z-10 overflow-x-hidden md:overflow-x-visible ${ADMIN_MOBILE_TOP_PADDING}`}
-      >
-        <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
@@ -1086,8 +1062,7 @@ const AdminDashboardLayout = () => {
             </motion.div>
           </div>
         </motion.div>
-      </motion.div>
-    </div>
+    </AdminPageContent>
   );
 };
 

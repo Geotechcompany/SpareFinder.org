@@ -12,9 +12,8 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/components/ui/use-toast";
 import { api } from "@/lib/api";
-import AdminDesktopSidebar from "@/components/AdminDesktopSidebar";
 import { AdminPageHeader, AdminPageHeaderToolbar } from "@/components/admin/AdminPageHeader";
-import { ADMIN_MOBILE_TOP_PADDING, useAdminMainMotion } from "@/lib/admin-layout";
+import { AdminPageContent } from "@/components/admin/AdminPageContent";
 import { TableSkeleton } from "@/components/skeletons";
 import {
   Table,
@@ -108,8 +107,6 @@ const UserManagement = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [roleFilter, setRoleFilter] = useState<string>("all");
-  const [isCollapsed, setIsCollapsed] = useState(false);
-  const mainMotion = useAdminMainMotion(isCollapsed);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkActionLoading, setBulkActionLoading] = useState(false);
   const [bulkDeleteDialogOpen, setBulkDeleteDialogOpen] = useState(false);
@@ -440,60 +437,9 @@ const UserManagement = () => {
     }
   };
 
-  const handleToggleSidebar = () => {
-    setIsCollapsed(!isCollapsed);
-  };
-
   return (
-    <div className="min-h-screen flex w-full bg-gradient-to-br from-background via-[#F0F2F5] to-[#E8EBF1] dark:from-[#0B1026] dark:via-[#1A1033] dark:to-[#0C1226] relative overflow-hidden">
-      {/* Animated Background Elements */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <motion.div
-          className="absolute top-1/4 -right-40 w-80 h-80 bg-brand/15 rounded-full blur-3xl opacity-60"
-          animate={{
-            scale: [1, 1.3, 1],
-            rotate: [0, 180, 360],
-          }}
-          transition={{
-            duration: 20,
-            repeat: Infinity,
-            ease: "linear",
-          }}
-        />
-        <motion.div
-          className="absolute -bottom-40 -left-40 w-96 h-96 bg-blue-600/10 rounded-full blur-3xl opacity-40"
-          animate={{
-            scale: [1.2, 1, 1.2],
-            x: [0, 50, 0],
-            y: [0, -30, 0],
-          }}
-          transition={{
-            duration: 25,
-            repeat: Infinity,
-            ease: "easeInOut",
-          }}
-        />
-      </div>
-
-      <AdminDesktopSidebar
-        isCollapsed={isCollapsed}
-        onToggle={handleToggleSidebar}
-      />
-
-      {/* Main Content */}
-      <motion.div
-        initial={false}
-        animate={mainMotion}
-        transition={{ duration: 0.3, ease: "easeInOut" }}
-        className={`flex-1 p-2 sm:p-4 lg:p-8 relative z-10 overflow-x-hidden md:overflow-x-visible ${ADMIN_MOBILE_TOP_PADDING}`}
-      >
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-          className="space-y-4 sm:space-y-6 lg:space-y-8 max-w-7xl mx-auto"
-        >
-          <AdminPageHeader
+    <AdminPageContent>
+<AdminPageHeader
             breadcrumbPage="People & roles"
             title="User accounts"
             description="Look up members, adjust roles, and keep access under control."
@@ -969,9 +915,7 @@ const UserManagement = () => {
               )}
             </CardContent>
           </Card>
-        </motion.div>
-      </motion.div>
-    </div>
+    </AdminPageContent>
   );
 };
 

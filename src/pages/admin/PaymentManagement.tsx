@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { format } from "date-fns";
-import AdminDesktopSidebar from "@/components/AdminDesktopSidebar";
 import { AdminPageHeader, AdminPageHeaderToolbar } from "@/components/admin/AdminPageHeader";
-import { ADMIN_MOBILE_TOP_PADDING, useAdminMainMotion } from "@/lib/admin-layout";
+import { AdminPageContent } from "@/components/admin/AdminPageContent";
 import {
   Card,
   CardContent,
@@ -105,8 +104,6 @@ interface StripeInvoice {
 }
 
 const PaymentManagement = () => {
-  const [isCollapsed, setIsCollapsed] = useState(false);
-  const mainMotion = useAdminMainMotion(isCollapsed);
   const [showSecrets, setShowSecrets] = useState<{ [key: string]: boolean }>(
     {}
   );
@@ -134,10 +131,6 @@ const PaymentManagement = () => {
   });
   
   const { toast } = useToast();
-  
-  const handleToggleSidebar = () => {
-    setIsCollapsed(!isCollapsed);
-  };
 
   const toggleSecretVisibility = (id: string) => {
     setShowSecrets(prev => ({ ...prev, [id]: !prev[id] }));
@@ -507,43 +500,12 @@ const PaymentManagement = () => {
   }
 
   return (
-    <div className="min-h-screen flex w-full bg-gradient-to-br from-background via-[#F0F2F5] to-[#E8EBF1] dark:from-[#0B1026] dark:via-[#1A1033] dark:to-[#0C1226] relative overflow-hidden">
-      {/* Animated Background Elements */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <motion.div
-          className="absolute top-1/4 -right-40 w-80 h-80 bg-green-600/15 rounded-full blur-3xl opacity-60"
-          animate={{
-            scale: [1, 1.3, 1],
-            rotate: [0, 180, 360],
-          }}
-          transition={{
-            duration: 20,
-            repeat: Infinity,
-            ease: "linear"
-          }}
-        />
-        <motion.div
-          className="absolute -bottom-40 -left-40 w-96 h-96 bg-emerald-600/10 rounded-full blur-3xl opacity-40"
-          animate={{
-            scale: [1.2, 1, 1.2],
-            x: [0, 50, 0],
-            y: [0, -30, 0],
-          }}
-          transition={{
-            duration: 25,
-            repeat: Infinity,
-            ease: "easeInOut"
-          }}
-        />
-      </div>
-
-      <AdminDesktopSidebar isCollapsed={isCollapsed} onToggle={handleToggleSidebar} />
-      
-      <motion.div
+    <AdminPageContent>
+<motion.div
         initial={false}
         animate={mainMotion}
         transition={{ duration: 0.3, ease: "easeInOut" }}
-        className={`flex-1 overflow-x-auto p-4 lg:p-8 relative z-10 ${ADMIN_MOBILE_TOP_PADDING}`}
+        className={`flex-1 overflow-x-auto p-4 lg:p-8 relative z-10`}
       >
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -1097,9 +1059,7 @@ const PaymentManagement = () => {
               </CardContent>
             </Card>
           </motion.div>
-        </motion.div>
-      </motion.div>
-    </div>
+    </AdminPageContent>
   );
 };
 

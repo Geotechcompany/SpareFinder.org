@@ -1,8 +1,6 @@
 import React, { useState, useEffect } from "react";
-import { motion } from "framer-motion";
-import AdminDesktopSidebar from "@/components/AdminDesktopSidebar";
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
-import { ADMIN_MOBILE_TOP_PADDING, useAdminMainMotion } from "@/lib/admin-layout";
+import { AdminPageContent } from "@/components/admin/AdminPageContent";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -52,8 +50,6 @@ interface DbPlan {
 }
 
 const PlansManagement = () => {
-  const [isCollapsed, setIsCollapsed] = useState(false);
-  const mainMotion = useAdminMainMotion(isCollapsed);
   const [plans, setPlans] = useState<DbPlan[]>([]);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<DbPlan | null>(null);
@@ -145,15 +141,7 @@ const PlansManagement = () => {
   }
 
   return (
-    <div className="flex min-h-screen bg-background">
-      <AdminDesktopSidebar isCollapsed={isCollapsed} onToggle={() => setIsCollapsed(!isCollapsed)} />
-      <motion.main
-        initial={false}
-        animate={mainMotion}
-        transition={{ duration: 0.3, ease: "easeInOut" }}
-        className={`flex-1 overflow-x-auto p-4 md:p-6 lg:p-8 ${ADMIN_MOBILE_TOP_PADDING}`}
-      >
-        <div className="mx-auto max-w-5xl space-y-6">
+    <AdminPageContent className="max-w-5xl">
           <AdminPageHeader
             breadcrumbPage="Pricing plans"
             title="Pricing plans"
@@ -198,8 +186,6 @@ const PlansManagement = () => {
               </Table>
             </CardContent>
           </Card>
-        </div>
-      </motion.main>
 
       <Dialog open={!!editing} onOpenChange={(open) => !open && setEditing(null)}>
         <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
@@ -209,7 +195,7 @@ const PlansManagement = () => {
               {editing && `Editing "${editing.name}". Change tier, name, price, and more.`}
             </DialogDescription>
           </DialogHeader>
-          {editing && (
+          {editing ? (
             <div className="grid gap-4 py-4">
               <div className="grid gap-2">
                 <Label>Tier (internal key)</Label>
@@ -315,7 +301,7 @@ const PlansManagement = () => {
                 <Label>Active (shown on site)</Label>
               </div>
             </div>
-          )}
+          ) : null}
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditing(null)}>
               Cancel
@@ -327,7 +313,7 @@ const PlansManagement = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </AdminPageContent>
   );
 };
 

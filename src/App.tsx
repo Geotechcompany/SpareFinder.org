@@ -60,6 +60,7 @@ const Reviews = lazy(() => import("@/pages/Reviews"));
 const Support = lazy(() => import("@/pages/Support"));
 const PublicReviews = lazy(() => import("@/pages/PublicReviews"));
 const DashboardLayout = lazy(() => import("@/components/DashboardLayout"));
+const AdminLayout = lazy(() => import("@/components/AdminLayout"));
 const SharedAnalysis = lazy(() => import("@/pages/SharedAnalysis"));
 const ClerkSsoCallback = lazy(() => import("@/pages/ClerkSsoCallback"));
 const ApiDocs = lazy(() => import("@/pages/ApiDocs"));
@@ -197,125 +198,30 @@ const App = () => (
                   />
 
                   <Route
-                    path="/admin/dashboard"
+                    path="/admin"
                     element={
                       <AdminProtectedRoute>
-                        <AdminDashboard />
+                        <AdminLayout />
                       </AdminProtectedRoute>
                     }
-                  />
-                  <Route
-                    path="/admin/user-management"
-                    element={
-                      <AdminProtectedRoute>
-                        <UserManagement />
-                      </AdminProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path="/admin/system-analytics"
-                    element={
-                      <AdminProtectedRoute>
-                        <SystemAnalytics />
-                      </AdminProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path="/admin/system-settings"
-                    element={
-                      <AdminProtectedRoute>
-                        <SystemSettings />
-                      </AdminProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path="/admin/database-console"
-                    element={
-                      <AdminProtectedRoute>
-                        <DatabaseConsole />
-                      </AdminProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path="/admin/audit-logs"
-                    element={
-                      <AdminProtectedRoute>
-                        <AuditLogs />
-                      </AdminProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path="/admin/email-smtp"
-                    element={
-                      <AdminProtectedRoute>
-                        <EmailSmtpManagement />
-                      </AdminProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path="/admin/payment-methods"
-                    element={
-                      <AdminProtectedRoute>
-                        <PaymentManagement />
-                      </AdminProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path="/admin/plans"
-                    element={
-                      <AdminProtectedRoute>
-                        <PlansManagement />
-                      </AdminProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path="/admin/ai-models"
-                    element={
-                      <AdminProtectedRoute>
-                        <AIModelsManagement />
-                      </AdminProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path="/admin/subscribers"
-                    element={
-                      <AdminProtectedRoute>
-                        <SubscribersManagement />
-                      </AdminProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path="/admin/onboarding-surveys"
-                    element={
-                      <AdminProtectedRoute>
-                        <OnboardingSurveys />
-                      </AdminProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path="/admin/tickets"
-                    element={
-                      <AdminProtectedRoute>
-                        <TicketManagement />
-                      </AdminProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path="/admin/marketing-outbound"
-                    element={
-                      <AdminProtectedRoute>
-                        <MarketingOutbound />
-                      </AdminProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path="/admin/announcements"
-                    element={
-                      <AdminProtectedRoute>
-                        <AdminAnnouncements />
-                      </AdminProtectedRoute>
-                    }
-                  />
+                  >
+                    <Route index element={<Navigate to="dashboard" replace />} />
+                    <Route path="dashboard" element={<AdminDashboard />} />
+                    <Route path="user-management" element={<UserManagement />} />
+                    <Route path="system-analytics" element={<SystemAnalytics />} />
+                    <Route path="system-settings" element={<SystemSettings />} />
+                    <Route path="database-console" element={<DatabaseConsole />} />
+                    <Route path="audit-logs" element={<AuditLogs />} />
+                    <Route path="email-smtp" element={<EmailSmtpManagement />} />
+                    <Route path="payment-methods" element={<PaymentManagement />} />
+                    <Route path="plans" element={<PlansManagement />} />
+                    <Route path="ai-models" element={<AIModelsManagement />} />
+                    <Route path="subscribers" element={<SubscribersManagement />} />
+                    <Route path="onboarding-surveys" element={<OnboardingSurveys />} />
+                    <Route path="tickets" element={<TicketManagement />} />
+                    <Route path="marketing-outbound" element={<MarketingOutbound />} />
+                    <Route path="announcements" element={<AdminAnnouncements />} />
+                  </Route>
                   <Route path="/admin/login/*" element={<AdminLogin />} />
                   <Route path="/privacy-policy" element={<PrivacyPolicy />} />
                   <Route path="/terms-of-service" element={<TermsOfService />} />

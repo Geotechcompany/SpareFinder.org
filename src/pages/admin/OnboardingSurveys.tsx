@@ -1,8 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import AdminDesktopSidebar from "@/components/AdminDesktopSidebar";
 import { AdminPageHeader, AdminPageHeaderToolbar } from "@/components/admin/AdminPageHeader";
-import { ADMIN_MOBILE_TOP_PADDING } from "@/lib/admin-layout";
+import { AdminPageContent } from "@/components/admin/AdminPageContent";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -59,8 +58,7 @@ const formatDate = (iso: string) => {
 };
 
 const OnboardingSurveys = () => {
-  const { toast } = useToast();
-  const [isCollapsed, setIsCollapsed] = useState(false);
+  const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [range, setRange] = useState<"7d" | "30d" | "90d" | "365d">("90d");
@@ -121,38 +119,8 @@ const OnboardingSurveys = () => {
   }, [range, pagination.page]);
 
   return (
-    <div className="min-h-screen flex w-full bg-gradient-to-br from-background via-[#F0F2F5] to-[#E8EBF1] dark:from-[#0B1026] dark:via-[#1A1033] dark:to-[#0C1226] relative overflow-hidden">
-      {/* Background accents */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-1/4 -right-40 w-80 h-80 bg-brand/10 rounded-full blur-3xl opacity-60" />
-        <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-blue-600/10 rounded-full blur-3xl opacity-40" />
-      </div>
-
-      <AdminDesktopSidebar
-        isCollapsed={isCollapsed}
-        onToggle={() => setIsCollapsed(!isCollapsed)}
-      />
-
-      {/* Main Content */}
-      <motion.div
-        initial={false}
-        animate={{}}
-        transition={{ duration: 0.3, ease: "easeInOut" }}
-        style={
-          {
-            // Only apply sidebar offset on desktop, matching AdminDesktopSidebar's fixed width.
-            "--admin-sidebar-offset": isCollapsed ? "80px" : "320px",
-          } as React.CSSProperties
-        }
-        className={`flex-1 p-2 sm:p-4 lg:p-8 relative z-10 overflow-x-hidden md:overflow-x-visible lg:ml-[var(--admin-sidebar-offset)] lg:w-[calc(100%-var(--admin-sidebar-offset))] ${ADMIN_MOBILE_TOP_PADDING}`}
-      >
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.35 }}
-          className="space-y-6 max-w-7xl mx-auto"
-        >
-              <AdminPageHeader
+    <AdminPageContent>
+<AdminPageHeader
                 breadcrumbPage="Welcome survey"
                 title={
                   <h1 className="flex flex-wrap items-center gap-2 text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
@@ -349,9 +317,7 @@ const OnboardingSurveys = () => {
                   )}
                 </CardContent>
               </Card>
-        </motion.div>
-      </motion.div>
-    </div>
+    </AdminPageContent>
   );
 };
 

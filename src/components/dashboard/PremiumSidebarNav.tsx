@@ -285,12 +285,14 @@ export function PremiumSidebarNav({
   onNavigate,
   className,
   showWorkspaceTools = true,
+  isNavActive = isDashboardNavActive,
 }: {
   isCollapsed?: boolean;
   groups?: DashboardNavGroup[];
   onNavigate?: () => void;
   className?: string;
   showWorkspaceTools?: boolean;
+  isNavActive?: (pathname: string, href: string) => boolean;
 }) {
   const location = useLocation();
   const defaultGroups = useVisibleDashboardNavGroups();
@@ -328,7 +330,7 @@ export function PremiumSidebarNav({
                 >
                   <NavItemLink
                     item={item}
-                    active={isDashboardNavActive(location.pathname, item.href)}
+                    active={isNavActive(location.pathname, item.href)}
                     isCollapsed={isCollapsed}
                     onNavigate={onNavigate}
                   />

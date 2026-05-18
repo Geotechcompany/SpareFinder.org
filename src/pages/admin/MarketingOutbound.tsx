@@ -1,8 +1,7 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import AdminDesktopSidebar from "@/components/AdminDesktopSidebar";
 import { AdminPageHeader, AdminPageHeaderToolbar } from "@/components/admin/AdminPageHeader";
-import { ADMIN_MOBILE_TOP_PADDING, useAdminMainMotion } from "@/lib/admin-layout";
+import { AdminPageContent } from "@/components/admin/AdminPageContent";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -189,8 +188,6 @@ const MarketingOutbound: React.FC = () => {
     },
     [setSearchParams]
   );
-  const [isCollapsed, setIsCollapsed] = useState(false);
-  const mainMotion = useAdminMainMotion(isCollapsed);
   const [loading, setLoading] = useState(true);
   const [dashboard, setDashboard] = useState<Record<string, unknown> | null>(null);
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
@@ -883,12 +880,11 @@ const MarketingOutbound: React.FC = () => {
 
   return (
     <div className="flex min-h-screen bg-background">
-      <AdminDesktopSidebar isCollapsed={isCollapsed} onToggle={() => setIsCollapsed(!isCollapsed)} />
       <motion.main
         initial={false}
         animate={mainMotion}
         transition={{ duration: 0.3, ease: "easeInOut" }}
-        className={`flex-1 overflow-auto p-4 sm:p-6 md:p-10 ${ADMIN_MOBILE_TOP_PADDING}`}
+        className={`flex-1 overflow-auto p-4 sm:p-6 md:p-10`}
       >
         <div className="mx-auto max-w-6xl space-y-6 sm:space-y-8">
           <AdminPageHeader
