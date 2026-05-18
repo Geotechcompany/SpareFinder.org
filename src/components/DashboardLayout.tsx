@@ -10,6 +10,7 @@ import { Menu } from "lucide-react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import DashboardHeader from "@/components/DashboardHeader";
 import DashboardMobileTabs from "@/components/DashboardMobileTabs";
+import { ImpersonationBanner } from "@/components/admin/ImpersonationBanner";
 import { useDashboardSidebarOffset } from "@/hooks/use-dashboard-sidebar-offset";
 
 const DashboardLayout: React.FC = () => {
@@ -98,6 +99,7 @@ const DashboardLayout: React.FC = () => {
           )}
         >
           <div className="mx-auto flex w-full max-w-[var(--dashboard-content-max-width)] flex-col">
+            <ImpersonationBanner />
             <DashboardHeader />
             <Outlet />
           </div>

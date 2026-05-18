@@ -3,7 +3,9 @@ from __future__ import annotations
 import html
 import os
 import smtplib
-from datetime import datetime, timedelta
+import math
+import requests
+from datetime import datetime, timedelta, timezone
 from email.header import Header
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
@@ -117,6 +119,52 @@ def _send_test_email_smtp(*, smtp_cfg: dict[str, Any], to_email: str, subject: s
 # -----------------------
 
 
+def _parse_iso_datetime(val: Any) -> datetime | None:
+    if not val:
+        return None
+    if isinstance(val, datetime):
+        dt = val
+    else:
+        try:
+            s = str(val).strip().replace("Z", "+00:00")
+            dt = datetime.fromisoformat(s)
+        except (TypeError, ValueError):
+            return None
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=timezone.utc)
+    return dt
+
+
+def _trial_info_from_subscription(
+    tier: str, status: str, period_end_raw: Any
+) -> dict[str, Any]:
+    """Match billing UI: trialing status, or Starter (free) with a future period end."""
+    status_l = (status or "").lower()
+    tier_l = (tier or "free").lower()
+    end = _parse_iso_datetime(period_end_raw)
+    now = datetime.now(timezone.utc)
+
+    is_on_trial = status_l == "trialing" or (
+        tier_l == "free" and end is not None and end > now
+    )
+
+    days_remaining: int | None = None
+    trial_ends_at: str | None = None
+
+    if is_on_trial:
+        trial_ends_at = str(period_end_raw) if period_end_raw else None
+        if end:
+            days_remaining = max(0, math.ceil((end - now).total_seconds() / 86400))
+        else:
+            days_remaining = 0
+
+    return {
+        "is_on_trial": is_on_trial,
+        "trial_days_remaining": days_remaining,
+        "trial_ends_at": trial_ends_at,
+    }
+
+
 @router.get("/users")
 async def admin_get_users(
     page: int = Query(default=1, ge=1),
@@ -146,16 +194,22 @@ async def admin_get_users(
         try:
             subs_res = (
                 supabase.table("subscriptions")
-                .select("user_id, tier, status")
+                .select("user_id, tier, status, current_period_end")
                 .in_("user_id", user_ids)
                 .execute()
             )
             for row in (subs_res.data or []):
                 uid = row.get("user_id")
                 if uid:
+                    tier = row.get("tier") or "free"
+                    status = row.get("status") or "inactive"
+                    period_end = row.get("current_period_end")
+                    trial = _trial_info_from_subscription(tier, status, period_end)
                     subscription_by_user[str(uid)] = {
-                        "tier": row.get("tier") or "free",
-                        "status": row.get("status") or "inactive",
+                        "tier": tier,
+                        "status": status,
+                        "current_period_end": period_end,
+                        **trial,
                     }
         except Exception:
             pass
@@ -164,6 +218,9 @@ async def admin_get_users(
         sub = subscription_by_user.get(str(uid)) if uid else None
         u["subscription_tier"] = sub["tier"] if sub else "free"
         u["subscription_status"] = sub["status"] if sub else "inactive"
+        u["is_on_trial"] = bool(sub and sub.get("is_on_trial"))
+        u["trial_days_remaining"] = sub.get("trial_days_remaining") if sub else None
+        u["trial_ends_at"] = sub.get("trial_ends_at") if sub else None
 
     return api_ok(
         data={
@@ -210,6 +267,103 @@ class UpdatePlanBody(BaseModel):
         if s == "no plan":
             return "no_plan"
         return s
+
+
+@router.post("/users/{userId}/impersonate")
+async def admin_impersonate_user(
+    userId: str = Path(...),
+    admin: CurrentUser = Depends(require_roles("admin", "super_admin")),
+):
+    """
+    Create a Clerk actor token so the admin can sign in as the target user.
+    Requires CLERK_SECRET_KEY. See Clerk user impersonation docs.
+    """
+    clerk_secret = (os.getenv("CLERK_SECRET_KEY") or "").strip()
+    if not clerk_secret:
+        return api_error(
+            "Clerk secret key is not configured. Set CLERK_SECRET_KEY on the API server.",
+            status_code=503,
+        )
+
+    admin_clerk_id = (admin.clerk_user_id or "").strip()
+    if not admin_clerk_id:
+        return api_error(
+            "Your admin account is not linked to Clerk. Sign out and sign in again via Clerk.",
+            status_code=400,
+        )
+
+    if str(admin.id) == str(userId):
+        return api_error("You cannot impersonate your own account.", status_code=400)
+
+    supabase = get_supabase_admin()
+    target_res = (
+        supabase.table("profiles")
+        .select("id, email, full_name, role, clerk_user_id")
+        .eq("id", userId)
+        .limit(1)
+        .execute()
+    )
+    target_rows = target_res.data or []
+    if not target_rows:
+        return api_error("User not found", status_code=404)
+
+    target = target_rows[0]
+    target_role = (target.get("role") or "user").lower()
+    if target_role in ("admin", "super_admin") and admin.role != "super_admin":
+        return api_error(
+            "Only super admins can impersonate admin accounts.",
+            status_code=403,
+        )
+
+    target_clerk_id = (target.get("clerk_user_id") or "").strip()
+    if not target_clerk_id:
+        return api_error(
+            "This user has no Clerk account linked yet. They must sign in at least once.",
+            status_code=400,
+        )
+
+    clerk_base = (os.getenv("CLERK_API_URL") or "https://api.clerk.com/v1").rstrip("/")
+    payload = {
+        "user_id": target_clerk_id,
+        "expires_in_seconds": 3600,
+        "actor": {"sub": admin_clerk_id},
+    }
+    try:
+        resp = requests.post(
+            f"{clerk_base}/actor_tokens",
+            headers={
+                "Authorization": f"Bearer {clerk_secret}",
+                "Content-Type": "application/json",
+            },
+            json=payload,
+            timeout=15,
+        )
+    except requests.RequestException as exc:
+        return api_error(f"Failed to contact Clerk: {exc}", status_code=502)
+
+    if resp.status_code not in (200, 201):
+        detail = resp.text[:500] if resp.text else resp.reason
+        return api_error(
+            f"Clerk could not create an impersonation token ({resp.status_code}): {detail}",
+            status_code=502,
+        )
+
+    data = resp.json() if resp.content else {}
+    token = data.get("token") if isinstance(data, dict) else None
+    if not isinstance(token, str) or not token.strip():
+        return api_error("Clerk did not return an impersonation token.", status_code=502)
+
+    return api_ok(
+        message="Impersonation token created",
+        data={
+            "token": token.strip(),
+            "target": {
+                "id": target.get("id"),
+                "email": target.get("email"),
+                "full_name": target.get("full_name"),
+            },
+        },
+    )
 
 
 @router.patch("/users/{userId}/plan")

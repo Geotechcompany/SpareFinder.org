@@ -872,6 +872,18 @@ export const adminApi = {
     return response.data;
   },
 
+  impersonateUser: async (
+    userId: string
+  ): Promise<
+    ApiResponse<{
+      token: string;
+      target: { id: string; email?: string; full_name?: string };
+    }>
+  > => {
+    const response = await apiClient.post(`/admin/users/${userId}/impersonate`);
+    return response.data;
+  },
+
   getSubscribers: async (
     page: number = 1,
     limit: number = 50,

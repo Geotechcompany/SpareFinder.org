@@ -66,8 +66,11 @@ import {
   ChevronLeft,
   ChevronRight,
   ChevronDown,
+  Clock,
+  UserCog,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { startImpersonationRedirect } from "@/lib/impersonation";
 
 interface UserData {
   id: string;
@@ -87,6 +90,10 @@ interface UserData {
   last_upload_at?: string;
   subscription_tier?: string;
   subscription_status?: string;
+  is_on_trial?: boolean;
+  trial_days_remaining?: number | null;
+  trial_ends_at?: string | null;
+  clerk_user_id?: string | null;
 }
 
 interface Pagination {
@@ -110,8 +117,9 @@ const UserManagement = () => {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkActionLoading, setBulkActionLoading] = useState(false);
   const [bulkDeleteDialogOpen, setBulkDeleteDialogOpen] = useState(false);
+  const [impersonatingUserId, setImpersonatingUserId] = useState<string | null>(null);
   const { toast } = useToast();
-  const { user: currentUser } = useAuth();
+  const { user: currentUser, isSuperAdmin } = useAuth();
 
   // Debounce search to avoid too many API calls
   useEffect(() => {
@@ -426,6 +434,63 @@ const UserManagement = () => {
     }
   };
 
+  const handleImpersonate = async (target: UserData) => {
+    if (target.id === currentUser?.id) {
+      toast({
+        variant: "destructive",
+        title: "Cannot impersonate",
+        description: "You cannot impersonate your own account.",
+      });
+      return;
+    }
+    if (
+      (target.role === "admin" || target.role === "super_admin") &&
+      !isSuperAdmin
+    ) {
+      toast({
+        variant: "destructive",
+        title: "Not allowed",
+        description: "Only super admins can impersonate staff accounts.",
+      });
+      return;
+    }
+
+    setImpersonatingUserId(target.id);
+    try {
+      const response = await api.admin.impersonateUser(target.id);
+      const token = response.data?.token;
+      if (!response.success || !token) {
+        throw new Error(
+          response.error || response.message || "Failed to start impersonation"
+        );
+      }
+      const targetMeta = response.data?.target;
+      startImpersonationRedirect(token, {
+        targetEmail: targetMeta?.email || target.email,
+        targetName: targetMeta?.full_name || target.full_name,
+        returnUrl: "/admin/users",
+      });
+    } catch (error) {
+      console.error("Impersonation error:", error);
+      toast({
+        variant: "destructive",
+        title: "Impersonation failed",
+        description:
+          error instanceof Error
+            ? error.message
+            : "Could not sign in as this user. Check Clerk configuration.",
+      });
+      setImpersonatingUserId(null);
+    }
+  };
+
+  const formatTrialLabel = (days: number | null | undefined) => {
+    if (days == null) return "Trial active";
+    if (days <= 0) return "Ends today";
+    if (days === 1) return "1 day left";
+    return `${days} days left`;
+  };
+
   const getRoleColor = (role: string) => {
     switch (role) {
       case "super_admin":
@@ -651,6 +716,9 @@ const UserManagement = () => {
                             Plan
                           </TableHead>
                           <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                            Trial
+                          </TableHead>
+                          <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                             Activity
                           </TableHead>
                           <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
@@ -664,7 +732,7 @@ const UserManagement = () => {
                       <TableBody>
                         {users.length === 0 ? (
                           <TableRow>
-                              <TableCell colSpan={8} className="py-8 text-center">
+                              <TableCell colSpan={9} className="py-8 text-center">
                               <div className="text-muted-foreground">
                                 {searchTerm || roleFilter !== "all" ? (
                                   <div>
@@ -755,6 +823,30 @@ const UserManagement = () => {
                                     </SelectContent>
                                   </Select>
                                 </TableCell>
+                                <TableCell className="text-sm">
+                                  {user.is_on_trial ? (
+                                    <div className="space-y-1">
+                                      <Badge
+                                        variant="secondary"
+                                        className="bg-amber-500/15 text-amber-700 border-amber-500/30 dark:text-amber-400"
+                                      >
+                                        <Clock className="w-3 h-3 mr-1" />
+                                        Free trial
+                                      </Badge>
+                                      <p className="text-xs font-medium text-amber-700 dark:text-amber-400">
+                                        {formatTrialLabel(user.trial_days_remaining)}
+                                      </p>
+                                      {user.trial_ends_at && (
+                                        <p className="text-xs text-muted-foreground">
+                                          Ends{" "}
+                                          {new Date(user.trial_ends_at).toLocaleDateString()}
+                                        </p>
+                                      )}
+                                    </div>
+                                  ) : (
+                                    <span className="text-muted-foreground">—</span>
+                                  )}
+                                </TableCell>
                                 <TableCell className="text-sm text-muted-foreground dark:text-gray-300">
                                   <div className="text-sm">
                                     <div className="flex items-center space-x-2">
@@ -815,6 +907,52 @@ const UserManagement = () => {
                                         </SelectItem>
                                       </SelectContent>
                                     </Select>
+
+                                    {user.id !== currentUser?.id &&
+                                      (user.role === "user" || isSuperAdmin) && (
+                                        <AlertDialog>
+                                          <AlertDialogTrigger asChild>
+                                            <Button
+                                              variant="ghost"
+                                              size="sm"
+                                              className="h-8 w-8 p-0 text-brand hover:text-brand hover:bg-brand/10"
+                                              title="Sign in as this user"
+                                              disabled={impersonatingUserId === user.id}
+                                            >
+                                              {impersonatingUserId === user.id ? (
+                                                <Loader2 className="w-4 h-4 animate-spin" />
+                                              ) : (
+                                                <UserCog className="w-4 h-4" />
+                                              )}
+                                            </Button>
+                                          </AlertDialogTrigger>
+                                          <AlertDialogContent className="border border-border bg-background/95 text-foreground dark:bg-gray-900 dark:border-white/10 dark:text-white">
+                                            <AlertDialogHeader>
+                                              <AlertDialogTitle className="text-foreground dark:text-white">
+                                                Impersonate user?
+                                              </AlertDialogTitle>
+                                              <AlertDialogDescription className="text-muted-foreground dark:text-gray-400">
+                                                You will be signed in as{" "}
+                                                <strong>{user.full_name || user.email}</strong>{" "}
+                                                and redirected to their dashboard. Use{" "}
+                                                <strong>Exit impersonation</strong> in the banner
+                                                when finished.
+                                              </AlertDialogDescription>
+                                            </AlertDialogHeader>
+                                            <AlertDialogFooter>
+                                              <AlertDialogCancel className="border border-border bg-background/80 text-foreground hover:bg-accent dark:bg-white/5 dark:border-white/10 dark:text-white">
+                                                Cancel
+                                              </AlertDialogCancel>
+                                              <AlertDialogAction
+                                                onClick={() => void handleImpersonate(user)}
+                                                className="bg-brand hover:bg-brand/90"
+                                              >
+                                                Impersonate
+                                              </AlertDialogAction>
+                                            </AlertDialogFooter>
+                                          </AlertDialogContent>
+                                        </AlertDialog>
+                                      )}
 
                                     <AlertDialog>
                                       <AlertDialogTrigger asChild>
