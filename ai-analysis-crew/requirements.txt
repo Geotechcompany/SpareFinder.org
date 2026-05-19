@@ -1,6 +1,6 @@
 fastapi==0.115.0
-uvicorn[standard]==0.30.3
-python-multipart==0.0.6
+uvicorn[standard]>=0.31.1,<1.0.0
+python-multipart>=0.0.9,<1.0.0
 
 # websockets is pulled by realtime/uvicorn and (via stagehand) google-genai.
 # Keep it compatible with google-genai (<15.1,>=13) and realtime (<16,>=11).
@@ -10,7 +10,7 @@ setuptools>=65.5.0,<82
 # Pin crewai 1.6.x: 1.7+ pulls openai~=1.83; 1.14+ requires openai>=2.30 (conflicts with stagehand/openai==1.99.6)
 # >=1.6.0 required for Crew(stream=True) kickoff streaming
 crewai==1.6.1
-crewai-tools>=0.17.0,<0.18.0
+# crewai-tools omitted: pulls embedchain/chromadb<0.6 which conflicts with crewai 1.6.1; not used in app code
 langchain-openai==0.2.14
 # Pin OpenAI client to avoid resolver backtracking during Docker builds on Render
 # NOTE: stagehand requires openai>=1.99.6
