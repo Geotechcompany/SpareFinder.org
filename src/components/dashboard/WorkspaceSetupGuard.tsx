@@ -1,5 +1,6 @@
-import React, { useEffect } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import React from "react";
+import { Loader2 } from "lucide-react";
+import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 
@@ -10,39 +11,41 @@ const ALLOWED_WITHOUT_WORKSPACE_PREFIXES = [
   "/dashboard/settings",
 ] as const;
 
-/** Sends users without an active workspace to onboarding to create one. */
+function isAllowedWithoutWorkspace(pathname: string): boolean {
+  return ALLOWED_WITHOUT_WORKSPACE_PREFIXES.some((prefix) =>
+    pathname.startsWith(prefix)
+  );
+}
+
+/** Sends users without an active workspace to onboarding; avoids mounting dashboard routes first. */
 export function WorkspaceSetupGuard({ children }: { children: React.ReactNode }) {
-  const navigate = useNavigate();
   const location = useLocation();
   const { isAuthenticated, isLoading: authLoading, isAdmin } = useAuth();
   const { activeWorkspaceId, isLoading: workspaceLoading } = useWorkspace();
 
-  useEffect(() => {
-    if (authLoading || workspaceLoading || !isAuthenticated || isAdmin) return;
-    if (activeWorkspaceId) return;
+  if (authLoading || workspaceLoading) {
+    return (
+      <div
+        className="flex min-h-[50vh] items-center justify-center"
+        aria-busy="true"
+        aria-label="Loading workspace"
+      >
+        <Loader2 className="h-8 w-8 animate-spin text-brand" />
+      </div>
+    );
+  }
 
-    const path = location.pathname;
-    if (
-      ALLOWED_WITHOUT_WORKSPACE_PREFIXES.some((prefix) => path.startsWith(prefix))
-    ) {
-      return;
-    }
-
+  if (
+    isAuthenticated &&
+    !isAdmin &&
+    !activeWorkspaceId &&
+    !isAllowedWithoutWorkspace(location.pathname)
+  ) {
     const next = encodeURIComponent(
       `${location.pathname}${location.search}${location.hash}`
     );
-    navigate(`/onboarding/profile?next=${next}`, { replace: true });
-  }, [
-    authLoading,
-    workspaceLoading,
-    isAuthenticated,
-    isAdmin,
-    activeWorkspaceId,
-    location.pathname,
-    location.search,
-    location.hash,
-    navigate,
-  ]);
+    return <Navigate to={`/onboarding/profile?next=${next}`} replace />;
+  }
 
   return <>{children}</>;
 }

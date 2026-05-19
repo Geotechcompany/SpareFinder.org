@@ -55,7 +55,7 @@ const PrivacyPolicy = lazy(() => import("@/pages/PrivacyPolicy"));
 const TermsOfService = lazy(() => import("@/pages/TermsOfService"));
 const Help = lazy(() => import("@/pages/Help"));
 const Trial = lazy(() => import("@/pages/Trial"));
-const OnboardingProfile = lazy(() => import("@/pages/OnboardingProfile"));
+import OnboardingProfile from "@/pages/OnboardingProfile";
 const MigrateAccount = lazy(() =>
   import("@/pages/MigrateAccount").then((m) => ({ default: m.MigrateAccount }))
 );

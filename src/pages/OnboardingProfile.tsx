@@ -17,7 +17,6 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/components/ui/use-toast";
-import { AnimatePresence, motion } from "framer-motion";
 import { ArrowLeft, ArrowRight, Building2, Target, Share2, Sparkles } from "lucide-react";
 
 type Interest = {
@@ -54,7 +53,7 @@ const STEP_META: Array<{
     description: "Company details to personalize your dashboard.",
     icon: Building2,
     image: {
-      src: "https://images.unsplash.com/photo-1587614382340-3ec188b4e842?auto=format&fit=crop&w=1600&q=80",
+      src: "/registerphoto.png",
       fallbackSrc: "/registerphoto.png",
       alt: "Industrial workshop",
       kicker: "Set up once",
@@ -67,7 +66,7 @@ const STEP_META: Array<{
     description: "Tell us what you want to achieve first.",
     icon: Target,
     image: {
-      src: "https://images.unsplash.com/photo-1460925895917-afdab827c52f?auto=format&fit=crop&w=1600&q=80",
+      src: "/dashboard.png",
       fallbackSrc: "/dashboard.png",
       alt: "Analytics dashboard",
       kicker: "Personalized",
@@ -80,7 +79,7 @@ const STEP_META: Array<{
     description: "Help us understand how you found SpareFinder.",
     icon: Share2,
     image: {
-      src: "https://images.unsplash.com/photo-1573164713712-03790a178651?auto=format&fit=crop&w=1600&q=80",
+      src: "/registerphoto.png",
       fallbackSrc: "/registerphoto.png",
       alt: "Team collaboration",
       kicker: "Improve onboarding",
@@ -93,7 +92,7 @@ const STEP_META: Array<{
     description: "Confirm details before continuing.",
     icon: Sparkles,
     image: {
-      src: "https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&w=1600&q=80",
+      src: "/dashboard.png",
       fallbackSrc: "/dashboard.png",
       alt: "Technology abstract",
       kicker: "Almost there",
@@ -106,7 +105,8 @@ const OnboardingProfile: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { user, isLoading, checkAuth } = useAuth();
-  const { refreshWorkspaces, needsSetup } = useWorkspace();
+  const { refreshWorkspaces, needsSetup, isLoading: workspaceLoading } =
+    useWorkspace();
   const { toast } = useToast();
 
   const nextPath = useMemo(() => {
@@ -115,7 +115,6 @@ const OnboardingProfile: React.FC = () => {
   }, [searchParams]);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isPrefillLoading, setIsPrefillLoading] = useState(true);
 
   const [company, setCompany] = useState("");
   const [role, setRole] = useState<string>("");
@@ -130,59 +129,53 @@ const OnboardingProfile: React.FC = () => {
   const activeStep = STEP_META[stepIndex];
   const progressValue = Math.round(((stepIndex + 1) / STEP_META.length) * 100);
 
-  const [rightImageSrc, setRightImageSrc] = useState(STEP_META[0].image.src);
+  const rightImageSrc = activeStep.image.src;
 
-  // Prefill from backend profile (includes preferences) to avoid asking twice.
+  // Instant prefill from auth user; enrich from profile API in background (non-blocking).
   useEffect(() => {
-    let isMounted = true;
-
-    const run = async () => {
-      if (isLoading) return;
-      if (!user) {
-        // Never leave the button stuck disabled when auth is not loading but user is missing.
-        setIsPrefillLoading(false);
-        return;
-      }
-
-      setIsPrefillLoading(true);
-      try {
-        const resp = await api.user.getProfile();
-        const profile = (resp as any)?.data?.profile;
-        const preferences = profile?.preferences ?? {};
-        const onboarding = preferences?.onboarding ?? {};
-
-        if (!isMounted) return;
-        setCompany(safeString(profile?.company) || safeString(user.company) || "");
-        setRole(safeString(onboarding.role));
-        setCompanySize(safeString(onboarding.companySize));
-        setPrimaryGoal(safeString(onboarding.primaryGoal));
-        setSelectedInterests(safeStringArray(onboarding.interests));
-        setReferralSource(safeString(onboarding.referralSource));
-        setReferralSourceOther(safeString(onboarding.referralSourceOther));
-      } catch {
-        // ignore; we can still allow manual entry
-        if (!isMounted) return;
-        setCompany(user.company ?? "");
-      } finally {
-        if (!isMounted) return;
-        setIsPrefillLoading(false);
-      }
-    };
-
-    void run();
-    return () => {
-      isMounted = false;
-    };
-  }, [isLoading, user]);
-
-  // If workspace already exists, skip onboarding.
-  useEffect(() => {
-    if (isLoading) return;
     if (!user) return;
-    if (!needsSetup && user.company && user.company.trim().length > 0) {
+    if (user.company?.trim()) setCompany(user.company.trim());
+
+    let cancelled = false;
+    void api.user
+      .getProfile()
+      .then((resp) => {
+        if (cancelled) return;
+        const profile = (resp as { data?: { profile?: Record<string, unknown> } })
+          ?.data?.profile;
+        const onboarding =
+          (profile?.preferences as { onboarding?: Record<string, unknown> } | undefined)
+            ?.onboarding ?? {};
+        const profileCompany = safeString(profile?.company);
+        if (profileCompany) setCompany(profileCompany);
+        if (safeString(onboarding.role)) setRole(safeString(onboarding.role));
+        if (safeString(onboarding.companySize))
+          setCompanySize(safeString(onboarding.companySize));
+        if (safeString(onboarding.primaryGoal))
+          setPrimaryGoal(safeString(onboarding.primaryGoal));
+        setSelectedInterests(safeStringArray(onboarding.interests));
+        if (safeString(onboarding.referralSource))
+          setReferralSource(safeString(onboarding.referralSource));
+        if (safeString(onboarding.referralSourceOther))
+          setReferralSourceOther(safeString(onboarding.referralSourceOther));
+      })
+      .catch(() => {
+        /* manual entry is fine */
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
+
+  // Workspace already created — no need to repeat onboarding.
+  useEffect(() => {
+    if (isLoading || workspaceLoading) return;
+    if (!user) return;
+    if (!needsSetup) {
       navigate(nextPath, { replace: true });
     }
-  }, [isLoading, user, needsSetup, nextPath, navigate]);
+  }, [isLoading, workspaceLoading, user, needsSetup, nextPath, navigate]);
 
   const toggleInterest = (interestId: string) => {
     setSelectedInterests((prev) =>
@@ -190,11 +183,31 @@ const OnboardingProfile: React.FC = () => {
     );
   };
 
-  const canGoNext = () => {
-    if (activeStep.id === "company") return !!company.trim();
-    if (activeStep.id === "referral") return !!referralSource.trim() && (referralSource !== "other" || !!referralSourceOther.trim());
+  const canGoNext = useMemo(() => {
+    if (activeStep.id === "company") {
+      return (
+        !!company.trim() && !!role.trim() && !!companySize.trim()
+      );
+    }
+    if (activeStep.id === "goals") {
+      return !!primaryGoal.trim();
+    }
+    if (activeStep.id === "referral") {
+      return (
+        !!referralSource.trim() &&
+        (referralSource !== "other" || !!referralSourceOther.trim())
+      );
+    }
     return true;
-  };
+  }, [
+    activeStep.id,
+    company,
+    role,
+    companySize,
+    primaryGoal,
+    referralSource,
+    referralSourceOther,
+  ]);
 
   const handleSubmit = async () => {
     const trimmedCompany = company.trim();
@@ -253,11 +266,14 @@ const OnboardingProfile: React.FC = () => {
     }
   };
 
-  const isCompleteDisabled = isSubmitting || isLoading || isPrefillLoading || !company.trim();
-
-  useEffect(() => {
-    setRightImageSrc(activeStep.image.src);
-  }, [activeStep.id]);
+  const isCompleteDisabled =
+    isSubmitting ||
+    !company.trim() ||
+    !role.trim() ||
+    !companySize.trim() ||
+    !primaryGoal.trim() ||
+    !referralSource.trim() ||
+    (referralSource === "other" && !referralSourceOther.trim());
 
   return (
     <div className="flex min-h-[100dvh] flex-col bg-gradient-to-b from-background via-[#F0F2F5] to-[#E8EBF1] dark:from-slate-950 dark:via-slate-950 dark:to-slate-900">
@@ -290,15 +306,7 @@ const OnboardingProfile: React.FC = () => {
               </div>
 
               <div className="mt-6 min-h-0 flex-1 overflow-y-auto pr-1 [-webkit-overflow-scrolling:touch]">
-              <AnimatePresence mode="wait">
-                <motion.div
-                  key={activeStep.id}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                  transition={{ duration: 0.2 }}
-                  className="space-y-5"
-                >
+              <div key={activeStep.id} className="space-y-5">
                   {activeStep.id === "company" ? (
                     <>
                       <div className="space-y-2">
@@ -470,24 +478,24 @@ const OnboardingProfile: React.FC = () => {
                       </p>
                     </div>
                   ) : null}
-                </motion.div>
-              </AnimatePresence>
+              </div>
               </div>
 
               <div className="mt-6 flex shrink-0 flex-col-reverse gap-3 border-t border-border/60 pt-6 sm:flex-row sm:items-center sm:justify-between">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  onClick={() => {
-                    if (stepIndex === 0) navigate(nextPath);
-                    else setStepIndex((s) => Math.max(0, s - 1));
-                  }}
-                  disabled={isSubmitting}
-                  className="w-full sm:w-auto"
-                >
-                  <ArrowLeft className="mr-2 h-4 w-4" />
-                  {stepIndex === 0 ? "Skip for now" : "Back"}
-                </Button>
+                {stepIndex > 0 ? (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={() => setStepIndex((s) => Math.max(0, s - 1))}
+                    disabled={isSubmitting}
+                    className="w-full sm:w-auto"
+                  >
+                    <ArrowLeft className="mr-2 h-4 w-4" />
+                    Back
+                  </Button>
+                ) : (
+                  <div className="hidden sm:block sm:w-auto" aria-hidden />
+                )}
 
                 {activeStep.id === "review" ? (
                   <Button
@@ -502,7 +510,7 @@ const OnboardingProfile: React.FC = () => {
                   <Button
                     type="button"
                     onClick={() => setStepIndex((s) => Math.min(STEP_META.length - 1, s + 1))}
-                    disabled={isSubmitting || isLoading || isPrefillLoading || !canGoNext()}
+                    disabled={isSubmitting || !canGoNext}
                     className="w-full sm:w-auto bg-gradient-to-r from-brand to-brand-dark hover:from-brand-dark hover:to-brand-dark"
                   >
                     Next
@@ -524,8 +532,8 @@ const OnboardingProfile: React.FC = () => {
                     src={rightImageSrc}
                     alt={activeStep.image.alt}
                     className="h-full w-full min-h-[100dvh] object-cover"
-                    loading="lazy"
-                    onError={() => setRightImageSrc(activeStep.image.fallbackSrc)}
+                    loading="eager"
+                    decoding="async"
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/55 via-black/10 to-transparent" />
                   <div className="absolute bottom-6 left-6 right-6 text-white lg:bottom-10 lg:left-10 lg:right-10 xl:bottom-14 xl:left-14 xl:right-14">

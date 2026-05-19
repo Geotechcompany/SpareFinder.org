@@ -13,27 +13,30 @@ import { Sparkles, Shield, CheckCircle2, Crown, Zap, ShieldCheck } from "lucide-
 import { api } from "@/lib/api";
 import { PLAN_CONFIG, type PlanTier, isUnlimited } from "@/lib/plans";
 import { useAuth } from "@/contexts/AuthContext";
+import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { useToast } from "@/components/ui/use-toast";
 
 const Trial: React.FC = () => {
   const navigate = useNavigate();
   const { user, isLoading } = useAuth();
+  const { needsSetup, isLoading: workspaceLoading } = useWorkspace();
   const { toast } = useToast();
   const [loadingTier, setLoadingTier] = useState<PlanTier | null>(null);
   const [loadingMode, setLoadingMode] = useState<"trial" | "paid" | null>(null);
   const [trialUsed, setTrialUsed] = useState(false);
   const [trialUsedLoading, setTrialUsedLoading] = useState(true);
 
-  // Enforce post-signup onboarding before plan selection.
+  // Require workspace onboarding before plan selection.
   React.useEffect(() => {
-    if (isLoading) return;
+    if (isLoading || workspaceLoading) return;
     if (!user) return;
-    if (!user.company || user.company.trim().length === 0) {
-      navigate(`/onboarding/profile?next=${encodeURIComponent("/dashboard/billing")}`, {
-        replace: true,
-      });
+    if (needsSetup || !user.company?.trim()) {
+      navigate(
+        `/onboarding/profile?next=${encodeURIComponent("/onboarding/trial")}`,
+        { replace: true }
+      );
     }
-  }, [isLoading, user, navigate]);
+  }, [isLoading, workspaceLoading, user, needsSetup, navigate]);
 
   // Fetch whether user has already used a trial (one trial per account).
   React.useEffect(() => {
@@ -115,16 +118,8 @@ const Trial: React.FC = () => {
           <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-brand/5 via-transparent to-blue-500/5 dark:from-brand/10 dark:to-blue-500/10" />
 
           <CardHeader className="relative text-center space-y-3">
-          <Button
-            type="button"
-            variant="ghost"
-            className="absolute right-4 top-4 text-muted-foreground hover:text-foreground hover:bg-muted/60"
-            onClick={() => navigate("/dashboard")}
-          >
-            Skip for now
-          </Button>
-          <div className="mx-auto w-14 h-14 rounded-xl bg-gradient-to-r from-brand to-brand-dark flex items-center justify-center">
-            <Sparkles className="w-7 h-7 text-white" />
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-xl bg-gradient-to-r from-brand to-brand-dark">
+            <Sparkles className="h-7 w-7 text-white" />
           </div>
           <CardTitle className="text-2xl text-foreground">Choose your plan</CardTitle>
           <CardDescription className="text-muted-foreground">
