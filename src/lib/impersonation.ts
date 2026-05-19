@@ -30,8 +30,29 @@ export function clearImpersonationMeta(): void {
   sessionStorage.removeItem(IMPERSONATION_STORAGE_KEY);
 }
 
-export function startImpersonationRedirect(token: string, meta: ImpersonationMeta): void {
+export function startImpersonationSession(
+  session: { token?: string | null; redirectUrl?: string | null },
+  meta: ImpersonationMeta
+): void {
   writeImpersonationMeta(meta);
-  const ticket = encodeURIComponent(token);
-  window.location.href = `${window.location.origin}/dashboard?__clerk_ticket=${ticket}`;
+
+  const redirectUrl = session.redirectUrl?.trim();
+  if (redirectUrl) {
+    window.location.href = redirectUrl;
+    return;
+  }
+
+  const token = session.token?.trim();
+  if (token) {
+    const ticket = encodeURIComponent(token);
+    window.location.href = `${window.location.origin}/dashboard?__clerk_ticket=${ticket}`;
+    return;
+  }
+
+  throw new Error("No impersonation ticket returned from the server.");
+}
+
+/** @deprecated Use startImpersonationSession */
+export function startImpersonationRedirect(token: string, meta: ImpersonationMeta): void {
+  startImpersonationSession({ token }, meta);
 }

@@ -17,6 +17,7 @@ from .workspace_dependencies import (
     WorkspaceScope,
     get_workspace_scope,
     workspace_delete,
+    workspace_isolation_enabled,
     workspace_select,
     workspace_update,
 )
@@ -264,7 +265,6 @@ async def create_crew_analysis_job(
         job_data = {
             "id": job_id,
             "user_id": user_id,
-            "workspace_id": workspace_id,
             "user_email": user_email,
             "image_url": image_url,
             "image_name": image.filename,
@@ -272,6 +272,8 @@ async def create_crew_analysis_job(
             "status": "pending",
             "progress": 0,
         }
+        if workspace_isolation_enabled():
+            job_data["workspace_id"] = workspace_id
 
         result = (
             supabase.table("crew_analysis_jobs")

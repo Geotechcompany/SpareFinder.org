@@ -876,7 +876,8 @@ export const adminApi = {
     userId: string
   ): Promise<
     ApiResponse<{
-      token: string;
+      token?: string | null;
+      redirect_url?: string | null;
       target: { id: string; email?: string; full_name?: string };
     }>
   > => {

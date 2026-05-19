@@ -80,8 +80,17 @@ async def get_workspace_scope(
 
 def _workspace_column_missing(exc: BaseException) -> bool:
     text = str(exc).lower()
-    return "42703" in text or (
-        "workspace_id" in text and "does not exist" in text
+    if "42703" in text or "pgrst204" in text:
+        return True
+    if "workspace_id" not in text:
+        return False
+    return any(
+        marker in text
+        for marker in (
+            "does not exist",
+            "could not find",
+            "schema cache",
+        )
     )
 
 
@@ -101,9 +110,19 @@ def _probe_workspace_isolation() -> bool:
         supabase.table("crew_analysis_jobs").select("workspace_id").limit(1).execute()
         _workspace_isolation_ready = True
     except Exception as exc:
-        _workspace_isolation_ready = not _workspace_column_missing(exc)
+        if _workspace_column_missing(exc):
+            _workspace_isolation_ready = False
+        else:
+            # Network/transient errors: do not enable workspace columns
+            _workspace_isolation_ready = False
 
     return _workspace_isolation_ready
+
+
+def reset_workspace_isolation_probe() -> None:
+    """Clear cached probe (e.g. after running DB migrations)."""
+    global _workspace_isolation_ready
+    _workspace_isolation_ready = None
 
 
 def workspace_or_filter(scope: WorkspaceScope, *, user_column: str = "user_id") -> str:

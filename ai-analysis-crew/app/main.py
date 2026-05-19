@@ -63,10 +63,22 @@ app = FastAPI(
     redirect_slashes=True  # Allow both /api/billing and /api/billing/
 )
 
-# CORS middleware
+# CORS middleware — explicit origins (wildcard + credentials breaks browser CORS)
+_cors_origins = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "https://sparefinder.org",
+    "https://www.sparefinder.org",
+]
+_extra = (os.getenv("CORS_ORIGINS") or "").strip()
+if _extra:
+    _cors_origins.extend(o.strip() for o in _extra.split(",") if o.strip())
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # In production, replace with specific frontend URL
+    allow_origins=_cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

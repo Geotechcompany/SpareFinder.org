@@ -12,7 +12,7 @@ export default defineConfig(({ mode }) => ({
     // Use "/api/" (trailing slash) so "/api-docs" is not mistaken for "/api" + "docs"
     proxy: {
       "^/api/": {
-        target: process.env.VITE_API_URL || "http://localhost:8000",
+        target: process.env.VITE_API_URL || "http://localhost:8700",
         changeOrigin: true,
         secure: false,
       },

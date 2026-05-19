@@ -70,7 +70,7 @@ import {
   UserCog,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
-import { startImpersonationRedirect } from "@/lib/impersonation";
+import { startImpersonationSession } from "@/lib/impersonation";
 
 interface UserData {
   id: string;
@@ -459,17 +459,25 @@ const UserManagement = () => {
     try {
       const response = await api.admin.impersonateUser(target.id);
       const token = response.data?.token;
-      if (!response.success || !token) {
+      const redirectUrl = (response.data as { redirect_url?: string })?.redirect_url;
+      if (!response.success || (!token && !redirectUrl)) {
         throw new Error(
-          response.error || response.message || "Failed to start impersonation"
+          response.message ||
+            (typeof response.error === "string" && response.error !== "error"
+              ? response.error
+              : null) ||
+            "Failed to start impersonation. Check Clerk impersonation is enabled."
         );
       }
       const targetMeta = response.data?.target;
-      startImpersonationRedirect(token, {
-        targetEmail: targetMeta?.email || target.email,
-        targetName: targetMeta?.full_name || target.full_name,
-        returnUrl: "/admin/users",
-      });
+      startImpersonationSession(
+        { token, redirectUrl },
+        {
+          targetEmail: targetMeta?.email || target.email,
+          targetName: targetMeta?.full_name || target.full_name,
+          returnUrl: "/admin/users",
+        }
+      );
     } catch (error) {
       console.error("Impersonation error:", error);
       toast({

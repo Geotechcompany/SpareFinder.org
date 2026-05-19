@@ -24,6 +24,16 @@ if not SUPABASE_URL or not SUPABASE_KEY:
 else:
     logger.info(f"✅ Supabase configured: {SUPABASE_URL[:30]}...")
 
+def _workspace_columns_ready() -> bool:
+    """Only attach workspace_id when the column exists (post-migration)."""
+    try:
+        from .api.workspace_dependencies import workspace_isolation_enabled
+
+        return workspace_isolation_enabled()
+    except Exception:
+        return False
+
+
 # Supabase headers
 SUPABASE_HEADERS = {
     "apikey": SUPABASE_KEY,
@@ -133,7 +143,7 @@ def store_crew_analysis_to_database(
         # Add user_id if available (now supported in schema)
         if user_id:
             job_data['user_id'] = user_id
-        if workspace_id:
+        if workspace_id and _workspace_columns_ready():
             job_data['workspace_id'] = workspace_id
         
         # Store in jobs table
@@ -154,7 +164,6 @@ def store_crew_analysis_to_database(
         search_data = {
             'id': analysis_id,
             'user_id': user_id,  # Add user_id for RLS
-            'workspace_id': workspace_id,
             'search_term': keywords or 'SpareFinder AI Research',
             'search_type': 'advanced',  # Use 'advanced' as per part_searches check constraint
             'part_name': part_name,
@@ -182,7 +191,9 @@ def store_crew_analysis_to_database(
             },
             'created_at': datetime.utcnow().isoformat()
         }
-        
+        if workspace_id and _workspace_columns_ready():
+            search_data["workspace_id"] = workspace_id
+
         searches_url = f"{SUPABASE_URL}/rest/v1/part_searches"
         logger.info(f"📤 Upserting to part_searches table: {searches_url}")
         
@@ -465,9 +476,9 @@ def create_crew_job(
             'created_at': datetime.utcnow().isoformat(),
             'updated_at': datetime.utcnow().isoformat()
         }
-        if workspace_id:
+        if workspace_id and _workspace_columns_ready():
             job_data['workspace_id'] = workspace_id
-        
+
         url = f"{SUPABASE_URL}/rest/v1/crew_analysis_jobs"
         # Use fresh headers without Prefer to avoid schema cache issues
         fresh_headers = {

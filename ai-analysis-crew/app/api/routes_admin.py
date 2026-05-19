@@ -6,6 +6,7 @@ import smtplib
 import math
 import requests
 from datetime import datetime, timedelta, timezone
+from urllib.parse import parse_qs, urlparse
 from email.header import Header
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
@@ -133,6 +134,30 @@ def _parse_iso_datetime(val: Any) -> datetime | None:
     if dt.tzinfo is None:
         return dt.replace(tzinfo=timezone.utc)
     return dt
+
+
+def _actor_ticket_from_clerk_response(data: dict[str, Any]) -> tuple[str | None, str | None]:
+    """Clerk may return `token`, a consumable `url`, or both (token can be null)."""
+    token: str | None = None
+    redirect_url: str | None = None
+
+    raw_token = data.get("token")
+    if isinstance(raw_token, str) and raw_token.strip():
+        token = raw_token.strip()
+
+    raw_url = data.get("url")
+    if isinstance(raw_url, str) and raw_url.strip():
+        redirect_url = raw_url.strip()
+        if not token:
+            parsed = urlparse(redirect_url)
+            query = parse_qs(parsed.query)
+            for key in ("__clerk_ticket", "ticket"):
+                values = query.get(key)
+                if values and isinstance(values[0], str) and values[0].strip():
+                    token = values[0].strip()
+                    break
+
+    return token, redirect_url
 
 
 def _trial_info_from_subscription(
@@ -348,15 +373,24 @@ async def admin_impersonate_user(
             status_code=502,
         )
 
-    data = resp.json() if resp.content else {}
-    token = data.get("token") if isinstance(data, dict) else None
-    if not isinstance(token, str) or not token.strip():
-        return api_error("Clerk did not return an impersonation token.", status_code=502)
+    clerk_payload = resp.json() if resp.content else {}
+    if not isinstance(clerk_payload, dict):
+        clerk_payload = {}
+
+    token, redirect_url = _actor_ticket_from_clerk_response(clerk_payload)
+    if not token and not redirect_url:
+        status = clerk_payload.get("status")
+        return api_error(
+            "Clerk did not return an impersonation ticket or URL. "
+            f"Enable user impersonation in the Clerk Dashboard (status={status!r}).",
+            status_code=502,
+        )
 
     return api_ok(
         message="Impersonation token created",
         data={
-            "token": token.strip(),
+            "token": token,
+            "redirect_url": redirect_url,
             "target": {
                 "id": target.get("id"),
                 "email": target.get("email"),
