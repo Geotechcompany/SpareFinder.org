@@ -447,9 +447,9 @@ async def delete_crew_analysis_job(
 
         from ..crew_job_cancel import request_cancel_crew_job
 
+        request_cancel_crew_job(job_id)
         job_status = str(check_result.data.get("status") or "").lower()
         if job_status in ("pending", "processing"):
-            request_cancel_crew_job(job_id)
             logger.info("Cancelling in-flight crew analysis before delete: %s", job_id)
 
         delete_result = (
