@@ -22,6 +22,14 @@ _UPLOAD_TIMEOUT_SEC = 120
 _UPLOAD_RETRIES = 3
 
 
+class StorageUploadError(RuntimeError):
+    """Raised when Supabase Storage REST upload returns a non-success status."""
+
+    def __init__(self, status_code: int, detail: str):
+        self.status_code = status_code
+        super().__init__(f"HTTP {status_code}: {detail}")
+
+
 def _storage_headers(content_type: str, *, upsert: bool = True) -> dict[str, str]:
     return {
         "Authorization": f"Bearer {SUPABASE_KEY}",
@@ -32,7 +40,8 @@ def _storage_headers(content_type: str, *, upsert: bool = True) -> dict[str, str
 
 
 def _public_url(bucket: str, storage_path: str) -> str:
-    return f"{SUPABASE_URL}/storage/v1/object/public/{bucket}/{storage_path}"
+    encoded_path = quote(storage_path, safe="/")
+    return f"{SUPABASE_URL}/storage/v1/object/public/{bucket}/{encoded_path}"
 
 
 def _upload_via_rest(
@@ -52,12 +61,15 @@ def _upload_via_rest(
         timeout=(15, _UPLOAD_TIMEOUT_SEC),
     )
     if response.status_code not in (200, 201):
-        raise RuntimeError(
-            f"HTTP {response.status_code}: {(response.text or '')[:500]}"
+        raise StorageUploadError(
+            response.status_code,
+            (response.text or "")[:500],
         )
 
 
 def _is_retryable_error(exc: BaseException) -> bool:
+    if isinstance(exc, StorageUploadError):
+        return 500 <= exc.status_code < 600
     if isinstance(exc, (requests.exceptions.ConnectionError, requests.exceptions.Timeout)):
         return True
     msg = str(exc).lower()
