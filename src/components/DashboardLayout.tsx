@@ -101,9 +101,11 @@ const DashboardLayout: React.FC = () => {
           <div className="mx-auto flex w-full max-w-[var(--dashboard-content-max-width)] flex-col">
             <ImpersonationBanner />
             <DashboardHeader />
-            <Suspense fallback={null}>
-              <Outlet />
-            </Suspense>
+            <WorkspaceSetupGuard>
+              <Suspense fallback={null}>
+                <Outlet />
+              </Suspense>
+            </WorkspaceSetupGuard>
           </div>
         </motion.div>
 

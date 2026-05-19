@@ -51,6 +51,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import { prependCrewJobToCache } from "@/lib/crew-jobs-cache";
 import { useSubscription } from "@/contexts/SubscriptionContext";
 import { PlanRequiredCard } from "@/components/billing/PlanRequiredCard";
+import { WorkspaceRequiredCard } from "@/components/dashboard/WorkspaceRequiredCard";
+import { useRequireWorkspace } from "@/hooks/use-require-workspace";
 import { API_BASE_URL } from "@/lib/config";
 import axios from "axios";
 import { useToast } from "@/components/ui/use-toast";
@@ -933,10 +935,6 @@ const Upload = () => {
   const [confirmKeywordSearchOpen, setConfirmKeywordSearchOpen] =
     useState(false);
   const [isKeywordSearching, setIsKeywordSearching] = useState(false);
-  if (!subscriptionLoading && !hasPlanAccess) {
-    return <PlanRequiredCard title="Activate a plan to upload" />;
-  }
-
   // Wizard state
   const [wizardStep, setWizardStep] = useState<
     "landing" | "selection" | "image" | "keywords" | "review"
@@ -979,6 +977,8 @@ const Upload = () => {
   const { toast } = useToast();
   const { uploadFile } = useFileUpload();
   const navigate = useNavigate();
+  const { hasWorkspace, requireWorkspace, isLoading: workspaceLoading } =
+    useRequireWorkspace();
 
   const getProgressStageColor = (stage: string) => {
     switch (stage) {
@@ -1141,6 +1141,8 @@ const Upload = () => {
   };
 
   const performKeywordSearch = async () => {
+    if (!requireWorkspace()) return;
+
     const keywordsStr = Array.isArray(savedKeywords)
       ? savedKeywords.join(" ")
       : String(savedKeywords ?? "");
@@ -1357,6 +1359,8 @@ const Upload = () => {
   };
 
   const handleReviewAnalyze = async () => {
+    if (!requireWorkspace()) return;
+
     if (selectedMode === "keywords") {
       await performKeywordSearch();
       return;
@@ -2301,6 +2305,8 @@ const Upload = () => {
   );
 
   const scheduleAnalysis = useCallback(async () => {
+    if (!requireWorkspace()) return;
+
     if (!uploadedFile) {
       toast({
         title: "No file selected",
@@ -3495,8 +3501,21 @@ const Upload = () => {
     );
   };
 
+  if (!subscriptionLoading && !hasPlanAccess) {
+    return <PlanRequiredCard title="Activate a plan to upload" />;
+  }
+
+  if (
+    !subscriptionLoading &&
+    !workspaceLoading &&
+    hasPlanAccess &&
+    !hasWorkspace
+  ) {
+    return <WorkspaceRequiredCard />;
+  }
+
   return (
-    <div className="min-h-screen flex w-full bg-background dark:bg-black relative overflow-hidden">
+    <motion.div className="min-h-screen flex w-full bg-background dark:bg-black relative overflow-hidden">
       {/* Animated Background Elements */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <motion.div
@@ -4024,9 +4043,11 @@ const Upload = () => {
                 onBack={handleBackStep}
                 onStartOver={handleResetWizard}
                 analyzeDisabled={
-                  (selectedMode === "image" || selectedMode === "both") &&
-                  !uploadedFile
+                  !hasWorkspace ||
+                  ((selectedMode === "image" || selectedMode === "both") &&
+                    !uploadedFile)
                 }
+                workspaceRequired={!hasWorkspace}
                 onAnalyze={handleReviewAnalyze}
               />
             </motion.div>
@@ -4788,7 +4809,7 @@ const Upload = () => {
         imageFile={uploadedFile}
         keywords={savedKeywords.join(" ")}
       />
-    </div>
+    </motion.div>
   );
 };
 

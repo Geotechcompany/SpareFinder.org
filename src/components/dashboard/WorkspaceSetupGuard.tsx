@@ -3,26 +3,44 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 
-/** Sends users without a workspace to onboarding to create one. */
+/** Routes users may visit before they have an active workspace (e.g. billing, then onboarding). */
+const ALLOWED_WITHOUT_WORKSPACE_PREFIXES = [
+  "/onboarding",
+  "/dashboard/billing",
+  "/dashboard/settings",
+] as const;
+
+/** Sends users without an active workspace to onboarding to create one. */
 export function WorkspaceSetupGuard({ children }: { children: React.ReactNode }) {
   const navigate = useNavigate();
   const location = useLocation();
   const { isAuthenticated, isLoading: authLoading, isAdmin } = useAuth();
-  const { needsSetup, isLoading: workspaceLoading } = useWorkspace();
+  const { activeWorkspaceId, isLoading: workspaceLoading } = useWorkspace();
 
   useEffect(() => {
     if (authLoading || workspaceLoading || !isAuthenticated || isAdmin) return;
-    if (!needsSetup) return;
-    if (location.pathname.startsWith("/onboarding")) return;
+    if (activeWorkspaceId) return;
 
-    navigate("/onboarding/profile?next=/dashboard", { replace: true });
+    const path = location.pathname;
+    if (
+      ALLOWED_WITHOUT_WORKSPACE_PREFIXES.some((prefix) => path.startsWith(prefix))
+    ) {
+      return;
+    }
+
+    const next = encodeURIComponent(
+      `${location.pathname}${location.search}${location.hash}`
+    );
+    navigate(`/onboarding/profile?next=${next}`, { replace: true });
   }, [
     authLoading,
     workspaceLoading,
     isAuthenticated,
     isAdmin,
-    needsSetup,
+    activeWorkspaceId,
     location.pathname,
+    location.search,
+    location.hash,
     navigate,
   ]);
 

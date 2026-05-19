@@ -62,6 +62,9 @@ export type AnalysisSummaryReviewProps = {
   onAnalyze: () => void;
 
   analyzeDisabled?: boolean;
+
+  /** When true, show a hint that a workspace must be created first. */
+  workspaceRequired?: boolean;
 };
 
 export function AnalysisSummaryReview({
@@ -82,6 +85,8 @@ export function AnalysisSummaryReview({
   onAnalyze,
 
   analyzeDisabled = false,
+
+  workspaceRequired = false,
 }: AnalysisSummaryReviewProps) {
   const hasImage = (mode === "image" || mode === "both") && uploadedFile;
 
@@ -295,6 +300,13 @@ export function AnalysisSummaryReview({
             </p>
           </div>
         </div>
+
+        {workspaceRequired ? (
+          <p className="relative mb-4 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-900 dark:text-amber-100">
+            Create a workspace before starting an analysis. Use the sidebar switcher
+            or complete quick onboarding.
+          </p>
+        ) : null}
 
         <div className="relative flex flex-col gap-3 rounded-2xl border border-border/50 bg-muted/30 p-2 shadow-inner backdrop-blur-md dark:border-white/10 dark:bg-black/30 sm:flex-row sm:items-center sm:justify-between sm:p-2.5">
           <Button
