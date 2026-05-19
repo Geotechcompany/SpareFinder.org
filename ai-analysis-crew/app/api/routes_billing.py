@@ -12,6 +12,7 @@ from pydantic import BaseModel
 
 from .auth_dependencies import CurrentUser, get_current_user
 from .responses import api_error, api_ok
+from .subscription_utils import pick_best_subscription_row
 from .supabase_admin import get_supabase_admin
 from ..email_sender import (
     send_expired_plan_resubscribe_email,
@@ -165,9 +166,7 @@ async def get_billing_info(user: CurrentUser = Depends(get_current_user)):
         # Get subscription info
         sub_result = supabase.table("subscriptions").select("*").eq("user_id", user_id).execute()
 
-        subscription = None
-        if sub_result.data and len(sub_result.data) > 0:
-            subscription = sub_result.data[0]
+        subscription = pick_best_subscription_row(sub_result.data or [])
 
         # Get current usage
         now = datetime.now()

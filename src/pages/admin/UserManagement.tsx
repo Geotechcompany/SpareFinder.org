@@ -801,7 +801,9 @@ const UserManagement = () => {
                                 <TableCell>
                                   <Select
                                     value={
-                                      user.subscription_status === "canceled"
+                                      !user.subscription_status ||
+                                      user.subscription_status === "canceled" ||
+                                      user.subscription_status === "inactive"
                                         ? "no_plan"
                                         : (user.subscription_tier || "free")
                                     }

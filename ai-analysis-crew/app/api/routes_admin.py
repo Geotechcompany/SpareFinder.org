@@ -23,6 +23,7 @@ from .errors import ApiError
 from .responses import api_error, api_ok
 from .support_ticket_email import format_ticket_message_html_for_email, format_ticket_message_plain_for_email
 from .support_ticket_thread import enrich_ticket_messages_authors, fetch_ticket_messages_raw
+from .subscription_utils import merge_subscription_by_user, pick_best_subscription_row
 from .supabase_admin import get_supabase_admin
 from .supabase_auth_admin import delete_supabase_auth_user
 
@@ -223,26 +224,25 @@ async def admin_get_users(
                 .in_("user_id", user_ids)
                 .execute()
             )
-            for row in (subs_res.data or []):
-                uid = row.get("user_id")
-                if uid:
-                    tier = row.get("tier") or "free"
-                    status = row.get("status") or "inactive"
-                    period_end = row.get("current_period_end")
-                    trial = _trial_info_from_subscription(tier, status, period_end)
-                    subscription_by_user[str(uid)] = {
-                        "tier": tier,
-                        "status": status,
-                        "current_period_end": period_end,
-                        **trial,
-                    }
+            merged = merge_subscription_by_user(subs_res.data or [])
+            for uid_s, row in merged.items():
+                tier = row.get("tier") or "free"
+                status = row.get("status") or "inactive"
+                period_end = row.get("current_period_end")
+                trial = _trial_info_from_subscription(tier, status, period_end)
+                subscription_by_user[uid_s] = {
+                    "tier": tier,
+                    "status": status,
+                    "current_period_end": period_end,
+                    **trial,
+                }
         except Exception:
             pass
     for u in users:
         uid = u.get("id")
         sub = subscription_by_user.get(str(uid)) if uid else None
-        u["subscription_tier"] = sub["tier"] if sub else "free"
-        u["subscription_status"] = sub["status"] if sub else "inactive"
+        u["subscription_tier"] = sub["tier"] if sub else None
+        u["subscription_status"] = sub["status"] if sub else None
         u["is_on_trial"] = bool(sub and sub.get("is_on_trial"))
         u["trial_days_remaining"] = sub.get("trial_days_remaining") if sub else None
         u["trial_ends_at"] = sub.get("trial_ends_at") if sub else None
@@ -462,7 +462,7 @@ async def admin_update_user_plan(
             .execute()
         )
         data_list = (updated_list.data or []) if hasattr(updated_list, "data") else []
-        updated = data_list[0] if data_list else None
+        updated = pick_best_subscription_row(data_list)
         return api_ok(
             message="User plan set to no plan." if is_no_plan else "User plan updated successfully",
             data={"subscription": updated},
@@ -490,7 +490,7 @@ async def admin_update_user_plan(
         .execute()
     )
     data_list = (inserted_list.data or []) if hasattr(inserted_list, "data") else []
-    inserted = data_list[0] if data_list else None
+    inserted = pick_best_subscription_row(data_list)
     return api_ok(
         message="User plan set to no plan." if is_no_plan else "User plan set successfully",
         data={"subscription": inserted},

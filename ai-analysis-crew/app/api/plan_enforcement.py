@@ -79,18 +79,22 @@ def plan_display_name(tier: str) -> str:
 
 async def _fetch_user_subscription_row(user_id: str) -> dict | None:
     """Active or trialing subscription (matches frontend isPlanActive)."""
+    from .subscription_utils import ACTIVE_STATUSES, pick_best_subscription_row
+
     supabase = get_supabase_admin()
     sub = (
         supabase.table("subscriptions")
-        .select("tier, plan_type, status")
+        .select("tier, plan_type, status, current_period_end, updated_at")
         .eq("user_id", user_id)
-        .in_("status", ["active", "trialing"])
-        .limit(1)
         .execute()
     )
-    if sub.data:
-        return sub.data[0]
-    return None
+    row = pick_best_subscription_row(sub.data or [])
+    if not row:
+        return None
+    status = str(row.get("status") or "").lower()
+    if status not in ACTIVE_STATUSES:
+        return None
+    return row
 
 
 async def user_has_active_plan(user_id: str, role: str) -> bool:

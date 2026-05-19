@@ -153,6 +153,23 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({
     };
   }, [refreshSubscription]);
 
+  // Re-fetch after admin plan changes or when returning to the tab.
+  useEffect(() => {
+    if (!isAuthenticated || isAuthLoading) return;
+
+    const onFocus = () => void refreshSubscription();
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") void refreshSubscription();
+    };
+
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, [isAuthenticated, isAuthLoading, refreshSubscription]);
+
   const value: SubscriptionContextValue = useMemo(
     () => ({
       tier,
