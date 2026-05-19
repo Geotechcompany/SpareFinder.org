@@ -48,6 +48,7 @@ import MobileSidebar from "@/components/MobileSidebar";
 import { useDashboardLayout } from "@/contexts/DashboardLayoutContext";
 import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
+import { prependCrewJobToCache } from "@/lib/crew-jobs-cache";
 import { useSubscription } from "@/contexts/SubscriptionContext";
 import { PlanRequiredCard } from "@/components/billing/PlanRequiredCard";
 import { API_BASE_URL } from "@/lib/config";
@@ -899,6 +900,7 @@ const Upload = () => {
   /** Brief submit state for crew jobs — no fullscreen overlay (analysis runs on History). */
   const [isSubmittingCrewJob, setIsSubmittingCrewJob] = useState(false);
   const { inLayout } = useDashboardLayout();
+  const { user } = useAuth();
   const { isPlanActive, isLoading: subscriptionLoading } = useSubscription();
   const { regionLabel, isLoading: regionLoading, error: regionError } = useDetectedRegion();
   const REGION_PREFERENCE_KEY = "sparefinder_region_enabled";
@@ -1247,6 +1249,9 @@ const Upload = () => {
             }
           : null;
 
+      if (user?.id && newCrewJob) {
+        prependCrewJobToCache(user.id, newCrewJob);
+      }
       setTimeout(() => {
         navigate("/dashboard/history", {
           replace: true,
@@ -1444,6 +1449,10 @@ const Upload = () => {
             current_stage: "image_analysis",
           }
         : null;
+
+      if (user?.id && historyJob) {
+        prependCrewJobToCache(user.id, historyJob);
+      }
 
       showAnalysisStartedToast({
         imageName: uploadedFile.name,

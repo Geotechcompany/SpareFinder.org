@@ -1,6 +1,7 @@
 import React, {
   useState,
   useEffect,
+  useLayoutEffect,
   useCallback,
   useRef,
   useMemo,
@@ -70,9 +71,20 @@ import {
 } from "@/components/ui/pagination";
 import { useLocation } from "react-router-dom";
 
+import {
+  readCrewJobsCache,
+  writeCrewJobsCache,
+} from "@/lib/crew-jobs-cache";
+
 const HISTORY_PATH = "/dashboard/history";
 
 const OPTIMISTIC_JOB_GRACE_MS = 3 * 60 * 1000;
+
+function prependCrewJob(jobs: any[], job: any): any[] {
+  if (!job?.id) return jobs;
+  const row = { ...job, _uniqueCardKey: job.id };
+  return [row, ...jobs.filter((j) => j.id !== job.id)];
+}
 
 /** API list is source of truth; keep short-lived optimistic rows not yet in the API. */
 function mergeCrewJobsFromApi(prev: any[], fromApi: any[]): any[] {
@@ -704,32 +716,79 @@ const History = () => {
   const fetchAllDataRef = useRef(fetchAllData);
   fetchAllDataRef.current = fetchAllData;
 
-  const refreshCrewJobsFromApi = useCallback(async () => {
-    try {
-      const resp = await api.upload.getCrewAnalysisJobs();
-      const fromApi = parseCrewJobsFromResponse(resp);
-      let shouldRefreshAll = false;
-      setCrewJobs((prev) => {
-        if (!fromApi.length) return prev;
-        const hadActive = crewJobsHaveActive(prev);
-        const merged = mergeCrewJobsFromApi(prev, fromApi);
-        const nowComplete = merged.some((j) => j.status === "completed");
-        if (hadActive && nowComplete) shouldRefreshAll = true;
-        return merged;
-      });
+  const crewJobsFetchInFlightRef = useRef<Promise<boolean> | null>(null);
 
-      if (shouldRefreshAll) {
-        void fetchAllDataRef.current?.({ background: true });
-      }
-      return true;
-    } catch (error) {
-      console.error("Failed to refresh crew jobs:", error);
-      return false;
+  const refreshCrewJobsFromApi = useCallback(async () => {
+    if (crewJobsFetchInFlightRef.current) {
+      return crewJobsFetchInFlightRef.current;
     }
+
+    const run = (async () => {
+      try {
+        const resp = await api.upload.getCrewAnalysisJobs();
+        const fromApi = parseCrewJobsFromResponse(resp);
+        let shouldRefreshAll = false;
+        setCrewJobs((prev) => {
+          if (!fromApi.length) return prev;
+          const hadActive = crewJobsHaveActive(prev);
+          const merged = mergeCrewJobsFromApi(prev, fromApi);
+          const nowComplete = merged.some((j) => j.status === "completed");
+          if (hadActive && nowComplete) shouldRefreshAll = true;
+          return merged;
+        });
+
+        if (shouldRefreshAll) {
+          void fetchAllDataRef.current?.({ background: true });
+        }
+        return true;
+      } catch (error) {
+        console.error("Failed to refresh crew jobs:", error);
+        return false;
+      } finally {
+        crewJobsFetchInFlightRef.current = null;
+      }
+    })();
+
+    crewJobsFetchInFlightRef.current = run;
+    return run;
   }, []);
 
   const crewJobsRef = useRef(crewJobs);
   crewJobsRef.current = crewJobs;
+
+  // Persist crew jobs so Upload → History redirect shows prior analyses immediately
+  useEffect(() => {
+    if (!user?.id || crewJobs.length === 0) return;
+    writeCrewJobsCache(user.id, crewJobs);
+  }, [crewJobs, user?.id]);
+
+  // Hydrate from session cache before paint (avoids empty list until slow API returns)
+  useLayoutEffect(() => {
+    if (!user?.id || location.pathname !== HISTORY_PATH) return;
+
+    const state = location.state as { newCrewJob?: any } | null | undefined;
+    const newCrewJob = state?.newCrewJob;
+    const cached = readCrewJobsCache(user.id);
+    const seeded = newCrewJob?.id
+      ? prependCrewJob(cached, newCrewJob)
+      : cached;
+
+    if (seeded.length > 0) {
+      setCrewJobs((prev) => {
+        if (prev.length === 0) return seeded;
+        const byId = new Map<string, any>();
+        for (const j of [...seeded, ...prev]) {
+          if (j?.id) byId.set(j.id, j);
+        }
+        return Array.from(byId.values()).sort(
+          (a, b) =>
+            new Date(b.created_at || 0).getTime() -
+            new Date(a.created_at || 0).getTime()
+        );
+      });
+      setIsLoading(false);
+    }
+  }, [user?.id, location.pathname, location.state]);
 
   // Real-time polling for job statuses and data updates
   const pollJobStatuses = useCallback(async () => {
@@ -1232,37 +1291,29 @@ const History = () => {
       const newCrewJob = state?.newCrewJob;
       const isAfterRedirectWithJob = !!newCrewJob?.id;
       if (newCrewJob?.id) {
-        setCrewJobs((prev) => {
-          if (prev.some((j) => j.id === newCrewJob.id)) return prev;
-          return [{ ...newCrewJob, _uniqueCardKey: newCrewJob.id }, ...prev];
-        });
+        setCrewJobs((prev) => prependCrewJob(prev, newCrewJob));
+        writeCrewJobsCache(
+          user.id,
+          prependCrewJob(readCrewJobsCache(user.id), newCrewJob)
+        );
         window.history.replaceState(null, "", location.pathname);
-        // Show content immediately (optimistic job card); don't leave page stuck on skeleton
         setIsLoading(false);
       }
 
       console.log("📊 Refetching History data (landed on page) for user:", user.id);
       isInitializedRef.current = true;
 
-      // Crew jobs: fetch immediately on every navigation (user?.id poll does not re-run on redirect)
+      // One crew refresh + one full fetch (fetchAllData also loads crew jobs — deduped via in-flight ref)
       void refreshCrewJobsFromApi();
-
-      // Full history fetch can be slow; run in background when we already show the new job card
       fetchAllData(isAfterRedirectWithJob ? { background: true } : undefined);
 
-      // Light follow-up if the new job row is not in the API yet
-      const tCrew = isAfterRedirectWithJob
-        ? setTimeout(() => void refreshCrewJobsFromApi(), 600)
-        : undefined;
-      const tAll = isAfterRedirectWithJob
-        ? setTimeout(() => fetchAllData({ background: true }), 1200)
-        : undefined;
       const tRetry = isAfterRedirectWithJob
-        ? setTimeout(() => fetchAllData({ background: true }), 8000)
+        ? setTimeout(() => {
+            void refreshCrewJobsFromApi();
+            void fetchAllData({ background: true });
+          }, 2000)
         : undefined;
       return () => {
-        if (tCrew) clearTimeout(tCrew);
-        if (tAll) clearTimeout(tAll);
         if (tRetry) clearTimeout(tRetry);
       };
     }
@@ -1357,7 +1408,6 @@ const History = () => {
   useEffect(() => {
     if (!user?.id || location.pathname !== HISTORY_PATH) return;
 
-    void refreshCrewJobsFromApi();
     const pollInterval = setInterval(() => {
       const jobs = crewJobsRef.current;
       if (!crewJobsHaveActive(jobs)) return;

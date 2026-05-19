@@ -7,16 +7,17 @@ python-multipart==0.0.6
 websockets==14.2
 
 setuptools>=65.5.0,<82
+# Pin crewai 1.6.x: 1.7+ pulls openai~=1.83; 1.14+ requires openai>=2.30 (conflicts with stagehand/openai==1.99.6)
 # >=1.6.0 required for Crew(stream=True) kickoff streaming
-crewai>=1.6.0,<2.0.0
-crewai-tools>=0.17.0,<1.0.0
+crewai==1.6.1
+crewai-tools>=0.17.0,<0.18.0
 langchain-openai==0.2.14
 # Pin OpenAI client to avoid resolver backtracking during Docker builds on Render
 # NOTE: stagehand requires openai>=1.99.6
 openai==1.99.6
 reportlab==4.0.7
 pillow==10.1.0
-python-dotenv==1.0.0
+python-dotenv>=1.1.1,<2.0.0
 tiktoken>=0.7.0
 requests>=2.31.0
 
