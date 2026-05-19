@@ -45,7 +45,7 @@ export const WorkspaceRequiredCard: React.FC<{
             "bg-card/85 shadow-sm backdrop-blur-xl dark:border-white/10 dark:bg-card/60"
           )}
         >
-          <motion.div
+          <div
             className="pointer-events-none absolute -right-10 -top-10 h-32 w-32 rounded-full bg-brand/15 blur-2xl"
             aria-hidden
           />
@@ -75,8 +75,8 @@ export const WorkspaceRequiredCard: React.FC<{
                 </motion.div>
                 <div className="absolute -bottom-1 -right-1 flex h-8 w-8 items-center justify-center rounded-full border-2 border-card bg-brand/15 text-brand">
                   <Layers className="h-3.5 w-3.5" aria-hidden />
-                </motion.div>
-              </motion.div>
+                </div>
+              </div>
 
               <span className="mb-3 inline-flex items-center gap-1.5 rounded-full border border-brand/25 bg-brand/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-brand">
                 <Sparkles className="h-3 w-3" aria-hidden />
@@ -100,8 +100,8 @@ export const WorkspaceRequiredCard: React.FC<{
                 Create workspace
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
-            </motion.div>
-          </motion.div>
+            </div>
+          </div>
         </article>
       </motion.div>
     </motion.div>
