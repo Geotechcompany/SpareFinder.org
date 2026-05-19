@@ -167,6 +167,12 @@ async def get_billing_info(user: CurrentUser = Depends(get_current_user)):
         sub_result = supabase.table("subscriptions").select("*").eq("user_id", user_id).execute()
 
         subscription = pick_best_subscription_row(sub_result.data or [])
+        if subscription:
+            subscription = {
+                **subscription,
+                "status": str(subscription.get("status") or "inactive").lower().strip(),
+                "tier": str(subscription.get("tier") or "free").lower().strip(),
+            }
 
         # Get current usage
         now = datetime.now()

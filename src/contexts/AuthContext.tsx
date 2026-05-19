@@ -103,7 +103,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       // Wait a bit to ensure token provider is set
       await new Promise(resolve => setTimeout(resolve, 100));
 
-      setIsProfileLoading(true);
+      // Avoid flashing the whole app on background profile refreshes (workspace switch, etc.)
+      if (!user) {
+        setIsProfileLoading(true);
+      }
 
       // Short timeout so we don't hang when backend is busy (e.g. Crew AI running)
       const authTimeoutMs = 10000;

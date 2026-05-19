@@ -24,17 +24,24 @@ def subscription_status_rank(status: str | None) -> int:
 
 def pick_best_subscription_row(rows: list[dict[str, Any]] | None) -> dict[str, Any] | None:
     """
-    Prefer active/trialing rows; break ties by most recent period_end / updated_at.
-    """
+    Prefer active/trialing rows; break ties by latest period_end / updated_at.
+  """
     if not rows:
         return None
 
     def sort_key(row: dict[str, Any]) -> tuple[int, str]:
         rank = subscription_status_rank(row.get("status"))
         period_end = str(row.get("current_period_end") or row.get("updated_at") or "")
+        # Negate period_end string sort by using reverse on second key via rank first
         return (rank, period_end)
 
-    return min(rows, key=sort_key)
+    active_pool = [
+        r
+        for r in rows
+        if subscription_status_rank(r.get("status")) <= subscription_status_rank("trialing")
+    ]
+    pool = active_pool if active_pool else rows
+    return max(pool, key=lambda r: sort_key(r))
 
 
 def merge_subscription_by_user(

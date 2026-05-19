@@ -7,7 +7,8 @@ import React, {
   useRef,
   useState,
 } from "react";
-import { api } from "@/lib/api";
+import axios from "axios";
+import { api, type ApiResponse } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
 
 type SubscriptionTier = "free" | "pro" | "enterprise" | "none";
@@ -20,16 +21,10 @@ type RawSubscription = {
   current_period_end?: string;
 };
 
-type RawBillingResponse =
-  | {
-      subscription?: RawSubscription;
-    }
-  | {
-      success?: boolean;
-      data?: {
-        subscription?: RawSubscription;
-      };
-    };
+type BillingPayload = {
+  subscription?: RawSubscription;
+  trial_used?: boolean;
+};
 
 const parseIsoDate = (value: unknown): Date | null => {
   if (!value || typeof value !== "string") return null;
@@ -54,13 +49,33 @@ const SubscriptionContext = createContext<SubscriptionContextValue | undefined>(
 
 const normalizeTier = (tier: unknown): SubscriptionTier => {
   if (tier === "free" || tier === "pro" || tier === "enterprise") return tier;
-  // Backend may return "starter" for Starter plan; map to "free" for feature checks
   if (tier === "starter" || tier === "basic") return "free";
   return "none";
 };
 
 const isStatusActive = (status: unknown): boolean => {
-  return status === "active" || status === "trialing";
+  const s = typeof status === "string" ? status.toLowerCase() : "";
+  return s === "active" || s === "trialing";
+};
+
+const extractBillingPayload = (raw: unknown): BillingPayload | null => {
+  if (!raw || typeof raw !== "object") return null;
+
+  const envelope = raw as ApiResponse<BillingPayload> & BillingPayload;
+
+  if (envelope.success === false) {
+    return null;
+  }
+
+  if (envelope.data && typeof envelope.data === "object") {
+    return envelope.data as BillingPayload;
+  }
+
+  if ("subscription" in envelope) {
+    return envelope as BillingPayload;
+  }
+
+  return null;
 };
 
 const parseBilling = (
@@ -71,22 +86,39 @@ const parseBilling = (
   currentPeriodStart: Date | null;
   currentPeriodEnd: Date | null;
 } => {
-  const payload = raw as RawBillingResponse | null | undefined;
+  const payload = extractBillingPayload(raw);
+  const sub = payload?.subscription;
 
-  const sub =
-    (payload && "subscription" in payload ? payload.subscription : undefined) ||
-    (payload && "data" in payload ? payload.data?.subscription : undefined);
-
-  const status = (sub?.status ?? null) as SubscriptionStatus;
+  const statusRaw = sub?.status ?? null;
+  const status =
+    typeof statusRaw === "string" ? statusRaw.toLowerCase() : statusRaw;
   const tier = isStatusActive(status) ? normalizeTier(sub?.tier) : "none";
 
   return {
     tier,
-    status,
+    status: status as SubscriptionStatus,
     currentPeriodStart: parseIsoDate(sub?.current_period_start),
     currentPeriodEnd: parseIsoDate(sub?.current_period_end),
   };
 };
+
+function isRetryableBillingError(error: unknown): boolean {
+  if (!axios.isAxiosError(error)) return true;
+  const status = error.response?.status;
+  if (!status) return true;
+  if (status === 401 || status === 403) return true;
+  if (status === 429 || status >= 500) return true;
+  if (error.code === "ECONNABORTED") return true;
+  return false;
+}
+
+function isCanceledError(error: unknown): boolean {
+  if (error instanceof DOMException && error.name === "AbortError") return true;
+  if (!axios.isAxiosError(error)) return false;
+  return error.code === "ERR_CANCELED" || error.name === "CanceledError";
+}
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export const useSubscription = (): SubscriptionContextValue => {
   const context = useContext(SubscriptionContext);
@@ -99,7 +131,7 @@ export const useSubscription = (): SubscriptionContextValue => {
 export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
-  const { isAuthenticated, isLoading: isAuthLoading } = useAuth();
+  const { user, isAuthenticated, isLoading: isAuthLoading } = useAuth();
 
   const [tier, setTier] = useState<SubscriptionTier>("none");
   const [status, setStatus] = useState<SubscriptionStatus>(null);
@@ -107,68 +139,91 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({
   const [currentPeriodEnd, setCurrentPeriodEnd] = useState<Date | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
-  const abortRef = useRef<AbortController | null>(null);
+  const requestSeqRef = useRef(0);
+  const hasLoadedRef = useRef(false);
 
-  const refreshSubscription = useCallback(async () => {
-    if (isAuthLoading || !isAuthenticated) {
-      setTier("none");
-      setStatus(null);
-      setCurrentPeriodStart(null);
-      setCurrentPeriodEnd(null);
-      setIsLoading(false);
-      return;
-    }
+  const clearSubscription = useCallback(() => {
+    setTier("none");
+    setStatus(null);
+    setCurrentPeriodStart(null);
+    setCurrentPeriodEnd(null);
+    hasLoadedRef.current = false;
+  }, []);
 
-    abortRef.current?.abort();
-    const controller = new AbortController();
-    abortRef.current = controller;
-
-    try {
-      setIsLoading(true);
-      const response = await api.billing.getBillingInfo({
-        signal: controller.signal,
-      });
-      const next = parseBilling(response);
+  const applySubscription = useCallback(
+    (next: ReturnType<typeof parseBilling>) => {
       setTier(next.tier);
       setStatus(next.status);
       setCurrentPeriodStart(next.currentPeriodStart);
       setCurrentPeriodEnd(next.currentPeriodEnd);
-    } catch (err) {
-      // If the request was intentionally aborted, ignore.
-      if (err instanceof DOMException && err.name === "AbortError") return;
-      // Fail closed: treat as no active plan.
-      setTier("none");
-      setStatus(null);
-      setCurrentPeriodStart(null);
-      setCurrentPeriodEnd(null);
-    } finally {
+      hasLoadedRef.current = true;
+    },
+    []
+  );
+
+  const refreshSubscription = useCallback(async () => {
+    if (!isAuthenticated || !user?.id) {
+      if (!isAuthLoading) {
+        clearSubscription();
+      }
       setIsLoading(false);
+      return;
     }
-  }, [isAuthenticated, isAuthLoading]);
+
+    const seq = ++requestSeqRef.current;
+    const showBlockingLoader = !hasLoadedRef.current;
+    if (showBlockingLoader) setIsLoading(true);
+
+    const maxAttempts = hasLoadedRef.current ? 1 : 3;
+
+    try {
+      for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+        if (seq !== requestSeqRef.current) return;
+
+        if (attempt > 0) {
+          await sleep(400 * attempt);
+        }
+
+        try {
+          const response = await api.billing.getBillingInfo({
+            timeout: 15000,
+          });
+
+          if (seq !== requestSeqRef.current) return;
+
+          const payload = extractBillingPayload(response);
+          if (!payload) {
+            throw new Error("Billing response missing subscription payload");
+          }
+
+          applySubscription(parseBilling(response));
+          return;
+        } catch (err) {
+          if (isCanceledError(err)) return;
+
+          const canRetry =
+            attempt < maxAttempts - 1 && isRetryableBillingError(err);
+
+          if (!canRetry) {
+            console.warn("Billing fetch failed:", err);
+            if (!hasLoadedRef.current) {
+              clearSubscription();
+            }
+            return;
+          }
+        }
+      }
+    } finally {
+      if (seq === requestSeqRef.current && showBlockingLoader) {
+        setIsLoading(false);
+      }
+    }
+  }, [applySubscription, clearSubscription, isAuthenticated, isAuthLoading, user?.id]);
 
   useEffect(() => {
+    if (isAuthLoading) return;
     void refreshSubscription();
-    return () => {
-      abortRef.current?.abort();
-    };
-  }, [refreshSubscription]);
-
-  // Re-fetch after admin plan changes or when returning to the tab.
-  useEffect(() => {
-    if (!isAuthenticated || isAuthLoading) return;
-
-    const onFocus = () => void refreshSubscription();
-    const onVisibility = () => {
-      if (document.visibilityState === "visible") void refreshSubscription();
-    };
-
-    window.addEventListener("focus", onFocus);
-    document.addEventListener("visibilitychange", onVisibility);
-    return () => {
-      window.removeEventListener("focus", onFocus);
-      document.removeEventListener("visibilitychange", onVisibility);
-    };
-  }, [isAuthenticated, isAuthLoading, refreshSubscription]);
+  }, [isAuthLoading, isAuthenticated, user?.id, refreshSubscription]);
 
   const value: SubscriptionContextValue = useMemo(
     () => ({
@@ -178,7 +233,7 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({
       isTrialing: status === "trialing",
       currentPeriodStart,
       currentPeriodEnd,
-      isLoading: isAuthLoading || isLoading,
+      isLoading: (isAuthLoading && !hasLoadedRef.current) || isLoading,
       refreshSubscription,
     }),
     [
@@ -198,4 +253,3 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({
     </SubscriptionContext.Provider>
   );
 };
-

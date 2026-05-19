@@ -454,6 +454,7 @@ async def admin_update_user_plan(
         if not is_no_plan:
             payload_update["current_period_start"] = now.isoformat() + "Z"
             payload_update["current_period_end"] = period_end.isoformat() + "Z"
+        # Update every row for this user (duplicates can otherwise leave a stale canceled row "winning").
         supabase.table("subscriptions").update(payload_update).eq("user_id", userId).execute()
         updated_list = (
             supabase.table("subscriptions")
