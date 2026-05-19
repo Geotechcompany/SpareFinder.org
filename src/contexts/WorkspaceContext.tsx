@@ -24,6 +24,10 @@ type WorkspaceContextValue = {
   refreshWorkspaces: () => Promise<void>;
   switchWorkspace: (workspaceId: string) => Promise<void>;
   createWorkspace: (name: string) => Promise<WorkspaceRecord | null>;
+  renameWorkspace: (
+    workspaceId: string,
+    name: string
+  ) => Promise<WorkspaceRecord | null>;
 };
 
 const WorkspaceContext = createContext<WorkspaceContextValue | undefined>(
@@ -150,6 +154,45 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
     [applyPayload, checkAuth]
   );
 
+  const renameWorkspace = useCallback(
+    async (workspaceId: string, name: string) => {
+      const trimmed = name.trim();
+      if (!trimmed) {
+        throw new Error("Workspace name is required");
+      }
+
+      try {
+        const res = await api.workspaces.update(workspaceId, trimmed);
+        if (res.success && res.data?.workspace) {
+          const updated = res.data.workspace;
+          setWorkspaces((prev) =>
+            prev.map((w) => (w.id === workspaceId ? { ...w, ...updated } : w))
+          );
+          if (activeWorkspaceId === workspaceId) {
+            setActiveWorkspace(updated);
+            await checkAuth();
+          }
+          return updated;
+        }
+        const message =
+          (res as { message?: string }).message ||
+          (typeof res.error === "string" ? res.error : undefined);
+        throw new Error(message || "Could not rename workspace");
+      } catch (err: unknown) {
+        const axiosMsg =
+          err &&
+          typeof err === "object" &&
+          "response" in err &&
+          (err as { response?: { data?: { message?: string } } }).response?.data
+            ?.message;
+        throw new Error(
+          axiosMsg || (err instanceof Error ? err.message : "Could not rename workspace")
+        );
+      }
+    },
+    [activeWorkspaceId, checkAuth]
+  );
+
   const value = useMemo(
     () => ({
       workspaces,
@@ -161,6 +204,7 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
       refreshWorkspaces,
       switchWorkspace,
       createWorkspace,
+      renameWorkspace,
     }),
     [
       workspaces,
@@ -172,6 +216,7 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
       refreshWorkspaces,
       switchWorkspace,
       createWorkspace,
+      renameWorkspace,
     ]
   );
 

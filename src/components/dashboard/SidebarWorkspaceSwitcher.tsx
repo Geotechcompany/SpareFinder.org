@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Check, ChevronsUpDown, Plus, Settings2 } from "lucide-react";
 import { api } from "@/lib/api";
 import {
@@ -58,6 +58,7 @@ export function SidebarWorkspaceSwitcher({
     isLoading,
     switchWorkspace,
     createWorkspace,
+    renameWorkspace,
     refreshWorkspaces,
   } = useWorkspace();
 
@@ -72,10 +73,18 @@ export function SidebarWorkspaceSwitcher({
   const [isCreating, setIsCreating] = useState(false);
   const [isSwitching, setIsSwitching] = useState<string | null>(null);
   const [manageOpen, setManageOpen] = useState(false);
+  const [renameName, setRenameName] = useState("");
+  const [isRenaming, setIsRenaming] = useState(false);
 
-  const canManageActiveImage =
+  const canManageWorkspace =
     activeWorkspace &&
     (activeWorkspace.role === "owner" || activeWorkspace.role === "admin");
+
+  useEffect(() => {
+    if (manageOpen && activeWorkspace) {
+      setRenameName(activeWorkspace.name);
+    }
+  }, [manageOpen, activeWorkspace?.id, activeWorkspace?.name]);
 
   const displayName = activeWorkspace?.name || "Select workspace";
 
@@ -143,6 +152,30 @@ export function SidebarWorkspaceSwitcher({
       });
     } finally {
       setIsCreating(false);
+    }
+  };
+
+  const handleRename = async () => {
+    if (!activeWorkspace) return;
+    const trimmed = renameName.trim();
+    if (!trimmed || trimmed === activeWorkspace.name) return;
+    setIsRenaming(true);
+    try {
+      await renameWorkspace(activeWorkspace.id, trimmed);
+      toast({
+        title: "Workspace renamed",
+        description: trimmed,
+      });
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Check the name and try again.";
+      toast({
+        variant: "destructive",
+        title: "Could not rename workspace",
+        description: message,
+      });
+    } finally {
+      setIsRenaming(false);
     }
   };
 
@@ -244,7 +277,7 @@ export function SidebarWorkspaceSwitcher({
             })}
           </div>
           <div className="my-1 h-px bg-border" />
-          {canManageActiveImage ? (
+          {canManageWorkspace ? (
             <button
               type="button"
               onClick={() => {
@@ -254,7 +287,7 @@ export function SidebarWorkspaceSwitcher({
               className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted/80"
             >
               <Settings2 className="h-4 w-4" />
-              Workspace photo
+              Workspace settings
             </button>
           ) : null}
           <button
@@ -279,35 +312,69 @@ export function SidebarWorkspaceSwitcher({
       <Dialog open={manageOpen} onOpenChange={setManageOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Workspace photo</DialogTitle>
+            <DialogTitle>Workspace settings</DialogTitle>
             <DialogDescription>
-              Upload a logo or image for {activeWorkspace?.name ?? "this workspace"}.
+              Rename this workspace or upload a logo. Only owners and admins can make changes.
             </DialogDescription>
           </DialogHeader>
           {activeWorkspace ? (
-            <ProfileImageUploader
-              size="lg"
-              imageUrl={activeWorkspace.imageUrl}
-              fallbackLabel={activeWorkspace.name}
-              onUpload={async (file) => {
-                const res = await api.workspaces.uploadImage(activeWorkspace.id, file);
-                const imageUrl =
-                  res.data?.imageUrl ??
-                  res.data?.workspace?.imageUrl ??
-                  null;
-                if (!res.success || !imageUrl) {
-                  throw new Error(
-                    (res as { message?: string }).message || "Upload failed"
-                  );
-                }
-                await refreshWorkspaces();
-                toast({
-                  title: "Workspace photo updated",
-                  description: activeWorkspace.name,
-                });
-                return imageUrl;
-              }}
-            />
+            <div className="space-y-6">
+              <div className="space-y-2">
+                <Label htmlFor="rename-workspace-name">Workspace name</Label>
+                <div className="flex gap-2">
+                  <Input
+                    id="rename-workspace-name"
+                    value={renameName}
+                    onChange={(e) => setRenameName(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") void handleRename();
+                    }}
+                    maxLength={120}
+                    autoComplete="organization"
+                  />
+                  <Button
+                    type="button"
+                    onClick={() => void handleRename()}
+                    disabled={
+                      isRenaming ||
+                      !renameName.trim() ||
+                      renameName.trim() === activeWorkspace.name
+                    }
+                  >
+                    {isRenaming ? "Saving…" : "Save"}
+                  </Button>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label>Workspace photo</Label>
+                <ProfileImageUploader
+                  size="lg"
+                  imageUrl={activeWorkspace.imageUrl}
+                  fallbackLabel={activeWorkspace.name}
+                  onUpload={async (file) => {
+                    const res = await api.workspaces.uploadImage(
+                      activeWorkspace.id,
+                      file
+                    );
+                    const imageUrl =
+                      res.data?.imageUrl ??
+                      res.data?.workspace?.imageUrl ??
+                      null;
+                    if (!res.success || !imageUrl) {
+                      throw new Error(
+                        (res as { message?: string }).message || "Upload failed"
+                      );
+                    }
+                    await refreshWorkspaces();
+                    toast({
+                      title: "Workspace photo updated",
+                      description: activeWorkspace.name,
+                    });
+                    return imageUrl;
+                  }}
+                />
+              </div>
+            </div>
           ) : null}
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => setManageOpen(false)}>
