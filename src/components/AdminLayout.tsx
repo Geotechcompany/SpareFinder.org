@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { Suspense, useState } from "react";
 import { motion } from "framer-motion";
 import { Menu } from "lucide-react";
 import { Outlet } from "react-router-dom";
@@ -63,7 +63,9 @@ const AdminLayout: React.FC = () => {
           >
             <div className="mx-auto flex w-full max-w-[var(--dashboard-content-max-width)] flex-col">
               <AdminHeader />
-              <Outlet />
+              <Suspense fallback={null}>
+                <Outlet />
+              </Suspense>
             </div>
           </motion.div>
         </motion.div>
