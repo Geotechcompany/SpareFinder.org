@@ -8,6 +8,7 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, Request, HTTPException
 from fastapi.responses import JSONResponse
+from starlette.concurrency import run_in_threadpool
 from pydantic import BaseModel
 
 from .auth_dependencies import CurrentUser, get_current_user
@@ -50,6 +51,18 @@ async def search_keywords(
         if not keywords:
             return api_error("Keywords are required", status_code=400)
 
+        from ..content_validator import validate_keywords
+
+        kw_validation = await run_in_threadpool(lambda: validate_keywords(keywords))
+        if not kw_validation.is_valid:
+            return JSONResponse(
+                status_code=422,
+                content={
+                    **api_error(kw_validation.user_message, code="invalid_content"),
+                    "detected_subject": kw_validation.detected_subject,
+                },
+            )
+
         user_email = payload.user_email or user.email
         if not user_email or "@" not in user_email:
             return api_error("Valid email address is required", status_code=400)
@@ -59,7 +72,6 @@ async def search_keywords(
         job_id = str(uuid.uuid4())
 
         from ..notification_service import notify_analysis_started
-        from starlette.concurrency import run_in_threadpool
 
         await run_in_threadpool(
             lambda: notify_analysis_started(
@@ -143,6 +155,18 @@ async def schedule_keyword_search(
         if not keywords:
             return JSONResponse(
                 status_code=400, content={"error": "Keywords are required"}
+            )
+
+        from ..content_validator import validate_keywords
+
+        kw_validation = await run_in_threadpool(lambda: validate_keywords(keywords))
+        if not kw_validation.is_valid:
+            return JSONResponse(
+                status_code=422,
+                content={
+                    **api_error(kw_validation.user_message, code="invalid_content"),
+                    "detected_subject": kw_validation.detected_subject,
+                },
             )
 
         # Use authenticated user's email if available, otherwise require it in body

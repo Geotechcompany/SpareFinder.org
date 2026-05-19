@@ -13,8 +13,15 @@ from jose import jwt, JWTError
 from pydantic import BaseModel
 
 from .supabase_admin import get_supabase_admin
+from .supabase_resilience import is_transient_http_error, run_supabase
+from .http_errors import raise_service_unavailable
 
 logger = logging.getLogger(__name__)
+
+
+def _sb(query: Any) -> Any:
+    """Execute a Supabase query builder with transient retries."""
+    return run_supabase(lambda: query.execute())
 
 # Online notifications are throttled per-user to avoid admin notification spam.
 ONLINE_NOTIFY_TTL_SECONDS = 900
@@ -324,11 +331,10 @@ async def get_current_user(
                 pass
 
             # Fetch user profile from Supabase using Clerk user ID
-            result = (
+            result = _sb(
                 supabase.table("profiles")
                 .select("*")
                 .eq("clerk_user_id", clerk_user_id)
-                .execute()
             )
 
             if not result.data or len(result.data) == 0:
@@ -341,13 +347,15 @@ async def get_current_user(
                     email = fetched_email or email
                     full_name = full_name or fetched_name
                 if email:
-                    by_email = supabase.table("profiles").select("*").eq("email", email).execute()
+                    by_email = _sb(supabase.table("profiles").select("*").eq("email", email))
                     if by_email.data and len(by_email.data) > 0:
                         profile = by_email.data[0]
                         # Link profile to Clerk (always overwrite to handle pk_test→pk_live migrations)
-                        supabase.table("profiles").update(
-                            {"clerk_user_id": clerk_user_id, "updated_at": "now()"}
-                        ).eq("id", profile["id"]).execute()
+                        _sb(
+                            supabase.table("profiles")
+                            .update({"clerk_user_id": clerk_user_id, "updated_at": "now()"})
+                            .eq("id", profile["id"])
+                        )
                         profile["clerk_user_id"] = clerk_user_id
                         u = CurrentUser(
                             id=profile["id"],
@@ -378,17 +386,19 @@ async def get_current_user(
                         ),
                     )
                 try:
-                    supabase.table("profiles").insert(
-                        [
-                            {
-                                "id": new_id,
-                                "email": email,
-                                "full_name": full_name,
-                                "role": "user",
-                                "clerk_user_id": clerk_user_id,
-                            }
-                        ]
-                    ).execute()
+                    _sb(
+                        supabase.table("profiles").insert(
+                            [
+                                {
+                                    "id": new_id,
+                                    "email": email,
+                                    "full_name": full_name,
+                                    "role": "user",
+                                    "clerk_user_id": clerk_user_id,
+                                }
+                            ]
+                        )
+                    )
                 except Exception as insert_err:  # noqa: BLE001
                     err_msg = str(insert_err).lower() if insert_err else ""
                     if "23503" in err_msg or "foreign key" in err_msg or "profiles_id_fkey" in err_msg:
@@ -397,7 +407,9 @@ async def get_current_user(
                             detail="Profile creation failed: profiles.id references auth.users. Run migration 023_profiles_allow_clerk_ids.sql in Supabase (SQL Editor or MCP) to allow Clerk users.",
                         ) from insert_err
                     raise
-                inserted_res = supabase.table("profiles").select("*").eq("id", new_id).single().execute()
+                inserted_res = _sb(
+                    supabase.table("profiles").select("*").eq("id", new_id).single()
+                )
                 inserted = inserted_res.data if inserted_res and inserted_res.data else None
                 if not inserted:
                     raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Profile created but could not be read back")
@@ -442,7 +454,7 @@ async def get_current_user(
         # If `sub` looks like a UUID, try it as `profiles.id` first (fast path).
         try:
             uuid.UUID(sub)
-            by_id = supabase.table("profiles").select("*").eq("id", sub).execute()
+            by_id = _sb(supabase.table("profiles").select("*").eq("id", sub))
             if by_id.data and len(by_id.data) > 0:
                 profile = by_id.data[0]
                 u = CurrentUser(
@@ -475,7 +487,7 @@ async def get_current_user(
                 user_email = getattr(user_obj, "email", None)
 
             if user_id:
-                by_id = supabase.table("profiles").select("*").eq("id", user_id).execute()
+                by_id = _sb(supabase.table("profiles").select("*").eq("id", user_id))
                 if by_id.data and len(by_id.data) > 0:
                     profile = by_id.data[0]
                     u = CurrentUser(
@@ -495,7 +507,11 @@ async def get_current_user(
                 if user_email and isinstance(user_email, str) and user_email.strip():
                     new_id = str(user_id)
                     try:
-                        supabase.table("profiles").insert([{"id": new_id, "email": user_email.strip().lower(), "role": "user"}]).execute()
+                        _sb(
+                            supabase.table("profiles").insert(
+                                [{"id": new_id, "email": user_email.strip().lower(), "role": "user"}]
+                            )
+                        )
                     except Exception as insert_err:  # noqa: BLE001
                         err_msg = str(insert_err).lower() if insert_err else ""
                         if "23503" in err_msg or "foreign key" in err_msg or "profiles_id_fkey" in err_msg:
@@ -538,10 +554,13 @@ async def get_current_user(
     except HTTPException:
         raise
     except Exception as e:
-        print(f"❌ Authentication error: {e}")
+        if is_transient_http_error(e):
+            logger.warning("Transient error during authentication (not invalid token): %s", e)
+            raise_service_unavailable(e)
+        logger.error("Authentication error: %s", e)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Authentication failed"
+            detail="Authentication failed",
         )
 
 

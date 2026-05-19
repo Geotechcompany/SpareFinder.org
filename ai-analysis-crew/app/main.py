@@ -865,6 +865,19 @@ async def run_analysis_background(
             detailed_description = await asyncio.to_thread(
                 get_image_description, image_data, keywords
             )
+            from .content_validator import (
+                NonManufacturingPartError,
+                validate_identified_part,
+            )
+
+            part_check = await asyncio.to_thread(
+                validate_identified_part, detailed_description
+            )
+            if not part_check.is_valid:
+                raise NonManufacturingPartError(
+                    part_check.user_message,
+                    part_check.detected_subject,
+                )
             emit_progress("image_analysis", "Image analyzed successfully", "completed")
             await _update_job_async(analysis_id, "processing", "part_identifier", 20)
             crew, report_task = await asyncio.to_thread(
@@ -894,7 +907,11 @@ async def run_analysis_background(
         await _update_job_async(analysis_id, "processing", "research_agent", 30)
         emit_progress("execution", "Starting analysis workflow...", "in_progress")
 
-        heartbeat_thread = _start_crew_progress_heartbeat(analysis_id, heartbeat_stop)
+        heartbeat_thread = _start_crew_progress_heartbeat(
+            analysis_id,
+            heartbeat_stop,
+            start_from_progress=_CREW_STAGE_PROGRESS["execution"],
+        )
         result = await asyncio.to_thread(crew.kickoff)
         heartbeat_stop.set()
         if heartbeat_thread:
@@ -1310,4 +1327,3 @@ async def websocket_progress(websocket: WebSocket):
 if __name__ == "__main__":
     port = int(os.getenv("PORT", 8000))
     uvicorn.run(app, host="0.0.0.0", port=port)
-

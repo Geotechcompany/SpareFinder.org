@@ -57,6 +57,10 @@ import {
   showAnalysisErrorToast,
   showAnalysisStartedToast,
 } from "@/lib/analysis-toasts";
+import {
+  extractApiErrorMessage,
+  getClientKeywordValidationError,
+} from "@/lib/content-validation";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
@@ -1136,6 +1140,19 @@ const Upload = () => {
   };
 
   const performKeywordSearch = async () => {
+    const keywordsStr = Array.isArray(savedKeywords)
+      ? savedKeywords.join(" ")
+      : String(savedKeywords ?? "");
+    const keywordError = getClientKeywordValidationError(keywordsStr);
+    if (keywordError) {
+      toast({
+        title: "Not a spare part search",
+        description: keywordError,
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
       setIsKeywordSearching(true);
       setAnalysisResults(null);
@@ -1249,6 +1266,16 @@ const Upload = () => {
         };
 
         const errorCode = data?.error as string | undefined;
+
+        if (status === 422 || errorCode === "invalid_content") {
+          showAnalysisErrorToast(
+            (data?.message as string) ||
+              "SpareFinder only analyzes manufacturing and industrial spare parts."
+          );
+          setConfirmKeywordSearchOpen(false);
+          setIsKeywordSearching(false);
+          return;
+        }
 
         // Treat provider rate limiting as a queued background job instead of a hard error
         if (
@@ -4671,6 +4698,23 @@ const Upload = () => {
                       }
 
                       redirectGuardRef.current = false;
+
+                      const keywordLine = savedKeywords.join(" ").trim();
+                      const requiresKeywordCheck =
+                        selectedMode === "both" && keywordLine.length > 0;
+                      if (requiresKeywordCheck) {
+                        const keywordError =
+                          getClientKeywordValidationError(keywordLine);
+                        if (keywordError) {
+                          toast({
+                            title: "Not a spare part search",
+                            description: keywordError,
+                            variant: "destructive",
+                          });
+                          return;
+                        }
+                      }
+
                       setIsAnalyzing(true);
 
                       try {
@@ -4775,12 +4819,21 @@ const Upload = () => {
                           error instanceof Error &&
                           (error.message.includes("timeout") ||
                             error.message.includes("exceeded"));
+                        const axiosStatus =
+                          error &&
+                          typeof error === "object" &&
+                          "response" in error
+                            ? (error as { response?: { status?: number } }).response
+                                ?.status
+                            : undefined;
+                        if (axiosStatus === 422) {
+                          showAnalysisErrorToast(extractApiErrorMessage(error));
+                          return;
+                        }
                         showAnalysisErrorToast(
                           isTimeout
                             ? "The server may still be processing. Check History for your job."
-                            : error instanceof Error
-                              ? error.message
-                              : "Please try again.",
+                            : extractApiErrorMessage(error),
                           isTimeout
                         );
                         if (isTimeout) {

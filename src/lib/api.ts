@@ -226,11 +226,52 @@ apiClient.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
+const isTransientApiError = (error: unknown): boolean => {
+  if (!axios.isAxiosError(error)) {
+    return true;
+  }
+  const status = error.response?.status;
+  if (!status) return true;
+  if (status === 502 || status === 503 || status === 504) return true;
+  const detail = String(
+    error.response?.data?.detail ??
+      error.response?.data?.message ??
+      error.message ??
+      ""
+  ).toLowerCase();
+  return (
+    detail.includes("temporarily unavailable") ||
+    detail.includes("connection interrupted") ||
+    detail.includes("server disconnected") ||
+    detail.includes("network error")
+  );
+};
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
 // Response interceptor for handling authentication errors and token refresh
 apiClient.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config;
+
+    // Retry transient backend / network failures without logging the user out
+    if (originalRequest && isTransientApiError(error)) {
+      const retryCount = (originalRequest._transientRetry as number) || 0;
+      if (retryCount < 3) {
+        originalRequest._transientRetry = retryCount + 1;
+        await sleep(800 * (retryCount + 1));
+        try {
+          const freshToken = await getAuthToken();
+          if (freshToken) {
+            originalRequest.headers["Authorization"] = `Bearer ${freshToken}`;
+          }
+        } catch {
+          /* ignore */
+        }
+        return apiClient(originalRequest);
+      }
+    }
 
     // If the error is due to an unauthorized request and we haven't already tried to refresh
     if (error.response?.status === 401 && !originalRequest._retry) {
@@ -298,15 +339,8 @@ apiClient.interceptors.response.use(
           }
         }
         
-        // Only redirect to login if refresh truly failed and we're not on a public route
-        console.warn("🔒 Unauthorized (Clerk) - redirecting to login");
-        authFailureHandler?.({
-          status: error.response?.status,
-          message: error.response?.data?.message || error.message,
-        });
-        if (!isPublicRoute) {
-          window.location.href = "/login";
-        }
+        // Do not hard-redirect while the session may still be valid (busy server / slow network)
+        console.warn("🔒 Unauthorized (Clerk) after refresh attempts — not forcing logout");
         return Promise.reject(error);
       }
 

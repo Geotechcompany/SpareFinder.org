@@ -9,7 +9,9 @@ from pydantic import BaseModel
 from starlette.concurrency import run_in_threadpool
 
 from .auth_dependencies import CurrentUser, get_current_user
+from .http_errors import raise_service_unavailable
 from .supabase_admin import get_supabase_admin
+from .supabase_resilience import is_transient_http_error, run_supabase
 
 _workspace_isolation_ready: bool | None = None
 
@@ -21,13 +23,20 @@ class WorkspaceScope(BaseModel):
 
 async def _fetch_active_workspace_id(user_id: str) -> str | None:
     supabase = get_supabase_admin()
-    res = await run_in_threadpool(
-        lambda: supabase.table("profiles")
-        .select("active_workspace_id")
-        .eq("id", user_id)
-        .single()
-        .execute()
-    )
+    try:
+        res = await run_in_threadpool(
+            lambda: run_supabase(
+                lambda: supabase.table("profiles")
+                .select("active_workspace_id")
+                .eq("id", user_id)
+                .single()
+                .execute()
+            )
+        )
+    except Exception as exc:
+        if is_transient_http_error(exc):
+            raise_service_unavailable(exc)
+        raise
     row = res.data or {}
     wid = str(row.get("active_workspace_id") or "").strip()
     return wid or None
@@ -35,14 +44,21 @@ async def _fetch_active_workspace_id(user_id: str) -> str | None:
 
 async def _is_workspace_member(user_id: str, workspace_id: str) -> bool:
     supabase = get_supabase_admin()
-    res = await run_in_threadpool(
-        lambda: supabase.table("workspace_members")
-        .select("workspace_id")
-        .eq("workspace_id", workspace_id)
-        .eq("user_id", user_id)
-        .limit(1)
-        .execute()
-    )
+    try:
+        res = await run_in_threadpool(
+            lambda: run_supabase(
+                lambda: supabase.table("workspace_members")
+                .select("workspace_id")
+                .eq("workspace_id", workspace_id)
+                .eq("user_id", user_id)
+                .limit(1)
+                .execute()
+            )
+        )
+    except Exception as exc:
+        if is_transient_http_error(exc):
+            raise_service_unavailable(exc)
+        raise
     return bool(res.data)
 
 

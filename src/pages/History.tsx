@@ -18,8 +18,6 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
-  FileText,
-  TrendingUp,
   Clock,
   CheckCircle,
   AlertTriangle,
@@ -114,13 +112,6 @@ const History = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const { user, isLoading: authLoading, isAuthenticated, logout } = useAuth();
   const { toast } = useToast();
-
-  const [stats, setStats] = useState({
-    totalUploads: 0,
-    completed: 0,
-    avgConfidence: "0.0",
-    avgProcessingTime: "0s",
-  });
 
   const [pastAnalysis, setpastAnalysis] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -343,12 +334,8 @@ const History = () => {
 
       // Fetch stats and user's history in parallel (but controlled)
       const BACKEND_BASE = API_BASE_URL;
-      const [statsResponse, historyResponse, crewJobsResponse] =
+      const [historyResponse, crewJobsResponse] =
         await Promise.allSettled([
-          dashboardApi.getStats().catch((err) => {
-            if (signal.aborted) throw new Error("Request aborted");
-            throw err;
-          }),
           // Fetch history using the updated API wrapper (aligned with backend routes)
           (async () => {
             try {
@@ -372,25 +359,6 @@ const History = () => {
             }
           })(),
         ]);
-
-      // Handle stats response
-      if (statsResponse.status === "fulfilled" && statsResponse.value.success) {
-        const data = statsResponse.value.data as any;
-        setStats({
-          totalUploads: data.totalUploads || 0,
-          completed: data.successfulUploads || 0,
-          avgConfidence: (data.avgConfidence || 0).toFixed(1),
-          avgProcessingTime: `${data.avgProcessTime || 0}s`,
-        });
-      } else {
-        console.warn("❌ Failed to fetch dashboard stats:", statsResponse);
-        setStats({
-          totalUploads: 0,
-          completed: 0,
-          avgConfidence: "0.0",
-          avgProcessingTime: "0s",
-        });
-      }
 
       // Handle history response
       console.log("🔍 History API response:", {
@@ -472,34 +440,6 @@ const History = () => {
           total: Math.max(crewAnalysisJobs.length, prev.total ?? 0),
         }));
 
-        // Derive stats from crew jobs so they match the cards (even if API stats failed or returned 0)
-        if (crewAnalysisJobs.length > 0) {
-          const completed = crewAnalysisJobs.filter((j: any) => j.status === "completed");
-          const total = crewAnalysisJobs.length;
-          let avgConf = 0;
-          let avgSec = 0;
-          if (completed.length > 0) {
-            const confSum = completed.reduce(
-              (s: number, j: any) => s + (typeof j.progress === "number" ? j.progress : 0),
-              0
-            );
-            avgConf = confSum / completed.length;
-            const timeSum = completed.reduce((s: number, j: any) => {
-              if (j.created_at && j.completed_at) {
-                const ms = new Date(j.completed_at).getTime() - new Date(j.created_at).getTime();
-                return s + ms / 1000;
-              }
-              return s;
-            }, 0);
-            avgSec = timeSum / completed.length;
-          }
-          setStats({
-            totalUploads: total,
-            completed: completed.length,
-            avgConfidence: avgConf.toFixed(1),
-            avgProcessingTime: `${Math.round(avgSec)}s`,
-          });
-        }
       } else {
         console.warn("❌ Failed to fetch crew jobs:", crewJobsResponse);
         if (!background) {
@@ -703,21 +643,17 @@ const History = () => {
       };
       hydrateImages();
 
-      // Check if any request failed with auth error
-      const authErrors = [statsResponse].filter(
-        (response) =>
-          response.status === "rejected" &&
-          response.reason?.response?.status === 401
+      const rejected = [historyResponse, crewJobsResponse].filter(
+        (r) => r.status === "rejected"
       );
-
-      if (authErrors.length > 0) {
-        console.log("🔒 Authentication errors detected, logging out...");
-        toast({
-          title: "Session Expired",
-          description: "Your session has expired. Please log in again.",
-          variant: "destructive",
-        });
-        await logout();
+      const transientRejected = rejected.filter((r) => {
+        const status = (r as { reason?: { response?: { status?: number } } })
+          .reason?.response?.status;
+        return !status || status === 502 || status === 503 || status === 504;
+      });
+      if (transientRejected.length > 0) {
+        console.warn("History fetch: transient API error, will retry on next poll");
+        setError("Connection is slow. History will refresh automatically.");
         return;
       }
 
@@ -730,19 +666,21 @@ const History = () => {
 
       console.error("❌ Error in fetchAllData:", error);
 
-      // Handle authentication errors
-      if (error.response?.status === 401) {
-        console.log("🔒 Authentication error, logging out...");
-        toast({
-          title: "Session Expired",
-          description: "Your session has expired. Please log in again.",
-          variant: "destructive",
-        });
-        await logout();
+      if (
+        !error.response ||
+        error.response?.status === 502 ||
+        error.response?.status === 503 ||
+        error.response?.status === 504
+      ) {
+        setError("Connection is slow. Retrying in the background…");
         return;
       }
 
-      // Handle other errors
+      if (error.response?.status === 401) {
+        setError("Could not verify your session. Try refreshing the page.");
+        return;
+      }
+
       setError(error.message || "Failed to load data");
       toast({
         title: "Error",
@@ -1026,36 +964,6 @@ const History = () => {
       clearInterval(id);
     };
   }, [authLoading, isAuthenticated, user?.id, fetchAllData]);
-
-  // Keep stats in sync with crew jobs (realtime + polling updates)
-  useEffect(() => {
-    if (crewJobs.length === 0) return;
-    const completed = crewJobs.filter((j: any) => j.status === "completed");
-    const total = crewJobs.length;
-    let avgConf = 0;
-    let avgSec = 0;
-    if (completed.length > 0) {
-      const confSum = completed.reduce(
-        (s: number, j: any) => s + (typeof j.progress === "number" ? j.progress : 0),
-        0
-      );
-      avgConf = confSum / completed.length;
-      const timeSum = completed.reduce((s: number, j: any) => {
-        if (j.created_at && j.completed_at) {
-          const ms = new Date(j.completed_at).getTime() - new Date(j.created_at).getTime();
-          return s + ms / 1000;
-        }
-        return s;
-      }, 0);
-      avgSec = timeSum / completed.length;
-    }
-    setStats({
-      totalUploads: total,
-      completed: completed.length,
-      avgConfidence: avgConf.toFixed(1),
-      avgProcessingTime: `${Math.round(avgSec)}s`,
-    });
-  }, [crewJobs]);
 
   // Export history function (downloads CSV file)
   const handleExportHistory = async () => {
@@ -1354,12 +1262,6 @@ const History = () => {
     // Reset when user logs out
     if (!isAuthenticated || !user?.id) {
       isInitializedRef.current = false;
-      setStats({
-        totalUploads: 0,
-        completed: 0,
-        avgConfidence: "0.0",
-        avgProcessingTime: "0s",
-      });
       setError(null);
       setIsLoading(false);
     }
@@ -1882,72 +1784,6 @@ const History = () => {
                 </div>
               </div>
             </div>
-          </div>
-
-          {/* Stats Grid */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 lg:gap-6">
-            {[
-              {
-                title: "Total Uploads",
-                value: stats.totalUploads.toString(),
-                icon: FileText,
-                color: "from-brand to-brand-dark",
-                bgColor: "from-brand/20 to-blue-600/20",
-              },
-              {
-                title: "Completed",
-                value: stats.completed.toString(),
-                icon: CheckCircle,
-                color: "from-green-600 to-emerald-600",
-                bgColor: "from-green-600/20 to-emerald-600/20",
-              },
-              {
-                title: "Avg Confidence",
-                value: `${stats.avgConfidence}%`,
-                icon: TrendingUp,
-                color: "from-blue-600 to-cyan-600",
-                bgColor: "from-blue-600/20 to-cyan-600/20",
-              },
-              {
-                title: "Avg Processing",
-                value: stats.avgProcessingTime,
-                icon: Clock,
-                color: "from-orange-600 to-red-600",
-                bgColor: "from-orange-600/20 to-red-600/20",
-              },
-            ].map((stat, index) => (
-              <motion.div
-                key={stat.title}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.1 * index, duration: 0.5 }}
-                whileHover={{ y: -2, scale: 1.02 }}
-                className="relative group"
-              >
-                <div
-                  className={`absolute inset-0 bg-gradient-to-r ${stat.bgColor} rounded-xl md:rounded-2xl blur-xl opacity-60 group-hover:opacity-80 transition-opacity`}
-                />
-                <Card className="relative border border-border bg-card text-foreground shadow-soft-elevated backdrop-blur-xl transition-all duration-300 hover:border-[#C7D2FE] dark:bg-black/40 dark:border-white/10 dark:hover:border-white/20">
-                  <CardContent className="p-3 md:p-4 lg:p-6">
-                    <div className="flex items-center justify-between">
-                      <div className="flex-1 min-w-0">
-                        <p className="text-xs font-medium text-muted-foreground md:text-sm truncate dark:text-gray-400">
-                          {stat.title}
-                        </p>
-                        <p className="mt-1 text-lg font-bold text-foreground md:text-xl lg:text-2xl truncate dark:text-white">
-                          {stat.value}
-                        </p>
-                      </div>
-                      <div
-                        className={`p-2 md:p-3 rounded-lg md:rounded-xl bg-gradient-to-r ${stat.color} shadow-lg flex-shrink-0`}
-                      >
-                        <stat.icon className="w-4 h-4 md:w-5 md:h-5 lg:w-6 lg:h-6 text-white" />
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </motion.div>
-            ))}
           </div>
 
           {/* History - Tabbed (Images vs Keywords) */}

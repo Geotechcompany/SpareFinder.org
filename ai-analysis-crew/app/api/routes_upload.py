@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any, Optional
 
 from fastapi import APIRouter, Depends, File, Form, UploadFile
+from fastapi.responses import JSONResponse
 from starlette.concurrency import run_in_threadpool
 
 from .auth_dependencies import CurrentUser, get_current_user, require_roles
@@ -187,6 +188,35 @@ async def create_crew_analysis_job(
     import uuid
     
     try:
+        supabase = get_supabase_admin()
+        user_id = scope.user_id
+        workspace_id = scope.workspace_id
+        user_email = user.email
+
+        image_data = await image.read()
+
+        from ..content_validator import validate_upload_content
+
+        validation = await run_in_threadpool(
+            lambda: validate_upload_content(
+                image_data=image_data,
+                keywords=keywords,
+            )
+        )
+        if not validation.is_valid:
+            logger.info(
+                "Rejected crew-analysis upload (subject=%s, source=%s)",
+                validation.detected_subject,
+                validation.source,
+            )
+            return JSONResponse(
+                status_code=422,
+                content={
+                    **api_error(validation.user_message, code="invalid_content"),
+                    "detected_subject": validation.detected_subject,
+                },
+            )
+
         allowed, current, limit = await check_upload_limit(scope, user.role)
         if not allowed:
             return api_error(
@@ -194,14 +224,6 @@ async def create_crew_analysis_job(
                 status_code=403,
             )
 
-        supabase = get_supabase_admin()
-        user_id = scope.user_id
-        workspace_id = scope.workspace_id
-        user_email = user.email
-
-        # Read image data
-        image_data = await image.read()
-        
         # Generate job ID (use UUID if database doesn't auto-generate)
         job_id = str(uuid.uuid4())
 

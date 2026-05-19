@@ -7,8 +7,10 @@ from fastapi import APIRouter, Depends, Query
 
 from .auth_dependencies import CurrentUser, get_current_user
 from .responses import api_error, api_ok
+from .http_errors import raise_service_unavailable
 from .supabase_admin import get_supabase_admin
 from .supabase_helpers import supabase_count
+from .supabase_resilience import is_transient_http_error, run_supabase
 from starlette.concurrency import run_in_threadpool
 
 router = APIRouter(prefix="/notifications", tags=["notifications"])
@@ -20,36 +22,46 @@ async def get_notifications(
     page: int = Query(default=1, ge=1),
     limit: int = Query(default=20, ge=1, le=200),
 ):
-    supabase = get_supabase_admin()
-    offset = (page - 1) * limit
+    try:
+        supabase = get_supabase_admin()
+        offset = (page - 1) * limit
 
-    res = await run_in_threadpool(
-        lambda: (
-            supabase.table("notifications")
-            .select("*")
-            .eq("user_id", user.id)
-            .order("created_at", desc=True)
-            .range(offset, offset + limit - 1)
-            .execute()
+        res = await run_in_threadpool(
+            lambda: run_supabase(
+                lambda: supabase.table("notifications")
+                .select("*")
+                .eq("user_id", user.id)
+                .order("created_at", desc=True)
+                .range(offset, offset + limit - 1)
+                .execute()
+            )
         )
-    )
-    notifications = res.data if res and res.data else []
-    total = await run_in_threadpool(
-        lambda: supabase_count(table="notifications", filters=[("user_id", "eq", user.id)])
-    )
-    unread = await run_in_threadpool(
-        lambda: supabase_count(
-            table="notifications",
-            filters=[("user_id", "eq", user.id), ("read", "eq", False)],
+        notifications = res.data if res and res.data else []
+        total = await run_in_threadpool(
+            lambda: supabase_count(table="notifications", filters=[("user_id", "eq", user.id)])
         )
-    )
+        unread = await run_in_threadpool(
+            lambda: supabase_count(
+                table="notifications",
+                filters=[("user_id", "eq", user.id), ("read", "eq", False)],
+            )
+        )
 
-    return api_ok(
-        data={
-            "notifications": notifications or [],
-            "pagination": {"page": page, "limit": limit, "total": total, "unreadCount": unread},
-        }
-    )
+        return api_ok(
+            data={
+                "notifications": notifications or [],
+                "pagination": {
+                    "page": page,
+                    "limit": limit,
+                    "total": total,
+                    "unreadCount": unread,
+                },
+            }
+        )
+    except Exception as exc:
+        if is_transient_http_error(exc):
+            raise_service_unavailable(exc)
+        raise
 
 
 @router.patch("/{notification_id}/read")
@@ -131,29 +143,39 @@ async def create_notification(
 
 @router.get("/stats")
 async def get_notification_stats(user: CurrentUser = Depends(get_current_user)):
-    supabase = get_supabase_admin()
+    try:
+        supabase = get_supabase_admin()
 
-    total = await run_in_threadpool(
-        lambda: supabase_count(table="notifications", filters=[("user_id", "eq", user.id)])
-    )
-    unread = await run_in_threadpool(
-        lambda: supabase_count(
-            table="notifications",
-            filters=[("user_id", "eq", user.id), ("read", "eq", False)],
+        total = await run_in_threadpool(
+            lambda: supabase_count(table="notifications", filters=[("user_id", "eq", user.id)])
         )
-    )
+        unread = await run_in_threadpool(
+            lambda: supabase_count(
+                table="notifications",
+                filters=[("user_id", "eq", user.id), ("read", "eq", False)],
+            )
+        )
 
-    types_res = await run_in_threadpool(
-        lambda: supabase.table("notifications").select("type").eq("user_id", user.id).execute()
-    )
-    rows = types_res.data if types_res and types_res.data else []
-    counter = Counter([r.get("type") for r in rows if isinstance(r, dict)])
+        types_res = await run_in_threadpool(
+            lambda: run_supabase(
+                lambda: supabase.table("notifications")
+                .select("type")
+                .eq("user_id", user.id)
+                .execute()
+            )
+        )
+        rows = types_res.data if types_res and types_res.data else []
+        counter = Counter([r.get("type") for r in rows if isinstance(r, dict)])
 
-    return api_ok(
-        data={
-            "total": total,
-            "unread": unread,
-            "read": max(0, total - unread),
-            "byType": dict(counter),
-        }
-    )
+        return api_ok(
+            data={
+                "total": total,
+                "unread": unread,
+                "read": max(0, total - unread),
+                "byType": dict(counter),
+            }
+        )
+    except Exception as exc:
+        if is_transient_http_error(exc):
+            raise_service_unavailable(exc)
+        raise

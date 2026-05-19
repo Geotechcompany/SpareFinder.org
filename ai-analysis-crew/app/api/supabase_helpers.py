@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 from typing import Any, Optional
 
 from .supabase_admin import get_supabase_admin
+from .supabase_resilience import run_supabase
 
 
 def utc_now_iso() -> str:
@@ -44,7 +45,7 @@ def supabase_count(*, table: str, filters: list[tuple[str, str, Any]]) -> int:
             q = q.not_.is_(col, val)  # type: ignore[attr-defined]
         else:
             raise ValueError(f"Unsupported op: {op}")
-    res = q.execute()
+    res = run_supabase(lambda: q.execute())
     c = _extract_count(res)
     if c is not None:
         return c
