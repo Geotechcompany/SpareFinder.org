@@ -74,6 +74,39 @@ import { useLocation } from "react-router-dom";
 
 const HISTORY_PATH = "/dashboard/history";
 
+const OPTIMISTIC_JOB_GRACE_MS = 3 * 60 * 1000;
+
+/** API list is source of truth; keep short-lived optimistic rows not yet in the API. */
+function mergeCrewJobsFromApi(prev: any[], fromApi: any[]): any[] {
+  const fromApiMapped = (fromApi || []).map((j) => ({
+    ...j,
+    _uniqueCardKey: j.id,
+  }));
+  if (fromApiMapped.length === 0) return prev;
+
+  const apiById = new Map(fromApiMapped.map((j) => [j.id, j]));
+  const now = Date.now();
+  const keepOptimistic = prev.filter((j) => {
+    const isOptimistic =
+      j._optimistic || String(j.id || "").startsWith("pending-");
+    if (!isOptimistic || apiById.has(j.id)) return false;
+    const created = j.created_at ? new Date(j.created_at).getTime() : now;
+    return now - created < OPTIMISTIC_JOB_GRACE_MS;
+  });
+
+  return [...fromApiMapped, ...keepOptimistic].sort(
+    (a, b) =>
+      new Date(b.created_at || 0).getTime() -
+      new Date(a.created_at || 0).getTime()
+  );
+}
+
+function crewJobsHaveActive(jobs: any[]): boolean {
+  return jobs.some(
+    (j) => j.status === "processing" || j.status === "pending"
+  );
+}
+
 const History = () => {
   const location = useLocation();
   const { inLayout } = useDashboardLayout();
@@ -432,23 +465,7 @@ const History = () => {
           );
         }
 
-        setCrewJobs((prev) => {
-          // When background fetch: merge API with current so we never drop optimistic job
-          const fromApi = crewAnalysisJobs.map((j: any) => ({ ...j, _uniqueCardKey: j.id }));
-          if (background && prev.length > 0) {
-            const byId = new Map(prev.map((j) => [j.id, { ...j, _uniqueCardKey: j.id }]));
-            fromApi.forEach((j: any) => byId.set(j.id, j));
-            let merged = Array.from(byId.values()).sort(
-              (a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()
-            );
-            // Drop optimistic placeholders when we have real jobs so image upload doesn't show duplicate cards
-            if (fromApi.length > 0) {
-              merged = merged.filter((j: any) => !j._optimistic && !String(j.id || "").startsWith("pending-"));
-            }
-            return merged;
-          }
-          return fromApi.length ? fromApi : prev;
-        });
+        setCrewJobs((prev) => mergeCrewJobsFromApi(prev, crewAnalysisJobs));
 
         setPagination(prev => ({
           ...prev,
@@ -738,6 +755,39 @@ const History = () => {
       if (!background) setIsLoading(false);
     }
   }, [hasValidToken, user?.id, toast, logout, pagination.page, pagination.limit]);
+
+  const fetchAllDataRef = useRef(fetchAllData);
+  fetchAllDataRef.current = fetchAllData;
+
+  const refreshCrewJobsFromApi = useCallback(async () => {
+    try {
+      const resp = await api.upload.getCrewAnalysisJobs();
+      const fromApi = Array.isArray((resp as any)?.data)
+        ? ((resp as any).data as any[])
+        : [];
+      if (!fromApi.length) return false;
+
+      let shouldRefreshAll = false;
+      setCrewJobs((prev) => {
+        const hadActive = crewJobsHaveActive(prev);
+        const merged = mergeCrewJobsFromApi(prev, fromApi);
+        const nowComplete = merged.some((j) => j.status === "completed");
+        if (hadActive && nowComplete) shouldRefreshAll = true;
+        return merged;
+      });
+
+      if (shouldRefreshAll) {
+        void fetchAllDataRef.current?.({ background: true });
+      }
+      return true;
+    } catch (error) {
+      console.error("Failed to refresh crew jobs:", error);
+      return false;
+    }
+  }, []);
+
+  const crewJobsRef = useRef(crewJobs);
+  crewJobsRef.current = crewJobs;
 
   // Real-time polling for job statuses and data updates
   const pollJobStatuses = useCallback(async () => {
@@ -1354,11 +1404,17 @@ const History = () => {
               return [payload.new as any, ...prev];
             });
           } else if (payload.eventType === "UPDATE") {
+            const updated = payload.new as any;
             setCrewJobs((prev) =>
               prev.map((job) =>
-                job.id === payload.new.id ? (payload.new as any) : job
+                job.id === updated.id
+                  ? { ...updated, _uniqueCardKey: updated.id }
+                  : job
               )
             );
+            if (updated.status === "completed" || updated.status === "failed") {
+              void fetchAllDataRef.current?.({ background: true });
+            }
           } else if (payload.eventType === "DELETE") {
             setCrewJobs((prev) =>
               prev.filter((job) => job.id !== payload.old.id)
@@ -1379,61 +1435,53 @@ const History = () => {
     };
   }, [user?.id]);
 
-  // Poll for crew job updates when there are active jobs
+  // Poll crew jobs while any are active (stable interval — not reset on every state update)
   useEffect(() => {
-    if (!user?.id || crewJobs.length === 0) return;
+    if (!user?.id) return;
 
-    // Check if there are any jobs that aren't completed
-    const hasActiveJobs = crewJobs.some(
-      (job) => job.status === "processing" || job.status === "pending"
-    );
-
-    if (!hasActiveJobs) return;
-
-    // Poll every 1s so we catch "completed" status soon after backend finishes
-    const pollInterval = setInterval(async () => {
-      try {
-        const resp = await api.upload.getCrewAnalysisJobs();
-        if (resp && (resp as any).data) {
-          const fromApi = (resp as any).data as any[];
-          setCrewJobs((prev) => {
-            const byId = new Map(prev.map((j) => [j.id, { ...j, _uniqueCardKey: j.id }]));
-            fromApi.forEach((j: any) => byId.set(j.id, { ...j, _uniqueCardKey: j.id }));
-            return Array.from(byId.values()).sort(
-              (a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()
-            );
-          });
-        }
-      } catch (error) {
-        console.error("Failed to poll crew jobs:", error);
-      }
-    }, 1000);
+    void refreshCrewJobsFromApi();
+    const pollInterval = setInterval(() => {
+      const jobs = crewJobsRef.current;
+      if (!crewJobsHaveActive(jobs)) return;
+      void refreshCrewJobsFromApi();
+    }, 2000);
 
     return () => clearInterval(pollInterval);
-  }, [user?.id, crewJobs]);
+  }, [user?.id, refreshCrewJobsFromApi]);
 
-  // Refetch crew jobs when tab becomes visible so we pick up completed status
+  // After jobs finish, poll a few more times so we pick up "completed" + result_data
+  useEffect(() => {
+    if (!user?.id) return;
+
+    let followUpCount = 0;
+    const followUpInterval = setInterval(() => {
+      const jobs = crewJobsRef.current;
+      if (crewJobsHaveActive(jobs)) {
+        followUpCount = 0;
+        return;
+      }
+      if (jobs.length === 0) return;
+
+      followUpCount += 1;
+      void refreshCrewJobsFromApi();
+      if (followUpCount >= 6) clearInterval(followUpInterval);
+    }, 3000);
+
+    return () => clearInterval(followUpInterval);
+  }, [user?.id, refreshCrewJobsFromApi]);
+
+  // Refetch when tab becomes visible (e.g. user read completion email in another tab)
   useEffect(() => {
     if (!user?.id) return;
     const onVisibilityChange = () => {
       if (document.visibilityState === "visible") {
-        api.upload.getCrewAnalysisJobs().then((resp) => {
-          if (resp && (resp as any).data) {
-            const fromApi = (resp as any).data as any[];
-            setCrewJobs((prev) => {
-              const byId = new Map(prev.map((j) => [j.id, { ...j, _uniqueCardKey: j.id }]));
-              fromApi.forEach((j: any) => byId.set(j.id, { ...j, _uniqueCardKey: j.id }));
-              return Array.from(byId.values()).sort(
-                (a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()
-              );
-            });
-          }
-        }).catch(() => {});
+        void refreshCrewJobsFromApi();
+        void fetchAllDataRef.current?.({ background: true });
       }
     };
     document.addEventListener("visibilitychange", onVisibilityChange);
     return () => document.removeEventListener("visibilitychange", onVisibilityChange);
-  }, [user?.id]);
+  }, [user?.id, refreshCrewJobsFromApi]);
 
   // Cleanup on unmount
   useEffect(() => {
