@@ -900,8 +900,9 @@ const Upload = () => {
   /** Brief submit state for crew jobs — no fullscreen overlay (analysis runs on History). */
   const [isSubmittingCrewJob, setIsSubmittingCrewJob] = useState(false);
   const { inLayout } = useDashboardLayout();
-  const { user } = useAuth();
+  const { user, isAdmin } = useAuth();
   const { isPlanActive, isLoading: subscriptionLoading } = useSubscription();
+  const hasPlanAccess = isAdmin || isPlanActive;
   const { regionLabel, isLoading: regionLoading, error: regionError } = useDetectedRegion();
   const REGION_PREFERENCE_KEY = "sparefinder_region_enabled";
   const [regionEnabled, setRegionEnabled] = useState<boolean | null>(() => {
@@ -932,7 +933,7 @@ const Upload = () => {
   const [confirmKeywordSearchOpen, setConfirmKeywordSearchOpen] =
     useState(false);
   const [isKeywordSearching, setIsKeywordSearching] = useState(false);
-  if (!subscriptionLoading && !isPlanActive) {
+  if (!subscriptionLoading && !hasPlanAccess) {
     return <PlanRequiredCard title="Activate a plan to upload" />;
   }
 

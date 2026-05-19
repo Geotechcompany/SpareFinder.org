@@ -98,8 +98,9 @@ const Dashboard = () => {
   useDashboardSidebarOffset(
     inLayout ? layoutSidebarCollapsed : isCollapsed
   );
-  const { user, isLoading: authLoading, logout, isAuthenticated } = useAuth();
+  const { user, isLoading: authLoading, logout, isAuthenticated, isAdmin } = useAuth();
   const { isPlanActive, isLoading: subscriptionLoading } = useSubscription();
+  const hasPlanAccess = isAdmin || isPlanActive;
   const navigate = useNavigate();
   const [isDataLoading, setIsDataLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -693,7 +694,7 @@ const Dashboard = () => {
 
   // Removed periodic auto-refresh to avoid repeated background requests when stats are legitimately empty
 
-  if (!subscriptionLoading && !isPlanActive) {
+  if (!subscriptionLoading && !hasPlanAccess) {
     if (inLayout) {
       return <PlanRequiredCard />;
     }
