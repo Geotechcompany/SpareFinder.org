@@ -107,7 +107,7 @@ async def get_user_tier_and_limits(user_id: str, role: str) -> tuple[str, dict]:
     """Billing tier and limits for the account (shared across all workspaces)."""
     if role in ("admin", "super_admin"):
         return "enterprise", SUBSCRIPTION_LIMITS["enterprise"]
-    row = _fetch_user_subscription_row(user_id)
+    row = await _fetch_user_subscription_row(user_id)
     tier = "free"
     if row:
         tier = _normalize_tier(row.get("tier") or row.get("plan_type") or "free")
