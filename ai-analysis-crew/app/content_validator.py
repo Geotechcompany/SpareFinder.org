@@ -18,23 +18,25 @@ logger = logging.getLogger(__name__)
 
 # User-facing copy
 REJECT_IMAGE_MESSAGE = (
-    "This image doesn't appear to show a manufacturing or industrial spare part. "
-    "Please upload a clear photo of a component, part, or equipment spare "
-    "(e.g. bearing, motor, sensor, pump, circuit board, automotive body part)."
+    "This image doesn't appear to show a spare part or component. "
+    "Please upload a clear photo of a part "
+    "(e.g. bearing, bumper, motor, sensor, pump, body panel, circuit board, metal fitting). "
+    "We cannot analyze animals, people, food, or nature scenes."
 )
 REJECT_KEYWORDS_MESSAGE = (
-    "Your search doesn't appear to be about a manufacturing or industrial spare part. "
-    "Use part names, OEM numbers, equipment models, or component descriptions "
-    "(e.g. \"SKF 6205 bearing\", \"hydraulic pump seal kit\")."
+    "Your search doesn't appear to be about a spare part or component. "
+    "Use part names, OEM numbers, equipment models, or descriptions "
+    "(e.g. \"front bumper assembly\", \"SKF 6205 bearing\", \"hydraulic pump seal kit\"). "
+    "We cannot search animals, food, or nature topics."
 )
 REJECT_COMBINED_MESSAGE = (
-    "SpareFinder only analyzes manufacturing and industrial spare parts. "
+    "SpareFinder analyzes spare parts and components (industrial, manufacturing, and automotive). "
     "Please provide a part image and/or keywords that describe a component or spare."
 )
 REJECT_IDENTIFIED_SUBJECT_MESSAGE = (
-    "SpareFinder only analyzes manufacturing and industrial spare parts. "
-    "We identified “{subject}” — please upload a clear photo of a component or spare "
-    "(e.g. bearing, motor, sensor, pump, seal, circuit board, industrial fitting)."
+    "SpareFinder analyzes spare parts and components (industrial, manufacturing, and automotive). "
+    "We identified “{subject}” — please upload a clear photo of a part or component "
+    "(e.g. bearing, bumper, motor, sensor, pump, seal, body panel, circuit board, metal fitting)."
 )
 
 
@@ -65,11 +67,33 @@ _NON_PART_KEYWORD_RE = re.compile(
 # Hints that keywords are plausibly part-related (if none match, still run LLM)
 _PART_HINT_RE = re.compile(
     r"\b("
-    r"part|parts|spare|spares|component|bearing|motor|pump|valve|sensor|seal|gasket|"
+    r"part|parts|spare|spares|component|assembly|bearing|motor|pump|valve|sensor|seal|gasket|"
     r"filter|belt|gear|cylinder|actuator|relay|contactor|breaker|fuse|pcb|board|"
     r"oem|aftermarket|hydraulic|pneumatic|industrial|machinery|equipment|"
     r"compressor|coupling|impeller|nozzle|fitting|flange|bracket|housing|"
-    r"bumper|grille|radiator|alternator|starter|turbo|injector|solenoid|"
+    r"bumper|fender|hood|bonnet|grille|radiator|alternator|starter|turbo|injector|solenoid|"
+    r"brake|caliper|rotor|axle|transmission|clutch|exhaust|headlight|taillight|mirror|panel|"
+    r"automotive|vehicle|car|truck|metal|steel|aluminum|aluminium|"
+    r")\b|[A-Z]{2,5}[-\s]?\d{2,}|\b\d{5,}[A-Z0-9-]*\b",
+    re.IGNORECASE,
+)
+
+# After vision identifies a subject — auto-accept obvious part descriptions
+_IDENTIFIED_PART_HINT_RE = re.compile(
+    r"\b("
+    r"part|parts|spare|spares|component|components|assembly|assemblies|"
+    r"bearing|motor|pump|valve|sensor|seal|gasket|filter|belt|gear|"
+    r"cylinder|actuator|relay|breaker|fuse|pcb|board|"
+    r"bumper|fender|hood|bonnet|grille|radiator|alternator|starter|turbo|"
+    r"injector|solenoid|brake|caliper|rotor|pad|strut|shock|spring|"
+    r"axle|driveshaft|transmission|clutch|flywheel|crankshaft|camshaft|"
+    r"exhaust|muffler|catalytic|manifold|intercooler|"
+    r"headlight|taillight|mirror|windshield|door|panel|trunk|boot|"
+    r"knuckle|hub|coupling|impeller|nozzle|fitting|flange|"
+    r"bracket|housing|mount|chassis|frame|"
+    r"hydraulic|pneumatic|industrial|machinery|equipment|automotive|"
+    r"metal|steel|aluminum|aluminium|iron|brass|copper|alloy|"
+    r"casting|forging|weldment|fabrication|"
     r")\b|[A-Z]{2,5}[-\s]?\d{2,}|\b\d{5,}[A-Z0-9-]*\b",
     re.IGNORECASE,
 )
@@ -143,19 +167,19 @@ def _llm_validate_keywords(keywords: str) -> ContentValidationResult:
             "heuristic",
         )
 
-    prompt = f"""You gate a spare-parts identification service (manufacturing, industrial, automotive components).
+    prompt = f"""You gate a spare-parts identification service (manufacturing, industrial, automotive, and metal components).
 
 Query: "{keywords}"
 
 Reply with JSON only:
 {{
   "is_spare_part_query": true or false,
-  "detected_subject": "short label e.g. hydraulic pump seal / cat photo / pizza",
+  "detected_subject": "short label e.g. front bumper assembly / hydraulic pump seal / cat photo / pizza",
   "reason": "one sentence for internal logs"
 }}
 
-Accept: part names, OEM numbers, equipment models, industrial/automotive component descriptions.
-Reject: animals, people, food, entertainment, memes, general trivia, unrelated consumer goods, landscapes."""
+Accept: part names, OEM numbers, equipment models, industrial/automotive component descriptions (including body panels, bumpers, engines, brakes, sensors, metals).
+Reject: animals, people, food, entertainment, memes, general trivia, unrelated consumer goods, empty/nature/landscape queries."""
 
     try:
         response = client.chat.completions.create(
@@ -215,23 +239,28 @@ def _llm_validate_image(image_data: bytes) -> ContentValidationResult:
     b64 = base64.b64encode(image_data).decode("utf-8")
     mime = _image_mime(image_data)
 
-    prompt = """You gate uploads for a manufacturing/industrial/automotive SPARE PART identification service.
+    prompt = """You gate uploads for a spare-parts identification service (manufacturing, industrial, automotive, metal components).
 
 Look at the image. Reply with JSON only:
 {
   "is_spare_part_image": true or false,
-  "detected_subject": "short label e.g. ball bearing / cat / person selfie / pizza",
+  "detected_subject": "short label e.g. front bumper assembly / ball bearing / cat / sunset",
   "confidence": "high" or "medium" or "low",
   "reason": "one sentence for internal logs"
 }
 
 ACCEPT (is_spare_part_image=true):
-- Individual components, parts, assemblies sold for repair (bearings, motors, pumps, valves, sensors, seals, PCBs, fittings, automotive body/mechanical parts as parts, industrial equipment components).
+- Any identifiable spare part or component for repair/replacement: industrial, machinery, automotive (including bumpers, fenders, doors, hoods, grilles, lights, brakes, engines, sensors), metal parts, assemblies, PCBs, fittings, pumps, bearings, etc.
+- A single automotive body panel or assembly photographed as a part (even if large).
 
 REJECT (is_spare_part_image=false):
-- Animals, pets, people, selfies, food, drinks, landscapes, buildings, memes, screenshots, documents-only, whole vehicles without focus on a specific replaceable part, random household items, clothing, toys unrelated to industrial parts.
+- Animals, pets, wildlife, people, selfies, portraits.
+- Food, drinks, memes, entertainment screenshots.
+- Nature-only scenes (landscapes, flowers, trees, sky, beach) with no equipment/part.
+- Blank, empty, unreadable, or extremely blurry images with no identifiable part.
+- Random household items, clothing, toys unrelated to parts.
 
-When uncertain but the main subject is clearly a part/component, accept. When clearly not a part, reject."""
+When uncertain but the main subject looks like a part, component, or metal assembly, accept. Reject only when clearly not a part."""
 
     try:
         response = client.chat.completions.create(
@@ -337,7 +366,7 @@ def _llm_validate_identified_part(identification_text: str) -> ContentValidation
         logger.warning("Identified-part validation skipped: OPENAI_API_KEY not set")
         return ContentValidationResult(True, "", None, "skipped")
 
-    prompt = f"""You gate a manufacturing / industrial SPARE PART identification service.
+    prompt = f"""You gate a spare-parts identification service (manufacturing, industrial, automotive, metal components).
 
 An AI vision step already analyzed an upload. Use this identification text:
 
@@ -348,21 +377,26 @@ An AI vision step already analyzed an upload. Use this identification text:
 Reply with JSON only:
 {{
   "is_manufacturing_spare_part": true or false,
-  "identified_part_name": "short label e.g. SKF 6205 bearing / Mazda front grille / cat / pizza / whole car",
+  "identified_part_name": "short label e.g. front bumper assembly / SKF 6205 bearing / cat / sunset",
   "detected_subject": "same as identified_part_name or shorter",
   "reason": "one sentence for internal logs"
 }}
 
 ACCEPT (is_manufacturing_spare_part=true):
-- Individual industrial, machinery, or equipment spare components.
-- Automotive replacement parts shown as an isolated component (bearing, brake pad, sensor, pump, seal, filter, alternator, etc.).
-- Clear focus on a purchasable repair part, not lifestyle/marketing imagery.
+- Industrial, machinery, or equipment spare components.
+- Automotive replacement parts and assemblies: mechanical, electrical, body (bumper, fender, hood, door, grille, panel, light, mirror), engine, brake, suspension, exhaust, etc.
+- Metal parts, castings, forgings, fabrications used as repair components.
+- Any discrete part or assembly a buyer would search for by name or OEM number.
 
 REJECT (is_manufacturing_spare_part=false):
-- Whole vehicles, car exteriors marketed as a car (brand grille photo, full car, showroom shot).
-- Animals, people, selfies, food, drinks, landscapes, memes, screenshots, documents-only.
-- Random consumer goods unrelated to industrial/MRO spare parts.
-- When the main subject is not a discrete component or spare for manufacturing/industrial use."""
+- Animals, pets, wildlife, people, selfies, portraits.
+- Food, drinks, memes, unrelated entertainment.
+- Nature-only subjects (landscape, flowers, trees, sky, beach) with no part.
+- Blank/empty/unreadable identification with no part named.
+- Random consumer goods (clothing, toys, furniture) unrelated to parts.
+
+Do NOT reject automotive body parts or large assemblies (e.g. "front bumper assembly") — those are valid spare parts.
+Only reject when the identification clearly names a non-part subject (animal, person, food, nature scene, etc.)."""
 
     try:
         response = client.chat.completions.create(
@@ -381,6 +415,13 @@ REJECT (is_manufacturing_spare_part=false):
         )
         if data.get("is_manufacturing_spare_part") is True:
             return ContentValidationResult(True, "", str(subject), "llm")
+        # LLM mislabeled subject (e.g. "people") but vision text describes a real part
+        if _IDENTIFIED_PART_HINT_RE.search(text):
+            logger.info(
+                "Identified-part LLM rejected %r but vision text has part hints — accepting",
+                subject,
+            )
+            return ContentValidationResult(True, "", str(subject), "heuristic")
         msg = REJECT_IDENTIFIED_SUBJECT_MESSAGE.format(subject=str(subject))
         return ContentValidationResult(False, msg, str(subject), "llm")
     except Exception as exc:
@@ -388,10 +429,43 @@ REJECT (is_manufacturing_spare_part=false):
         return ContentValidationResult(True, "", None, "skipped")
 
 
+def _heuristic_non_part_subject(text: str) -> Optional[str]:
+    """
+    Return a non-part label only when the text does not describe a component.
+
+    Vision models often mention "people" or "individuals" in disclaimers
+    ("I can't identify people in images") even for valid bumper/part photos.
+    """
+    if _IDENTIFIED_PART_HINT_RE.search(text):
+        return None
+    match = _NON_PART_KEYWORD_RE.search(text)
+    return match.group(0) if match else None
+
+
 def validate_identified_part(identification_text: str) -> ContentValidationResult:
-    """After vision/part identification — reject non-manufacturing subjects."""
+    """After vision/part identification — reject animals, nature, empty; accept parts."""
     if not _validation_enabled():
         return ContentValidationResult(True, "", None, "skipped")
+
+    text = (identification_text or "").strip()
+    if not text:
+        return ContentValidationResult(
+            False,
+            "Could not identify a part from this image. Try a clearer photo of the component.",
+            "empty",
+            "heuristic",
+        )
+
+    # Vision named a recognizable part (bumper, grille, bearing, etc.) — accept immediately
+    if _IDENTIFIED_PART_HINT_RE.search(text):
+        logger.info("Identified-part validation: accepted via part hints in vision text")
+        return ContentValidationResult(True, "", None, "heuristic")
+
+    blocked = _heuristic_non_part_subject(text)
+    if blocked:
+        msg = REJECT_IDENTIFIED_SUBJECT_MESSAGE.format(subject=blocked)
+        return ContentValidationResult(False, msg, blocked, "heuristic")
+
     return _llm_validate_identified_part(identification_text)
 
 

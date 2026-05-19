@@ -16,16 +16,11 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   requiredRole,
   redirectTo = '/login',
 }) => {
-  const { user, isLoading, isAdmin, isSuperAdmin } = useAuth()
+  const { user, isLoading, isAuthenticated, isAdmin, isSuperAdmin } = useAuth()
   const location = useLocation()
 
-  // Show loading spinner while checking authentication
-  if (isLoading) {
-    return <SpinningLogoLoader label="Loading…" />
-  }
-
-  // If authentication is required but user is not logged in
-  if (requireAuth && !user) {
+  // Clerk session is the source of truth; backend profile may load after redirect.
+  if (requireAuth && !isAuthenticated) {
     return (
       <Navigate
         to={redirectTo}
@@ -33,6 +28,10 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
         replace
       />
     )
+  }
+
+  if (requireAuth && isLoading) {
+    return <SpinningLogoLoader label="Loading…" />
   }
 
   // If specific role is required but user doesn't have it
@@ -46,8 +45,12 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     )
   }
 
-  // If user is logged in but trying to access login/register pages
-  if (!requireAuth && user && (location.pathname === '/login' || location.pathname === '/register')) {
+  // Signed-in users should not stay on login/register
+  if (
+    !requireAuth &&
+    isAuthenticated &&
+    (location.pathname === '/login' || location.pathname === '/register')
+  ) {
     return (
       <Navigate
         to="/dashboard"

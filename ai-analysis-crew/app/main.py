@@ -18,7 +18,6 @@ except Exception:
 import asyncio
 import base64
 import queue as queue_module
-import threading
 from typing import Optional, Callable
 import warnings
 import logging
@@ -43,6 +42,11 @@ except ImportError:
 # Setup logger
 logger = logging.getLogger(__name__)
 
+from .asyncio_compat import configure_asyncio_for_windows
+from .concurrency import configure_server_concurrency, run_crew_blocking
+
+configure_asyncio_for_windows()
+
 from pydantic import BaseModel
 from fastapi import FastAPI, File, Form, UploadFile, WebSocket, WebSocketDisconnect, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -51,10 +55,17 @@ from datetime import datetime
 import json
 import uvicorn
 from .crew_setup import setup_crew, set_progress_emitter, emit_progress, generate_report_tool_func, send_email_tool_func
+from .crew_progress import run_crew_kickoff
 from .email_sender import send_email_via_email_service, send_basic_email_smtp, send_no_regional_suppliers_email
 from .utils import ensure_temp_dir
-from .vision_analyzer import get_image_description
-from .database_storage import store_crew_analysis_to_database, update_crew_job_status, complete_crew_job
+from .vision_analyzer import get_image_description, sanitize_vision_description
+from .database_storage import (
+    complete_crew_job,
+    extract_identified_part_label,
+    store_crew_analysis_to_database,
+    update_crew_job_identified_part,
+    update_crew_job_status,
+)
 from openai import OpenAI
 
 app = FastAPI(
@@ -280,30 +291,6 @@ async def _update_job_async(
     )
 
 
-def _start_crew_progress_heartbeat(
-    job_id: str,
-    stop_event: threading.Event,
-    interval_sec: float = 45.0,
-) -> threading.Thread:
-    """Bump current_stage while kickoff runs (CrewAI has no per-agent callback in this version)."""
-    milestones = [
-        (25, "part_identifier"),
-        (40, "research_agent"),
-        (55, "research_agent"),
-        (65, "supplier_finder"),
-    ]
-
-    def _run() -> None:
-        for pct, stage in milestones:
-            if stop_event.wait(timeout=interval_sec):
-                return
-            update_crew_job_status(job_id, "processing", stage, pct)
-
-    thread = threading.Thread(target=_run, daemon=True)
-    thread.start()
-    return thread
-
-
 async def auto_start_pending_jobs():
     """Background task to automatically start pending analysis jobs."""
     # Import here to avoid circular imports at module level
@@ -325,14 +312,17 @@ async def auto_start_pending_jobs():
 
             supabase = get_supabase_admin()
 
-            # Find pending jobs
-            result = (
-                supabase.table("crew_analysis_jobs")
-                .select("id, user_email, keywords, image_url, image_name")
-                .eq("status", "pending")
-                .limit(10)  # Process max 10 at a time
-                .execute()
-            )
+            # Find pending jobs (thread pool — do not block the event loop during crew runs)
+            def _fetch_pending():
+                return (
+                    supabase.table("crew_analysis_jobs")
+                    .select("id, user_email, keywords, image_url, image_name")
+                    .eq("status", "pending")
+                    .limit(10)
+                    .execute()
+                )
+
+            result = await asyncio.to_thread(_fetch_pending)
             
             if not result.data or len(result.data) == 0:
                 continue
@@ -429,6 +419,8 @@ async def redis_broadcast_loop(message_queue: queue_module.Queue):
 @app.on_event("startup")
 async def startup_event():
     """Initialize on startup."""
+    configure_asyncio_for_windows()
+    configure_server_concurrency()
     ensure_temp_dir()
     # Debug: Print all registered routes
     api_routes = [r for r in app.routes if hasattr(r, "path") and r.path.startswith("/api")]
@@ -849,10 +841,9 @@ async def run_analysis_background(
         resolve_user_id, user_id, user_email
     )
     label_keywords = keywords_label or keywords
+    crew_report_text: Optional[str] = None
 
     set_progress_emitter(create_db_progress_emitter(analysis_id))
-    heartbeat_stop = threading.Event()
-    heartbeat_thread: Optional[threading.Thread] = None
     try:
         await _update_job_async(analysis_id, "processing", "image_analysis", 10)
 
@@ -862,16 +853,17 @@ async def run_analysis_background(
                 "Analyzing image with GPT-4o Vision...",
                 "in_progress",
             )
-            detailed_description = await asyncio.to_thread(
+            raw_vision = await run_crew_blocking(
                 get_image_description, image_data, keywords
             )
+            vision_text = sanitize_vision_description(raw_vision)
             from .content_validator import (
                 NonManufacturingPartError,
                 validate_identified_part,
             )
 
-            part_check = await asyncio.to_thread(
-                validate_identified_part, detailed_description
+            part_check = await run_crew_blocking(
+                validate_identified_part, vision_text
             )
             if not part_check.is_valid:
                 raise NonManufacturingPartError(
@@ -880,44 +872,50 @@ async def run_analysis_background(
                 )
             emit_progress("image_analysis", "Image analyzed successfully", "completed")
             await _update_job_async(analysis_id, "processing", "part_identifier", 20)
-            crew, report_task = await asyncio.to_thread(
-                setup_crew,
-                None,
-                detailed_description,
-                user_email,
-                user_country=user_country,
-                user_region=user_region,
+            vision_label = await asyncio.to_thread(
+                extract_identified_part_label, vision_text
             )
-        else:
-            await _update_job_async(analysis_id, "processing", "part_identifier", 15)
-            crew, report_task = await asyncio.to_thread(
+            if vision_label:
+                await asyncio.to_thread(
+                    update_crew_job_identified_part,
+                    analysis_id,
+                    vision_label,
+                    "part_identifier",
+                    20,
+                )
+            crew, report_task = await run_crew_blocking(
                 setup_crew,
                 None,
                 keywords,
                 user_email,
                 user_country=user_country,
                 user_region=user_region,
+                job_id=analysis_id,
+                vision_description=vision_text,
+            )
+        else:
+            await _update_job_async(analysis_id, "processing", "part_identifier", 15)
+            crew, report_task = await run_crew_blocking(
+                setup_crew,
+                None,
+                keywords,
+                user_email,
+                user_country=user_country,
+                user_region=user_region,
+                job_id=analysis_id,
             )
 
+        emit_progress("execution", "Starting analysis workflow...", "in_progress")
+        await _update_job_async(analysis_id, "processing", "part_identifier", 22)
+
+        result = await run_crew_blocking(run_crew_kickoff, crew, analysis_id)
+
+        await _update_job_async(analysis_id, "processing", "report_generator", 78)
         emit_progress(
-            "part_identifier",
-            "Part Identifier agent started - analyzing input...",
+            "report_generator",
+            "Agents finished — compiling your report…",
             "in_progress",
         )
-        await _update_job_async(analysis_id, "processing", "research_agent", 30)
-        emit_progress("execution", "Starting analysis workflow...", "in_progress")
-
-        heartbeat_thread = _start_crew_progress_heartbeat(
-            analysis_id,
-            heartbeat_stop,
-            start_from_progress=_CREW_STAGE_PROGRESS["execution"],
-        )
-        result = await asyncio.to_thread(crew.kickoff)
-        heartbeat_stop.set()
-        if heartbeat_thread:
-            heartbeat_thread.join(timeout=2.0)
-
-        await _update_job_async(analysis_id, "processing", "supplier_finder", 70)
         
         # Extract the report_task output directly
         # The report_task contains the full comprehensive report from the Report Compiler agent
@@ -957,6 +955,8 @@ async def run_analysis_background(
             import traceback
             logger.error(traceback.format_exc())
             result_text = str(result)
+
+        crew_report_text = result_text
         
         # Detect no-regional-suppliers so we can flag job and email user
         no_regional_suppliers = (
@@ -1072,11 +1072,29 @@ async def run_analysis_background(
             )
         
     except Exception as e:
-        heartbeat_stop.set()
-        if heartbeat_thread:
-            heartbeat_thread.join(timeout=2.0)
-        await _update_job_async(analysis_id, "failed", "error", 0, str(e))
-        if resolved_user_id:
+        if crew_report_text:
+            logger.error(
+                "Post-crew step failed for job %s (crew output preserved): %s",
+                analysis_id,
+                e,
+            )
+            try:
+                await _update_job_async(analysis_id, "completed", "completion", 100)
+                await asyncio.to_thread(
+                    complete_crew_job,
+                    analysis_id,
+                    {"report_text": crew_report_text, "post_processing_error": str(e)},
+                    None,
+                )
+            except Exception as completion_err:
+                logger.error(
+                    "Failed to mark job %s completed after post-crew error: %s",
+                    analysis_id,
+                    completion_err,
+                )
+        else:
+            await _update_job_async(analysis_id, "failed", "error", 0, str(e))
+        if resolved_user_id and not crew_report_text:
             await asyncio.to_thread(
                 notify_analysis_failed,
                 resolved_user_id,
@@ -1196,16 +1214,19 @@ async def websocket_progress(websocket: WebSocket):
         # Pre-analyze image with GPT-4o Vision if image is provided
         if image_data:
             emit_progress("image_analysis", "🔍 Analyzing image with GPT-4o Vision...", "in_progress")
-            detailed_description = await asyncio.to_thread(
+            raw_vision = await run_crew_blocking(
                 get_image_description, image_data, keywords
             )
+            vision_text = sanitize_vision_description(raw_vision)
             emit_progress("image_analysis", "✅ Image analyzed successfully", "completed")
-            # Pass the detailed description to CrewAI instead of raw image
-            # setup_crew returns a tuple: (crew, report_task)
-            crew, report_task = setup_crew(None, detailed_description, user_email)
+            crew, report_task = setup_crew(
+                None,
+                keywords,
+                user_email,
+                vision_description=vision_text,
+            )
         else:
             emit_progress("setup", "Initializing AI agents...", "in_progress")
-            # setup_crew returns a tuple: (crew, report_task)
             crew, report_task = setup_crew(None, keywords, user_email)
         
         # Emit progress for starting part identification
@@ -1215,7 +1236,7 @@ async def websocket_progress(websocket: WebSocket):
         emit_progress("execution", "Starting analysis workflow...", "in_progress")
         
         start_time = asyncio.get_event_loop().time()
-        result = await asyncio.to_thread(crew.kickoff)
+        result = await run_crew_blocking(run_crew_kickoff, crew)
         end_time = asyncio.get_event_loop().time()
         processing_time = end_time - start_time
         

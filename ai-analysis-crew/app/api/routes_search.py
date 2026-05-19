@@ -97,15 +97,17 @@ async def search_keywords(
                     "Failed to create crew job entry for %s, but continuing with analysis",
                     job_id,
                 )
-            await run_analysis_background(
-                job_id,
-                user_email,
-                None,
-                keywords,
-                user_country=user_country,
-                user_region=user_region,
-                user_id=user.id,
-                keywords_label=keywords,
+            asyncio.create_task(
+                run_analysis_background(
+                    job_id,
+                    user_email,
+                    None,
+                    keywords,
+                    user_country=user_country,
+                    user_region=user_region,
+                    user_id=user.id,
+                    keywords_label=keywords,
+                )
             )
 
         asyncio.create_task(_create_job_and_start_analysis())

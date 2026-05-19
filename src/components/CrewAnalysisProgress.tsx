@@ -103,6 +103,7 @@ export const CrewAnalysisProgress = ({
       technical_research: "research_agent",
       supplier_discovery: "supplier_finder",
       report_generation: "report_generator",
+      execution: "report_generator",
       database_storage: "email_agent",
       email_sending: "email_agent",
       completed: "email_agent",

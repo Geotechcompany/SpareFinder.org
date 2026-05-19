@@ -1059,6 +1059,8 @@ const PaymentManagement = () => {
               </CardContent>
             </Card>
           </motion.div>
+        </motion.div>
+      </motion.div>
     </AdminPageContent>
   );
 };

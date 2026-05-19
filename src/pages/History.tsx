@@ -703,10 +703,9 @@ const History = () => {
       const fromApi = Array.isArray((resp as any)?.data)
         ? ((resp as any).data as any[])
         : [];
-      if (!fromApi.length) return false;
-
       let shouldRefreshAll = false;
       setCrewJobs((prev) => {
+        if (!fromApi.length) return prev;
         const hadActive = crewJobsHaveActive(prev);
         const merged = mergeCrewJobsFromApi(prev, fromApi);
         const nowComplete = merged.some((j) => j.status === "completed");
@@ -1346,7 +1345,7 @@ const History = () => {
       const jobs = crewJobsRef.current;
       if (!crewJobsHaveActive(jobs)) return;
       void refreshCrewJobsFromApi();
-    }, 2000);
+    }, 3000);
 
     return () => clearInterval(pollInterval);
   }, [user?.id, refreshCrewJobsFromApi]);

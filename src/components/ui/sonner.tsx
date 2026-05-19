@@ -22,7 +22,7 @@ const Toaster = ({ ...props }: ToasterProps) => {
           toast:
             "group toast !rounded-2xl !border !border-border/50 !bg-background/90 !p-4 !pr-10 !text-foreground !shadow-2xl !backdrop-blur-xl dark:!border-white/10 dark:!bg-zinc-950/90",
           title: "!text-[0.9375rem] !font-semibold !leading-snug",
-          description: "!text-sm !leading-relaxed !text-muted-foreground",
+          description: "!text-sm !leading-relaxed opacity-90",
           actionButton:
             "!h-9 !rounded-xl !bg-primary !px-4 !text-primary-foreground !text-sm !font-medium",
           cancelButton:

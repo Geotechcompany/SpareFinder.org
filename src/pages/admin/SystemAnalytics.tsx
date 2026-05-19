@@ -364,11 +364,11 @@ const SystemAnalytics = () => {
 
   return (
     <AdminPageContent>
-<motion.div
-        initial={false}
-        animate={mainMotion}
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
         transition={{ duration: 0.3, ease: "easeInOut" }}
-        className={`flex-1 overflow-x-auto p-4 lg:p-8 relative z-10`}
+        className="relative z-10 flex-1 overflow-x-auto p-4 lg:p-8"
       >
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -728,6 +728,8 @@ const SystemAnalytics = () => {
               </Card>
             </motion.div>
           </div>
+        </motion.div>
+      </motion.div>
     </AdminPageContent>
   );
 };

@@ -45,12 +45,49 @@ interface AuthProviderProps {
   children: React.ReactNode;
 }
 
+function buildUserFromClerk(clerkUser: NonNullable<ReturnType<typeof useClerkUser>["user"]>): User {
+  const email =
+    clerkUser.primaryEmailAddress?.emailAddress ||
+    clerkUser.emailAddresses?.[0]?.emailAddress ||
+    "";
+  const role =
+    typeof clerkUser.publicMetadata?.role === "string"
+      ? clerkUser.publicMetadata.role
+      : "user";
+
+  return {
+    id: clerkUser.id,
+    email,
+    full_name:
+      clerkUser.fullName ||
+      [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(" ") ||
+      email.split("@")[0] ||
+      "User",
+    company:
+      typeof clerkUser.publicMetadata?.company === "string"
+        ? clerkUser.publicMetadata.company
+        : undefined,
+    role,
+    avatar_url: clerkUser.imageUrl ?? undefined,
+    created_at: clerkUser.createdAt?.toISOString() ?? new Date().toISOString(),
+  };
+}
+
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const { isLoaded, isSignedIn, getToken, signOut } = useClerkAuth();
   const { user: clerkUser } = useClerkUser();
 
   const [user, setUser] = useState<User | null>(null);
   const [isProfileLoading, setIsProfileLoading] = useState(false);
+
+  const applyClerkFallbackUser = () => {
+    if (clerkUser) {
+      setUser(buildUserFromClerk(clerkUser));
+      return true;
+    }
+    setUser(null);
+    return false;
+  };
 
   // Check if user is authenticated on app load
   const checkAuth = async () => {
@@ -106,11 +143,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         }
       } else {
         console.warn("❌ Failed to load app profile:", response?.error || response?.message);
-        setUser(null);
+        applyClerkFallbackUser();
       }
     } catch (error) {
       console.error("❌ Auth check failed:", error);
-      setUser(null);
+      applyClerkFallbackUser();
     } finally {
       setIsProfileLoading(false);
     }
@@ -221,7 +258,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   // Note: Clerk session state is shared across tabs by Clerk itself.
 
-  const isLoading = !isLoaded || isProfileLoading;
+  // Only block the app on profile fetch when Clerk says the user is signed in.
+  // Public routes (login/register) stay interactive while Crew AI runs on the server.
+  const isLoading = !isLoaded || (isSignedIn && isProfileLoading);
   const isAuthenticated = !!isSignedIn;
 
   const value: AuthContextType = useMemo(

@@ -88,7 +88,8 @@ const SubscribersManagement: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
-  const [totalCount, setTotalCount] = useState(0);
+  const [totalCount, setTotalCount] = useState(0);
+
   const [selectedSubscriber, setSelectedSubscriber] =
     useState<Subscriber | null>(null);
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
@@ -650,8 +651,7 @@ const SubscribersManagement: React.FC = () => {
           </CardContent>
         </Card>
             </div>
-          </div>
-        </motion.div>
+        </div>
 
       {/* Subscriber Details Modal */}
       {isDetailsModalOpen && selectedSubscriber && (
@@ -783,7 +783,7 @@ const SubscribersManagement: React.FC = () => {
           </div>
         </div>
       )}
-    </div>
+    </AdminPageContent>
   );
 };
 

@@ -61,6 +61,8 @@ import {
   extractApiErrorMessage,
   getClientKeywordValidationError,
 } from "@/lib/content-validation";
+import { AnalysisSummaryReview } from "@/components/upload/analysis-summary-review";
+import { WizardSnakeProgress } from "@/components/upload/wizard-snake-progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
@@ -894,6 +896,8 @@ const Upload = () => {
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  /** Brief submit state for crew jobs — no fullscreen overlay (analysis runs on History). */
+  const [isSubmittingCrewJob, setIsSubmittingCrewJob] = useState(false);
   const { inLayout } = useDashboardLayout();
   const { isPlanActive, isLoading: subscriptionLoading } = useSubscription();
   const { regionLabel, isLoading: regionLoading, error: regionError } = useDetectedRegion();
@@ -938,7 +942,6 @@ const Upload = () => {
   const [selectedMode, setSelectedMode] = useState<
     "image" | "keywords" | "both" | null
   >(null);
-  const [wizardProgress, setWizardProgress] = useState(0);
   const [showComprehensiveAnalysis, setShowComprehensiveAnalysis] =
     useState(false);
 
@@ -953,6 +956,8 @@ const Upload = () => {
         clearTimeout(maxWaitTimerRef.current);
         maxWaitTimerRef.current = null;
       }
+      setIsSubmittingCrewJob(false);
+      setIsAnalyzing(false);
     };
   }, []);
 
@@ -1046,7 +1051,6 @@ const Upload = () => {
   // Wizard navigation functions
   const handleModeSelection = (mode: "image" | "keywords" | "both") => {
     setSelectedMode(mode);
-    setWizardProgress(33);
 
     if (mode === "image") {
       setWizardStep("image");
@@ -1061,10 +1065,8 @@ const Upload = () => {
   const handleNextStep = () => {
     if (wizardStep === "image" && selectedMode === "both") {
       setWizardStep("keywords");
-      setWizardProgress(66);
     } else if (wizardStep === "image" || wizardStep === "keywords") {
       setWizardStep("review");
-      setWizardProgress(100);
     }
   };
 
@@ -1072,20 +1074,15 @@ const Upload = () => {
     if (wizardStep === "review") {
       if (selectedMode === "both") {
         setWizardStep("keywords");
-        setWizardProgress(66);
       } else {
         setWizardStep(selectedMode === "image" ? "image" : "keywords");
-        setWizardProgress(33);
       }
     } else if (wizardStep === "keywords") {
       setWizardStep("image");
-      setWizardProgress(33);
     } else if (wizardStep === "image") {
       setWizardStep("selection");
-      setWizardProgress(0);
     } else if (wizardStep === "selection") {
       setWizardStep("landing");
-      setWizardProgress(0);
       setSelectedMode(null);
     }
   };
@@ -1093,7 +1090,6 @@ const Upload = () => {
   const handleResetWizard = () => {
     setWizardStep("landing");
     setSelectedMode(null);
-    setWizardProgress(0);
     setUploadedFile(null);
     setImagePreview(null);
     setSavedKeywords([]);
@@ -1101,6 +1097,8 @@ const Upload = () => {
     setAnalysisResults(null);
     setSelectedPrediction(null);
     setOriginalAiResponse(null);
+    setIsAnalyzing(false);
+    setIsSubmittingCrewJob(false);
   };
 
   // Add keyword functionality
@@ -1270,7 +1268,7 @@ const Upload = () => {
         if (status === 422 || errorCode === "invalid_content") {
           showAnalysisErrorToast(
             (data?.message as string) ||
-              "SpareFinder only analyzes manufacturing and industrial spare parts."
+              "SpareFinder analyzes spare parts and components (industrial, manufacturing, and automotive)."
           );
           setConfirmKeywordSearchOpen(false);
           setIsKeywordSearching(false);
@@ -1348,6 +1346,150 @@ const Upload = () => {
       // Only clear if redirect hasn't happened yet (shouldn't reach here in success case)
       if (isKeywordSearching) {
         setIsKeywordSearching(false);
+      }
+    }
+  };
+
+  const handleReviewAnalyze = async () => {
+    if (selectedMode === "keywords") {
+      await performKeywordSearch();
+      return;
+    }
+    if (selectedMode !== "image" && selectedMode !== "both") {
+      return;
+    }
+    if (!uploadedFile) {
+      toast({
+        title: "No Image",
+        description: "Please upload an image to analyze",
+        variant: "destructive",
+      });
+      return;
+    }
+    const keywordLine = savedKeywords.join(" ").trim();
+    if (selectedMode === "both" && keywordLine.length > 0) {
+      const keywordError = getClientKeywordValidationError(keywordLine);
+      if (keywordError) {
+        toast({
+          title: "Not a spare part search",
+          description: keywordError,
+          variant: "destructive",
+        });
+        return;
+      }
+    }
+
+    redirectGuardRef.current = false;
+    setIsSubmittingCrewJob(true);
+
+    try {
+      let regionOptions: { userCountry?: string; userRegion?: string } | undefined;
+      try {
+        const regionRes = await api.user.getRegionPreference();
+        const data = (regionRes as any)?.data ?? regionRes;
+        const useRegional = data?.useRegionalSuppliers;
+        const userCountry = data?.userCountry ?? "";
+        const userRegion = data?.userRegion ?? "";
+        if (useRegional && (userCountry || userRegion)) {
+          regionOptions = {};
+          if (userCountry) regionOptions.userCountry = userCountry;
+          if (userRegion) regionOptions.userRegion = userRegion;
+        }
+      } catch {
+        /* optional */
+      }
+
+      const response = await api.upload.createCrewAnalysisJob(
+        uploadedFile,
+        savedKeywords.join(" "),
+        regionOptions
+      );
+
+      if (maxWaitTimerRef.current) {
+        clearTimeout(maxWaitTimerRef.current);
+        maxWaitTimerRef.current = null;
+      }
+      if (redirectGuardRef.current) return;
+
+      if (!response.success) {
+        throw new Error(response.message || "Failed to create analysis job");
+      }
+
+      redirectGuardRef.current = true;
+      setIsSubmittingCrewJob(false);
+
+      const jobId =
+        (response as any).jobId ?? (response as any).data?.jobId;
+      const newJob =
+        (response as any).data?.job ||
+        (response as any).job ||
+        (jobId
+          ? {
+              id: jobId,
+              image_url:
+                (response as any).imageUrl ?? (response as any).data?.imageUrl,
+              image_name: uploadedFile.name,
+              keywords: savedKeywords.join(" "),
+              status: "pending",
+              progress: 0,
+              created_at: new Date().toISOString(),
+            }
+          : null);
+
+      const historyJob = newJob
+        ? {
+            ...newJob,
+            status: "processing",
+            progress: 5,
+            current_stage: "image_analysis",
+          }
+        : null;
+
+      showAnalysisStartedToast({
+        imageName: uploadedFile.name,
+        keywords: savedKeywords.join(" "),
+        onViewHistory: () =>
+          navigate("/dashboard/history", {
+            replace: true,
+            state: historyJob ? { newCrewJob: historyJob } : undefined,
+          }),
+      });
+
+      navigate("/dashboard/history", {
+        replace: true,
+        state: historyJob ? { newCrewJob: historyJob } : undefined,
+      });
+    } catch (error) {
+      if (maxWaitTimerRef.current) {
+        clearTimeout(maxWaitTimerRef.current);
+        maxWaitTimerRef.current = null;
+      }
+      if (redirectGuardRef.current) return;
+
+      setIsSubmittingCrewJob(false);
+
+      const isTimeout =
+        error instanceof Error &&
+        (error.message.includes("timeout") ||
+          error.message.includes("exceeded"));
+      const axiosStatus =
+        error &&
+        typeof error === "object" &&
+        "response" in error
+          ? (error as { response?: { status?: number } }).response?.status
+          : undefined;
+      if (axiosStatus === 422) {
+        showAnalysisErrorToast(extractApiErrorMessage(error));
+        return;
+      }
+      showAnalysisErrorToast(
+        isTimeout
+          ? "The server may still be processing. Check History for your job."
+          : extractApiErrorMessage(error),
+        isTimeout
+      );
+      if (isTimeout) {
+        navigate("/dashboard/history", { replace: true });
       }
     }
   };
@@ -3527,79 +3669,35 @@ const Upload = () => {
             </DialogContent>
           </Dialog>
 
-          {/* Wizard Progress Bar - Snake-style stepped */}
+          {/* Wizard Progress Bar - premium snake stepper */}
           {wizardStep !== "landing" && wizardStep !== "selection" && (() => {
-            const steps = selectedMode === "both"
-              ? [
-                  { key: "image", label: "Upload" },
-                  { key: "keywords", label: "Keywords" },
-                  { key: "review", label: "Review" },
-                ]
-              : [
-                  { key: "image", label: "Upload" },
-                  { key: "review", label: "Review" },
-                ];
-            const currentIndex = steps.findIndex((s) => s.key === wizardStep);
-            const n = steps.length;
+            const steps =
+              selectedMode === "both"
+                ? [
+                    { key: "image", label: "Upload" },
+                    { key: "keywords", label: "Keywords" },
+                    { key: "review", label: "Review" },
+                  ]
+                : selectedMode === "keywords"
+                  ? [
+                      { key: "keywords", label: "Keywords" },
+                      { key: "review", label: "Review" },
+                    ]
+                  : [
+                      { key: "image", label: "Upload" },
+                      { key: "review", label: "Review" },
+                    ];
+            const currentIndex = Math.max(
+              0,
+              steps.findIndex((s) => s.key === wizardStep)
+            );
             return (
               <motion.div
                 initial={{ opacity: 0, height: 0 }}
                 animate={{ opacity: 1, height: "auto" }}
                 exit={{ opacity: 0, height: 0 }}
-                className="relative"
               >
-                <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-[#3A5AFE0A] via-[#8F39BB0A] to-transparent blur-xl opacity-80 dark:from-brand/10 dark:to-blue-600/10" />
-                <div className="relative rounded-2xl border border-border bg-card/95 px-4 py-4 shadow-soft-elevated backdrop-blur-xl dark:bg-black/30 dark:border-white/10 sm:px-5">
-                  <div className="mb-3 flex items-center justify-between">
-                    <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground sm:text-sm">
-                      Progress
-                    </span>
-                    <span className="text-sm font-semibold tabular-nums text-primary sm:text-base">
-                      {wizardProgress}%
-                    </span>
-                  </div>
-                  {/* Snake track: one bar with segment notches and smooth fill */}
-                  <div className="relative h-3 w-full overflow-hidden rounded-full bg-muted sm:h-3.5">
-                    <motion.div
-                      className="absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-primary via-primary to-primary/90"
-                      initial={false}
-                      animate={{ width: `${wizardProgress}%` }}
-                      transition={{ type: "tween", duration: 0.35, ease: [0.32, 0.72, 0, 1] }}
-                    />
-                    {/* Segment notches (snake segments) */}
-                    {n > 1 && Array.from({ length: n - 1 }).map((_, i) => (
-                      <div
-                        key={i}
-                        className="absolute top-0 bottom-0 w-1 flex-shrink-0 bg-card/95 dark:bg-background/80"
-                        style={{
-                          left: `${((i + 1) / n) * 100}%`,
-                          transform: "translateX(-50%)",
-                          borderRadius: 1,
-                        }}
-                      />
-                    ))}
-                  </div>
-                  {/* Labels under bar - one per segment, evenly spaced */}
-                  <div className="mt-2.5 flex w-full sm:mt-3">
-                    {steps.map((step, i) => {
-                      const isActive = currentIndex === i;
-                      const isComplete = currentIndex > i;
-                      return (
-                        <span
-                          key={step.key}
-                          className={cn(
-                            "flex-1 text-center text-xs font-medium transition-colors duration-200 sm:text-sm",
-                            isActive && "text-primary",
-                            isComplete && !isActive && "text-primary/80",
-                            !isActive && !isComplete && "text-muted-foreground"
-                          )}
-                        >
-                          {step.label}
-                        </span>
-                      );
-                    })}
-                  </div>
-                </div>
+                <WizardSnakeProgress steps={steps} currentIndex={currentIndex} />
               </motion.div>
             );
           })()}
@@ -3905,111 +4003,22 @@ const Upload = () => {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
-              className="max-w-4xl mx-auto"
+              className="mx-auto max-w-5xl"
             >
-              <Card className="border border-border bg-card/95 shadow-soft-elevated backdrop-blur-xl dark:bg-black/30 dark:border-white/10">
-                <CardHeader>
-                  <CardTitle className="text-foreground flex items-center gap-2">
-                    <FileText className="w-6 h-6 text-primary" />
-                    Analysis Summary
-                  </CardTitle>
-                  <CardDescription className="text-muted-foreground">
-                    Review your submission before starting the analysis
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  {/* Mode Badge */}
-                  <div className="flex items-center gap-2">
-                    <span className="text-muted-foreground text-sm">
-                      Analysis Mode:
-                    </span>
-                    <Badge className="bg-brand/20 text-brand-light border-brand/30">
-                      {selectedMode === "both"
-                        ? "Image + Keywords"
-                        : selectedMode === "image"
-                        ? "Image Only"
-                        : "Keywords Only"}
-                    </Badge>
-                  </div>
-
-                  {/* Image Summary */}
-                  {(selectedMode === "image" || selectedMode === "both") &&
-                    uploadedFile && (
-                      <div className="space-y-3">
-                        <h3 className="text-foreground font-semibold flex items-center gap-2">
-                          <ImagePlus className="w-5 h-5 text-primary" />
-                          Uploaded Image
-                        </h3>
-                        <div className="flex items-start gap-4 p-4 rounded-lg bg-muted/30 border border-border">
-                          {imagePreview && (
-                            <div className="relative w-32 h-32 rounded-lg overflow-hidden border border-border flex-shrink-0">
-                              <img
-                                src={imagePreview}
-                                alt="Part preview"
-                                className="w-full h-full object-cover"
-                              />
-                            </div>
-                          )}
-                          <div className="flex-1 space-y-2">
-                            <p className="text-foreground font-medium">
-                              {uploadedFile.name}
-                            </p>
-                            <p className="text-sm text-muted-foreground">
-                              {(uploadedFile.size / 1024).toFixed(2)} KB •{" "}
-                              {uploadedFile.type}
-                            </p>
-                            <Badge className="bg-green-600/20 text-green-300 border-green-500/30">
-                              <CheckCircle className="w-3 h-3 mr-1" />
-                              Ready for analysis
-                            </Badge>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-
-                  {/* Keywords Summary */}
-                  {(selectedMode === "keywords" || selectedMode === "both") &&
-                    savedKeywords.length > 0 && (
-                      <div className="space-y-3">
-                        <h3 className="text-foreground font-semibold flex items-center gap-2">
-                          <Target className="w-5 h-5 text-emerald-500" />
-                          Search Keywords ({savedKeywords.length})
-                        </h3>
-                        <div className="p-4 rounded-lg bg-muted/30 border border-border">
-                          <div className="flex flex-wrap gap-2">
-                            {savedKeywords.map((keyword, index) => (
-                              <Badge
-                                key={index}
-                                className="bg-emerald-600/20 text-emerald-300 border-emerald-500/30"
-                              >
-                                {keyword}
-                              </Badge>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-                    )}
-
-                  {/* Processing Info */}
-                  <div className="p-4 rounded-lg bg-primary/5 border border-primary/15">
-                    <div className="flex items-start gap-3">
-                      <Info className="w-5 h-5 text-primary mt-0.5 flex-shrink-0" />
-                      <div className="space-y-1">
-                        <p className="text-sm text-foreground font-medium">
-                          What happens next?
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {selectedMode === "both"
-                            ? "Your image will be analyzed using AI, refined with your keywords for maximum accuracy."
-                            : selectedMode === "image"
-                            ? "Your image will be processed using advanced AI to identify the Manufacturing spares part."
-                            : "Our system will search for parts matching your keywords in our extensive catalog."}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+              <AnalysisSummaryReview
+                mode={selectedMode ?? "image"}
+                uploadedFile={uploadedFile}
+                imagePreview={imagePreview}
+                keywords={savedKeywords}
+                isAnalyzing={isSubmittingCrewJob}
+                onBack={handleBackStep}
+                onStartOver={handleResetWizard}
+                analyzeDisabled={
+                  (selectedMode === "image" || selectedMode === "both") &&
+                  !uploadedFile
+                }
+                onAnalyze={handleReviewAnalyze}
+              />
             </motion.div>
           )}
 
@@ -4659,205 +4668,11 @@ const Upload = () => {
               </Button>
             </motion.div>
           )}
-
-          {wizardStep === "review" && (
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="flex justify-between items-center"
-            >
-              <Button
-                variant="outline"
-                onClick={handleBackStep}
-                className="bg-black/20 border-white/10 hover:bg-white/10"
-              >
-                Back
-              </Button>
-
-              <div className="flex gap-3">
-                <Button
-                  id="tour-search-keywords-btn"
-                  variant="outline"
-                  onClick={handleResetWizard}
-                  className="bg-black/20 border-white/10 hover:bg-white/10"
-                >
-                  Start Over
-                </Button>
-
-                <Button
-                  onClick={async () => {
-                    if (selectedMode === "image" || selectedMode === "both") {
-                      // Create SpareFinder Research job and redirect to history
-                      if (!uploadedFile) {
-                        toast({
-                          title: "No Image",
-                          description: "Please upload an image to analyze",
-                          variant: "destructive",
-                        });
-                        return;
-                      }
-
-                      redirectGuardRef.current = false;
-
-                      const keywordLine = savedKeywords.join(" ").trim();
-                      const requiresKeywordCheck =
-                        selectedMode === "both" && keywordLine.length > 0;
-                      if (requiresKeywordCheck) {
-                        const keywordError =
-                          getClientKeywordValidationError(keywordLine);
-                        if (keywordError) {
-                          toast({
-                            title: "Not a spare part search",
-                            description: keywordError,
-                            variant: "destructive",
-                          });
-                          return;
-                        }
-                      }
-
-                      setIsAnalyzing(true);
-
-                      try {
-                        let regionOptions: { userCountry?: string; userRegion?: string } | undefined;
-                        try {
-                          const regionRes = await api.user.getRegionPreference();
-                          const data = (regionRes as any)?.data ?? regionRes;
-                          const useRegional = data?.useRegionalSuppliers;
-                          const userCountry = data?.userCountry ?? "";
-                          const userRegion = data?.userRegion ?? "";
-                          if (useRegional && (userCountry || userRegion)) {
-                            regionOptions = {};
-                            if (userCountry) regionOptions.userCountry = userCountry;
-                            if (userRegion) regionOptions.userRegion = userRegion;
-                          }
-                        } catch (_) {
-                          // Ignore region-preference fetch failure; proceed without region
-                        }
-                        const response =
-                          await api.upload.createCrewAnalysisJob(
-                            uploadedFile,
-                            savedKeywords.join(" "),
-                            regionOptions
-                          );
-
-                        if (maxWaitTimerRef.current) {
-                          clearTimeout(maxWaitTimerRef.current);
-                          maxWaitTimerRef.current = null;
-                        }
-                        if (redirectGuardRef.current) return;
-
-                        if (!response.success) {
-                          throw new Error(
-                            response.message || "Failed to create analysis job"
-                          );
-                        }
-
-                        redirectGuardRef.current = true;
-                        setIsAnalyzing(false);
-
-                        const jobId =
-                          (response as any).jobId ??
-                          (response as any).data?.jobId;
-                        const newJob =
-                          (response as any).data?.job ||
-                          (response as any).job ||
-                          (jobId
-                            ? {
-                                id: jobId,
-                                image_url:
-                                  (response as any).imageUrl ??
-                                  (response as any).data?.imageUrl,
-                                image_name: uploadedFile?.name,
-                                keywords: savedKeywords.join(" "),
-                                status: "pending",
-                                progress: 0,
-                                created_at: new Date().toISOString(),
-                              }
-                            : null);
-
-                        const historyJob = newJob
-                          ? {
-                              ...newJob,
-                              status: "processing",
-                              progress: 5,
-                              current_stage: "image_analysis",
-                            }
-                          : null;
-
-                        showAnalysisStartedToast({
-                          imageName: uploadedFile?.name,
-                          keywords: savedKeywords.join(" "),
-                          onViewHistory: () =>
-                            navigate("/dashboard/history", {
-                              replace: true,
-                              state: historyJob
-                                ? { newCrewJob: historyJob }
-                                : undefined,
-                            }),
-                        });
-
-                        setTimeout(() => {
-                          navigate("/dashboard/history", {
-                            replace: true,
-                            state: historyJob
-                              ? { newCrewJob: historyJob }
-                              : undefined,
-                          });
-                        }, 400);
-                      } catch (error) {
-                        if (maxWaitTimerRef.current) {
-                          clearTimeout(maxWaitTimerRef.current);
-                          maxWaitTimerRef.current = null;
-                        }
-                        if (redirectGuardRef.current) return;
-
-                        console.error("SpareFinder Research error:", error);
-                        redirectGuardRef.current = true;
-                        setIsAnalyzing(false);
-
-                        const isTimeout =
-                          error instanceof Error &&
-                          (error.message.includes("timeout") ||
-                            error.message.includes("exceeded"));
-                        const axiosStatus =
-                          error &&
-                          typeof error === "object" &&
-                          "response" in error
-                            ? (error as { response?: { status?: number } }).response
-                                ?.status
-                            : undefined;
-                        if (axiosStatus === 422) {
-                          showAnalysisErrorToast(extractApiErrorMessage(error));
-                          return;
-                        }
-                        showAnalysisErrorToast(
-                          isTimeout
-                            ? "The server may still be processing. Check History for your job."
-                            : extractApiErrorMessage(error),
-                          isTimeout
-                        );
-                        if (isTimeout) {
-                          navigate("/dashboard/history", { replace: true });
-                        }
-                      }
-                    } else {
-                      performKeywordSearch();
-                    }
-                  }}
-                  disabled={!uploadedFile && selectedMode !== "keywords"}
-                  className="bg-gradient-to-r from-brand to-brand-dark hover:from-brand-dark hover:to-brand-dark shadow-lg shadow-brand/25 px-8 h-12"
-                >
-                  <Brain className="w-5 h-5 mr-2" />
-                  🤖 Analyze
-                </Button>
-              </div>
-            </motion.div>
-          )}
         </motion.div>
       </motion.div>
 
-      {/* Fullscreen Loading Overlay */}
-      {(isAnalyzing || isKeywordSearching) && (
+      {/* Fullscreen overlay — keyword search only; crew jobs continue on History */}
+      {isKeywordSearching && (
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -4878,12 +4693,10 @@ const Upload = () => {
             <div className="space-y-2">
               <h3 className="text-2xl font-bold text-white flex items-center gap-3 justify-center">
                 <Sparkles className="w-6 h-6 text-brand-light animate-pulse" />
-                {isAnalyzing ? "Analyzing Your Image" : "Searching Our Catalog"}
+                Searching Our Catalog
               </h3>
               <p className="text-gray-400 text-lg">
-                {isAnalyzing
-                  ? "Our AI is examining your Manufacturing spares part..."
-                  : "Finding matching parts for your keywords..."}
+                Finding matching parts for your keywords…
               </p>
             </div>
 

@@ -11,6 +11,7 @@ from typing import Annotated, Any
 from fastapi import Depends, Header, HTTPException, status
 from jose import jwt, JWTError
 from pydantic import BaseModel
+from starlette.concurrency import run_in_threadpool
 
 from .supabase_admin import get_supabase_admin
 from .supabase_resilience import is_transient_http_error, run_supabase
@@ -166,6 +167,23 @@ def _mark_online_and_notify(
 async def get_current_user(
     authorization: Annotated[str | None, Header()] = None
 ) -> CurrentUser:
+    """Async entry: resolve user in a thread so CrewAI work cannot block the event loop."""
+    try:
+        return await run_in_threadpool(_resolve_current_user, authorization)
+    except HTTPException:
+        raise
+    except Exception as e:
+        if is_transient_http_error(e):
+            logger.warning("Transient error during authentication (not invalid token): %s", e)
+            raise_service_unavailable(e)
+        logger.error("Authentication error: %s", e)
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication failed",
+        )
+
+
+def _resolve_current_user(authorization: str | None) -> CurrentUser:
     """
     Extract and validate the current user from the Authorization header.
     Supports Clerk JWT tokens.
@@ -553,15 +571,6 @@ async def get_current_user(
 
     except HTTPException:
         raise
-    except Exception as e:
-        if is_transient_http_error(e):
-            logger.warning("Transient error during authentication (not invalid token): %s", e)
-            raise_service_unavailable(e)
-        logger.error("Authentication error: %s", e)
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Authentication failed",
-        )
 
 
 def require_roles(*allowed_roles: str):

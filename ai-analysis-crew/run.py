@@ -4,11 +4,16 @@ Use this instead of uvicorn command to avoid reload issues on Windows.
 """
 
 import os
+import sys
 from pathlib import Path
 
 import uvicorn
 
 if __name__ == "__main__":
+    if sys.platform == "win32":
+        from app.asyncio_compat import configure_asyncio_for_windows
+
+        configure_asyncio_for_windows()
     # Disable telemetry
     os.environ["OTEL_SDK_DISABLED"] = "true"
 

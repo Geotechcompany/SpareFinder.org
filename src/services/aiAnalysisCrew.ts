@@ -63,6 +63,11 @@ export type CrewProgressCallback = (update: CrewProgressUpdate) => void;
 export function getCrewJobDisplayName(job: any): string | null {
   if (!job) return null;
 
+  const interimLabel = job?.result_data?.identified_part_label;
+  if (typeof interimLabel === "string" && interimLabel.trim()) {
+    return interimLabel.trim();
+  }
+
   const reportText: unknown = job?.result_data?.report_text;
   if (typeof reportText === "string" && reportText.trim()) {
     const fromReport = extractPartNameFromReportText(reportText);
@@ -126,7 +131,23 @@ function extractPartNameFromReportText(reportText: string): string | null {
     }
   }
 
-  // 2) Try the main title line: "PROFESSIONAL TECHNICAL REPORT ON <PART>"
+  // 2) Agent identification block (before full report is stored)
+  const brandMatch = reportText.match(
+    /\*\*Brand\/Manufacturer\*\*:\s*([^\n|]+)/i
+  );
+  const typeMatch = reportText.match(
+    /\*\*Type of Part\/Component\*\*:\s*(?:[A-Za-z][A-Za-z\s]*-\s*)?(.+?)(?:\n|$)/i
+  );
+  if (brandMatch && typeMatch) {
+    const brand = brandMatch[1].trim().replace(/\.$/, "");
+    const partType = typeMatch[1].trim().split(".")[0].trim();
+    if (brand && partType) {
+      const combined = `${brand} ${partType}`;
+      if (combined.length <= 120) return toTitleCase(combined);
+    }
+  }
+
+  // 3) Try the main title line: "PROFESSIONAL TECHNICAL REPORT ON <PART>"
   const titleLine = lines.find((l) => /^#{1,4}\s*/.test(l)) || lines[0] || "";
   const normalized = titleLine.replace(/^#{1,4}\s*/, "").trim();
   const m = normalized.match(/\bREPORT\b.*\bON\b\s+(.+)$/i);

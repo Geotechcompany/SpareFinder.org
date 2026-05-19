@@ -216,9 +216,98 @@ def store_crew_analysis_to_database(
 
 # Helper functions to extract structured data from report text
 
+def extract_identified_part_label(text: str) -> Optional[str]:
+    """Best-effort label from Part Identifier agent output (before full report)."""
+    if not text or not str(text).strip():
+        return None
+    import re
+
+    body = str(text).strip()
+    brand: Optional[str] = None
+    part_type: Optional[str] = None
+
+    brand_match = re.search(
+        r"\*\*Brand/Manufacturer\*\*:\s*([^\n|]+)", body, re.IGNORECASE
+    )
+    if brand_match:
+        brand = brand_match.group(1).strip().rstrip(".")
+
+    type_match = re.search(
+        r"\*\*Type of Part/Component\*\*:\s*(?:[A-Za-z][A-Za-z\s]*-\s*)?(.+?)(?:\n|$)",
+        body,
+        re.IGNORECASE,
+    )
+    if type_match:
+        part_type = type_match.group(1).strip().rstrip(".")
+
+    if brand and part_type:
+        short = part_type.split(".")[0].strip()
+        if len(short) > 72:
+            short = short[:69].rstrip() + "…"
+        return f"{brand} {short}"
+    if part_type:
+        label = part_type.split(".")[0].strip()
+        return label[:80] if len(label) > 80 else label
+    if brand:
+        return brand[:80]
+
+    table_match = re.search(
+        r"\|\s*Front Bumper Assembly[^|]*\|", body, re.IGNORECASE
+    )
+    if table_match:
+        return "Front Bumper Assembly"
+
+    return None
+
+
+def update_crew_job_identified_part(
+    job_id: str,
+    identified_part_label: str,
+    current_stage: Optional[str] = None,
+    progress: Optional[int] = None,
+) -> bool:
+    """Persist interim part label so History can show name while job is still running."""
+    try:
+        if not SUPABASE_URL or not SUPABASE_KEY:
+            return False
+        label = (identified_part_label or "").strip()
+        if not label:
+            return False
+
+        update_data: Dict[str, Any] = {
+            "updated_at": datetime.utcnow().isoformat(),
+            "result_data": {
+                "identified_part_label": label,
+                "partial": True,
+            },
+        }
+        if current_stage is not None:
+            update_data["current_stage"] = current_stage
+        if progress is not None:
+            update_data["progress"] = progress
+
+        url = f"{SUPABASE_URL}/rest/v1/crew_analysis_jobs?id=eq.{job_id}"
+        response = requests.patch(url, headers=SUPABASE_HEADERS, json=update_data)
+        if response.status_code not in (200, 204):
+            logger.warning(
+                "Failed to save identified part for job %s: %s %s",
+                job_id,
+                response.status_code,
+                response.text,
+            )
+            return False
+        return True
+    except Exception as e:
+        logger.warning("update_crew_job_identified_part failed: %s", e)
+        return False
+
+
 def _extract_part_name(report_text: str) -> str:
     """Extract part name from report"""
     try:
+        interim = extract_identified_part_label(report_text)
+        if interim:
+            return interim
         import re
         # Look for patterns like "Name: ..." or "Part Name: ..."
         match = re.search(r'(?:Part )?Name[:\s]+([^\n]+)', report_text, re.IGNORECASE)

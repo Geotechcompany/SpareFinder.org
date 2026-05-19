@@ -446,14 +446,22 @@ const EmailSmtpManagement = () => {
   return (
     <AdminPageContent>
       <motion.div
-                        whileHover={{ scale: 1.05 }}
-                        whileTap={{ scale: 0.95 }}
-                      >
-                        <Button
-                          onClick={handleSaveSettings}
-                          disabled={saving}
-                          className="bg-gradient-to-r from-brand-dark to-brand hover:from-blue-700 hover:to-brand-dark shadow-lg shadow-blue-500/25 rounded-xl"
-                        >
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="space-y-6 p-4 lg:p-8 max-w-7xl mx-auto"
+      >
+        <AdminPageHeader
+          breadcrumbPage="Email"
+          title="Email & SMTP"
+          description="Configure outbound email and manage templates."
+          actions={
+            <AdminPageHeaderToolbar>
+              <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                <Button
+                  onClick={handleSaveSettings}
+                  disabled={saving}
+                  className="rounded-xl bg-gradient-to-r from-brand-dark to-brand shadow-lg shadow-blue-500/25 hover:from-blue-700 hover:to-brand-dark"
+                >
                           {saving ? (
                             <>
                               <Loader2 className="w-4 h-4 mr-2 animate-spin" />
@@ -466,12 +474,10 @@ const EmailSmtpManagement = () => {
                             </>
                           )}
                         </Button>
-                      </motion.div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-            </motion.div>
+              </motion.div>
+            </AdminPageHeaderToolbar>
+          }
+        />
 
             {/* Email Templates */}
             <motion.div
@@ -611,8 +617,6 @@ const EmailSmtpManagement = () => {
                 </CardContent>
               </Card>
             </motion.div>
-          </div>
-        </motion.div>
       </motion.div>
 
       {/* Template Management Modal */}
@@ -913,7 +917,7 @@ const EmailSmtpManagement = () => {
           </motion.div>
         </div>
       )}
-    </div>
+    </AdminPageContent>
   );
 };
 

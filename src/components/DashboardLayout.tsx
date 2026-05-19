@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { Suspense, useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import DashboardSidebar from "@/components/DashboardSidebar";
 import MobileSidebar from "@/components/MobileSidebar";
@@ -101,7 +101,9 @@ const DashboardLayout: React.FC = () => {
           <div className="mx-auto flex w-full max-w-[var(--dashboard-content-max-width)] flex-col">
             <ImpersonationBanner />
             <DashboardHeader />
-            <Outlet />
+            <Suspense fallback={null}>
+              <Outlet />
+            </Suspense>
           </div>
         </motion.div>
 

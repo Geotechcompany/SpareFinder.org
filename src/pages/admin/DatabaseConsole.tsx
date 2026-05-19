@@ -356,6 +356,8 @@ const DatabaseConsole = () => {
               </CardContent>
             </Card>
           </motion.div>
+        </motion.div>
+      </motion.div>
     </AdminPageContent>
   );
 };

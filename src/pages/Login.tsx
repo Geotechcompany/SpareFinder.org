@@ -42,7 +42,7 @@ const getSessionIdFromClerkError = (err: unknown): string | undefined => {
 };
 
 const Login = () => {
-  const { isLoading, user, checkAuth } = useAuth();
+  const { isLoading, user, isAuthenticated, checkAuth } = useAuth();
   const { isSignedIn: isClerkSignedIn, userId: clerkUserId, sessionId: clerkSessionId } =
     useClerkAuth();
   const location = useLocation();
@@ -97,44 +97,67 @@ const Login = () => {
       setIsRedirecting(true);
       setErrorMessage(null);
 
-      const sessionId =
-        preferredSessionId ??
-        clerkSessionId ??
-        clerk.session?.id ??
-        undefined;
-
-      if (sessionId) {
-        try {
-          await setActive({ session: sessionId });
-        } catch {
-          // Session may already be active; continue to profile sync + redirect.
-        }
-      }
-
       try {
-        await checkAuth();
-      } catch {
-        // Profile sync can fail transiently; still send user to the app shell.
-      }
+        const sessionId =
+          preferredSessionId ??
+          clerkSessionId ??
+          clerk.session?.id ??
+          undefined;
 
-      navigate(redirectTo, { replace: true });
+        if (sessionId) {
+          try {
+            await setActive({ session: sessionId });
+          } catch {
+            // Session may already be active; continue to profile sync + redirect.
+          }
+        }
+
+        try {
+          await checkAuth();
+        } catch {
+          // Profile sync can fail transiently; still send user to the app shell.
+        }
+
+        navigate(redirectTo, { replace: true });
+      } catch {
+        redirectingRef.current = false;
+        setIsRedirecting(false);
+        autoRedirectStarted.current = false;
+        setErrorMessage("Unable to continue to your dashboard. Please try again.");
+      }
     },
     [checkAuth, clerk.session?.id, clerkSessionId, navigate, redirectTo, setActive]
   );
 
   // Auto-redirect when Clerk already has an active session (no manual banner).
   useEffect(() => {
-    if (!isLoaded || isLoading || user || !hasClerkSession) return;
+    if (!isLoaded || isLoading || user || isAuthenticated || !hasClerkSession) return;
     if (autoRedirectStarted.current) return;
     autoRedirectStarted.current = true;
     void redirectWithExistingSession();
-  }, [isLoaded, isLoading, user, hasClerkSession, redirectWithExistingSession]);
+  }, [isLoaded, isLoading, user, isAuthenticated, hasClerkSession, redirectWithExistingSession]);
 
   useEffect(() => {
     if (!hasClerkSession) {
       autoRedirectStarted.current = false;
     }
   }, [hasClerkSession]);
+
+  // Escape hatch if redirect stalls (e.g. backend unreachable)
+  useEffect(() => {
+    if (!isRedirecting) return;
+    const timeout = window.setTimeout(() => {
+      if (!user && !isAuthenticated) {
+        redirectingRef.current = false;
+        setIsRedirecting(false);
+        autoRedirectStarted.current = false;
+        setErrorMessage(
+          "We could not finish signing you in. Check that the API server is running, then try again."
+        );
+      }
+    }, 12000);
+    return () => window.clearTimeout(timeout);
+  }, [isRedirecting, user, isAuthenticated]);
 
   const formatStrategyLabel = (strategy: OAuthStrategy) => {
     const raw = strategy.replace(/^oauth_/, "");
@@ -488,11 +511,11 @@ const Login = () => {
     ),
   };
 
-  if (!isLoading && user) {
+  if (!isLoading && (user || isAuthenticated)) {
     return <Navigate to={redirectTo} replace />;
   }
 
-  if (isRedirecting || (isLoaded && hasClerkSession && !user)) {
+  if (isRedirecting) {
     return (
       <AuthShell {...authShellProps}>
         <SpinningLogoLoader label="Taking you to your dashboard…" />

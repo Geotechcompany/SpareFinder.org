@@ -487,6 +487,8 @@ const AuditLogs = () => {
               )}
             </CardContent>
           </Card>
+        </motion.div>
+      </motion.div>
     </AdminPageContent>
   );
 };

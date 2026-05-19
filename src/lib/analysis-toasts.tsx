@@ -29,7 +29,7 @@ export function showAnalysisStartedToast(options: AnalysisStartedOptions = {}): 
 
   toast.success("Analysis started", {
     description: buildSubtitle(options),
-    icon: <Icon className="h-5 w-5 shrink-0 text-primary" aria-hidden />,
+    icon: <Icon className="h-5 w-5 shrink-0 text-white" aria-hidden />,
     duration: 6500,
     action: options.onViewHistory
       ? {
@@ -69,7 +69,7 @@ export function showAnalysisCompletedToast(imageName?: string): void {
     description: imageName
       ? `Your report for ${imageName} is ready.`
       : "Your part analysis report is ready.",
-    icon: <History className="h-5 w-5 shrink-0 text-emerald-500" aria-hidden />,
+    icon: <History className="h-5 w-5 shrink-0 text-white" aria-hidden />,
     duration: 5500,
     action: {
       label: "View results",

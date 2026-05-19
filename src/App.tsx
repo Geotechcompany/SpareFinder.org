@@ -18,15 +18,19 @@ import { InstallPrompt } from "@/components/InstallPrompt";
 
 const Login = lazy(() => import("./pages/Login"));
 const Register = lazy(() => import("./pages/Register"));
-const Dashboard = lazy(() => import("./pages/Dashboard"));
-const Upload = lazy(() => import("./pages/Upload"));
-const History = lazy(() => import("./pages/History"));
-const Billing = lazy(() => import("./pages/Billing"));
+// Eager-loaded so in-dashboard navigation does not trigger the global SpinningLogoLoader.
+import DashboardLayout from "@/components/DashboardLayout";
+import Dashboard from "./pages/Dashboard";
+import Upload from "./pages/Upload";
+import History from "./pages/History";
+import Billing from "./pages/Billing";
+import Settings from "./pages/Settings";
+import Notifications from "./pages/Notifications";
+import Profile from "./pages/Profile";
+import Reviews from "./pages/Reviews";
+import Support from "./pages/Support";
 const TestPayment = lazy(() => import("./pages/TestPayment"));
 const AdminDashboard = lazy(() => import("./pages/AdminDashboard"));
-const Settings = lazy(() => import("./pages/Settings"));
-const Notifications = lazy(() => import("./pages/Notifications"));
-const Profile = lazy(() => import("./pages/Profile"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const UserManagement = lazy(() => import("@/pages/admin/UserManagement"));
 const SystemAnalytics = lazy(() => import("@/pages/admin/SystemAnalytics"));
@@ -56,10 +60,7 @@ const MigrateAccount = lazy(() =>
 const Unauthorized = lazy(() => import("@/pages/Unauthorized"));
 const ForgotPassword = lazy(() => import("@/pages/ForgotPassword"));
 const Contact = lazy(() => import("@/pages/Contact"));
-const Reviews = lazy(() => import("@/pages/Reviews"));
-const Support = lazy(() => import("@/pages/Support"));
 const PublicReviews = lazy(() => import("@/pages/PublicReviews"));
-const DashboardLayout = lazy(() => import("@/components/DashboardLayout"));
 const AdminLayout = lazy(() => import("@/components/AdminLayout"));
 const SharedAnalysis = lazy(() => import("@/pages/SharedAnalysis"));
 const ClerkSsoCallback = lazy(() => import("@/pages/ClerkSsoCallback"));

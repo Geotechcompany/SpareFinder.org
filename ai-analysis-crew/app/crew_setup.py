@@ -7,6 +7,8 @@ from crewai import Agent, Task, Crew
 from langchain_openai import ChatOpenAI
 from .report_generator import generate_report
 from .email_sender import send_email_with_attachment, send_email_via_email_service
+from .crew_progress import crew_streaming_enabled, create_task_progress_callback
+from .vision_analyzer import sanitize_vision_description
 
 
 # Global progress emitter function
@@ -210,6 +212,8 @@ def setup_crew(
     user_email: str,
     user_country: Optional[str] = None,
     user_region: Optional[str] = None,
+    job_id: Optional[str] = None,
+    vision_description: Optional[str] = None,
 ) -> Tuple[Crew, Task]:
     """
     Set up and configure the CrewAI crew for spare part analysis.
@@ -261,16 +265,37 @@ def setup_crew(
         elif image_data[:2] == b'\xff\xd8':
             image_type = "image/jpeg"
         
-        input_desc.append(f"An image of a car part has been provided. Please analyze this image carefully and identify the specific Engineering spares part shown.")
-    
-    if keywords:
+        input_desc.append(
+            "An image of a spare part has been provided. Analyze it and identify the specific "
+            "manufacturing / automotive / industrial component shown."
+        )
+
+    elif vision_description:
+        # Image was pre-analyzed by GPT-4o Vision before crew kickoff (main background path)
+        cleaned = sanitize_vision_description(vision_description)
+        input_desc.append(
+            f"""
+            Pre-analyzed spare part from an uploaded image (vision AI):
+
+            {cleaned}
+
+            IMPORTANT: Use this vision analysis as your primary source. Refine identification, infer likely OEM
+            part numbers and compatible vehicles/equipment where possible, and add technical specifications.
+            Do not repeat vision safety disclaimers about people or brands — focus on the part only.
+            """
+        )
+        if keywords and keywords.strip():
+            input_desc.append(f"Additional user keywords: {keywords.strip()}")
+
+    elif keywords:
         if image_data:
             input_desc.append(f"Additional keywords provided: {keywords}")
         else:
-            # For keyword-only searches, provide enhanced context
-            input_desc.append(f"""
+            # Keyword-only search (no prior vision pass)
+            input_desc.append(
+                f"""
             Keyword-based part search: {keywords}
-            
+
             IMPORTANT: Conduct a COMPREHENSIVE analysis using these keywords. Treat this as a full professional part identification request.
             Research thoroughly to identify:
             - Exact part name and type
@@ -279,9 +304,10 @@ def setup_crew(
             - Compatible vehicles/equipment with specific years and models
             - Technical specifications with real measurements
             - Real suppliers with actual contact information
-            
+
             Provide the same level of detail and professionalism as an image-based analysis.
-            """)
+            """
+            )
     
     analysis_input = " ".join(input_desc) if input_desc else "No specific input provided."
     
@@ -479,7 +505,21 @@ def setup_crew(
         context=[report_task]
     )
     
-    # Create crew
+    use_stream = crew_streaming_enabled()
+    # Always wire task_callback when we have a job id — streaming chunks alone often
+    # do not emit task transitions; callbacks fire on each completed task.
+    task_callback = create_task_progress_callback(job_id) if job_id else None
+
+    verbose_env = os.getenv("CREW_VERBOSE", "").strip().lower()
+    if verbose_env in ("1", "true", "yes"):
+        crew_verbose = True
+    elif verbose_env in ("0", "false", "no"):
+        crew_verbose = False
+    else:
+        # Streaming already prints progress; verbose duplicates "Final Answer" panels
+        crew_verbose = not use_stream
+
+    # Create crew (stream=True on CrewAI >= 1.6 for token-level progress)
     crew = Crew(
         agents=[
             part_identifier,
@@ -495,7 +535,9 @@ def setup_crew(
             report_task,
             email_task
         ],
-        verbose=True
+        verbose=True,
+        stream=use_stream,
+        task_callback=task_callback,
     )
     
     # Return crew and report_task so we can access the report output

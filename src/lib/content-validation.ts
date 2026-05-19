@@ -1,7 +1,7 @@
 /** Client-side pre-checks (backend enforces the real validation). */
 
 const NON_PART_KEYWORD_RE =
-  /\b(cat|cats|kitten|dog|puppy|pet|meme|selfie|food|pizza|recipe|football|soccer|celebrity|movie|song|landscape|sunset|beach|wedding|baby|gaming)\b/i;
+  /\b(cat|cats|kitten|dog|puppy|pet|animal|meme|selfie|food|pizza|recipe|football|soccer|celebrity|movie|song|landscape|sunset|beach|wedding|baby|gaming|flower|tree|nature|vacation)\b/i;
 
 export function getClientKeywordValidationError(keywords: string): string | null {
   const text = keywords.trim();
@@ -9,7 +9,7 @@ export function getClientKeywordValidationError(keywords: string): string | null
     return "Enter at least 2 characters describing a part or component.";
   }
   if (NON_PART_KEYWORD_RE.test(text)) {
-    return "SpareFinder only analyzes manufacturing and industrial spare parts.";
+    return "SpareFinder analyzes spare parts and components (industrial, manufacturing, and automotive). Please describe a part, not animals, food, or nature scenes.";
   }
   return null;
 }

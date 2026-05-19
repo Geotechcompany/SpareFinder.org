@@ -1,9 +1,22 @@
 """Direct GPT-4o Vision API integration for image analysis."""
 
 import os
+import re
 import base64
 from openai import OpenAI
 from typing import Optional
+
+# Lines/sentences to drop before sending vision text to CrewAI agents
+_VISION_DISCLAIMER_FRAGMENTS = (
+    "unable to identify",
+    "can't identify",
+    "cannot identify",
+    "i'm unable to",
+    "i am unable to",
+    "specific people",
+    "specific brands",
+    "not able to identify",
+)
 
 
 def analyze_image_with_gpt4o(image_data: bytes) -> str:
@@ -51,7 +64,9 @@ Please identify:
 7. **Technical Specifications**: Any visible specs (voltage, amperage, pressure ratings, dimensions, etc.)
 8. **Notable Features**: Any distinctive features, connectors, or characteristics that help identify this part
 
-Be as specific as possible. If you can't determine something with certainty, indicate that clearly. Focus on extracting ALL visible text and numbers."""
+Be as specific as possible. If you can't determine something with certainty, say "unknown" for that field.
+Do NOT include disclaimers about identifying people, faces, or brands — describe only the part/component.
+Focus on extracting ALL visible text and numbers on the part."""
 
     try:
         # Call GPT-4o with vision
@@ -88,6 +103,42 @@ Be as specific as possible. If you can't determine something with certainty, ind
         error_msg = f"Error analyzing image with GPT-4o Vision: {str(e)}"
         print(error_msg)
         return f"Unable to analyze image: {str(e)}"
+
+
+def sanitize_vision_description(text: str) -> str:
+    """
+    Remove vision safety boilerplate so Crew agents get a clean part description.
+    Keeps user keyword notes when present in combined get_image_description output.
+    """
+    if not text or not text.strip():
+        return ""
+
+    body = text.strip()
+    extra_keywords = ""
+    if "**Additional Keywords:**" in body:
+        parts = re.split(r"\*\*Additional Keywords:\*\*\s*", body, maxsplit=1, flags=re.IGNORECASE)
+        body = parts[0]
+        if len(parts) > 1:
+            extra_keywords = parts[1].strip()
+
+    body = re.sub(r"^\*\*Image Analysis:\*\*\s*", "", body, flags=re.IGNORECASE).strip()
+
+    kept_lines: list[str] = []
+    for line in body.splitlines():
+        low = line.lower()
+        if any(fragment in low for fragment in _VISION_DISCLAIMER_FRAGMENTS):
+            continue
+        if line.strip():
+            kept_lines.append(line)
+
+    cleaned = "\n".join(kept_lines).strip()
+    if extra_keywords:
+        cleaned = (
+            f"{cleaned}\n\nUser notes: {extra_keywords}".strip()
+            if cleaned
+            else f"User notes: {extra_keywords}"
+        )
+    return cleaned or text.strip()
 
 
 def get_image_description(image_data: Optional[bytes], keywords: Optional[str] = None) -> str:
