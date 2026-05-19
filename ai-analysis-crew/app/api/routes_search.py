@@ -58,8 +58,18 @@ async def search_keywords(
         user_region = payload.user_region or None
         job_id = str(uuid.uuid4())
 
+        from ..notification_service import notify_analysis_started
+        from starlette.concurrency import run_in_threadpool
+
+        await run_in_threadpool(
+            lambda: notify_analysis_started(
+                user.id,
+                job_id,
+                keywords=keywords,
+            )
+        )
+
         async def _create_job_and_start_analysis() -> None:
-            # Run blocking create_crew_job in executor so we don't block the loop
             loop = asyncio.get_event_loop()
             job_created = await loop.run_in_executor(
                 None,
@@ -76,12 +86,16 @@ async def search_keywords(
                     job_id,
                 )
             await run_analysis_background(
-                job_id, user_email, None, keywords,
+                job_id,
+                user_email,
+                None,
+                keywords,
                 user_country=user_country,
                 user_region=user_region,
+                user_id=user.id,
+                keywords_label=keywords,
             )
 
-        # Fire-and-forget: do not await so we return the response immediately
         asyncio.create_task(_create_job_and_start_analysis())
 
         # Return immediately so the client can redirect without waiting for DB or analysis

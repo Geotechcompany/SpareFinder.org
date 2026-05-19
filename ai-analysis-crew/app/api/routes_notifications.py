@@ -100,24 +100,27 @@ async def create_notification(
     message = (payload.get("message") or "").strip()
     ntype = (payload.get("type") or "info").strip()
     action_url: Optional[str] = payload.get("action_url")
+    metadata = payload.get("metadata")
 
     if not title or not message:
         return api_error(status_code=400, error="invalid_request", message="Title and message are required")
+
+    insert_row = {
+        "user_id": user.id,
+        "title": title,
+        "message": message,
+        "type": ntype,
+        "action_url": action_url,
+        "read": False,
+    }
+    if isinstance(metadata, dict):
+        insert_row["metadata"] = metadata
 
     supabase = get_supabase_admin()
     res = await run_in_threadpool(
         lambda: (
             supabase.table("notifications")
-            .insert(
-                {
-                    "user_id": user.id,
-                    "title": title,
-                    "message": message,
-                    "type": ntype,
-                    "action_url": action_url,
-                    "read": False,
-                }
-            )
+            .insert(insert_row)
             .select("*")
             .single()
             .execute()

@@ -38,6 +38,13 @@ import { PageSkeleton } from "@/components/skeletons";
 import { notificationsApi } from "@/lib/api";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
+import { NOTIFICATIONS_REFRESH_EVENT } from "@/lib/notification-events";
+import {
+  getNotificationAccentClass,
+  getNotificationBadgeLabel,
+  getNotificationIcon,
+  isAnalysisNotification,
+} from "@/lib/notification-display";
 
 interface Notification {
   id: string;
@@ -105,6 +112,13 @@ const Notifications = () => {
     fetchNotifications();
   }, []);
 
+  useEffect(() => {
+    const onRefresh = () => fetchNotifications();
+    window.addEventListener(NOTIFICATIONS_REFRESH_EVENT, onRefresh);
+    return () =>
+      window.removeEventListener(NOTIFICATIONS_REFRESH_EVENT, onRefresh);
+  }, []);
+
   const notificationSettings = [
     {
       key: "email_uploads",
@@ -140,11 +154,43 @@ const Notifications = () => {
     },
   ];
 
+  const analysisCount = notifications.filter((n) =>
+    isAnalysisNotification(n)
+  ).length;
+
   const filteredNotifications = notifications.filter((notification) => {
     if (selectedFilter === "all") return true;
     if (selectedFilter === "unread") return !notification.read;
+    if (selectedFilter === "analysis") {
+      return isAnalysisNotification(notification);
+    }
     return notification.type === selectedFilter;
   });
+
+  const openNotification = async (notification: Notification) => {
+    if (!notification.read) {
+      try {
+        const response = await notificationsApi.markAsRead(notification.id);
+        if (response.success) {
+          setNotifications((prev) =>
+            prev.map((n) =>
+              n.id === notification.id ? { ...n, read: true } : n
+            )
+          );
+        }
+      } catch {
+        /* ignore */
+      }
+    }
+    if (notification.action_url?.startsWith("/")) {
+      navigate(notification.action_url);
+    } else if (
+      notification.action_url &&
+      /^https?:\/\//i.test(notification.action_url)
+    ) {
+      window.open(notification.action_url, "_blank", "noopener,noreferrer");
+    }
+  };
 
   const unreadCount = notifications.filter((n) => !n.read).length;
 
@@ -223,36 +269,6 @@ const Notifications = () => {
       />
     );
   }
-
-  const getTypeIcon = (type: string) => {
-    switch (type) {
-      case "success":
-        return CheckCircle;
-      case "warning":
-        return AlertTriangle;
-      case "info":
-        return Info;
-      case "error":
-        return AlertTriangle;
-      default:
-        return Bell;
-    }
-  };
-
-  const getTypeColor = (type: string) => {
-    switch (type) {
-      case "success":
-        return "from-green-600 to-emerald-600";
-      case "warning":
-        return "from-yellow-600 to-orange-600";
-      case "info":
-        return "from-blue-600 to-cyan-600";
-      case "error":
-        return "from-red-600 to-pink-600";
-      default:
-        return "from-gray-600 to-gray-700";
-    }
-  };
 
   const formatTimestamp = (timestamp: string) => {
     const date = new Date(timestamp);
@@ -479,6 +495,11 @@ const Notifications = () => {
                     count: stats?.byType?.warning || 0,
                   },
                   {
+                    id: "analysis",
+                    label: "Analysis",
+                    count: analysisCount,
+                  },
+                  {
                     id: "info",
                     label: "Info",
                     count: stats?.byType?.info || 0,
@@ -555,7 +576,8 @@ const Notifications = () => {
                   <div className="space-y-3">
                       <AnimatePresence>
                         {filteredNotifications.map((notification, index) => {
-                          const Icon = getTypeIcon(notification.type);
+                          const Icon = getNotificationIcon(notification);
+                          const badge = getNotificationBadgeLabel(notification);
                           const isBeingMarked = markingAsRead.has(
                             notification.id
                           );
@@ -572,17 +594,19 @@ const Notifications = () => {
                               notification.read
                                 ? "bg-muted/60 border-border/70 opacity-80 dark:bg-white/5 dark:border-white/10"
                                 : "bg-card border-border hover:bg-muted/60 dark:bg-white/10 dark:border-white/20 dark:hover:bg-white/15"
+                            } ${
+                              isAnalysisNotification(notification) &&
+                              !notification.read
+                                ? "ring-1 ring-brand/25"
+                                : ""
                             }`}
-                              onClick={() =>
-                                !notification.read &&
-                                markAsRead(notification.id)
-                              }
+                              onClick={() => openNotification(notification)}
                             >
                               <div className="flex items-start space-x-4">
                                 <div
-                                  className={`w-12 h-12 rounded-xl flex items-center justify-center bg-gradient-to-r ${getTypeColor(
-                                    notification.type
-                                  )} flex-shrink-0`}
+                                  className={`w-12 h-12 rounded-xl flex items-center justify-center bg-gradient-to-br ${getNotificationAccentClass(
+                                    notification
+                                  )} flex-shrink-0 shadow-sm`}
                                 >
                                   <Icon className="w-6 h-6 text-white" />
                                 </div>
@@ -614,10 +638,20 @@ const Notifications = () => {
                                   <p className="mb-2 text-sm text-muted-foreground">
                                     {notification.message}
                                   </p>
-                                  <div className="flex items-center justify-between">
-                                    <span className="text-xs text-muted-foreground">
-                                      {formatTimestamp(notification.created_at)}
-                                    </span>
+                                  <div className="flex flex-wrap items-center justify-between gap-2">
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-xs text-muted-foreground">
+                                        {formatTimestamp(notification.created_at)}
+                                      </span>
+                                      {badge ? (
+                                        <Badge
+                                          variant="secondary"
+                                          className="rounded-full border-brand/20 bg-brand/10 text-[10px] text-brand"
+                                        >
+                                          {badge}
+                                        </Badge>
+                                      ) : null}
+                                    </div>
                                     {notification.read && (
                                       <span className="flex items-center text-xs text-emerald-600 dark:text-emerald-400">
                                         <Check className="w-3 h-3 mr-1" />

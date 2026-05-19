@@ -18,7 +18,8 @@ except Exception:
 import asyncio
 import base64
 import queue as queue_module
-from typing import Optional
+import threading
+from typing import Optional, Callable
 import warnings
 import logging
 
@@ -226,6 +227,81 @@ def create_progress_emitter(websocket: WebSocket):
             "timestamp": asyncio.get_event_loop().time()
         }, websocket)
     return emit
+
+
+# Map emit_progress stage keys to DB progress percentages (matches History UI stages).
+_CREW_STAGE_PROGRESS: dict[str, int] = {
+    "image_analysis": 10,
+    "setup": 15,
+    "part_identifier": 20,
+    "execution": 30,
+    "research_agent": 40,
+    "supplier_finder": 70,
+    "report_generator": 85,
+    "database_storage": 90,
+    "email_agent": 95,
+    "completion": 100,
+}
+
+
+def create_db_progress_emitter(job_id: str) -> Callable[..., None]:
+    """Persist crew tool / agent progress to crew_analysis_jobs for History polling."""
+
+    def emit(stage: str, message: str, status: str = "in_progress") -> None:
+        progress = _CREW_STAGE_PROGRESS.get(stage)
+        if progress is None:
+            return
+        if status == "error":
+            update_crew_job_status(job_id, "failed", stage, progress, message)
+            return
+        db_status = "processing"
+        if stage == "completion" and status == "completed":
+            db_status = "completed"
+        update_crew_job_status(job_id, db_status, stage, progress)
+
+    return emit
+
+
+async def _update_job_async(
+    job_id: str,
+    status: str,
+    current_stage: Optional[str] = None,
+    progress: Optional[int] = None,
+    error_message: Optional[str] = None,
+) -> None:
+    """Run sync Supabase status updates without blocking the event loop."""
+    await asyncio.to_thread(
+        update_crew_job_status,
+        job_id,
+        status,
+        current_stage,
+        progress,
+        error_message,
+    )
+
+
+def _start_crew_progress_heartbeat(
+    job_id: str,
+    stop_event: threading.Event,
+    interval_sec: float = 45.0,
+) -> threading.Thread:
+    """Bump current_stage while kickoff runs (CrewAI has no per-agent callback in this version)."""
+    milestones = [
+        (25, "part_identifier"),
+        (40, "research_agent"),
+        (55, "research_agent"),
+        (65, "supplier_finder"),
+    ]
+
+    def _run() -> None:
+        for pct, stage in milestones:
+            if stop_event.wait(timeout=interval_sec):
+                return
+            update_crew_job_status(job_id, "processing", stage, pct)
+
+    thread = threading.Thread(target=_run, daemon=True)
+    thread.start()
+    return thread
 
 
 async def auto_start_pending_jobs():
@@ -758,38 +834,73 @@ async def run_analysis_background(
     keywords: Optional[str],
     user_country: Optional[str] = None,
     user_region: Optional[str] = None,
+    user_id: Optional[str] = None,
+    image_name: Optional[str] = None,
+    keywords_label: Optional[str] = None,
 ):
     """Run the SpareFinder Research in the background and update database."""
+    from .notification_service import (
+        notify_analysis_completed,
+        notify_analysis_failed,
+        resolve_user_id,
+    )
+
+    resolved_user_id = await asyncio.to_thread(
+        resolve_user_id, user_id, user_email
+    )
+    label_keywords = keywords_label or keywords
+
+    set_progress_emitter(create_db_progress_emitter(analysis_id))
+    heartbeat_stop = threading.Event()
+    heartbeat_thread: Optional[threading.Thread] = None
     try:
-        # Update status to processing - Image Analysis stage
-        update_crew_job_status(analysis_id, "processing", "image_analysis", 10)
-        
-        # Pre-analyze image with GPT-4o Vision if image is provided
+        await _update_job_async(analysis_id, "processing", "image_analysis", 10)
+
         if image_data:
-            detailed_description = get_image_description(image_data, keywords)
-            update_crew_job_status(analysis_id, "processing", "part_identifier", 20)
-            crew, report_task = setup_crew(
-                None, detailed_description, user_email,
-                user_country=user_country, user_region=user_region,
+            emit_progress(
+                "image_analysis",
+                "Analyzing image with GPT-4o Vision...",
+                "in_progress",
+            )
+            detailed_description = await asyncio.to_thread(
+                get_image_description, image_data, keywords
+            )
+            emit_progress("image_analysis", "Image analyzed successfully", "completed")
+            await _update_job_async(analysis_id, "processing", "part_identifier", 20)
+            crew, report_task = await asyncio.to_thread(
+                setup_crew,
+                None,
+                detailed_description,
+                user_email,
+                user_country=user_country,
+                user_region=user_region,
             )
         else:
-            update_crew_job_status(analysis_id, "processing", "part_identifier", 15)
-            crew, report_task = setup_crew(
-                None, keywords, user_email,
-                user_country=user_country, user_region=user_region,
+            await _update_job_async(analysis_id, "processing", "part_identifier", 15)
+            crew, report_task = await asyncio.to_thread(
+                setup_crew,
+                None,
+                keywords,
+                user_email,
+                user_country=user_country,
+                user_region=user_region,
             )
-        
-        # Run crew execution - Research stage
-        update_crew_job_status(analysis_id, "processing", "research_agent", 30)
-        
-        # Execute crew in a thread pool
-        import concurrent.futures
-        with concurrent.futures.ThreadPoolExecutor() as executor:
-            future = executor.submit(crew.kickoff)
-            result = future.result()
-        
-        # Supplier Discovery stage
-        update_crew_job_status(analysis_id, "processing", "supplier_finder", 70)
+
+        emit_progress(
+            "part_identifier",
+            "Part Identifier agent started - analyzing input...",
+            "in_progress",
+        )
+        await _update_job_async(analysis_id, "processing", "research_agent", 30)
+        emit_progress("execution", "Starting analysis workflow...", "in_progress")
+
+        heartbeat_thread = _start_crew_progress_heartbeat(analysis_id, heartbeat_stop)
+        result = await asyncio.to_thread(crew.kickoff)
+        heartbeat_stop.set()
+        if heartbeat_thread:
+            heartbeat_thread.join(timeout=2.0)
+
+        await _update_job_async(analysis_id, "processing", "supplier_finder", 70)
         
         # Extract the report_task output directly
         # The report_task contains the full comprehensive report from the Report Compiler agent
@@ -840,20 +951,26 @@ async def run_analysis_background(
             result_text = result_text.replace("[NO_REGIONAL_SUPPLIERS]", "").strip()
             logger.info(f"📌 No regional suppliers for {region_label}; will flag job and send follow-up email")
         
-        # Generate PDF report
-        pdf_path = generate_report_tool_func(comprehensive_report_text=result_text)
+        emit_progress(
+            "report_generator",
+            "Generating professional PDF from analysis results...",
+            "in_progress",
+        )
+        pdf_path = await asyncio.to_thread(
+            generate_report_tool_func, comprehensive_report_text=result_text
+        )
         
         # Extract just the filename for URL storage
         pdf_filename = pdf_path.split('/')[-1] if '/' in pdf_path else pdf_path.split('\\')[-1]
         
-        # Report Generation stage
-        update_crew_job_status(analysis_id, "processing", "report_generator", 85)
-        
-        # Upload PDF to Supabase Storage for persistent access
+        await _update_job_async(analysis_id, "processing", "report_generator", 85)
+
         pdf_public_url = None
         try:
             from .pdf_storage import upload_pdf_to_supabase_storage
-            pdf_public_url = upload_pdf_to_supabase_storage(pdf_path, pdf_filename)
+            pdf_public_url = await asyncio.to_thread(
+                upload_pdf_to_supabase_storage, pdf_path, pdf_filename
+            )
             if pdf_public_url:
                 logger.info(f"✅ PDF uploaded to Supabase Storage: {pdf_public_url}")
             else:
@@ -861,29 +978,29 @@ async def run_analysis_background(
         except Exception as upload_err:
             logger.error(f"❌ Error uploading PDF: {upload_err}")
         
-        # Store to database (jobs and part_searches tables)
-        import uuid
-        update_crew_job_status(analysis_id, "processing", "database_storage", 90)
-        store_crew_analysis_to_database(
+        emit_progress("database_storage", "Storing analysis to database...", "in_progress")
+        await _update_job_async(analysis_id, "processing", "database_storage", 90)
+        await asyncio.to_thread(
+            store_crew_analysis_to_database,
             analysis_id=analysis_id,
             user_email=user_email,
             analysis_data={
-                'report_text': result_text,
-                'processing_time': 180,
-                'pdf_path': pdf_filename,
-                'pdf_url': pdf_public_url if pdf_public_url else pdf_filename
+                "report_text": result_text,
+                "processing_time": 180,
+                "pdf_path": pdf_filename,
+                "pdf_url": pdf_public_url if pdf_public_url else pdf_filename,
             },
             image_url=None,
-            keywords=keywords
+            keywords=keywords,
         )
-        
-        # Email sending stage
-        update_crew_job_status(analysis_id, "processing", "email_agent", 95)
-        
-        # Send email (non-blocking - don't fail analysis if email fails)
+        emit_progress("database_storage", "Analysis stored to database", "completed")
+
+        await _update_job_async(analysis_id, "processing", "email_agent", 95)
         logger.info(f"📧 Attempting to send email to {user_email}")
         try:
-            email_result = send_email_tool_func(user_email, pdf_path, pdf_public_url)
+            email_result = await asyncio.to_thread(
+                send_email_tool_func, user_email, pdf_path, pdf_public_url
+            )
             if "successfully" in email_result.lower():
                 logger.info(f"✅ Email sent successfully to {user_email}")
             else:
@@ -893,18 +1010,18 @@ async def run_analysis_background(
             logger.warning("⚠️ Email sending failed, but analysis completed successfully")
             # Don't re-raise - continue with job completion
         
-        # Complete the job - use public URL if available, otherwise filename
         logger.info(f"🏁 Completing job {analysis_id}")
-        # Set status to completed first so UI updates even if full completion payload fails
-        update_crew_job_status(analysis_id, "completed", "completed", 100)
+        await _update_job_async(analysis_id, "completed", "completion", 100)
+        emit_progress("completion", "Analysis complete", "completed")
         pdf_url_for_completion = pdf_public_url if pdf_public_url else pdf_filename
-        result_data = {'report_text': result_text}
+        result_data = {"report_text": result_text}
         if no_regional_suppliers:
-            result_data['no_regional_suppliers'] = True
-        completion_success = complete_crew_job(
-            job_id=analysis_id,
-            result_data=result_data,
-            pdf_url=pdf_url_for_completion
+            result_data["no_regional_suppliers"] = True
+        completion_success = await asyncio.to_thread(
+            complete_crew_job,
+            analysis_id,
+            result_data,
+            pdf_url_for_completion,
         )
         
         if completion_success:
@@ -915,9 +1032,11 @@ async def run_analysis_background(
         # If no suppliers were found in user region, send follow-up email (retry / disable preference)
         if no_regional_suppliers and region_label:
             try:
-                send_ok = send_no_regional_suppliers_email(
-                    to_email=user_email,
-                    region_label=region_label,
+                send_ok = await asyncio.to_thread(
+                    lambda: send_no_regional_suppliers_email(
+                        to_email=user_email,
+                        region_label=region_label,
+                    )
                 )
                 if send_ok:
                     logger.info(f"✅ No-regional-suppliers email sent to {user_email}")
@@ -925,17 +1044,33 @@ async def run_analysis_background(
                     logger.warning("⚠️ No-regional-suppliers email could not be sent")
             except Exception as email_err:
                 logger.warning(f"⚠️ No-regional-suppliers email failed: {email_err}")
+
+        if resolved_user_id:
+            await asyncio.to_thread(
+                notify_analysis_completed,
+                resolved_user_id,
+                analysis_id,
+                image_name=image_name,
+                keywords=label_keywords,
+            )
         
     except Exception as e:
-        # Mark as failed
-        update_crew_job_status(
-            analysis_id,
-            "failed",
-            "error",
-            0,
-            str(e)
-        )
+        heartbeat_stop.set()
+        if heartbeat_thread:
+            heartbeat_thread.join(timeout=2.0)
+        await _update_job_async(analysis_id, "failed", "error", 0, str(e))
+        if resolved_user_id:
+            await asyncio.to_thread(
+                notify_analysis_failed,
+                resolved_user_id,
+                analysis_id,
+                image_name=image_name,
+                keywords=label_keywords,
+                error_message=str(e),
+            )
         print(f"❌ Analysis failed: {e}")
+    finally:
+        set_progress_emitter(None)
 
 
 @app.post("/analyze-part")
@@ -1044,7 +1179,9 @@ async def websocket_progress(websocket: WebSocket):
         # Pre-analyze image with GPT-4o Vision if image is provided
         if image_data:
             emit_progress("image_analysis", "🔍 Analyzing image with GPT-4o Vision...", "in_progress")
-            detailed_description = get_image_description(image_data, keywords)
+            detailed_description = await asyncio.to_thread(
+                get_image_description, image_data, keywords
+            )
             emit_progress("image_analysis", "✅ Image analyzed successfully", "completed")
             # Pass the detailed description to CrewAI instead of raw image
             # setup_crew returns a tuple: (crew, report_task)
@@ -1060,11 +1197,8 @@ async def websocket_progress(websocket: WebSocket):
         # Run crew execution
         emit_progress("execution", "Starting analysis workflow...", "in_progress")
         
-        # Execute crew (this will trigger progress updates via emit_progress)
-        # Run in executor since crew.kickoff() is synchronous
-        loop = asyncio.get_event_loop()
         start_time = asyncio.get_event_loop().time()
-        result = await loop.run_in_executor(None, crew.kickoff)
+        result = await asyncio.to_thread(crew.kickoff)
         end_time = asyncio.get_event_loop().time()
         processing_time = end_time - start_time
         

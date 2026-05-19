@@ -53,6 +53,10 @@ import { PlanRequiredCard } from "@/components/billing/PlanRequiredCard";
 import { API_BASE_URL } from "@/lib/config";
 import axios from "axios";
 import { useToast } from "@/components/ui/use-toast";
+import {
+  showAnalysisErrorToast,
+  showAnalysisStartedToast,
+} from "@/lib/analysis-toasts";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
@@ -1183,12 +1187,30 @@ const Upload = () => {
         );
       }
 
-      // Show scheduling confirmation (same pattern as image upload)
-      toast({
-        title: "Keyword analysis scheduled",
-        description: `Your keyword search has been queued. Job ID: ${
-          jobId ?? "processing..."
-        }`,
+      showAnalysisStartedToast({
+        mode: "keywords",
+        keywords: Array.isArray(savedKeywords)
+          ? savedKeywords.join(" ")
+          : String(savedKeywords ?? ""),
+        onViewHistory: () =>
+          navigate("/dashboard/history", {
+            replace: true,
+            state: jobId
+              ? {
+                  newCrewJob: {
+                    id: jobId,
+                    keywords: Array.isArray(savedKeywords)
+                      ? savedKeywords.join(" ")
+                      : String(savedKeywords ?? ""),
+                    status: "processing",
+                    progress: 5,
+                    current_stage: "image_analysis",
+                    created_at: new Date().toISOString(),
+                    _uniqueCardKey: jobId,
+                  },
+                }
+              : undefined,
+          }),
       });
 
       // Close confirmation dialog and clear loading state
@@ -1202,20 +1224,20 @@ const Upload = () => {
           ? {
               id: jobId,
               keywords: keywordsStr,
-              status: "pending",
-              progress: 0,
+              status: "processing",
+              progress: 5,
+              current_stage: "image_analysis",
               created_at: new Date().toISOString(),
               _uniqueCardKey: jobId,
             }
           : null;
 
-      // Redirect with job in state so History shows the card while analysis runs
       setTimeout(() => {
         navigate("/dashboard/history", {
           replace: true,
           state: newCrewJob ? { newCrewJob } : undefined,
         });
-      }, 100);
+      }, 400);
       return;
     } catch (error: any) {
       console.error("Keyword search error:", error);
@@ -4651,35 +4673,6 @@ const Upload = () => {
                       redirectGuardRef.current = false;
                       setIsAnalyzing(true);
 
-                      // Redirect to History after 8s max so user is never stuck on overlay
-                      const maxWaitMs = 8000;
-                      const timerId = setTimeout(() => {
-                        if (redirectGuardRef.current) return;
-                        redirectGuardRef.current = true;
-                        setIsAnalyzing(false);
-                        toast({
-                          title: "Taking a moment…",
-                          description:
-                            "Your analysis is in the queue. Check History for progress.",
-                        });
-                        // Pass optimistic job so History shows a card (same flow as keyword analysis)
-                        const optimisticJob = {
-                          id: `pending-${Date.now()}`,
-                          keywords: savedKeywords.join(" "),
-                          image_name: uploadedFile?.name,
-                          status: "pending",
-                          progress: 0,
-                          created_at: new Date().toISOString(),
-                          _uniqueCardKey: `pending-${Date.now()}`,
-                          _optimistic: true,
-                        };
-                        navigate("/dashboard/history", {
-                          replace: true,
-                          state: { newCrewJob: optimisticJob },
-                        });
-                      }, maxWaitMs);
-                      maxWaitTimerRef.current = timerId;
-
                       try {
                         let regionOptions: { userCountry?: string; userRegion?: string } | undefined;
                         try {
@@ -4717,11 +4710,6 @@ const Upload = () => {
 
                         redirectGuardRef.current = true;
                         setIsAnalyzing(false);
-                        toast({
-                          title: "Analysis Started! 🚀",
-                          description:
-                            "Redirecting you to history to watch progress...",
-                        });
 
                         const jobId =
                           (response as any).jobId ??
@@ -4743,14 +4731,35 @@ const Upload = () => {
                               }
                             : null);
 
+                        const historyJob = newJob
+                          ? {
+                              ...newJob,
+                              status: "processing",
+                              progress: 5,
+                              current_stage: "image_analysis",
+                            }
+                          : null;
+
+                        showAnalysisStartedToast({
+                          imageName: uploadedFile?.name,
+                          keywords: savedKeywords.join(" "),
+                          onViewHistory: () =>
+                            navigate("/dashboard/history", {
+                              replace: true,
+                              state: historyJob
+                                ? { newCrewJob: historyJob }
+                                : undefined,
+                            }),
+                        });
+
                         setTimeout(() => {
                           navigate("/dashboard/history", {
                             replace: true,
-                            state: newJob
-                              ? { newCrewJob: newJob }
+                            state: historyJob
+                              ? { newCrewJob: historyJob }
                               : undefined,
                           });
-                        }, 100);
+                        }, 400);
                       } catch (error) {
                         if (maxWaitTimerRef.current) {
                           clearTimeout(maxWaitTimerRef.current);
@@ -4766,17 +4775,14 @@ const Upload = () => {
                           error instanceof Error &&
                           (error.message.includes("timeout") ||
                             error.message.includes("exceeded"));
-                        toast({
-                          title: isTimeout
-                            ? "Request timed out"
-                            : "Analysis Failed",
-                          description: isTimeout
-                            ? "The server may still be processing. Check the History page for your job and progress."
+                        showAnalysisErrorToast(
+                          isTimeout
+                            ? "The server may still be processing. Check History for your job."
                             : error instanceof Error
                               ? error.message
-                              : "Please try again",
-                          variant: "destructive",
-                        });
+                              : "Please try again.",
+                          isTimeout
+                        );
                         if (isTimeout) {
                           navigate("/dashboard/history", { replace: true });
                         }

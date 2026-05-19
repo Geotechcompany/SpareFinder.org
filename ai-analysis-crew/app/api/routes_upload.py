@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any, Optional
 
 from fastapi import APIRouter, Depends, File, Form, UploadFile
+from starlette.concurrency import run_in_threadpool
 
 from .auth_dependencies import CurrentUser, get_current_user, require_roles
 from .plan_enforcement import check_upload_limit
@@ -269,8 +270,9 @@ async def create_crew_analysis_job(
             "image_url": image_url,
             "image_name": image.filename,
             "keywords": keywords or "",
-            "status": "pending",
-            "progress": 0,
+            "status": "processing",
+            "current_stage": "image_analysis",
+            "progress": 5,
         }
         if workspace_isolation_enabled():
             job_data["workspace_id"] = workspace_id
@@ -288,9 +290,18 @@ async def create_crew_analysis_job(
         # Use the actual ID from the database (in case it was auto-generated)
         job_id = job.get("id") or job_id
 
-        # Start analysis in background immediately
+        from ..notification_service import notify_analysis_started
         from ..main import run_analysis_background
-        
+
+        await run_in_threadpool(
+            lambda: notify_analysis_started(
+                user_id,
+                job_id,
+                image_name=image.filename,
+                keywords=keywords or None,
+            )
+        )
+
         asyncio.create_task(
             run_analysis_background(
                 job_id,
@@ -299,6 +310,8 @@ async def create_crew_analysis_job(
                 keywords or "",
                 user_country=user_country or None,
                 user_region=user_region or None,
+                user_id=user_id,
+                image_name=image.filename,
             )
         )
 

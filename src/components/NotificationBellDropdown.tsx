@@ -1,13 +1,6 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import {
-  Bell,
-  CheckCircle,
-  Info,
-  AlertTriangle,
-  Loader2,
-  Inbox,
-} from "lucide-react";
+import { Bell, Loader2, Inbox } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -20,6 +13,13 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { notificationsApi } from "@/lib/api";
 import { cn } from "@/lib/utils";
+import { NOTIFICATIONS_REFRESH_EVENT } from "@/lib/notification-events";
+import {
+  getNotificationAccentClass,
+  getNotificationBadgeLabel,
+  getNotificationIcon,
+  isAnalysisNotification,
+} from "@/lib/notification-display";
 
 type PreviewNotification = {
   id: string;
@@ -29,19 +29,7 @@ type PreviewNotification = {
   read: boolean;
   action_url?: string | null;
   created_at: string;
-};
-
-const typeIcon = (type: string) => {
-  switch (type) {
-    case "success":
-      return CheckCircle;
-    case "warning":
-    case "error":
-      return AlertTriangle;
-    case "info":
-    default:
-      return Info;
-  }
+  metadata?: Record<string, unknown> | null;
 };
 
 const formatRelative = (iso: string) => {
@@ -115,6 +103,13 @@ export function NotificationBellDropdown({
     const onFocus = () => load();
     window.addEventListener("focus", onFocus);
     return () => window.removeEventListener("focus", onFocus);
+  }, [load]);
+
+  useEffect(() => {
+    const onRefresh = () => load();
+    window.addEventListener(NOTIFICATIONS_REFRESH_EVENT, onRefresh);
+    return () =>
+      window.removeEventListener(NOTIFICATIONS_REFRESH_EVENT, onRefresh);
   }, [load]);
 
   const onOpenChange = (next: boolean) => {
@@ -195,7 +190,9 @@ export function NotificationBellDropdown({
               </div>
             ) : (
               items.map((n) => {
-                const Icon = typeIcon(n.type);
+                const Icon = getNotificationIcon(n);
+                const badge = getNotificationBadgeLabel(n);
+                const analysis = isAnalysisNotification(n);
                 return (
                   <button
                     key={n.id}
@@ -203,16 +200,14 @@ export function NotificationBellDropdown({
                     onClick={() => handleItemActivate(n)}
                     className={cn(
                       "flex w-full gap-3 rounded-xl px-3 py-2.5 text-left transition-colors hover:bg-muted/70",
-                      !n.read && "bg-primary/[0.06]"
+                      !n.read && "bg-primary/[0.06]",
+                      analysis && !n.read && "ring-1 ring-brand/20"
                     )}
                   >
                     <div
                       className={cn(
-                        "mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground",
-                        n.type === "success" && "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400",
-                        n.type === "warning" && "bg-amber-500/15 text-amber-600 dark:text-amber-400",
-                        n.type === "error" && "bg-red-500/15 text-red-600 dark:text-red-400",
-                        n.type === "info" && "bg-sky-500/15 text-sky-600 dark:text-sky-400"
+                        "mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br text-white shadow-sm",
+                        getNotificationAccentClass(n)
                       )}
                     >
                       <Icon className="h-4 w-4" aria-hidden />
@@ -234,9 +229,16 @@ export function NotificationBellDropdown({
                       <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">
                         {n.message}
                       </p>
-                      <p className="mt-1 text-[11px] text-muted-foreground/80">
-                        {formatRelative(n.created_at)}
-                      </p>
+                      <div className="mt-1 flex flex-wrap items-center gap-2">
+                        <p className="text-[11px] text-muted-foreground/80">
+                          {formatRelative(n.created_at)}
+                        </p>
+                        {badge ? (
+                          <span className="rounded-full bg-brand/10 px-2 py-0.5 text-[10px] font-medium text-brand">
+                            {badge}
+                          </span>
+                        ) : null}
+                      </div>
                     </div>
                   </button>
                 );

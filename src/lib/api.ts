@@ -1817,6 +1817,7 @@ export const notificationsApi = {
     message: string;
     type?: "info" | "success" | "warning" | "error";
     action_url?: string;
+    metadata?: Record<string, unknown>;
   }): Promise<ApiResponse> => {
     try {
       const response = await apiClient.post("/notifications", notification);
