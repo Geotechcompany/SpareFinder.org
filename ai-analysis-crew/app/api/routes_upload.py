@@ -445,6 +445,13 @@ async def delete_crew_analysis_job(
         if not check_result.data:
             return api_error("Job not found or unauthorized", status_code=404)
 
+        from ..crew_job_cancel import request_cancel_crew_job
+
+        job_status = str(check_result.data.get("status") or "").lower()
+        if job_status in ("pending", "processing"):
+            request_cancel_crew_job(job_id)
+            logger.info("Cancelling in-flight crew analysis before delete: %s", job_id)
+
         delete_result = (
             workspace_delete(supabase, "crew_analysis_jobs", scope)
             .eq("id", job_id)

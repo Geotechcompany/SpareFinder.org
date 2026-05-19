@@ -20,14 +20,15 @@ from crewai import Crew
 
 
 
+from .crew_job_cancel import (
+    CrewJobCancelledError,
+    ensure_not_cancelled,
+    is_crew_job_cancelled,
+)
 from .database_storage import (
-
     extract_identified_part_label,
-
     update_crew_job_identified_part,
-
     update_crew_job_status,
-
 )
 
 
@@ -75,7 +76,8 @@ _AGENT_ROLE_TO_STAGE: dict[str, str] = {
 
 
 def _persist_stage(job_id: str, stage: str, progress: int) -> None:
-
+    if is_crew_job_cancelled(job_id):
+        return
     ok = update_crew_job_status(job_id, "processing", stage, progress)
 
     if ok:
@@ -295,11 +297,13 @@ def run_crew_kickoff(crew: Crew, job_id: Optional[str] = None) -> Any:
     """
 
     if not getattr(crew, "stream", False) or not job_id:
+        if job_id:
+            ensure_not_cancelled(job_id)
 
         result = crew.kickoff()
 
         if job_id:
-
+            ensure_not_cancelled(job_id)
             _finalize_crew_progress(job_id)
 
         return result
@@ -314,10 +318,13 @@ def run_crew_kickoff(crew: Crew, job_id: Optional[str] = None) -> Any:
 
         logger.warning("Crew streaming types unavailable; using plain kickoff()")
 
+        if job_id:
+            ensure_not_cancelled(job_id)
+
         result = crew.kickoff()
 
         if job_id:
-
+            ensure_not_cancelled(job_id)
             _finalize_crew_progress(job_id)
 
         return result
@@ -335,6 +342,8 @@ def run_crew_kickoff(crew: Crew, job_id: Optional[str] = None) -> Any:
 
 
     for chunk in streaming:
+        if job_id:
+            ensure_not_cancelled(job_id)
 
         idx = int(getattr(chunk, "task_index", -1))
 

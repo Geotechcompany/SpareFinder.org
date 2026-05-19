@@ -613,7 +613,15 @@ def update_crew_job_status(
         if not SUPABASE_URL or not SUPABASE_KEY:
             logger.warning("Supabase not configured - skipping job status update")
             return False
-        
+
+        try:
+            from .crew_job_cancel import is_crew_job_cancelled
+
+            if is_crew_job_cancelled(job_id):
+                return False
+        except ImportError:
+            pass
+
         update_data = {
             'status': status,
             'updated_at': datetime.utcnow().isoformat()

@@ -59,9 +59,18 @@ from .crew_progress import run_crew_kickoff
 from .email_sender import send_email_via_email_service, send_basic_email_smtp, send_no_regional_suppliers_email
 from .utils import ensure_temp_dir
 from .vision_analyzer import get_image_description, sanitize_vision_description
+from .crew_job_cancel import (
+    CrewJobCancelledError,
+    clear_cancel_flag,
+    is_crew_job_cancelled,
+    register_running_task,
+    request_cancel_crew_job,
+    unregister_running_task,
+)
 from .database_storage import (
     complete_crew_job,
     extract_identified_part_label,
+    get_crew_job_status,
     store_crew_analysis_to_database,
     update_crew_job_identified_part,
     update_crew_job_status,
@@ -819,6 +828,16 @@ async def unsubscribe_email(token: str, reason: str | None = None):
         )
 
 
+async def _ensure_job_active(job_id: str) -> None:
+    """Abort if the user deleted the job or cancellation was requested."""
+    if is_crew_job_cancelled(job_id):
+        raise CrewJobCancelledError(f"Job {job_id} was cancelled")
+    row = await asyncio.to_thread(get_crew_job_status, job_id)
+    if not row:
+        request_cancel_crew_job(job_id)
+        raise CrewJobCancelledError(f"Job {job_id} no longer exists")
+
+
 async def run_analysis_background(
     analysis_id: str,
     user_email: str,
@@ -837,6 +856,11 @@ async def run_analysis_background(
         resolve_user_id,
     )
 
+    current_task = asyncio.current_task()
+    if current_task is not None:
+        register_running_task(analysis_id, current_task)
+    clear_cancel_flag(analysis_id)
+
     resolved_user_id = await asyncio.to_thread(
         resolve_user_id, user_id, user_email
     )
@@ -845,6 +869,7 @@ async def run_analysis_background(
 
     set_progress_emitter(create_db_progress_emitter(analysis_id))
     try:
+        await _ensure_job_active(analysis_id)
         await _update_job_async(analysis_id, "processing", "image_analysis", 10)
 
         if image_data:
@@ -871,6 +896,7 @@ async def run_analysis_background(
                     part_check.detected_subject,
                 )
             emit_progress("image_analysis", "Image analyzed successfully", "completed")
+            await _ensure_job_active(analysis_id)
             await _update_job_async(analysis_id, "processing", "part_identifier", 20)
             vision_label = await asyncio.to_thread(
                 extract_identified_part_label, vision_text
@@ -905,10 +931,13 @@ async def run_analysis_background(
                 job_id=analysis_id,
             )
 
+        await _ensure_job_active(analysis_id)
         emit_progress("execution", "Starting analysis workflow...", "in_progress")
         await _update_job_async(analysis_id, "processing", "part_identifier", 22)
 
         result = await run_crew_blocking(run_crew_kickoff, crew, analysis_id)
+
+        await _ensure_job_active(analysis_id)
 
         await _update_job_async(analysis_id, "processing", "report_generator", 78)
         emit_progress(
@@ -957,7 +986,9 @@ async def run_analysis_background(
             result_text = str(result)
 
         crew_report_text = result_text
-        
+
+        await _ensure_job_active(analysis_id)
+
         # Detect no-regional-suppliers so we can flag job and email user
         no_regional_suppliers = (
             "[NO_REGIONAL_SUPPLIERS]" in result_text
@@ -1071,7 +1102,19 @@ async def run_analysis_background(
                 keywords=label_keywords,
             )
         
+    except CrewJobCancelledError as cancel_exc:
+        logger.info("Crew analysis stopped for job %s: %s", analysis_id, cancel_exc)
+    except asyncio.CancelledError:
+        logger.info("Crew analysis asyncio task cancelled for job %s", analysis_id)
+        raise
     except Exception as e:
+        if is_crew_job_cancelled(analysis_id):
+            logger.info(
+                "Ignoring error for cancelled crew job %s: %s",
+                analysis_id,
+                e,
+            )
+            return
         if crew_report_text:
             logger.error(
                 "Post-crew step failed for job %s (crew output preserved): %s",
@@ -1106,6 +1149,8 @@ async def run_analysis_background(
         print(f"❌ Analysis failed: {e}")
     finally:
         set_progress_emitter(None)
+        unregister_running_task(analysis_id, current_task)
+        clear_cancel_flag(analysis_id)
 
 
 @app.post("/analyze-part")
