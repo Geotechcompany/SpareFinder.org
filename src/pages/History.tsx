@@ -105,6 +105,16 @@ function crewJobsHaveActive(jobs: any[]): boolean {
   );
 }
 
+function parseCrewJobsFromResponse(resp: unknown): any[] {
+  if (!resp) return [];
+  if (Array.isArray(resp)) return resp;
+  if (typeof resp !== "object") return [];
+  const payload = resp as Record<string, unknown>;
+  if (Array.isArray(payload.data)) return payload.data as any[];
+  if (Array.isArray(payload.jobs)) return payload.jobs as any[];
+  return [];
+}
+
 const History = () => {
   const location = useLocation();
   const { inLayout } = useDashboardLayout();
@@ -417,10 +427,7 @@ const History = () => {
 
       // Handle crew jobs response: merge with current state when in background so we don't wipe optimistic job
       if (crewJobsResponse.status === "fulfilled" && crewJobsResponse.value) {
-        const crewData = crewJobsResponse.value as any;
-        const crewAnalysisJobs: any[] = Array.isArray(crewData.data)
-          ? crewData.data
-          : [];
+        const crewAnalysisJobs = parseCrewJobsFromResponse(crewJobsResponse.value);
         console.log("🤖 SpareFinder Research jobs:", crewAnalysisJobs.length, "jobs");
 
         // Check for duplicate IDs
@@ -700,9 +707,7 @@ const History = () => {
   const refreshCrewJobsFromApi = useCallback(async () => {
     try {
       const resp = await api.upload.getCrewAnalysisJobs();
-      const fromApi = Array.isArray((resp as any)?.data)
-        ? ((resp as any).data as any[])
-        : [];
+      const fromApi = parseCrewJobsFromResponse(resp);
       let shouldRefreshAll = false;
       setCrewJobs((prev) => {
         if (!fromApi.length) return prev;
@@ -1236,24 +1241,28 @@ const History = () => {
         setIsLoading(false);
       }
 
-      // When we have an optimistic job, fetch in background so the page doesn't freeze on slow/hanging APIs
       console.log("📊 Refetching History data (landed on page) for user:", user.id);
       isInitializedRef.current = true;
+
+      // Crew jobs: fetch immediately on every navigation (user?.id poll does not re-run on redirect)
+      void refreshCrewJobsFromApi();
+
+      // Full history fetch can be slow; run in background when we already show the new job card
       fetchAllData(isAfterRedirectWithJob ? { background: true } : undefined);
 
-      // Multiple delayed refetches so in-progress analysis shows up even if DB/API is briefly behind
-      const bg = isAfterRedirectWithJob ? { background: true } as const : undefined;
-      const t1 = setTimeout(() => fetchAllData(bg), 500);
-      const t2 = setTimeout(() => fetchAllData(bg), 1500);
-      const t3 = setTimeout(() => fetchAllData(bg), 3000);
-      // When analysis just started: retry stats/history in background after backend may have caught up
+      // Light follow-up if the new job row is not in the API yet
+      const tCrew = isAfterRedirectWithJob
+        ? setTimeout(() => void refreshCrewJobsFromApi(), 600)
+        : undefined;
+      const tAll = isAfterRedirectWithJob
+        ? setTimeout(() => fetchAllData({ background: true }), 1200)
+        : undefined;
       const tRetry = isAfterRedirectWithJob
         ? setTimeout(() => fetchAllData({ background: true }), 8000)
         : undefined;
       return () => {
-        clearTimeout(t1);
-        clearTimeout(t2);
-        clearTimeout(t3);
+        if (tCrew) clearTimeout(tCrew);
+        if (tAll) clearTimeout(tAll);
         if (tRetry) clearTimeout(tRetry);
       };
     }
@@ -1264,7 +1273,15 @@ const History = () => {
       setError(null);
       setIsLoading(false);
     }
-  }, [location.pathname, location.state, isAuthenticated, user?.id, authLoading, fetchAllData]);
+  }, [
+    location.pathname,
+    location.state,
+    isAuthenticated,
+    user?.id,
+    authLoading,
+    fetchAllData,
+    refreshCrewJobsFromApi,
+  ]);
 
   // Refetch data when pagination changes (but only after initial load)
   useEffect(() => {
@@ -1338,7 +1355,7 @@ const History = () => {
 
   // Poll crew jobs while any are active (stable interval — not reset on every state update)
   useEffect(() => {
-    if (!user?.id) return;
+    if (!user?.id || location.pathname !== HISTORY_PATH) return;
 
     void refreshCrewJobsFromApi();
     const pollInterval = setInterval(() => {
@@ -1348,7 +1365,7 @@ const History = () => {
     }, 3000);
 
     return () => clearInterval(pollInterval);
-  }, [user?.id, refreshCrewJobsFromApi]);
+  }, [user?.id, location.pathname, refreshCrewJobsFromApi]);
 
   // After jobs finish, poll a few more times so we pick up "completed" + result_data
   useEffect(() => {
