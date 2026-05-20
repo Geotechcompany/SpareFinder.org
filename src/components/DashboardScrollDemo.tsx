@@ -59,16 +59,16 @@ export function DashboardScrollDemo() {
           disabled={isOpening}
           aria-label="Play interactive product tour"
           className={cn(
-            "group relative mx-auto w-full overflow-hidden rounded-2xl border border-border/80",
-            "bg-muted/30 shadow-2xl transition-transform focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand",
-            "hover:scale-[1.01] active:scale-[0.99] disabled:pointer-events-none disabled:opacity-70"
+            "group relative block h-full min-h-[28rem] w-full overflow-hidden rounded-2xl",
+            "bg-zinc-950 shadow-2xl transition-transform focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand",
+            "hover:scale-[1.01] active:scale-[0.99] disabled:pointer-events-none disabled:opacity-70 md:min-h-0"
           )}
         >
           <img
             src="/dashboard.png"
             alt=""
             aria-hidden
-            className="h-full w-full object-cover object-left-top opacity-90 transition-opacity group-hover:opacity-75"
+            className="absolute inset-0 h-full w-full object-cover object-left-top opacity-95 transition-opacity group-hover:opacity-80"
             draggable={false}
           />
           <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/35 to-black/20" />
