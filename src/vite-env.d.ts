@@ -7,3 +7,9 @@ interface ImportMetaEnv {
 interface ImportMeta {
   readonly env: ImportMetaEnv
 }
+
+interface Window {
+  Supademo?: {
+    open: (demoId: string) => void;
+  };
+}

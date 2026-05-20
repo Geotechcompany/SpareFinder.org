@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import axios from "axios";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Dialog,
@@ -39,6 +40,23 @@ const helpfulFeatures = [
   "Compatibility Info",
   "Visual Recognition",
 ];
+
+function reviewSubmitErrorMessage(error: unknown): string {
+  if (axios.isAxiosError(error)) {
+    const data = error.response?.data as
+      | { message?: string; error?: string; detail?: string | { message?: string } }
+      | undefined;
+    if (data?.error === "duplicate") return "duplicate";
+    if (data?.message) return data.message;
+    const detail = data?.detail;
+    if (typeof detail === "string") return detail;
+    if (detail && typeof detail === "object" && "message" in detail) {
+      return String(detail.message);
+    }
+  }
+  if (error instanceof Error) return error.message;
+  return "Failed to submit review. Please try again.";
+}
 
 export const ReviewModal: React.FC<ReviewModalProps> = ({
   isOpen,
@@ -86,11 +104,21 @@ export const ReviewModal: React.FC<ReviewModalProps> = ({
       return;
     }
 
+    const jobIdTrimmed = jobId?.trim();
+    if (!jobIdTrimmed) {
+      toast({
+        title: "Missing analysis",
+        description: "This review is not linked to an analysis job. Try again from History.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
       const result = await api.analysisReviews.create({
-        job_id: jobId,
+        job_id: jobIdTrimmed,
         job_type: jobType,
         part_search_id: partSearchId || null,
         rating,
@@ -101,9 +129,12 @@ export const ReviewModal: React.FC<ReviewModalProps> = ({
       });
 
       if (!result.success) {
-        // Preserve existing UX for duplicate reviews if backend returns 409 conflict.
-        // Axios throws for non-2xx, so we only handle "logical" failures here.
-        throw new Error(result.error || "Failed to submit review");
+        if (result.error === "duplicate") {
+          throw new Error("duplicate");
+        }
+        throw new Error(
+          result.message || result.error || "Failed to submit review"
+        );
       }
 
       setIsSuccess(true);
@@ -117,11 +148,11 @@ export const ReviewModal: React.FC<ReviewModalProps> = ({
         handleClose();
         if (onReviewSubmitted) onReviewSubmitted();
       }, 1500);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error submitting review:", error);
+      const message = reviewSubmitErrorMessage(error);
 
-      // Check if it's a duplicate review error
-      if (error.message === "duplicate") {
+      if (message === "duplicate") {
         toast({
           title: "Review Already Exists",
           description: "You have already reviewed this analysis.",
@@ -130,8 +161,7 @@ export const ReviewModal: React.FC<ReviewModalProps> = ({
       } else {
         toast({
           title: "Submission Failed",
-          description:
-            error.message || "Failed to submit review. Please try again.",
+          description: message,
           variant: "destructive",
         });
       }

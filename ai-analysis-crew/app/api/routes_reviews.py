@@ -1,17 +1,20 @@
 from __future__ import annotations
 
 import os
+import uuid
 from datetime import datetime
 from typing import Any, Optional
 
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel, EmailStr, Field
+from starlette.concurrency import run_in_threadpool
 
 from ..email_sender import send_basic_email_smtp, send_email_via_email_service
 from ..sparefinder_contact import CONTACT_EMAIL
 from .auth_dependencies import CurrentUser, get_current_user
 from .errors import ApiError
-from .responses import api_ok
+from .responses import api_error, api_ok
+from .subscription_utils import pick_best_subscription_row
 from .supabase_admin import get_supabase_admin
 
 router = APIRouter(prefix="/reviews", tags=["reviews"])
@@ -28,16 +31,24 @@ def _send_email(*, to_email: str, subject: str, html: str, text: str) -> bool:
     return send_email_via_email_service(to_email=to_email, subject=subject, html=html, text=text)
 
 
+def _normalize_part_search_id(value: str | None) -> str | None:
+    if not value or not str(value).strip():
+        return None
+    try:
+        return str(uuid.UUID(str(value).strip()))
+    except (ValueError, AttributeError):
+        return None
+
+
 def _require_subscription_or_trial(*, user_id: str) -> None:
     supabase = get_supabase_admin()
-    sub = (
+    sub_res = (
         supabase.table("subscriptions")
         .select("tier, status, current_period_end")
         .eq("user_id", user_id)
-        .maybe_single()
         .execute()
-        .data
     )
+    sub = pick_best_subscription_row(sub_res.data or [])
     if not sub:
         raise ApiError(
             status_code=403,
@@ -269,37 +280,52 @@ async def create_analysis_review(payload: AnalysisReviewCreateBody, user: Curren
     # Soft validation for feedback_type (keep backwards compatible if UI changes)
     allowed_feedback = {"accuracy", "speed", "usability", "general"}
     feedback_type = payload.feedback_type if payload.feedback_type in allowed_feedback else (payload.feedback_type or None)
+    part_search_id = _normalize_part_search_id(payload.part_search_id)
+    helpful_features = payload.helpful_features if payload.helpful_features else []
+
+    row = {
+        "user_id": user.id,
+        "job_id": payload.job_id.strip(),
+        "job_type": payload.job_type,
+        "part_search_id": part_search_id,
+        "rating": payload.rating,
+        "comment": payload.comment,
+        "feedback_type": feedback_type,
+        "helpful_features": helpful_features,
+        "improvement_suggestions": payload.improvement_suggestions,
+    }
 
     try:
-        inserted = (
-            supabase.table("analysis_reviews")
-            .insert(
-                [
-                    {
-                        "user_id": user.id,
-                        "job_id": payload.job_id,
-                        "job_type": payload.job_type,
-                        "part_search_id": payload.part_search_id or None,
-                        "rating": payload.rating,
-                        "comment": payload.comment,
-                        "feedback_type": feedback_type,
-                        "helpful_features": payload.helpful_features,
-                        "improvement_suggestions": payload.improvement_suggestions,
-                    }
-                ]
-            )
+        inserted = await run_in_threadpool(
+            lambda: supabase.table("analysis_reviews")
+            .insert([row])
             .select("*")
             .single()
             .execute()
             .data
         )
+        if not inserted:
+            return api_error("Review was not saved", status_code=500)
         return api_ok(status_code=201, message="Review submitted successfully!", data=inserted)
     except Exception as e:
-        # Match frontend UX: return 200 with error="duplicate" so client can show dedicated toast.
         msg = str(e)
+        print(f"❌ create_analysis_review: {e}")
         if "23505" in msg or "duplicate" in msg.lower() or "unique" in msg.lower():
-            return api_ok(status_code=200, data=None, extra={"success": False, "error": "duplicate", "message": "You have already reviewed this analysis"})
-        raise
+            return {
+                "success": False,
+                "error": "duplicate",
+                "message": "You have already reviewed this analysis",
+            }
+        if "analysis_reviews" in msg and (
+            "does not exist" in msg.lower()
+            or "schema cache" in msg.lower()
+            or "42P01" in msg
+        ):
+            return api_error(
+                "Reviews are not configured on the server. Run docs/sql/create_analysis_reviews.sql in Supabase.",
+                status_code=503,
+            )
+        return api_error("Failed to submit review", status_code=500)
 
 
 @router.delete("/analysis/{reviewId}")

@@ -1,7 +1,25 @@
-import React from "react";
+import React, { useState } from "react";
+import { Play, Sparkles } from "lucide-react";
 import { ContainerScroll } from "@/components/ui/container-scroll-animation";
+import { Button } from "@/components/ui/button";
+import { openSupademoTour } from "@/lib/supademo";
+import { cn } from "@/lib/utils";
 
 export function DashboardScrollDemo() {
+  const [isOpening, setIsOpening] = useState(false);
+
+  const handleOpenTour = async () => {
+    if (isOpening) return;
+    setIsOpening(true);
+    try {
+      await openSupademoTour();
+    } catch (err) {
+      console.warn("Could not open Supademo tour:", err);
+    } finally {
+      setIsOpening(false);
+    }
+  };
+
   return (
     <div className="flex flex-col overflow-hidden">
       <ContainerScroll
@@ -14,19 +32,65 @@ export function DashboardScrollDemo() {
               </span>
             </h1>
             <p className="mx-auto mt-6 max-w-3xl text-xl text-muted-foreground dark:text-gray-400">
-              Instantly identify any Engineering spares or industrial part with our advanced AI technology
+              Instantly identify any Engineering spares or industrial part with our
+              advanced AI technology
             </p>
+            <div className="mx-auto mt-8 flex flex-wrap items-center justify-center gap-3">
+              <Button
+                type="button"
+                size="lg"
+                disabled={isOpening}
+                onClick={() => void handleOpenTour()}
+                className="gap-2 bg-gradient-to-r from-brand to-brand-dark text-white shadow-lg hover:opacity-95"
+              >
+                <Play className="h-5 w-5 fill-current" />
+                {isOpening ? "Opening tour…" : "Try the tour"}
+              </Button>
+              <p className="w-full text-center text-sm text-muted-foreground">
+                Interactive walkthrough — upload, analyze, and review results
+              </p>
+            </div>
           </>
         }
       >
-        <img
-          src="/dashboard.png"
-          alt="SpareFinder Dashboard"
-          className="mx-auto rounded-2xl object-cover h-full object-left-top w-full"
-          draggable={false}
-        />
+        <button
+          type="button"
+          onClick={() => void handleOpenTour()}
+          disabled={isOpening}
+          aria-label="Play interactive product tour"
+          className={cn(
+            "group relative mx-auto w-full overflow-hidden rounded-2xl border border-border/80",
+            "bg-muted/30 shadow-2xl transition-transform focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand",
+            "hover:scale-[1.01] active:scale-[0.99] disabled:pointer-events-none disabled:opacity-70"
+          )}
+        >
+          <img
+            src="/dashboard.png"
+            alt=""
+            aria-hidden
+            className="h-full w-full object-cover object-left-top opacity-90 transition-opacity group-hover:opacity-75"
+            draggable={false}
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/35 to-black/20" />
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 p-6">
+            <div className="flex h-20 w-20 items-center justify-center rounded-full bg-white/95 shadow-xl ring-4 ring-brand/30 transition-transform group-hover:scale-110">
+              <Play className="h-10 w-10 fill-brand text-brand" />
+            </div>
+            <div className="text-center">
+              <p className="flex items-center justify-center gap-2 text-lg font-semibold text-white">
+                <Sparkles className="h-5 w-5 text-brand-light" />
+                See how SpareFinder works
+              </p>
+              <p className="mt-1 text-sm text-white/80">
+                Click to open the guided demo in a popup
+              </p>
+            </div>
+            <span className="rounded-full bg-white/15 px-4 py-2 text-sm font-medium text-white backdrop-blur-sm ring-1 ring-white/25">
+              {isOpening ? "Loading tour…" : "Try the tour"}
+            </span>
+          </div>
+        </button>
       </ContainerScroll>
     </div>
   );
 }
-
