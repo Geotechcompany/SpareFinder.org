@@ -250,6 +250,25 @@
     html {
         scroll-behavior: smooth;
     }
+
+    /* GSAP story-scroll: smooth scroll fights scrub + pin (match Flow Art demo) */
+    html:has([data-flow-art]) {
+        scroll-behavior: auto;
+    }
+}
+
+#capabilities,
+[data-flow-art] {
+    position: relative;
+}
+
+[data-flow-section] {
+    position: relative;
+}
+
+.flow-art-container {
+    transform-origin: bottom left;
+    backface-visibility: hidden;
 }
 
 .dashboard-premium {

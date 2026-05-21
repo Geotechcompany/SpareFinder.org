@@ -20,7 +20,7 @@ export function Header() {
   const scrolled = useScroll(10);
 
   const platform = [
-    { label: "Features", href: "/#features" },
+    { label: "Features", href: "/#capabilities" },
     { label: "AI Capabilities", href: "/#capabilities" },
     { label: "Upload & Analyze", href: "/dashboard/upload" },
     { label: "Analytics", href: "/#analytics" },

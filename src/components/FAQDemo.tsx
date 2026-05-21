@@ -1,4 +1,4 @@
-import FAQ1 from "@/components/ui/faq-monochrome";
+import { FaqSection } from "@/components/ui/faq-section";
 
 const FAQDemo = () => {
   const faqs = [
@@ -11,7 +11,7 @@ const FAQDemo = () => {
     {
       question: "What types of parts can SpareFinder identify?",
       answer:
-        "SpareFinder can identify Engineering spares parts, heavy equipment components, aerospace parts, industrial machinery, marine equipment, agricultural machinery, and more. Our database covers over 10 million parts across diverse industrial sectors.",
+        "SpareFinder can identify engineering spares, heavy equipment components, aerospace parts, industrial machinery, marine equipment, agricultural machinery, and more. Our database covers over 10 million parts across diverse industrial sectors.",
       meta: "Coverage",
     },
     {
@@ -23,25 +23,25 @@ const FAQDemo = () => {
     {
       question: "Can I use SpareFinder for my business?",
       answer:
-        "Absolutely! We offer enterprise plans specifically designed for businesses. Features include bulk analysis, API access, priority support, team collaboration tools, and custom integrations with your existing systems.",
+        "Absolutely. We offer enterprise plans designed for businesses, including bulk analysis, API access, priority support, team collaboration tools, and custom integrations with your existing systems.",
       meta: "Enterprise",
     },
     {
       question: "Is my data secure with SpareFinder?",
       answer:
-        "Yes, we take security seriously. All images and data are encrypted in transit and at rest. We comply with industry standards and never share your proprietary information with third parties. Enterprise plans include additional security features.",
+        "Yes. All images and data are encrypted in transit and at rest. We comply with industry standards and never share your proprietary information with third parties. Enterprise plans include additional security features.",
       meta: "Security",
     },
     {
       question: "What if the AI can't identify my part?",
       answer:
-        "If our AI can't provide a confident match, our expert support team will manually review your submission. We'll work with you to identify the part and use this feedback to improve our AI models for future recognition.",
+        "If our AI can't provide a confident match, our expert support team will manually review your submission. We'll work with you to identify the part and use this feedback to improve our models for future recognition.",
       meta: "Support",
     },
   ];
 
   return (
-    <FAQ1
+    <FaqSection
       faqs={faqs}
       title="Find the answers you're looking for"
       subtitle="SpareFinder FAQ"
@@ -51,9 +51,3 @@ const FAQDemo = () => {
 };
 
 export default FAQDemo;
-
-
-
-
-
-

@@ -61,7 +61,7 @@ const DemoOne = () => {
               className="w-full rounded-xl border border-border bg-transparent px-6 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-muted sm:w-auto md:px-8 md:py-3 dark:border-white/20 dark:text-white dark:hover:bg-white/10"
               asChild
             >
-              <a href="/#features">Learn More</a>
+              <a href="/#capabilities">Learn More</a>
             </Button>
           </div>
         </div>

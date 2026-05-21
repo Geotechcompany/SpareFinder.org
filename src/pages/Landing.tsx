@@ -7,15 +7,10 @@ import {
 import { Button } from "@/components/ui/button";
 import {
   Rocket,
-  ShieldCheck,
   BarChart,
   Globe,
   Zap,
-  Cloud,
   Factory,
-  Cpu,
-  Database,
-  Server,
   TestTube2,
   Upload,
   Check,
@@ -37,7 +32,7 @@ import {
   LucideIcon,
 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useInView } from "framer-motion";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
@@ -45,15 +40,16 @@ import { DemoOne } from "@/components/ui/demo";
 import { DashboardScrollDemo } from "@/components/DashboardScrollDemo";
 import { HowItWorks } from "@/components/ui/how-it-works";
 import CoreValueStatsDemo from "@/components/CoreValueStatsDemo";
+import CoreCapabilitiesStory from "@/components/CoreCapabilitiesStory";
 import StaggerTestimonialsDemo from "@/components/StaggerTestimonialsDemo";
 import Marquee from "@/components/ui/marquee";
 import IndustrialApplications from "@/components/IndustrialApplications";
 import FAQDemo from "@/components/FAQDemo";
+import LandingFinalCta from "@/components/LandingFinalCta";
 import { LazyOrb } from "@/components/ui/lazy-orb";
 import { LazyHeroScene } from "@/components/ui/lazy-hero-scene";
 import { useTheme } from "@/contexts/ThemeContext";
 import { useAuth } from "@/contexts/AuthContext";
-import { FeaturesSectionWithHoverEffects } from "@/components/ui/feature-section-with-hover-effects";
 import {
   Dialog,
   DialogContent,
@@ -238,60 +234,6 @@ const Landing = () => {
     setIsProcessing(false);
   };
 
-  const features = useMemo(
-    () => [
-      {
-        icon: Cpu,
-        title: "AI-Powered Recognition",
-        description:
-          "Advanced computer vision models identify parts with 99.9% accuracy across 50+ industrial categories",
-        image:
-          "https://images.unsplash.com/photo-1639322537228-f710d8465a4d?auto=format&fit=crop&w=800",
-      },
-      {
-        icon: Database,
-        title: "Comprehensive Database",
-        description:
-          "Over 10 million parts from 1000+ manufacturers with detailed specifications and pricing",
-        image:
-          "https://images.unsplash.com/photo-1558494949-ef010cbdcc31?auto=format&fit=crop&w=800",
-      },
-      {
-        icon: Zap,
-        title: "Instant Results",
-        description:
-          "Get complete part information, specifications, and supplier contacts in milliseconds",
-        image:
-          "https://images.unsplash.com/photo-1460925895917-afdab827c52f?auto=format&fit=crop&w=800",
-      },
-      {
-        icon: Cloud,
-        title: "Multi-Format Support",
-        description:
-          "Upload images, PDFs, CAD files, or even capture photos directly from your mobile device",
-        image:
-          "https://images.unsplash.com/photo-1573164713712-03790a178651?auto=format&fit=crop&w=800",
-      },
-      {
-        icon: Server,
-        title: "Enterprise Integration",
-        description:
-          "REST APIs, webhook support, and seamless integration with ERP systems and inventory management",
-        image:
-          "https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&w=800",
-      },
-      {
-        icon: ShieldCheck,
-        title: "Quality Assurance",
-        description:
-          "Verified suppliers, authentic parts, and comprehensive warranty information to ensure reliability",
-        image:
-          "https://images.unsplash.com/photo-1587614382340-3ec188b4e842?auto=format&fit=crop&w=800",
-      },
-    ],
-    []
-  );
-
   const aiInterfaceImage =
     "https://images.unsplash.com/photo-1639322537228-f710d8465a4d?auto=format&fit=crop&w=1920";
 
@@ -305,7 +247,7 @@ const Landing = () => {
     <div className="landing-premium min-h-screen bg-background text-foreground">
       <Header />
 
-      <main id="main-content">
+      <main id="main-content" className="relative">
       {/* Hero Section (DemoOne) — visible H1 lives in DemoOne */}
       <section className="relative mt-6 w-full overflow-visible pt-4 pb-8">
         {actualTheme === "light" && (
@@ -330,55 +272,18 @@ const Landing = () => {
         </div>
       </section>
 
-      {/* Dashboard Scroll Animation */}
-      <section className="relative overflow-hidden bg-background">
+      {/* Dashboard Scroll Animation + product tour */}
+      <section className="relative z-20 overflow-visible bg-background">
         <DashboardScrollDemo />
       </section>
 
-      {/* Core Values Section */}
-      <section className="relative overflow-hidden bg-background">
+      {/* Core values stats — restored after hero / dashboard block */}
+      <section className="relative z-10 overflow-visible bg-background">
         <CoreValueStatsDemo />
       </section>
 
-      {/* Features Grid */}
-      <section
-        id="features"
-        className="relative py-24 px-4 sm:px-6 lg:px-8 overflow-hidden"
-      >
-        <div className="absolute inset-0 bg-gradient-to-b from-background via-muted/30 to-background" />
-        <div className="absolute inset-0">
-          <div className="absolute top-1/4 left-1/4 h-96 w-96 rounded-full bg-[#3A5AFE1A] blur-3xl dark:bg-brand/10" />
-          <div className="absolute bottom-1/4 right-1/4 h-96 w-96 rounded-full bg-[#06B6D41A] blur-3xl dark:bg-blue-500/10" />
-        </div>
-
-        <div className="max-w-7xl mx-auto relative z-10">
-          <motion.div
-            className="text-center mb-20"
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8 }}
-          >
-            <motion.div
-              initial={{ opacity: 0, scale: 0.5 }}
-              whileInView={{ opacity: 1, scale: 1 }}
-              transition={{ duration: 0.5 }}
-              className="mb-8 inline-flex items-center rounded-full border border-border bg-card/80 px-4 py-2 text-xs font-medium text-muted-foreground backdrop-blur-xl"
-            >
-              <Sparkles className="mr-2 h-4 w-4 text-primary dark:text-brand-light" />
-              <span>Powered by Advanced AI</span>
-            </motion.div>
-            <h2 className="mb-6 text-5xl font-bold tracking-tight text-foreground lg:text-6xl">
-              Core Capabilities
-            </h2>
-            <p className="mx-auto max-w-3xl text-xl leading-relaxed text-slate-600 ">
-              Revolutionary part identification technology that transforms how
-              industrial teams work
-            </p>
-          </motion.div>
-
-          <FeaturesSectionWithHoverEffects features={features} />
-        </div>
-      </section>
+      {/* Core Capabilities — stacked scroll story (GSAP pin + rotate) */}
+      <CoreCapabilitiesStory />
 
       {/* Industrial Applications */}
       <IndustrialApplications />
@@ -698,34 +603,7 @@ const Landing = () => {
         )}
       </AnimatePresence>
 
-      {/* Final CTA */}
-      <section className="py-20">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <div className="rounded-3xl border border-border bg-card p-10 shadow-soft-elevated backdrop-blur-xl sm:p-16">
-            <h2 className="mb-6 text-4xl font-bold tracking-tight text-foreground ">
-              Ready to Revolutionize Your Part Identification?
-            </h2>
-            <p className="mx-auto mb-8 max-w-2xl text-muted-foreground ">
-              Join hundreds of manufacturers already using our AI-powered
-              platform
-            </p>
-            <div className="flex justify-center gap-4">
-              <Button
-                asChild
-                className="premium-button bg-primary px-8 py-6 text-lg font-semibold text-primary-foreground hover:bg-primary/90"
-              >
-                <Link to="/register">Start Free Trial</Link>
-              </Button>
-              <Button
-                variant="outline"
-                className="border-border px-8 py-6 text-lg font-medium text-foreground hover:bg-muted dark:border-gray-600  dark:hover:bg-white/10"
-              >
-                Contact Sales
-              </Button>
-            </div>
-          </div>
-        </div>
-      </section>
+      <LandingFinalCta />
 
       {/* FAQ Section (last content block before footer) */}
       <FAQDemo />

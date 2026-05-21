@@ -21,7 +21,7 @@ export function DashboardScrollDemo() {
   };
 
   return (
-    <div className="flex flex-col overflow-hidden">
+    <div className="flex flex-col overflow-visible">
       <ContainerScroll
         titleComponent={
           <>
