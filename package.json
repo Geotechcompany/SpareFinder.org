@@ -12,7 +12,8 @@
         "update-browserslist": "UPDATE_BROWSERSLIST_DB_PACKAGE_MANAGER=npm npx update-browserslist-db@latest",
         "test": "jest",
         "test:watch": "jest --watch",
-        "test:coverage": "jest --coverage"
+        "test:coverage": "jest --coverage",
+        "hero:frames": "node scripts/extract-hero-frames.mjs"
     },
     "dependencies": {
         "@clerk/clerk-react": "^5.58.1",

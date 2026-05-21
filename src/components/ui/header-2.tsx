@@ -15,7 +15,7 @@ import {
   NavigationMenuLink,
 } from "@/components/ui/navigation-menu";
 
-export function Header() {
+export function Header({ overlay = false }: { overlay?: boolean }) {
   const [open, setOpen] = React.useState(false);
   const scrolled = useScroll(10);
 
@@ -35,17 +35,35 @@ export function Header() {
     { label: "Contact", href: "/contact" },
   ];
 
+  /** Glassmorphism capsule over the hero video */
+  const glassOverlayHero =
+    "border-white/40 bg-white/20 text-white shadow-[0_8px_32px_rgba(0,0,0,0.2),inset_0_1px_0_rgba(255,255,255,0.45)] backdrop-blur-2xl backdrop-saturate-150";
+
+  const overlayHeroNav = overlay;
+  const overlayNavLink =
+    "text-white/90 hover:bg-white/15 hover:text-white data-[state=open]:bg-white/15 data-[state=open]:text-white [&_svg]:text-white/80";
+
   return (
     <header
       className={cn(
-        "sticky top-0 z-[100] mx-auto w-full max-w-5xl rounded-none border-b border-border/70 bg-background/90 text-foreground backdrop-blur-xl md:rounded-[15px] md:border md:transition-all md:ease-out",
-        scrolled && !open && "md:top-4 md:max-w-4xl md:shadow-soft-elevated",
-        open && "shadow-soft-elevated",
-        scrolled &&
-          !open &&
-          "dark:bg-gradient-to-br dark:from-[#000]/90 dark:to-[#1A2428]/90 dark:border-white/10",
-        open &&
-          "dark:bg-gradient-to-br dark:from-[#000]/95 dark:to-[#1A2428]/95 dark:border-white/10"
+        "z-[100] mx-auto w-full max-w-5xl transition-all duration-300 ease-out",
+        overlay
+          ? cn(
+              "fixed left-0 right-0 top-0",
+              glassOverlayHero,
+              "rounded-none border-b md:top-4 md:mx-auto md:max-w-4xl md:rounded-full md:border",
+              scrolled && !open && "md:bg-white/30",
+              open && "bg-white/35"
+            )
+          : cn(
+              "sticky top-0 border-b border-border/50 bg-background/75 text-foreground shadow-[0_8px_32px_rgba(15,23,42,0.06)] backdrop-blur-xl backdrop-saturate-150 md:rounded-[15px] md:border",
+              scrolled && !open && "md:top-4 md:max-w-4xl md:shadow-soft-elevated",
+              open && "shadow-soft-elevated",
+              scrolled &&
+                !open &&
+                "dark:border-white/10 dark:bg-white/5 dark:shadow-[0_12px_40px_rgba(0,0,0,0.35)]",
+              open && "dark:border-white/10 dark:bg-white/[0.08]"
+            )
       )}
     >
       <nav
@@ -57,9 +75,12 @@ export function Header() {
         <div className="flex items-center gap-3">
           <a href="/" className="flex items-center gap-3">
             <img
-              src="/sparefinderlogo.png"
-              alt="SpareFinder Logo"
-              className="h-10 w-auto object-contain sm:h-11"
+              src={overlay ? "/sparefinder_logo_light.png" : "/sparefinderlogo.png"}
+              alt="SpareFinder"
+              className={cn(
+                "w-auto object-contain",
+                overlay ? "h-9 sm:h-10" : "h-10 sm:h-11"
+              )}
             />
           </a>
         </div>
@@ -70,7 +91,12 @@ export function Header() {
           <NavigationMenu>
             <NavigationMenuList>
               <NavigationMenuItem>
-                <NavigationMenuTrigger className="bg-transparent">
+                <NavigationMenuTrigger
+                  className={cn(
+                    "bg-transparent",
+                    overlayHeroNav && overlayNavLink
+                  )}
+                >
                   Platform
                 </NavigationMenuTrigger>
                 <NavigationMenuContent>
@@ -89,7 +115,12 @@ export function Header() {
                 </NavigationMenuContent>
               </NavigationMenuItem>
               <NavigationMenuItem>
-                <NavigationMenuTrigger className="bg-transparent">
+                <NavigationMenuTrigger
+                  className={cn(
+                    "bg-transparent",
+                    overlayHeroNav && overlayNavLink
+                  )}
+                >
                   Solutions
                 </NavigationMenuTrigger>
                 <NavigationMenuContent>
@@ -108,7 +139,12 @@ export function Header() {
                 </NavigationMenuContent>
               </NavigationMenuItem>
               <NavigationMenuItem>
-                <NavigationMenuTrigger className="bg-transparent">
+                <NavigationMenuTrigger
+                  className={cn(
+                    "bg-transparent",
+                    overlayHeroNav && overlayNavLink
+                  )}
+                >
                   Resources
                 </NavigationMenuTrigger>
                 <NavigationMenuContent>
@@ -130,12 +166,31 @@ export function Header() {
           </NavigationMenu>
           <a
             href="/reviews"
-            className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground dark:text-white/80 dark:hover:text-white"
+            className={cn(
+              "text-sm font-medium transition-colors",
+              overlayHeroNav
+                ? "text-white/90 hover:text-white"
+                : "text-muted-foreground hover:text-foreground dark:text-white/80 dark:hover:text-white"
+            )}
           >
             Reviews
           </a>
-          <ThemeToggle />
-          <a href="/login" className={buttonVariants({ variant: "outline" })}>
+          <div
+            className={cn(
+              overlayHeroNav &&
+                "[&_button]:text-white/90 [&_button]:hover:bg-white/15 [&_button]:hover:text-white"
+            )}
+          >
+            <ThemeToggle />
+          </div>
+          <a
+            href="/login"
+            className={cn(
+              buttonVariants({ variant: "outline" }),
+              overlayHeroNav &&
+                "border-white/40 bg-white/10 text-white backdrop-blur-sm hover:bg-white/20 hover:text-white"
+            )}
+          >
             Sign In
           </a>
           <a
@@ -152,7 +207,11 @@ export function Header() {
           size="icon"
           variant="outline"
           onClick={() => setOpen(!open)}
-          className="inline-flex h-10 w-10 shrink-0 touch-manipulation lg:hidden [@media(pointer:coarse)]:inline-flex"
+          className={cn(
+            "inline-flex h-10 w-10 shrink-0 touch-manipulation lg:hidden [@media(pointer:coarse)]:inline-flex",
+            overlayHeroNav &&
+              "border-white/40 bg-white/10 text-white backdrop-blur-sm hover:bg-white/20 hover:text-white"
+          )}
           aria-label={open ? "Close menu" : "Open menu"}
         >
           <MenuToggleIcon open={open} className="size-5" duration={300} />

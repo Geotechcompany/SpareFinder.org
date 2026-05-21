@@ -1,0 +1,8 @@
+{
+  "frameCount": 903,
+  "fps": 60,
+  "width": 1280,
+  "height": 720,
+  "pattern": "/hero-frames/frame_%05d.jpg",
+  "startIndex": 0
+}

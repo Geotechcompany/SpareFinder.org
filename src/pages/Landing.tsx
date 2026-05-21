@@ -36,7 +36,7 @@ import { useState, useEffect, useRef } from "react";
 import { useInView } from "framer-motion";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
-import { DemoOne } from "@/components/ui/demo";
+import HeroFrameScroll from "@/components/HeroFrameScroll";
 import { DashboardScrollDemo } from "@/components/DashboardScrollDemo";
 import { HowItWorks } from "@/components/ui/how-it-works";
 import CoreValueStatsDemo from "@/components/CoreValueStatsDemo";
@@ -46,9 +46,7 @@ import Marquee from "@/components/ui/marquee";
 import IndustrialApplications from "@/components/IndustrialApplications";
 import FAQDemo from "@/components/FAQDemo";
 import LandingFinalCta from "@/components/LandingFinalCta";
-import { LazyOrb } from "@/components/ui/lazy-orb";
-import { LazyHeroScene } from "@/components/ui/lazy-hero-scene";
-import { useTheme } from "@/contexts/ThemeContext";
+import { CookieConsent } from "@/components/CookieConsent";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   Dialog,
@@ -91,46 +89,6 @@ interface CheckoutResponse {
 
 type BillingCycle = "monthly" | "annually";
 
-// Cookie consent component
-const CookieConsent = () => {
-  const [show, setShow] = useState(true);
-
-  if (!show) return null;
-
-  return (
-    <motion.div
-      initial={{ y: 100 }}
-      animate={{ y: 0 }}
-      exit={{ y: 100 }}
-      className="fixed bottom-0 left-0 right-0 z-50 border-t border-border bg-background/95 p-4 text-foreground shadow-soft-elevated backdrop-blur-xl dark:border-gray-800 dark:bg-gray-900/95"
-    >
-      <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-4 sm:flex-row">
-        <p className="text-sm text-slate-600 ">
-          We use cookies to enhance your experience. By continuing to visit this
-          site you agree to our use of cookies.
-        </p>
-        <div className="flex gap-3">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setShow(false)}
-            className="border-border text-slate-700 hover:bg-muted dark:border-gray-700  dark:hover:bg-gray-800"
-          >
-            Decline
-          </Button>
-          <Button
-            size="sm"
-            onClick={() => setShow(false)}
-            className="premium-button bg-primary text-primary-foreground hover:bg-primary/90"
-          >
-            Accept All
-          </Button>
-        </div>
-      </div>
-    </motion.div>
-  );
-};
-
 const Landing = () => {
   const [billingCycle, setBillingCycle] = useState<BillingCycle>("monthly");
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -146,7 +104,6 @@ const Landing = () => {
   const [isProcessing, setIsProcessing] = useState(false);
 
   const { toast } = useToast();
-  const { actualTheme } = useTheme();
   const { isAuthenticated } = useAuth();
   const navigate = useNavigate();
 
@@ -245,32 +202,14 @@ const Landing = () => {
 
   return (
     <div className="landing-premium min-h-screen bg-background text-foreground">
-      <Header />
+      <Header overlay />
+
+      {/* Hero — full-bleed under fixed nav; no top margin */}
+      <section className="relative w-full overflow-visible">
+        <HeroFrameScroll />
+      </section>
 
       <main id="main-content" className="relative">
-      {/* Hero Section (DemoOne) — visible H1 lives in DemoOne */}
-      <section className="relative mt-6 w-full overflow-visible pt-4 pb-8">
-        {actualTheme === "light" && (
-          <div className="pointer-events-none absolute inset-x-0 top-10 z-0 flex justify-center">
-            <div className="h-[720px] w-full max-w-6xl">
-              <LazyOrb
-                hoverIntensity={0.6}
-                rotateOnHover
-                hue={0}
-                className="h-full w-full"
-              />
-            </div>
-          </div>
-        )}
-        {actualTheme === "dark" && (
-          <div className="pointer-events-none absolute inset-0 z-0">
-            <LazyHeroScene />
-          </div>
-        )}
-        <div className="relative z-10">
-          <DemoOne />
-        </div>
-      </section>
 
       {/* Dashboard Scroll Animation + product tour */}
       <section className="relative z-20 overflow-visible bg-background">
