@@ -913,13 +913,17 @@
     @apply my-1 pl-2;
 }
 
-/* PWA Install Banner - Adjust header position when banner is visible */
-body.pwa-banner-visible header[class*="sticky"] {
-    top: 60px !important;
+/* PWA install strip — hero nav sits directly below */
+body.pwa-banner-visible [data-hero-header] {
+    top: var(--pwa-banner-height, 2.375rem) !important;
 }
 
 @media (min-width: 768px) {
-    body.pwa-banner-visible header[class*="sticky"] {
-        top: 64px !important;
+    body.pwa-banner-visible [data-hero-header] {
+        top: calc(var(--pwa-banner-height, 2.375rem) + 0.25rem) !important;
     }
+}
+
+body.pwa-banner-visible header[class*="sticky"]:not([data-hero-header]) {
+    top: var(--pwa-banner-height, 2.375rem) !important;
 }

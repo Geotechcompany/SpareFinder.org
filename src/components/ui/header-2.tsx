@@ -45,6 +45,7 @@ export function Header({ overlay = false }: { overlay?: boolean }) {
 
   return (
     <header
+      data-hero-header={overlay ? "" : undefined}
       className={cn(
         "z-[100] mx-auto w-full max-w-5xl transition-all duration-300 ease-out",
         overlay
