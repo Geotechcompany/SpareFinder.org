@@ -1,5 +1,7 @@
 {
   "frameCount": 903,
+  "frameStep": 4,
+  "displayFrameCount": 226,
   "fps": 60,
   "width": 1280,
   "height": 720,

@@ -5,11 +5,17 @@ import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { useGSAP } from "@gsap/react";
 import { ChevronDown, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { HERO_FRAMES, heroFrameSrc } from "@/lib/hero-frames";
+import {
+  HERO_DISPLAY_FRAME_COUNT,
+  HERO_POSTER_SRC,
+  heroFrameSrc,
+} from "@/lib/hero-frames";
 
 gsap.registerPlugin(ScrollTrigger);
 
-const FRAME_COUNT = HERO_FRAMES.frameCount;
+const FRAME_COUNT = HERO_DISPLAY_FRAME_COUNT;
+const PRELOAD_NEIGHBOR_RADIUS = 2;
+const IDLE_PRELOAD_STRIDE = 6;
 
 export interface HeroScene {
   badge: string;
@@ -140,11 +146,6 @@ function cornerAlignClass(corner: HeroCorner) {
   return corner.includes("right") ? "text-right" : "text-left";
 }
 
-function cornerFloatY(corner: HeroCorner) {
-  if (corner.startsWith("top")) return [0, -10, 0] as const;
-  return [0, 12, 0] as const;
-}
-
 function HeroSceneCopy({ scene, index }: { scene: HeroScene; index: number }) {
   const titleCorner = TITLE_CORNERS[index % TITLE_CORNERS.length];
   const subtitleCorner = SUBTITLE_CORNERS[index % SUBTITLE_CORNERS.length];
@@ -156,9 +157,7 @@ function HeroSceneCopy({ scene, index }: { scene: HeroScene; index: number }) {
 
   return (
     <>
-      <motion.div
-        animate={{ y: cornerFloatY(titleCorner) }}
-        transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }}
+      <div
         className={cn(
           "absolute z-20 max-w-[min(94vw,40rem)]",
           cornerPositionClass(titleCorner),
@@ -184,16 +183,9 @@ function HeroSceneCopy({ scene, index }: { scene: HeroScene; index: number }) {
         >
           {scene.title}
         </p>
-      </motion.div>
+      </div>
 
-      <motion.div
-        animate={{ y: cornerFloatY(subtitleCorner) }}
-        transition={{
-          duration: 5.5,
-          repeat: Infinity,
-          ease: "easeInOut",
-          delay: index * 0.15,
-        }}
+      <div
         className={cn(
           "absolute z-20 max-w-[min(88vw,30rem)]",
           cornerPositionClass(subtitleCorner),
@@ -214,7 +206,7 @@ function HeroSceneCopy({ scene, index }: { scene: HeroScene; index: number }) {
         >
           {scene.subtitle}
         </p>
-      </motion.div>
+      </div>
     </>
   );
 }
@@ -264,27 +256,18 @@ function HeroTextLayers({
   activeIndex: number;
   visible: boolean;
 }) {
+  const scene = HERO_SCENES[activeIndex];
   return (
-    <div className="pointer-events-none absolute inset-0 z-20" aria-live="polite">
-      {HERO_SCENES.map((scene, i) => {
-        const isActive = visible && activeIndex === i;
-        return (
-          <motion.div
-            key={`hero-text-${i}`}
-            className="absolute inset-0"
-            initial={false}
-            animate={{
-              opacity: isActive ? 1 : 0,
-              scale: isActive ? 1 : 0.98,
-            }}
-            transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
-            aria-hidden={!isActive}
-          >
-            <HeroSceneCopy scene={scene} index={i} />
-          </motion.div>
-        );
-      })}
-    </div>
+    <motion.div
+      className="pointer-events-none absolute inset-0 z-20"
+      aria-live="polite"
+      initial={false}
+      animate={{ opacity: visible ? 1 : 0 }}
+      transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+      key={activeIndex}
+    >
+      <HeroSceneCopy scene={scene} index={activeIndex} />
+    </motion.div>
   );
 }
 
@@ -330,77 +313,127 @@ export function HeroFrameScroll() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const cacheRef = useRef<Map<number, HTMLImageElement>>(new Map());
+  const loadingRef = useRef<Set<number>>(new Set());
   const frameRef = useRef(0);
-  const renderFrameRef = useRef<(index: number) => void>(() => {});
+  const sceneIndexRef = useRef(0);
+  const scrollRafRef = useRef(0);
+  const pendingProgressRef = useRef(0);
   const [progress, setProgress] = useState(0);
   const [sceneIndex, setSceneIndex] = useState(0);
   const [ready, setReady] = useState(false);
   const reducedMotion = useReducedMotion();
 
-  const applyScrollProgress = useCallback((p: number) => {
-    const clamped = Math.min(1, Math.max(0, p));
-    const frameIdx = Math.round(clamped * (FRAME_COUNT - 1));
-    const nextScene = sceneIndexFromProgress(clamped);
-
-    setProgress(clamped);
-    setSceneIndex(nextScene);
-    renderFrameRef.current(frameIdx);
+  const preloadNeighbors = useCallback((index: number) => {
+    for (let d = 1; d <= PRELOAD_NEIGHBOR_RADIUS; d++) {
+      if (index - d >= 0) void loadFrameRef.current(index - d);
+      if (index + d < FRAME_COUNT) void loadFrameRef.current(index + d);
+    }
   }, []);
 
-  const loadFrame = useCallback((index: number) => {
-    const cached = cacheRef.current.get(index);
-    if (cached?.complete) return Promise.resolve(cached);
+  const loadFrameRef = useRef<(index: number) => Promise<HTMLImageElement | null>>(
+    async () => null
+  );
 
-    return new Promise<HTMLImageElement>((resolve, reject) => {
+  const loadFrame = useCallback((index: number) => {
+    const clamped = Math.max(0, Math.min(FRAME_COUNT - 1, index));
+    const cached = cacheRef.current.get(clamped);
+    if (cached?.complete) return Promise.resolve(cached);
+    if (loadingRef.current.has(clamped)) {
+      return new Promise((resolve) => {
+        const check = () => {
+          const hit = cacheRef.current.get(clamped);
+          if (hit?.complete) resolve(hit);
+          else setTimeout(check, 16);
+        };
+        check();
+      });
+    }
+
+    loadingRef.current.add(clamped);
+    return new Promise<HTMLImageElement | null>((resolve) => {
       const img = new Image();
       img.decoding = "async";
       img.onload = () => {
-        cacheRef.current.set(index, img);
+        cacheRef.current.set(clamped, img);
+        loadingRef.current.delete(clamped);
         resolve(img);
       };
-      img.onerror = reject;
-      img.src = heroFrameSrc(index);
+      img.onerror = () => {
+        loadingRef.current.delete(clamped);
+        resolve(null);
+      };
+      img.src = heroFrameSrc(clamped);
     });
   }, []);
 
+  loadFrameRef.current = loadFrame;
+
+  const drawFrameToCanvas = useCallback((index: number) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return false;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return false;
+    const img = cacheRef.current.get(index);
+    if (!img?.complete) return false;
+
+    const w = Number(canvas.dataset.logicalW) || canvas.clientWidth;
+    const h = Number(canvas.dataset.logicalH) || canvas.clientHeight;
+    drawCover(ctx, img, w, h);
+    frameRef.current = index;
+    return true;
+  }, []);
+
   const renderFrame = useCallback(
-    async (index: number) => {
-      const canvas = canvasRef.current;
-      if (!canvas) return;
-      const ctx = canvas.getContext("2d");
-      if (!ctx) return;
-
+    (index: number) => {
       const clamped = Math.max(0, Math.min(FRAME_COUNT - 1, index));
-      if (clamped === frameRef.current && ready) {
-        const hit = cacheRef.current.get(clamped);
-        if (hit?.complete) {
-          drawCover(ctx, hit, canvas.width, canvas.height);
-          return;
-        }
-      }
-      frameRef.current = clamped;
-
-      try {
-        const img = await loadFrame(clamped);
-        const w = Number(canvas.dataset.logicalW) || canvas.clientWidth;
-        const h = Number(canvas.dataset.logicalH) || canvas.clientHeight;
-        drawCover(ctx, img, w, h);
+      if (drawFrameToCanvas(clamped)) {
         if (!ready) setReady(true);
-
-        const neighbors = [clamped - 2, clamped - 1, clamped + 1, clamped + 2];
-        neighbors.forEach((n) => {
-          if (n >= 0 && n < FRAME_COUNT) void loadFrame(n);
-        });
-      } catch {
-        /* skip broken frame */
+        preloadNeighbors(clamped);
+        return;
       }
+
+      void loadFrame(clamped).then((img) => {
+        if (!img) return;
+        if (drawFrameToCanvas(clamped)) {
+          if (!ready) setReady(true);
+          preloadNeighbors(clamped);
+        }
+      });
     },
-    [loadFrame, ready]
+    [drawFrameToCanvas, loadFrame, preloadNeighbors, ready]
   );
 
-  renderFrameRef.current = (index: number) => {
-    void renderFrame(index);
-  };
+  const flushScrollProgress = useCallback(() => {
+    scrollRafRef.current = 0;
+    const clamped = pendingProgressRef.current;
+    const frameIdx = Math.round(clamped * (FRAME_COUNT - 1));
+    renderFrame(frameIdx);
+
+    const nextScene = sceneIndexFromProgress(clamped);
+    if (nextScene !== sceneIndexRef.current) {
+      sceneIndexRef.current = nextScene;
+      setSceneIndex(nextScene);
+    }
+    setProgress(clamped);
+  }, [renderFrame]);
+
+  const applyScrollProgress = useCallback(
+    (p: number) => {
+      pendingProgressRef.current = Math.min(1, Math.max(0, p));
+      if (scrollRafRef.current) return;
+      scrollRafRef.current = requestAnimationFrame(flushScrollProgress);
+    },
+    [flushScrollProgress]
+  );
+
+  useEffect(() => {
+    const link = document.createElement("link");
+    link.rel = "preload";
+    link.as = "image";
+    link.href = HERO_POSTER_SRC;
+    document.head.appendChild(link);
+    return () => link.remove();
+  }, []);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -409,7 +442,8 @@ export function HeroFrameScroll() {
     const resize = () => {
       const parent = canvas.parentElement;
       if (!parent) return;
-      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      const isMobile = window.matchMedia("(max-width: 768px)").matches;
+      const dpr = Math.min(window.devicePixelRatio || 1, isMobile ? 1.25 : 1.75);
       const w = parent.clientWidth;
       const h = parent.clientHeight;
       canvas.width = Math.floor(w * dpr);
@@ -423,7 +457,7 @@ export function HeroFrameScroll() {
       }
       canvas.dataset.logicalW = String(w);
       canvas.dataset.logicalH = String(h);
-      void renderFrame(frameRef.current);
+      renderFrame(frameRef.current);
     };
 
     resize();
@@ -436,28 +470,25 @@ export function HeroFrameScroll() {
   }, [loadFrame, renderFrame]);
 
   useEffect(() => {
-    if (reducedMotion || !scrollRef.current) return;
+    let cursor = IDLE_PRELOAD_STRIDE;
+    let cancelled = false;
 
-    const el = scrollRef.current;
-
-    const measureProgress = () => {
-      const rect = el.getBoundingClientRect();
-      const scrollable = el.offsetHeight - window.innerHeight;
-      if (scrollable <= 0) return 0;
-      return Math.min(1, Math.max(0, -rect.top / scrollable));
+    const idlePreload = (deadline: IdleDeadline) => {
+      while (!cancelled && cursor < FRAME_COUNT && deadline.timeRemaining() > 4) {
+        void loadFrame(cursor);
+        cursor += IDLE_PRELOAD_STRIDE;
+      }
+      if (!cancelled && cursor < FRAME_COUNT) {
+        requestIdleCallback(idlePreload, { timeout: 2500 });
+      }
     };
 
-    const onScroll = () => applyScrollProgress(measureProgress());
-
-    onScroll();
-    window.addEventListener("scroll", onScroll, { passive: true });
-    window.addEventListener("resize", onScroll);
-
+    const startId = requestIdleCallback(idlePreload, { timeout: 1200 });
     return () => {
-      window.removeEventListener("scroll", onScroll);
-      window.removeEventListener("resize", onScroll);
+      cancelled = true;
+      cancelIdleCallback(startId);
     };
-  }, [reducedMotion, applyScrollProgress]);
+  }, [loadFrame]);
 
   useGSAP(
     () => {
@@ -467,16 +498,15 @@ export function HeroFrameScroll() {
         trigger: scrollRef.current,
         start: "top top",
         end: "bottom bottom",
-        scrub: true,
+        scrub: 0.35,
         onUpdate: (self) => applyScrollProgress(self.progress),
       });
 
-      const refresh = () => ScrollTrigger.refresh();
-      refresh();
-      requestAnimationFrame(refresh);
+      requestAnimationFrame(() => ScrollTrigger.refresh());
 
       return () => {
         trigger.kill();
+        if (scrollRafRef.current) cancelAnimationFrame(scrollRafRef.current);
       };
     },
     { scope: scrollRef, dependencies: [reducedMotion, applyScrollProgress] }
@@ -516,9 +546,23 @@ export function HeroFrameScroll() {
           SpareFinder — {HERO_EYEBROW}. One photo, instant industrial part
           identification.
         </h1>
+        <img
+          src={HERO_POSTER_SRC}
+          alt=""
+          fetchPriority="high"
+          decoding="async"
+          className={cn(
+            "absolute inset-0 h-full w-full object-cover transition-opacity duration-300",
+            ready ? "pointer-events-none opacity-0" : "opacity-100"
+          )}
+          aria-hidden
+        />
         <canvas
           ref={canvasRef}
-          className="absolute inset-0 h-full w-full"
+          className={cn(
+            "absolute inset-0 h-full w-full will-change-transform",
+            ready ? "opacity-100" : "opacity-0"
+          )}
           aria-hidden
         />
 
