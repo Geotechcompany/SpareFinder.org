@@ -1,5 +1,4 @@
 import React, { useCallback, useEffect, useState } from "react";
-import { motion } from "framer-motion";
 import { AdminPageHeader, AdminPageHeaderToolbar } from "@/components/admin/AdminPageHeader";
 import { AdminPageContent } from "@/components/admin/AdminPageContent";
 import { Button } from "@/components/ui/button";
@@ -879,14 +878,8 @@ const MarketingOutbound: React.FC = () => {
   const cronBase = `${String(API_BASE_URL || "").replace(/\/$/, "")}/api`;
 
   return (
-    <div className="flex min-h-screen bg-background">
-      <motion.main
-        initial={false}
-        animate={mainMotion}
-        transition={{ duration: 0.3, ease: "easeInOut" }}
-        className={`flex-1 overflow-auto p-4 sm:p-6 md:p-10`}
-      >
-        <div className="mx-auto max-w-6xl space-y-6 sm:space-y-8">
+    <>
+      <AdminPageContent className="max-w-6xl">
           <AdminPageHeader
             breadcrumbPage="Email campaigns"
             title={
@@ -1845,8 +1838,7 @@ const MarketingOutbound: React.FC = () => {
               </TabsContent>
             </Tabs>
           )}
-        </div>
-      </motion.main>
+      </AdminPageContent>
 
       <Dialog
         open={testSendOpen}
@@ -2192,7 +2184,7 @@ const MarketingOutbound: React.FC = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
+    </>
   );
 };
 

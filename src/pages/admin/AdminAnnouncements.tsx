@@ -1,6 +1,5 @@
 import React, { useState } from "react";
 import { AdminPageContent } from "@/components/admin/AdminPageContent";
-import { motion } from "framer-motion";
 import {
   AdminPageHeader,
   AdminPageHeaderToolbar,
@@ -93,12 +92,7 @@ const AdminAnnouncements = () => {
   };
 
   return (
-    <div className="flex min-h-screen w-full bg-background">
-      <motion.main
-        {...mainMotion}
-        className={`flex-1 px-3 pb-10 pt-4 sm:px-6 sm:pt-6 lg:px-8`}
-      >
-        <div className="mx-auto flex max-w-3xl flex-col gap-6">
+    <AdminPageContent className="max-w-3xl">
           <AdminPageHeader
             title="In-app announcements"
             description="Post a notification to user accounts. It appears in the bell menu and on the Notifications page."
@@ -225,9 +219,7 @@ const AdminAnnouncements = () => {
               </form>
             </CardContent>
           </Card>
-        </div>
-      </motion.main>
-    </div>
+    </AdminPageContent>
   );
 };
 

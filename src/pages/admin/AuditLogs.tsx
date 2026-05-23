@@ -231,18 +231,6 @@ const AuditLogs = () => {
 
   return (
     <AdminPageContent>
-<motion.div
-        initial={false}
-        animate={mainMotion}
-        transition={{ duration: 0.3, ease: "easeInOut" }}
-        className={`flex-1 p-4 sm:p-6 lg:p-8 relative z-10 overflow-x-auto`}
-      >
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-          className="space-y-8 max-w-7xl mx-auto"
-        >
           <AdminPageHeader
             breadcrumbPage="Activity log"
             title="Audit log"
@@ -487,8 +475,6 @@ const AuditLogs = () => {
               )}
             </CardContent>
           </Card>
-        </motion.div>
-      </motion.div>
     </AdminPageContent>
   );
 };

@@ -501,18 +501,6 @@ const PaymentManagement = () => {
 
   return (
     <AdminPageContent>
-<motion.div
-        initial={false}
-        animate={mainMotion}
-        transition={{ duration: 0.3, ease: "easeInOut" }}
-        className={`flex-1 overflow-x-auto p-4 lg:p-8 relative z-10`}
-      >
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-          className="space-y-6 lg:space-y-8 max-w-7xl mx-auto"
-        >
           <Dialog>
             <>
               <AdminPageHeader
@@ -1059,8 +1047,6 @@ const PaymentManagement = () => {
               </CardContent>
             </Card>
           </motion.div>
-        </motion.div>
-      </motion.div>
     </AdminPageContent>
   );
 };
