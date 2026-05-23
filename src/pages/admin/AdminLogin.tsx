@@ -5,11 +5,16 @@ import { Shield } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { AuthShell } from "@/components/auth/auth-shell";
 import { authClerkAppearance } from "@/components/auth/clerk-appearance";
+import { SpinningLogoLoader } from "@/components/brand/spinning-logo-loader";
 
 const AdminLogin = () => {
   const { isLoading, isAuthenticated } = useAuth();
 
-  if (!isLoading && isAuthenticated) {
+  if (isLoading) {
+    return <SpinningLogoLoader label="Loading…" />;
+  }
+
+  if (isAuthenticated) {
     return <Navigate to="/admin/dashboard" replace />;
   }
 

@@ -19,7 +19,11 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   const { user, isLoading, isAuthenticated, isAdmin, isSuperAdmin } = useAuth()
   const location = useLocation()
 
-  // Clerk session is the source of truth; backend profile may load after redirect.
+  // Wait for Clerk (and profile hydration when signed in) before routing decisions.
+  if (requireAuth && isLoading) {
+    return <SpinningLogoLoader label="Loading…" />
+  }
+
   if (requireAuth && !isAuthenticated) {
     return (
       <Navigate
@@ -30,8 +34,9 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     )
   }
 
-  if (requireAuth && isLoading) {
-    return <SpinningLogoLoader label="Loading…" />
+  // Signed-in session can hydrate before the app profile is available.
+  if (requireAuth && isAuthenticated && !user) {
+    return <SpinningLogoLoader label="Loading profile…" />
   }
 
   // If specific role is required but user doesn't have it

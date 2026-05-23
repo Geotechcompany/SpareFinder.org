@@ -511,7 +511,11 @@ const Login = () => {
     ),
   };
 
-  if (!isLoading && (user || isAuthenticated)) {
+  if (isLoading || (hasClerkSession && !user && !isAuthenticated)) {
+    return <SpinningLogoLoader label="Restoring your session…" />;
+  }
+
+  if (user || isAuthenticated) {
     return <Navigate to={redirectTo} replace />;
   }
 
