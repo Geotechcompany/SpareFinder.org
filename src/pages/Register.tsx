@@ -15,6 +15,12 @@ const Register = () => {
   const [searchParams] = useSearchParams();
   const isMigrate = searchParams.get("migrate") === "1";
   const migrateEmail = searchParams.get("email");
+  const nextPath = searchParams.get("next");
+
+  const postSignupUrl =
+    nextPath && nextPath.startsWith("/") && !nextPath.startsWith("//")
+      ? nextPath
+      : "/onboarding/profile";
 
   // Capture invite ref from URL so we can apply after signup
   const ref = searchParams.get("ref");
@@ -29,7 +35,7 @@ const Register = () => {
   // After sign-up, Clerk authenticates immediately; send users to onboarding before the app shell.
   // (ClerkProvider afterSignUpUrl also targets this path — this avoids racing to /dashboard from here.)
   if (!isLoading && isAuthenticated) {
-    return <Navigate to="/onboarding/profile" replace />;
+    return <Navigate to={postSignupUrl} replace />;
   }
 
   return (
@@ -87,12 +93,19 @@ const Register = () => {
         routing="path"
         path="/register"
         signInUrl="/login"
-        forceRedirectUrl="/onboarding/profile"
+        forceRedirectUrl={postSignupUrl}
         appearance={authClerkAppearance as any}
       />
       <div className="mt-5 text-center text-xs text-muted-foreground">
         Already have an account?{" "}
-        <Link to="/login" className="font-semibold text-foreground hover:text-primary">
+        <Link
+          to={
+            nextPath
+              ? `/login?next=${encodeURIComponent(nextPath)}${migrateEmail ? `&email=${encodeURIComponent(migrateEmail)}` : ""}`
+              : "/login"
+          }
+          className="font-semibold text-foreground hover:text-primary"
+        >
           Sign in
         </Link>
       </div>

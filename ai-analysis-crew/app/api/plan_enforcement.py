@@ -103,6 +103,69 @@ async def user_has_active_plan(user_id: str, role: str) -> bool:
     return (await _fetch_user_subscription_row(user_id)) is not None
 
 
+async def get_profile_role(user_id: str) -> str:
+    supabase = get_supabase_admin()
+    res = (
+        supabase.table("profiles")
+        .select("role")
+        .eq("id", user_id)
+        .limit(1)
+        .execute()
+    )
+    if res.data:
+        return str(res.data[0].get("role") or "user")
+    return "user"
+
+
+async def get_workspace_owner_user_id(workspace_id: str) -> str | None:
+    """Billing account for a workspace is the member with role=owner."""
+    supabase = get_supabase_admin()
+    res = (
+        supabase.table("workspace_members")
+        .select("user_id")
+        .eq("workspace_id", workspace_id)
+        .eq("role", "owner")
+        .limit(1)
+        .execute()
+    )
+    if res.data:
+        return str(res.data[0]["user_id"])
+    ws = (
+        supabase.table("workspaces")
+        .select("created_by")
+        .eq("id", workspace_id)
+        .limit(1)
+        .execute()
+    )
+    if ws.data:
+        created_by = ws.data[0].get("created_by")
+        if created_by:
+            return str(created_by)
+    return None
+
+
+async def resolve_billing_user_id(
+    user_id: str,
+    role: str,
+    workspace_id: str | None,
+) -> tuple[str, str]:
+    """
+    Return (billing_user_id, plan_source).
+    Members/admins without their own plan inherit the workspace owner's subscription.
+    """
+    if role in ("admin", "super_admin"):
+        return user_id, "self"
+    if await user_has_active_plan(user_id, role):
+        return user_id, "self"
+    if workspace_id:
+        owner_id = await get_workspace_owner_user_id(workspace_id)
+        if owner_id and owner_id != user_id:
+            owner_role = await get_profile_role(owner_id)
+            if await user_has_active_plan(owner_id, owner_role):
+                return owner_id, "workspace_owner"
+    return user_id, "self"
+
+
 async def get_user_tier_and_limits(user_id: str, role: str) -> tuple[str, dict]:
     """Billing tier and limits for the account (shared across all workspaces)."""
     if role in ("admin", "super_admin"):
@@ -231,13 +294,17 @@ async def check_upload_limit(
 ) -> tuple[bool, int, int]:
     """
     Returns (allowed, current_count, limit).
-    Limits are shared across all workspaces on the account.
+    Limits are shared across all workspaces on the billing account.
     """
-    tier, limits = await get_user_tier_and_limits(scope.user_id, role)
+    billing_user_id = getattr(scope, "billing_user_id", None) or scope.user_id
+    billing_role = role
+    if billing_user_id != scope.user_id:
+        billing_role = await get_profile_role(billing_user_id)
+    tier, limits = await get_user_tier_and_limits(billing_user_id, billing_role)
     limit = limits.get("searches", 20)
     if limit == -1:
         return True, 0, -1
-    current = await count_shared_monthly_uploads(scope.user_id)
+    current = await count_shared_monthly_uploads(billing_user_id)
     allowed = current < limit
     return allowed, current, limit
 
@@ -247,7 +314,11 @@ def require_tier(min_tier: Literal["free", "pro", "enterprise"]):
         scope: WorkspaceScope = Depends(get_workspace_scope),
         user: CurrentUser = Depends(get_current_user),
     ):
-        tier, _ = await get_user_tier_and_limits(user.id, user.role)
+        billing_user_id = getattr(scope, "billing_user_id", None) or user.id
+        billing_role = user.role
+        if billing_user_id != user.id:
+            billing_role = await get_profile_role(billing_user_id)
+        tier, _ = await get_user_tier_and_limits(billing_user_id, billing_role)
         if not tier_meets(tier, min_tier):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,

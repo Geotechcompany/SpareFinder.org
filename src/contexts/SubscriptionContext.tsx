@@ -10,6 +10,7 @@ import React, {
 import axios from "axios";
 import { api, type ApiResponse } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
+import { useWorkspace } from "@/contexts/WorkspaceContext";
 
 type SubscriptionTier = "free" | "pro" | "enterprise" | "none";
 type SubscriptionStatus = string | null;
@@ -24,6 +25,7 @@ type RawSubscription = {
 type BillingPayload = {
   subscription?: RawSubscription;
   trial_used?: boolean;
+  inheritedWorkspaceAccess?: boolean;
 };
 
 const parseIsoDate = (value: unknown): Date | null => {
@@ -37,6 +39,7 @@ export type SubscriptionContextValue = {
   status: SubscriptionStatus;
   isPlanActive: boolean;
   isTrialing: boolean;
+  inheritedWorkspaceAccess: boolean;
   currentPeriodStart: Date | null;
   currentPeriodEnd: Date | null;
   isLoading: boolean;
@@ -132,9 +135,11 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
   const { user, isAuthenticated, isLoading: isAuthLoading } = useAuth();
+  const { activeWorkspaceId, isLoading: workspaceLoading } = useWorkspace();
 
   const [tier, setTier] = useState<SubscriptionTier>("none");
   const [status, setStatus] = useState<SubscriptionStatus>(null);
+  const [inheritedWorkspaceAccess, setInheritedWorkspaceAccess] = useState(false);
   const [currentPeriodStart, setCurrentPeriodStart] = useState<Date | null>(null);
   const [currentPeriodEnd, setCurrentPeriodEnd] = useState<Date | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -145,15 +150,17 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({
   const clearSubscription = useCallback(() => {
     setTier("none");
     setStatus(null);
+    setInheritedWorkspaceAccess(false);
     setCurrentPeriodStart(null);
     setCurrentPeriodEnd(null);
     hasLoadedRef.current = false;
   }, []);
 
   const applySubscription = useCallback(
-    (next: ReturnType<typeof parseBilling>) => {
+    (next: ReturnType<typeof parseBilling>, inherited: boolean) => {
       setTier(next.tier);
       setStatus(next.status);
+      setInheritedWorkspaceAccess(inherited);
       setCurrentPeriodStart(next.currentPeriodStart);
       setCurrentPeriodEnd(next.currentPeriodEnd);
       hasLoadedRef.current = true;
@@ -167,6 +174,11 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({
         clearSubscription();
       }
       setIsLoading(false);
+      return;
+    }
+
+    // Wait until workspace context is ready so X-Workspace-Id is sent on billing requests.
+    if (workspaceLoading) {
       return;
     }
 
@@ -196,7 +208,10 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({
             throw new Error("Billing response missing subscription payload");
           }
 
-          applySubscription(parseBilling(response));
+          applySubscription(
+            parseBilling(response),
+            Boolean(payload?.inheritedWorkspaceAccess)
+          );
           return;
         } catch (err) {
           if (isCanceledError(err)) return;
@@ -218,12 +233,26 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({
         setIsLoading(false);
       }
     }
-  }, [applySubscription, clearSubscription, isAuthenticated, isAuthLoading, user?.id]);
+  }, [
+    applySubscription,
+    clearSubscription,
+    isAuthenticated,
+    isAuthLoading,
+    user?.id,
+    workspaceLoading,
+  ]);
 
   useEffect(() => {
-    if (isAuthLoading) return;
+    if (isAuthLoading || workspaceLoading) return;
     void refreshSubscription();
-  }, [isAuthLoading, isAuthenticated, user?.id, refreshSubscription]);
+  }, [
+    isAuthLoading,
+    workspaceLoading,
+    isAuthenticated,
+    user?.id,
+    activeWorkspaceId,
+    refreshSubscription,
+  ]);
 
   const value: SubscriptionContextValue = useMemo(
     () => ({
@@ -231,17 +260,23 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({
       status,
       isPlanActive: isStatusActive(status),
       isTrialing: status === "trialing",
+      inheritedWorkspaceAccess,
       currentPeriodStart,
       currentPeriodEnd,
-      isLoading: (isAuthLoading && !hasLoadedRef.current) || isLoading,
+      isLoading:
+        (isAuthLoading && !hasLoadedRef.current) ||
+        workspaceLoading ||
+        isLoading,
       refreshSubscription,
     }),
     [
       tier,
       status,
+      inheritedWorkspaceAccess,
       currentPeriodStart,
       currentPeriodEnd,
       isAuthLoading,
+      workspaceLoading,
       isLoading,
       refreshSubscription,
     ]

@@ -567,6 +567,62 @@ def _send_workspace_invite_email(
     return ok
 
 
+async def _fetch_invitation_row_by_token(supabase: Any, token: str) -> dict[str, Any] | None:
+    res = await run_in_threadpool(
+        lambda: supabase.table("workspace_invitations")
+        .select("id, email, role, expires_at, accepted_at, workspaces(id, name)")
+        .eq("token", token.strip())
+        .limit(1)
+        .execute()
+    )
+    row = (res.data or [None])[0]
+    return row if row else None
+
+
+def _validate_invitation_row(row: dict[str, Any]) -> str | None:
+    if row.get("accepted_at"):
+        return "This invitation has already been accepted"
+    expires_at = row.get("expires_at")
+    if expires_at and str(expires_at) < datetime.now(timezone.utc).isoformat():
+        return "This invitation has expired"
+    return None
+
+
+@router.get("/invitations/public-preview")
+async def public_preview_workspace_invitation(
+    token: str = Query(..., min_length=16, max_length=128),
+):
+    """Preview a pending workspace invitation without authentication (token is the secret)."""
+    try:
+        supabase = get_supabase_admin()
+        row = await _fetch_invitation_row_by_token(supabase, token)
+        if not row:
+            return api_error("Invitation not found", status_code=404)
+        invalid = _validate_invitation_row(row)
+        if invalid:
+            return api_error(invalid, status_code=410)
+
+        ws = row.get("workspaces") or {}
+        return api_ok(
+            data={
+                "invitation": {
+                    "email": (row.get("email") or "").strip().lower(),
+                    "role": row.get("role") or "member",
+                    "expiresAt": row.get("expires_at"),
+                },
+                "workspace": {
+                    "id": str(ws.get("id") or ""),
+                    "name": ws.get("name") or "",
+                },
+            }
+        )
+    except Exception as exc:
+        if _is_missing_team_table_error(exc):
+            return api_error(_TEAM_SCHEMA_MISSING, status_code=503)
+        print(f"❌ public_preview_workspace_invitation: {exc}")
+        return api_error("Failed to load invitation", status_code=500)
+
+
 @router.get("/invitations/preview")
 async def preview_workspace_invitation(
     token: str = Query(..., min_length=16, max_length=128),
@@ -575,21 +631,12 @@ async def preview_workspace_invitation(
     """Preview a pending workspace invitation (authenticated)."""
     try:
         supabase = get_supabase_admin()
-        res = await run_in_threadpool(
-            lambda: supabase.table("workspace_invitations")
-            .select("id, email, role, expires_at, accepted_at, workspaces(id, name)")
-            .eq("token", token.strip())
-            .limit(1)
-            .execute()
-        )
-        row = (res.data or [None])[0]
+        row = await _fetch_invitation_row_by_token(supabase, token)
         if not row:
             return api_error("Invitation not found", status_code=404)
-        if row.get("accepted_at"):
-            return api_error("This invitation has already been accepted", status_code=410)
-        expires_at = row.get("expires_at")
-        if expires_at and str(expires_at) < datetime.now(timezone.utc).isoformat():
-            return api_error("This invitation has expired", status_code=410)
+        invalid = _validate_invitation_row(row)
+        if invalid:
+            return api_error(invalid, status_code=410)
 
         invite_email = (row.get("email") or "").strip().lower()
         user_email = (user.email or "").strip().lower()
@@ -599,7 +646,7 @@ async def preview_workspace_invitation(
                 "invitation": {
                     "email": invite_email,
                     "role": row.get("role") or "member",
-                    "expiresAt": expires_at,
+                    "expiresAt": row.get("expires_at"),
                 },
                 "workspace": {
                     "id": str(ws.get("id") or ""),

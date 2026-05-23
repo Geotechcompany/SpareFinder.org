@@ -19,6 +19,7 @@ _workspace_isolation_ready: bool | None = None
 class WorkspaceScope(BaseModel):
     workspace_id: str
     user_id: str
+    billing_user_id: str
 
 
 async def _fetch_active_workspace_id(user_id: str) -> str | None:
@@ -42,7 +43,7 @@ async def _fetch_active_workspace_id(user_id: str) -> str | None:
     return wid or None
 
 
-async def _is_workspace_member(user_id: str, workspace_id: str) -> bool:
+async def is_workspace_member(user_id: str, workspace_id: str) -> bool:
     supabase = get_supabase_admin()
     try:
         res = await run_in_threadpool(
@@ -62,6 +63,22 @@ async def _is_workspace_member(user_id: str, workspace_id: str) -> bool:
     return bool(res.data)
 
 
+async def _resolve_scope(
+    user: CurrentUser,
+    candidate: str,
+) -> WorkspaceScope:
+    from .plan_enforcement import resolve_billing_user_id
+
+    billing_user_id, _ = await resolve_billing_user_id(
+        user.id, user.role, candidate
+    )
+    return WorkspaceScope(
+        workspace_id=candidate,
+        user_id=user.id,
+        billing_user_id=billing_user_id,
+    )
+
+
 async def get_workspace_scope(
     user: CurrentUser = Depends(get_current_user),
     x_workspace_id: Annotated[str | None, Header(alias="X-Workspace-Id")] = None,
@@ -73,10 +90,10 @@ async def get_workspace_scope(
     if user.role in ("admin", "super_admin"):
         # Admins may omit workspace; use header or profile default for dashboard preview.
         candidate = (x_workspace_id or "").strip() or await _fetch_active_workspace_id(user.id)
-        if candidate and await _is_workspace_member(user.id, candidate):
-            return WorkspaceScope(workspace_id=candidate, user_id=user.id)
+        if candidate and await is_workspace_member(user.id, candidate):
+            return await _resolve_scope(user, candidate)
         if candidate:
-            return WorkspaceScope(workspace_id=candidate, user_id=user.id)
+            return await _resolve_scope(user, candidate)
 
     candidate = (x_workspace_id or "").strip() or await _fetch_active_workspace_id(user.id)
     if not candidate:
@@ -85,13 +102,13 @@ async def get_workspace_scope(
             detail="No active workspace. Create or select a workspace first.",
         )
 
-    if not await _is_workspace_member(user.id, candidate):
+    if not await is_workspace_member(user.id, candidate):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="You do not have access to this workspace.",
         )
 
-    return WorkspaceScope(workspace_id=candidate, user_id=user.id)
+    return await _resolve_scope(user, candidate)
 
 
 def _workspace_column_missing(exc: BaseException) -> bool:

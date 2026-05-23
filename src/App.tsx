@@ -64,7 +64,7 @@ const ForgotPassword = lazy(() => import("@/pages/ForgotPassword"));
 const Contact = lazy(() => import("@/pages/Contact"));
 const PublicReviews = lazy(() => import("@/pages/PublicReviews"));
 const SharedAnalysis = lazy(() => import("@/pages/SharedAnalysis"));
-const WorkspaceInviteAccept = lazy(() => import("@/pages/WorkspaceInviteAccept"));
+import WorkspaceInviteAccept from "./pages/WorkspaceInviteAccept";
 const ClerkSsoCallback = lazy(() => import("@/pages/ClerkSsoCallback"));
 const ApiDocs = lazy(() => import("@/pages/ApiDocs"));
 

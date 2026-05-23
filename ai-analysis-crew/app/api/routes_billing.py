@@ -4,16 +4,18 @@ from __future__ import annotations
 
 import os
 from datetime import datetime, timedelta
-from typing import Any, Optional
+from typing import Annotated, Any, Optional
 
 import stripe
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Header, Request
 from pydantic import BaseModel
 
 from .auth_dependencies import CurrentUser, get_current_user
+from .plan_enforcement import get_profile_role, get_user_tier_and_limits, resolve_billing_user_id
 from .responses import api_error, api_ok
 from .subscription_utils import pick_best_subscription_row
 from .supabase_admin import get_supabase_admin
+from .workspace_dependencies import is_workspace_member
 from ..email_sender import (
     send_expired_plan_resubscribe_email,
     send_payment_failed_email,
@@ -154,17 +156,38 @@ def _user_has_used_trial(supabase, user_id: str) -> bool:
 
 @router.get("", name="get_billing_info")
 @router.get("/", name="get_billing_info_slash")  # Also handle trailing slash
-async def get_billing_info(user: CurrentUser = Depends(get_current_user)):
+async def get_billing_info(
+    user: CurrentUser = Depends(get_current_user),
+    x_workspace_id: Annotated[str | None, Header(alias="X-Workspace-Id")] = None,
+):
     """
     Get billing information for the current user.
-    Returns subscription details, usage, and invoices.
+    When X-Workspace-Id is set and the user is a workspace member without their own
+    plan, returns the workspace owner's subscription (shared team access).
     """
     try:
         supabase = get_supabase_admin()
         user_id = user.id
+        workspace_id = (x_workspace_id or "").strip() or None
+        billing_user_id = user_id
+        plan_source = "self"
 
-        # Get subscription info
-        sub_result = supabase.table("subscriptions").select("*").eq("user_id", user_id).execute()
+        if workspace_id and await is_workspace_member(user_id, workspace_id):
+            billing_user_id, plan_source = await resolve_billing_user_id(
+                user_id, user.role, workspace_id
+            )
+
+        billing_role = user.role if billing_user_id == user_id else await get_profile_role(
+            billing_user_id
+        )
+
+        # Get subscription info (own or inherited from workspace owner)
+        sub_result = (
+            supabase.table("subscriptions")
+            .select("*")
+            .eq("user_id", billing_user_id)
+            .execute()
+        )
 
         subscription = pick_best_subscription_row(sub_result.data or [])
         if subscription:
@@ -182,7 +205,7 @@ async def get_billing_info(user: CurrentUser = Depends(get_current_user)):
         usage_result = (
             supabase.table("usage_tracking")
             .select("*")
-            .eq("user_id", user_id)
+            .eq("user_id", billing_user_id)
             .eq("month", current_month)
             .eq("year", current_year)
             .execute()
@@ -222,8 +245,8 @@ async def get_billing_info(user: CurrentUser = Depends(get_current_user)):
             "storage_used": 0,
         }
 
-        # Get limits based on tier
-        tier = user_subscription.get("tier", "free")
+        # Get limits based on tier (billing account, including inherited workspace plan)
+        tier, _ = await get_user_tier_and_limits(billing_user_id, billing_role)
         limits = SUBSCRIPTION_LIMITS.get(tier, SUBSCRIPTION_LIMITS["free"])
 
         if user.role in ("admin", "super_admin"):
@@ -248,6 +271,8 @@ async def get_billing_info(user: CurrentUser = Depends(get_current_user)):
             data={
                 "subscription": user_subscription,
                 "trial_used": trial_used,
+                "planSource": plan_source,
+                "inheritedWorkspaceAccess": plan_source == "workspace_owner",
                 "usage": {
                     "current_period": {
                         "searches": user_usage.get("searches_count", 0),

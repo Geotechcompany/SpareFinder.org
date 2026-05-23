@@ -2371,6 +2371,19 @@ export const api = {
       );
       return response.data;
     },
+    publicPreviewInvitation: async (
+      token: string
+    ): Promise<
+      ApiResponse<{
+        invitation: { email: string; role: WorkspaceInviteRole; expiresAt?: string };
+        workspace: { id: string; name: string };
+      }>
+    > => {
+      const response = await apiClient.get(
+        `/workspaces/invitations/public-preview?token=${encodeURIComponent(token)}`
+      );
+      return response.data;
+    },
     acceptInvitation: async (
       token: string
     ): Promise<

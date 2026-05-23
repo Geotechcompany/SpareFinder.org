@@ -79,6 +79,13 @@ const Login = () => {
     return (location.state as { from?: { pathname?: string } })?.from?.pathname || "/dashboard";
   }, [location.state, searchParams]);
 
+  useEffect(() => {
+    const inviteEmail = searchParams.get("email")?.trim().toLowerCase();
+    if (inviteEmail) {
+      setEmail(inviteEmail);
+    }
+  }, [searchParams]);
+
   const oauthStrategies = useMemo(() => {
     if (!isLoaded || !signIn) return [] as OAuthStrategy[];
     const supported = ((signIn as any).supportedFirstFactors || []) as Array<{
@@ -189,6 +196,47 @@ const Login = () => {
     return { clerkCode, clerkMsg, paramName };
   };
 
+  type SignInFactor = {
+    strategy: string;
+    emailAddressId?: string;
+    phoneNumberId?: string;
+    safeIdentifier?: string;
+  };
+
+  const readSupportedFirstFactors = (): SignInFactor[] => {
+    const fromSignIn = (signIn as { supportedFirstFactors?: SignInFactor[] } | null)
+      ?.supportedFirstFactors;
+    return Array.isArray(fromSignIn) ? fromSignIn : [];
+  };
+
+  const isInvalidVerificationStrategyError = (err: unknown) => {
+    const { clerkCode, clerkMsg } = getClerkError(err);
+    const msg = (clerkMsg || "").toLowerCase();
+    return (
+      clerkCode === "strategy_for_user_invalid" ||
+      (clerkCode === "form_param_value_invalid" && msg.includes("strategy")) ||
+      msg.includes("invalid verification strategy")
+    );
+  };
+
+  const beginEmailCodeFirstFactor = async (
+    emailCodeFactor: SignInFactor,
+    infoMessageText: string
+  ) => {
+    if (!signIn) return;
+    setEmailAddressId(emailCodeFactor.emailAddressId ?? null);
+    if (emailCodeFactor.emailAddressId) {
+      await signIn.prepareFirstFactor({
+        strategy: "email_code",
+        emailAddressId: emailCodeFactor.emailAddressId,
+      });
+    } else {
+      await (signIn.prepareFirstFactor as any)({ strategy: "email_code" });
+    }
+    setLoginStep("email_code");
+    setInfoMessage(infoMessageText);
+  };
+
   const handleOauth = async (strategy: OAuthStrategy) => {
     if (!isLoaded || !signIn) return;
     setErrorMessage(null);
@@ -237,12 +285,46 @@ const Login = () => {
         }
         throw createErr;
       }
+
+      const supportedFirstFactors = readSupportedFirstFactors();
+      const passwordSupported = supportedFirstFactors.some((f) => f.strategy === "password");
+      const emailCodeFactor = supportedFirstFactors.find((f) => f.strategy === "email_code");
+
+      if (!passwordSupported) {
+        if (emailCodeFactor) {
+          await beginEmailCodeFirstFactor(
+            emailCodeFactor,
+            "This account uses email verification instead of a password. We sent a code to your inbox — enter it below."
+          );
+          return;
+        }
+
+        setErrorMessage(
+          oauthStrategies.length
+            ? "This email cannot sign in with a password. Use Continue with Google, or create an account if you are new."
+            : "This email cannot sign in with a password. Create an account if you are new to SpareFinder."
+        );
+        return;
+      }
+
+      if (!password.trim()) {
+        setErrorMessage("Enter your password.");
+        return;
+      }
+
       let result;
       try {
         result = await signIn.attemptFirstFactor({ strategy: "password", password });
       } catch (factorErr: unknown) {
         if (isSessionExistsError(factorErr)) {
           await redirectWithExistingSession(getSessionIdFromClerkError(factorErr));
+          return;
+        }
+        if (isInvalidVerificationStrategyError(factorErr) && emailCodeFactor) {
+          await beginEmailCodeFirstFactor(
+            emailCodeFactor,
+            "We could not verify your password for this account. We sent a one-time code to your email instead."
+          );
           return;
         }
         throw factorErr;
@@ -378,13 +460,42 @@ const Login = () => {
         } catch {
           // ignore and fall back to showing error
         }
+
+        const registerNext = encodeURIComponent(redirectTo);
+        setErrorMessage(
+          "No account found for this email. Create one to continue, then return to accept your workspace invite."
+        );
+        navigate(
+          `/register?email=${encodeURIComponent(normalizedEmail)}&next=${registerNext}`,
+          { replace: true }
+        );
+        return;
+      }
+
+      if (isInvalidVerificationStrategyError(err) && signIn) {
+        const emailCodeFactor = readSupportedFirstFactors().find(
+          (f) => f.strategy === "email_code"
+        );
+        if (emailCodeFactor) {
+          try {
+            await beginEmailCodeFirstFactor(
+              emailCodeFactor,
+              "This account uses email verification. Enter the code we sent to your inbox."
+            );
+            return;
+          } catch {
+            // fall through to generic message
+          }
+        }
       }
 
       setErrorMessage(
         clerkMsg ||
           (clerkCode === "form_password_incorrect"
             ? "Incorrect password."
-            : "Unable to sign in. Please try again.")
+            : isInvalidVerificationStrategyError(err)
+              ? "This account cannot use email and password. Try Continue with Google or create an account."
+              : "Unable to sign in. Please try again.")
       );
     } finally {
       if (!redirectingRef.current) {
