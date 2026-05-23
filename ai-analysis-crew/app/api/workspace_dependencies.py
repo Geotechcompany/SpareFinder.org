@@ -20,6 +20,7 @@ class WorkspaceScope(BaseModel):
     workspace_id: str
     user_id: str
     billing_user_id: str
+    member_user_ids: list[str] = []
 
 
 async def _fetch_active_workspace_id(user_id: str) -> str | None:
@@ -63,6 +64,29 @@ async def is_workspace_member(user_id: str, workspace_id: str) -> bool:
     return bool(res.data)
 
 
+async def _fetch_workspace_member_user_ids(workspace_id: str) -> list[str]:
+    supabase = get_supabase_admin()
+    try:
+        res = await run_in_threadpool(
+            lambda: run_supabase(
+                lambda: supabase.table("workspace_members")
+                .select("user_id")
+                .eq("workspace_id", workspace_id)
+                .execute()
+            )
+        )
+    except Exception as exc:
+        if is_transient_http_error(exc):
+            raise_service_unavailable(exc)
+        raise
+    ids: list[str] = []
+    for row in res.data or []:
+        uid = str(row.get("user_id") or "").strip()
+        if uid and uid not in ids:
+            ids.append(uid)
+    return ids
+
+
 async def _resolve_scope(
     user: CurrentUser,
     candidate: str,
@@ -72,10 +96,14 @@ async def _resolve_scope(
     billing_user_id, _ = await resolve_billing_user_id(
         user.id, user.role, candidate
     )
+    member_user_ids = await _fetch_workspace_member_user_ids(candidate)
+    if user.id not in member_user_ids:
+        member_user_ids = [user.id, *member_user_ids]
     return WorkspaceScope(
         workspace_id=candidate,
         user_id=user.id,
         billing_user_id=billing_user_id,
+        member_user_ids=member_user_ids,
     )
 
 
@@ -158,10 +186,28 @@ def reset_workspace_isolation_probe() -> None:
     _workspace_isolation_ready = None
 
 
+def _scope_member_user_ids(scope: WorkspaceScope) -> list[str]:
+    member_ids = list(scope.member_user_ids or [])
+    if scope.user_id and scope.user_id not in member_ids:
+        member_ids.insert(0, scope.user_id)
+    return member_ids or [scope.user_id]
+
+
+def _legacy_workspace_user_filter(
+    scope: WorkspaceScope, *, user_column: str = "user_id"
+) -> str:
+    """Legacy rows without workspace_id belong to any member of the workspace."""
+    member_ids = _scope_member_user_ids(scope)
+    if len(member_ids) == 1:
+        return f"and(workspace_id.is.null,{user_column}.eq.{member_ids[0]})"
+    in_list = ",".join(member_ids)
+    return f"and(workspace_id.is.null,{user_column}.in.({in_list}))"
+
+
 def workspace_or_filter(scope: WorkspaceScope, *, user_column: str = "user_id") -> str:
     wid = scope.workspace_id
-    uid = scope.user_id
-    return f"workspace_id.eq.{wid},and(workspace_id.is.null,{user_column}.eq.{uid})"
+    legacy = _legacy_workspace_user_filter(scope, user_column=user_column)
+    return f"workspace_id.eq.{wid},{legacy}"
 
 
 def apply_workspace_filter(query: Any, scope: WorkspaceScope, *, user_column: str = "user_id"):
@@ -169,8 +215,11 @@ def apply_workspace_filter(query: Any, scope: WorkspaceScope, *, user_column: st
     Apply workspace isolation to a Supabase filter builder (after .select/.delete/.update).
     Falls back to user_id-only when workspace_id columns are not migrated yet.
     """
+    member_ids = _scope_member_user_ids(scope)
     if not _probe_workspace_isolation():
-        return query.eq(user_column, scope.user_id)
+        if len(member_ids) == 1:
+            return query.eq(user_column, member_ids[0])
+        return query.in_(user_column, member_ids)
     return query.or_(workspace_or_filter(scope, user_column=user_column))
 
 

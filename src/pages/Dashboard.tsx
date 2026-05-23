@@ -27,6 +27,7 @@ import { useDashboardChrome } from "@/hooks/use-dashboard-chrome";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSubscription } from "@/contexts/SubscriptionContext";
+import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { PlanRequiredCard } from "@/components/billing/PlanRequiredCard";
 import { format } from "date-fns";
 import { useNavigate } from "react-router-dom";
@@ -99,6 +100,7 @@ const Dashboard = () => {
     inLayout ? layoutSidebarCollapsed : isCollapsed
   );
   const { user, isLoading: authLoading, logout, isAuthenticated, isAdmin } = useAuth();
+  const { activeWorkspaceId, isLoading: workspaceLoading } = useWorkspace();
   const { isPlanActive, isLoading: subscriptionLoading } = useSubscription();
   const hasPlanAccess = isAdmin || isPlanActive;
   const navigate = useNavigate();
@@ -112,12 +114,12 @@ const Dashboard = () => {
 
   const storageKey = useCallback(
     (base: string) => {
-      // IMPORTANT: scope dashboard caches to the logged-in app user.
-      // Otherwise a canceled fetch can leave stale stats from a previous user/session.
       const uid = user?.id;
+      const wid = activeWorkspaceId;
+      if (uid && wid) return `${base}:${uid}:${wid}`;
       return uid ? `${base}:${uid}` : base;
     },
-    [user?.id]
+    [user?.id, activeWorkspaceId]
   );
 
   // State for dashboard data (persist last successful stats to avoid flicker-to-zero)
@@ -178,11 +180,13 @@ const Dashboard = () => {
   // Clerk migration: tokens are no longer stored in tokenStorage.
   // Use Clerk-backed auth state + app user presence to decide readiness.
   const canFetchDashboard = useCallback(() => {
-    // Backend identifies the user from the Authorization bearer token.
-    // Don't block dashboard fetch on `user?.id` because the profile can briefly be null
-    // during refresh/revalidation, which would wipe the UI back to 0.
-    return !authLoading && isAuthenticated;
-  }, [authLoading, isAuthenticated]);
+    return (
+      !authLoading &&
+      !workspaceLoading &&
+      isAuthenticated &&
+      Boolean(activeWorkspaceId)
+    );
+  }, [authLoading, workspaceLoading, isAuthenticated, activeWorkspaceId]);
 
   const fetchDashboardData = useCallback(async () => {
     // Prevent multiple simultaneous requests
@@ -603,14 +607,13 @@ const Dashboard = () => {
       isFetchingRef.current = false;
       setIsDataLoading(false);
     }
-  }, [canFetchDashboard, toast, logout, storageKey]);
+  }, [canFetchDashboard, toast, logout, storageKey, activeWorkspaceId]);
 
-  // Hydrate cached dashboard data once we know which user is signed in.
-  // This keeps the UI stable during refresh, without risking cross-user leakage.
+  // Hydrate cached dashboard data once we know which user/workspace is active.
   useEffect(() => {
-    if (authLoading) return;
+    if (authLoading || workspaceLoading) return;
     if (!isAuthenticated) return;
-    if (!user?.id) return;
+    if (!user?.id || !activeWorkspaceId) return;
 
     try {
       const rawStats = localStorage.getItem(storageKey("dashboard_overview_stats_v1"));
@@ -651,25 +654,31 @@ const Dashboard = () => {
     } catch {
       // ignore cache parse errors
     }
-  }, [authLoading, isAuthenticated, user?.id, storageKey]);
+  }, [authLoading, workspaceLoading, isAuthenticated, user?.id, activeWorkspaceId, storageKey]);
 
-  // Initialize data fetch - run whenever auth becomes ready and user is present.
-  // Avoid one-shot gating; Clerk can take longer than a fixed timeout to hydrate.
+  // Refetch dashboard data when auth or active workspace changes.
   useEffect(() => {
-    if (authLoading) return;
+    if (authLoading || workspaceLoading) return;
 
-    // If unauthenticated, ProtectedRoute will redirect; don't wipe UI state to 0 (prevents flicker).
     if (!isAuthenticated) {
       hasLoadedOnceRef.current = false;
       return;
     }
 
-    // Kick off (or retry) data fetch when auth is ready.
-    // fetchDashboardData itself is guarded against parallel calls.
+    if (!activeWorkspaceId) return;
+
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    isFetchingRef.current = false;
+    hasLoadedOnceRef.current = false;
+
     fetchDashboardData();
   }, [
     authLoading,
+    workspaceLoading,
     isAuthenticated,
+    activeWorkspaceId,
     fetchDashboardData,
   ]);
 
