@@ -64,6 +64,7 @@ const ForgotPassword = lazy(() => import("@/pages/ForgotPassword"));
 const Contact = lazy(() => import("@/pages/Contact"));
 const PublicReviews = lazy(() => import("@/pages/PublicReviews"));
 const SharedAnalysis = lazy(() => import("@/pages/SharedAnalysis"));
+const WorkspaceInviteAccept = lazy(() => import("@/pages/WorkspaceInviteAccept"));
 const ClerkSsoCallback = lazy(() => import("@/pages/ClerkSsoCallback"));
 const ApiDocs = lazy(() => import("@/pages/ApiDocs"));
 
@@ -232,6 +233,14 @@ const App = () => (
                   <Route path="/reviews" element={<PublicReviews />} />
                   <Route path="/unauthorized" element={<Unauthorized />} />
                   <Route path="/share/:token" element={<SharedAnalysis />} />
+                  <Route
+                    path="/invite/workspace"
+                    element={
+                      <ProtectedRoute requireAuth={false}>
+                        <WorkspaceInviteAccept />
+                      </ProtectedRoute>
+                    }
+                  />
                   {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                   <Route path="*" element={<NotFound />} />
                 </Routes>

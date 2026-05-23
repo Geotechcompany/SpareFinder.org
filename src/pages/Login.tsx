@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Navigate, useLocation, useNavigate } from "react-router-dom";
+import { Navigate, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth as useClerkAuth, useClerk, useSignIn } from "@clerk/clerk-react";
 import { Sparkles, ArrowRight, Eye, EyeOff } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
@@ -46,6 +46,7 @@ const Login = () => {
   const { isSignedIn: isClerkSignedIn, userId: clerkUserId, sessionId: clerkSessionId } =
     useClerkAuth();
   const location = useLocation();
+  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { isLoaded, signIn, setActive } = useSignIn();
   const clerk = useClerk();
@@ -70,10 +71,13 @@ const Login = () => {
     isClerkSignedIn || clerkUserId || clerkSessionId || clerk.session?.id || clerk.user?.id
   );
 
-  const redirectTo = useMemo(
-    () => (location.state as any)?.from?.pathname || "/dashboard",
-    [location.state]
-  );
+  const redirectTo = useMemo(() => {
+    const next = searchParams.get("next");
+    if (next && next.startsWith("/") && !next.startsWith("//")) {
+      return next;
+    }
+    return (location.state as { from?: { pathname?: string } })?.from?.pathname || "/dashboard";
+  }, [location.state, searchParams]);
 
   const oauthStrategies = useMemo(() => {
     if (!isLoaded || !signIn) return [] as OAuthStrategy[];

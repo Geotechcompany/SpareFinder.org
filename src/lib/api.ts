@@ -2290,7 +2290,123 @@ export const api = {
       );
       return response.data;
     },
+    listMembers: async (
+      workspaceId: string
+    ): Promise<
+      ApiResponse<{
+        members: WorkspaceMemberRecord[];
+        canManage: boolean;
+        currentUserRole: WorkspaceMemberRole;
+      }>
+    > => {
+      const response = await apiClient.get(
+        `/workspaces/${encodeURIComponent(workspaceId)}/members`
+      );
+      return response.data;
+    },
+    listInvitations: async (
+      workspaceId: string
+    ): Promise<ApiResponse<{ invitations: WorkspaceInvitationRecord[] }>> => {
+      const response = await apiClient.get(
+        `/workspaces/${encodeURIComponent(workspaceId)}/invitations`
+      );
+      return response.data;
+    },
+    inviteMember: async (
+      workspaceId: string,
+      payload: { email: string; role: WorkspaceInviteRole }
+    ): Promise<
+      ApiResponse<{
+        invitation: WorkspaceInvitationRecord;
+        inviteUrl: string;
+        emailSent: boolean;
+      }>
+    > => {
+      const response = await apiClient.post(
+        `/workspaces/${encodeURIComponent(workspaceId)}/invitations`,
+        payload
+      );
+      return response.data;
+    },
+    revokeInvitation: async (
+      workspaceId: string,
+      invitationId: string
+    ): Promise<ApiResponse<{ revoked: boolean }>> => {
+      const response = await apiClient.delete(
+        `/workspaces/${encodeURIComponent(workspaceId)}/invitations/${encodeURIComponent(invitationId)}`
+      );
+      return response.data;
+    },
+    updateMemberRole: async (
+      workspaceId: string,
+      memberUserId: string,
+      role: WorkspaceInviteRole
+    ): Promise<ApiResponse<{ member: WorkspaceMemberRecord }>> => {
+      const response = await apiClient.patch(
+        `/workspaces/${encodeURIComponent(workspaceId)}/members/${encodeURIComponent(memberUserId)}`,
+        { role }
+      );
+      return response.data;
+    },
+    removeMember: async (
+      workspaceId: string,
+      memberUserId: string
+    ): Promise<ApiResponse<{ removed: boolean; userId: string }>> => {
+      const response = await apiClient.delete(
+        `/workspaces/${encodeURIComponent(workspaceId)}/members/${encodeURIComponent(memberUserId)}`
+      );
+      return response.data;
+    },
+    previewInvitation: async (
+      token: string
+    ): Promise<
+      ApiResponse<{
+        invitation: { email: string; role: WorkspaceInviteRole; expiresAt?: string };
+        workspace: { id: string; name: string };
+        emailMatches: boolean;
+      }>
+    > => {
+      const response = await apiClient.get(
+        `/workspaces/invitations/preview?token=${encodeURIComponent(token)}`
+      );
+      return response.data;
+    },
+    acceptInvitation: async (
+      token: string
+    ): Promise<
+      ApiResponse<{
+        workspace: WorkspaceRecord;
+        activeWorkspaceId: string;
+        alreadyMember: boolean;
+      }>
+    > => {
+      const response = await apiClient.post("/workspaces/invitations/accept", {
+        token,
+      });
+      return response.data;
+    },
   },
+};
+
+export type WorkspaceMemberRole = "owner" | "admin" | "member";
+export type WorkspaceInviteRole = "admin" | "member";
+
+export type WorkspaceMemberRecord = {
+  userId: string;
+  role: WorkspaceMemberRole | string;
+  joinedAt?: string;
+  email: string;
+  fullName: string;
+  avatarUrl?: string | null;
+};
+
+export type WorkspaceInvitationRecord = {
+  id: string;
+  email: string;
+  role: WorkspaceInviteRole | string;
+  expiresAt?: string;
+  acceptedAt?: string | null;
+  createdAt?: string;
 };
 
 export type WorkspaceRecord = {

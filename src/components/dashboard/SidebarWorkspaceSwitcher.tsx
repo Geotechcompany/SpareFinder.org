@@ -30,7 +30,9 @@ import { useToast } from "@/components/ui/use-toast";
 import { useNavigate } from "react-router-dom";
 import { WorkspaceIcon } from "@/components/dashboard/WorkspaceIcon";
 import { ProfileImageUploader } from "@/components/profile/ProfileImageUploader";
+import { WorkspaceTeamPanel } from "@/components/dashboard/WorkspaceTeamPanel";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 function formatWorkspaceQuota(quota: {
   workspaceCount: number;
   maxWorkspaces: number;
@@ -277,7 +279,7 @@ export function SidebarWorkspaceSwitcher({
             })}
           </div>
           <div className="my-1 h-px bg-border" />
-          {canManageWorkspace ? (
+          {activeWorkspace ? (
             <button
               type="button"
               onClick={() => {
@@ -287,7 +289,7 @@ export function SidebarWorkspaceSwitcher({
               className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted/80"
             >
               <Settings2 className="h-4 w-4" />
-              Workspace settings
+              {canManageWorkspace ? "Workspace settings" : "View team"}
             </button>
           ) : null}
           <button
@@ -310,77 +312,135 @@ export function SidebarWorkspaceSwitcher({
       </Popover>
 
       <Dialog open={manageOpen} onOpenChange={setManageOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Workspace settings</DialogTitle>
-            <DialogDescription>
-              Rename this workspace or upload a logo. Only owners and admins can make changes.
-            </DialogDescription>
-          </DialogHeader>
+        <DialogContent
+          className={cn(
+            "flex max-h-[min(92dvh,820px)] w-[calc(100vw-1rem)] max-w-2xl flex-col gap-0 overflow-hidden p-0",
+            "max-sm:fixed max-sm:inset-x-0 max-sm:bottom-0 max-sm:top-auto max-sm:max-h-[92dvh]",
+            "max-sm:translate-x-0 max-sm:translate-y-0 max-sm:rounded-b-none max-sm:rounded-t-[1.75rem]",
+            "sm:left-[50%] sm:top-[50%] sm:translate-x-[-50%] sm:translate-y-[-50%]"
+          )}
+        >
           {activeWorkspace ? (
-            <div className="space-y-6">
-              <div className="space-y-2">
-                <Label htmlFor="rename-workspace-name">Workspace name</Label>
-                <div className="flex gap-2">
-                  <Input
-                    id="rename-workspace-name"
-                    value={renameName}
-                    onChange={(e) => setRenameName(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") void handleRename();
-                    }}
-                    maxLength={120}
-                    autoComplete="organization"
-                  />
-                  <Button
-                    type="button"
-                    onClick={() => void handleRename()}
-                    disabled={
-                      isRenaming ||
-                      !renameName.trim() ||
-                      renameName.trim() === activeWorkspace.name
-                    }
+            <Tabs defaultValue="general" className="flex min-h-0 flex-1 flex-col">
+              <div className="shrink-0 border-b border-border/60 bg-gradient-to-b from-muted/30 to-background px-4 pb-4 pt-5 sm:px-6 sm:pt-6">
+                <DialogHeader className="space-y-1 pr-8 text-left">
+                  <DialogTitle className="text-lg sm:text-xl">
+                    Workspace settings
+                  </DialogTitle>
+                  <DialogDescription className="text-sm leading-relaxed">
+                    Manage branding, teammates, and access for{" "}
+                    <span className="font-medium text-foreground">
+                      {activeWorkspace.name}
+                    </span>
+                    .
+                  </DialogDescription>
+                </DialogHeader>
+                <TabsList className="mt-4 grid h-11 w-full grid-cols-2 rounded-xl bg-muted/60 p-1">
+                  <TabsTrigger
+                    value="general"
+                    className="rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm"
                   >
-                    {isRenaming ? "Saving…" : "Save"}
-                  </Button>
-                </div>
+                    General
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="team"
+                    className="rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm"
+                  >
+                    Team
+                  </TabsTrigger>
+                </TabsList>
               </div>
-              <div className="space-y-2">
-                <Label>Workspace photo</Label>
-                <ProfileImageUploader
-                  size="lg"
-                  imageUrl={activeWorkspace.imageUrl}
-                  fallbackLabel={activeWorkspace.name}
-                  onUpload={async (file) => {
-                    const res = await api.workspaces.uploadImage(
-                      activeWorkspace.id,
-                      file
-                    );
-                    const imageUrl =
-                      res.data?.imageUrl ??
-                      res.data?.workspace?.imageUrl ??
-                      null;
-                    if (!res.success || !imageUrl) {
-                      throw new Error(
-                        (res as { message?: string }).message || "Upload failed"
-                      );
-                    }
-                    await refreshWorkspaces();
-                    toast({
-                      title: "Workspace photo updated",
-                      description: activeWorkspace.name,
-                    });
-                    return imageUrl;
-                  }}
-                />
+
+              <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4 sm:px-6 sm:py-5">
+                <TabsContent value="general" className="mt-0 space-y-6">
+                  <div className="space-y-2">
+                    <Label htmlFor="rename-workspace-name">Workspace name</Label>
+                    <div className="flex flex-col gap-2 sm:flex-row">
+                      <Input
+                        id="rename-workspace-name"
+                        value={renameName}
+                        onChange={(e) => setRenameName(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") void handleRename();
+                        }}
+                        maxLength={120}
+                        autoComplete="organization"
+                        disabled={!canManageWorkspace}
+                        className="h-11 min-w-0 flex-1"
+                      />
+                      <Button
+                        type="button"
+                        className="h-11 shrink-0 sm:min-w-[96px]"
+                        onClick={() => void handleRename()}
+                        disabled={
+                          !canManageWorkspace ||
+                          isRenaming ||
+                          !renameName.trim() ||
+                          renameName.trim() === activeWorkspace.name
+                        }
+                      >
+                        {isRenaming ? "Saving…" : "Save"}
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Workspace photo</Label>
+                    {canManageWorkspace ? (
+                      <ProfileImageUploader
+                        size="lg"
+                        imageUrl={activeWorkspace.imageUrl}
+                        fallbackLabel={activeWorkspace.name}
+                        onUpload={async (file) => {
+                          const res = await api.workspaces.uploadImage(
+                            activeWorkspace.id,
+                            file
+                          );
+                          const imageUrl =
+                            res.data?.imageUrl ??
+                            res.data?.workspace?.imageUrl ??
+                            null;
+                          if (!res.success || !imageUrl) {
+                            throw new Error(
+                              (res as { message?: string }).message || "Upload failed"
+                            );
+                          }
+                          await refreshWorkspaces();
+                          toast({
+                            title: "Workspace photo updated",
+                            description: activeWorkspace.name,
+                          });
+                          return imageUrl;
+                        }}
+                      />
+                    ) : (
+                      <p className="text-sm text-muted-foreground">
+                        Only owners and admins can change the workspace photo.
+                      </p>
+                    )}
+                  </div>
+                </TabsContent>
+                <TabsContent value="team" className="mt-0">
+                  <WorkspaceTeamPanel
+                    workspaceId={activeWorkspace.id}
+                    workspaceName={activeWorkspace.name}
+                    currentUserRole={activeWorkspace.role}
+                    canManage={Boolean(canManageWorkspace)}
+                  />
+                </TabsContent>
               </div>
-            </div>
+
+              <DialogFooter className="shrink-0 border-t border-border/60 bg-muted/20 px-4 py-3 sm:px-6">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="h-11 w-full sm:w-auto"
+                  onClick={() => setManageOpen(false)}
+                >
+                  Done
+                </Button>
+              </DialogFooter>
+            </Tabs>
           ) : null}
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setManageOpen(false)}>
-              Done
-            </Button>
-          </DialogFooter>
         </DialogContent>
       </Dialog>
 
