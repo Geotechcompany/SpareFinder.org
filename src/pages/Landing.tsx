@@ -120,6 +120,7 @@ const Landing = () => {
         amount,
         currency: "GBP",
         billing_cycle: isAnnual ? "annual" : "monthly",
+        trial_days: isAnnual ? 0 : (plan.trial?.days ?? 0),
         success_url: `${window.location.origin}/dashboard/billing?payment_success=true`,
         cancel_url: `${window.location.origin}/dashboard/billing?payment_cancelled=true`,
       };
@@ -161,7 +162,6 @@ const Landing = () => {
       return;
     }
 
-    // Authenticated users can purchase directly via Stripe modal
     if (plan.id === "enterprise") {
       toast({
         title: "Enterprise Plan",

@@ -84,6 +84,8 @@ export function PricingSection({
               ? "Contact Sales"
               : plan.popular
               ? "Go Professional"
+              : plan.trial?.days
+              ? "Start Trial"
               : "Get Started";
 
           return (

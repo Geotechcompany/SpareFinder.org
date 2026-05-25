@@ -103,7 +103,7 @@ export const PLAN_CONFIG: Record<PlanTier, PlanFeature> = {
       storage: 1 * 1024 * 1024 * 1024, // 1GB
     },
     trial: {
-      days: 30,
+      days: 7,
       trialPrice: 15, // Special trial pricing
     },
   },
@@ -124,7 +124,7 @@ export const PLAN_CONFIG: Record<PlanTier, PlanFeature> = {
       storage: 25 * 1024 * 1024 * 1024, // 25GB
     },
     trial: {
-      days: 7,
+      days: 3,
     },
   },
   enterprise: {

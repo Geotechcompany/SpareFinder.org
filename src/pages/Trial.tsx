@@ -199,20 +199,29 @@ const Trial: React.FC = () => {
                             : `Start ${plan.trial?.days}-day Free Trial`}
                         </Button>
                       )
-                    ) : (
+                    ) : tier === "enterprise" ? (
                       <div className="rounded-xl border border-border bg-muted/40 p-3 text-sm text-muted-foreground">
-                        Enterprise plans are provisioned with a custom agreement.
+                        Enterprise plans are provisioned with a custom agreement. Contact our sales team to get started.
                       </div>
-                    )}
+                    ) : null}
 
-                    <Button
-                      onClick={() => startCheckout({ tier, mode: "paid" })}
-                      variant="secondary"
-                      disabled={loadingTier !== null}
-                      className="h-11 w-full"
-                    >
-                      {isPaidLoading ? "Redirecting…" : trialUsed && hasTrial ? "Subscribe now" : "Continue without trial"}
-                    </Button>
+                    {tier === "enterprise" ? (
+                      <Button
+                        onClick={() => navigate("/contact")}
+                        className="h-11 w-full bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700"
+                      >
+                        Contact Sales
+                      </Button>
+                    ) : (
+                      <Button
+                        onClick={() => startCheckout({ tier, mode: "paid" })}
+                        variant="secondary"
+                        disabled={loadingTier !== null}
+                        className="h-11 w-full"
+                      >
+                        {isPaidLoading ? "Redirecting…" : trialUsed && hasTrial ? "Subscribe now" : "Continue without trial"}
+                      </Button>
+                    )}
                   </div>
                 </div>
               );

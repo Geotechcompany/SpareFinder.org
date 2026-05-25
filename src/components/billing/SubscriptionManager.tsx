@@ -179,7 +179,15 @@ export const SubscriptionManager: React.FC = () => {
 
     setIsUpdating(tier);
     try {
-      // Starter (free tier label) -> Stripe checkout with 30-day trial @ £12.99
+      if (tier === "enterprise") {
+        toast.info(
+          "Enterprise plans are provisioned with a custom agreement. Our sales team will help you get started."
+        );
+        window.location.href = "/contact";
+        return;
+      }
+
+      // Starter (free tier label) -> Stripe checkout with 7-day trial @ £12.99
       if (tier === "free") {
         const plan = PLAN_FEATURES["free"];
         const starterPlan = PLAN_CONFIG.free;
@@ -188,7 +196,7 @@ export const SubscriptionManager: React.FC = () => {
           amount: starterPlan.price,
           currency: starterPlan.currency.toLowerCase(),
           billing_cycle: "monthly",
-          trial_days: starterPlan.trial?.days || 30,
+          trial_days: starterPlan.trial?.days || 7,
           success_url: `${window.location.origin}/dashboard/billing?payment_success=true&tier=starter`,
           cancel_url: `${window.location.origin}/dashboard/billing?payment_cancelled=true`,
         };
@@ -209,9 +217,9 @@ export const SubscriptionManager: React.FC = () => {
             tier: "free",
             name: plan.name,
             price: `£${starterPlan.price} / month`,
-            trialDays: starterPlan.trial?.days || 30,
+            trialDays: starterPlan.trial?.days || 7,
             nextCharge: new Date(
-              Date.now() + (starterPlan.trial?.days || 30) * 86400000
+              Date.now() + (starterPlan.trial?.days || 7) * 86400000
             ).toLocaleDateString(),
             features: plan.features,
             colorClass: plan.color,
@@ -221,13 +229,15 @@ export const SubscriptionManager: React.FC = () => {
         return;
       }
 
-      // For paid tiers, create Stripe checkout session
+      // For paid tiers, create Stripe checkout session (with trial when configured)
       const plan = PLAN_FEATURES[tier];
+      const planConfig = PLAN_CONFIG[tier];
       const checkoutData = {
         plan: plan.name,
         amount: plan.price,
         currency: plan.currency.toLowerCase(),
         billing_cycle: "monthly",
+        trial_days: planConfig.trial?.days ?? 0,
         success_url: `${window.location.origin}/dashboard/billing?payment_success=true&tier=${tier}`,
         cancel_url: `${window.location.origin}/dashboard/billing?payment_cancelled=true`,
       };
@@ -248,12 +258,15 @@ export const SubscriptionManager: React.FC = () => {
         setPaymentError(
           "We couldn’t start your trial with this payment method."
         );
+        const fallbackTrialDays = planConfig.trial?.days ?? 0;
         setTrialPlan({
           tier,
           name: p.name,
           price: `£${p.price} / month`,
-          trialDays: 7,
-          nextCharge: new Date(Date.now() + 7 * 86400000).toLocaleDateString(),
+          trialDays: fallbackTrialDays,
+          nextCharge: new Date(
+            Date.now() + fallbackTrialDays * 86400000
+          ).toLocaleDateString(),
           features: p.features,
           colorClass: p.color,
         });

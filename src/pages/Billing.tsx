@@ -240,7 +240,7 @@ const Billing = () => {
       toast({
         title: "Trial skipped",
         description:
-          "You can start your 30-day free trial anytime from Billing.",
+          "You can start your 7-day free trial anytime from Billing.",
       });
       navigate("/dashboard/billing", { replace: true });
     }
@@ -429,10 +429,20 @@ const Billing = () => {
 
   const handlePlanChange = async (planId: string) => {
     try {
-      // Starter (free) -> begin 30-day trial at £12.99/month via Stripe (trial only if not already used)
+      if (planId === "enterprise") {
+        toast({
+          title: "Enterprise Plan",
+          description:
+            "Our sales team will contact you to discuss custom enterprise solutions.",
+        });
+        navigate("/contact");
+        return;
+      }
+
+      // Starter (free) -> begin 7-day trial at £12.99/month via Stripe (trial only if not already used)
       if (planId === "free") {
         const starterPlan = allPlans.find((p) => p.id === "free" || p.id === "starter") || getPlan("free");
-        const trialDays = trialUsed ? 0 : (starterPlan.trial?.days ?? 30);
+        const trialDays = trialUsed ? 0 : (starterPlan.trial?.days ?? 7);
         const checkoutResponse = (await api.billing.createCheckoutSession({
           plan: starterPlan.name,
           amount: starterPlan.price,
@@ -469,16 +479,33 @@ const Billing = () => {
 
         // Create Stripe checkout session
         const tierParam = planId === "free" ? "starter" : planId;
+        const planFeature =
+          allPlans.find((p) => normalizePlanId(p.id) === planId) || getPlan(planId as PlanTier);
+        const trialDays =
+          trialUsed ? 0 : (planFeature.trial?.days ?? 0);
         const checkoutResponse = (await api.billing.createCheckoutSession({
           plan: selectedPlan.name,
           amount: selectedPlan.price,
           currency: "GBP",
           billing_cycle: "monthly",
+          trial_days: trialDays,
           success_url: `${window.location.origin}/dashboard/billing?payment_success=true&tier=${tierParam}&session_id={CHECKOUT_SESSION_ID}`,
           cancel_url: `${window.location.origin}/dashboard/billing?payment_cancelled=true`,
         })) as CheckoutResponse;
 
         if (checkoutResponse.data?.checkout_url) {
+          if (
+            trialDays > 0 &&
+            (checkoutResponse.data as { trial_denied?: boolean }).trial_denied
+          ) {
+            toast({
+              title: "Free trial already used",
+              description:
+                "Your account has already used the free trial. Subscribe now to continue.",
+            });
+            setTrialUsed(true);
+            return;
+          }
           try {
             sessionStorage.setItem(
               PAYMENT_SUCCESS_STORAGE_KEY,
