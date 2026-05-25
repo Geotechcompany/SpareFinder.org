@@ -116,33 +116,50 @@ const getFeatureRequiredTier = (feature: string): PlanTier => {
   const lowerFeature = feature.toLowerCase();
   
   // Starter/Basic tier features (available to all)
-  if (lowerFeature.includes("20 analyses") ||
-      lowerFeature.includes("basic search") || 
-      (lowerFeature.includes("web portal") && !lowerFeature.includes("api"))) {
+  if (
+    lowerFeature.includes("20 analyses") ||
+    lowerFeature.includes("up to 3 workspace") ||
+    lowerFeature.includes("3 team member") ||
+    lowerFeature.includes("uk & regional") ||
+    lowerFeature.includes("basic search") ||
+    (lowerFeature.includes("web portal") && !lowerFeature.includes("api"))
+  ) {
     return "free";
   }
-  
-  // Professional tier features (includes Starter features)
-  if (lowerFeature.includes("500 analyses") ||
-      lowerFeature.includes("catalogue storage") || 
-      lowerFeature.includes("part lists") || 
-      lowerFeature.includes("drawings") ||
-      lowerFeature.includes("api access") || 
-      lowerFeature.includes("erp") || 
-      lowerFeature.includes("cmms") ||
-      lowerFeature.includes("analytics dashboard")) {
+
+  // Professional tier features
+  if (
+    lowerFeature.includes("500 analyses") ||
+    lowerFeature.includes("up to 5 workspace") ||
+    lowerFeature.includes("15 team member") ||
+    lowerFeature.includes("multi-region") ||
+    lowerFeature.includes("team invite") ||
+    lowerFeature.includes("catalogue storage") ||
+    lowerFeature.includes("part lists") ||
+    lowerFeature.includes("drawings") ||
+    lowerFeature.includes("api access") ||
+    lowerFeature.includes("erp") ||
+    lowerFeature.includes("cmms") ||
+    lowerFeature.includes("analytics dashboard")
+  ) {
     return "pro";
   }
-  
-  // Enterprise tier features (includes Starter + Professional features)
-  if (lowerFeature.includes("unlimited analyses") ||
-      lowerFeature.includes("advanced ai") || 
-      lowerFeature.includes("customisation") || 
-      lowerFeature.includes("train on your data") ||
-      lowerFeature.includes("full integration") ||
-      lowerFeature.includes("predictive demand") ||
-      lowerFeature.includes("dedicated support") ||
-      lowerFeature.includes("sla")) {
+
+  // Enterprise tier features
+  if (
+    lowerFeature.includes("unlimited analyses") ||
+    lowerFeature.includes("unlimited workspace") ||
+    lowerFeature.includes("unlimited team") ||
+    lowerFeature.includes("global regional") ||
+    lowerFeature.includes("team permissions") ||
+    lowerFeature.includes("advanced ai") ||
+    lowerFeature.includes("customisation") ||
+    lowerFeature.includes("train on your data") ||
+    lowerFeature.includes("full integration") ||
+    lowerFeature.includes("predictive demand") ||
+    lowerFeature.includes("dedicated support") ||
+    lowerFeature.includes("sla")
+  ) {
     return "enterprise";
   }
   

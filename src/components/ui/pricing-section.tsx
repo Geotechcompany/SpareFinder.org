@@ -82,10 +82,10 @@ export function PricingSection({
           const cta =
             plan.id === "enterprise"
               ? "Contact Sales"
+              : plan.trial?.days
+              ? "Start Free Trial"
               : plan.popular
               ? "Go Professional"
-              : plan.trial?.days
-              ? "Start Trial"
               : "Get Started";
 
           return (

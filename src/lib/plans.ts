@@ -62,12 +62,17 @@ const TIER_FEATURES: Record<PlanTier, string[]> = {
   free: [
     "20 analyses per month (shared across workspaces)",
     "Up to 3 workspaces",
+    "Up to 3 team members per workspace",
+    "Regional supplier prioritisation",
     "Basic search & match results",
     "Web portal access",
   ],
   pro: [
     "500 analyses per month (shared across workspaces)",
     "Up to 5 workspaces",
+    "Up to 15 team members per workspace",
+    "Multi-region supplier prioritisation",
+    "Team invites, roles & workspace switching",
     "Catalogue storage (part lists, drawings)",
     "API access for ERP/CMMS",
     "Analytics dashboard",
@@ -76,6 +81,9 @@ const TIER_FEATURES: Record<PlanTier, string[]> = {
   enterprise: [
     "Unlimited analyses (shared across workspaces)",
     "Unlimited workspaces",
+    "Unlimited team members",
+    "Global regional supplier intelligence",
+    "Advanced team permissions & workspace governance",
     "Advanced AI customisation (train on your data)",
     "ERP/CMMS full integration",
     "Predictive demand analytics",
@@ -83,6 +91,14 @@ const TIER_FEATURES: Record<PlanTier, string[]> = {
     "Web portal access",
   ],
 };
+
+/** Map API tier strings to internal PlanTier keys. */
+export function normalizeApiTier(tier: string | null | undefined): PlanTier {
+  const t = (tier || "free").toLowerCase().trim();
+  if (t === "pro" || t === "professional" || t === "business") return "pro";
+  if (t === "enterprise") return "enterprise";
+  return "free";
+}
 
 // Master plan configuration - UPDATE THIS TO CHANGE PLANS ACROSS THE ENTIRE APP
 export const PLAN_CONFIG: Record<PlanTier, PlanFeature> = {
@@ -188,28 +204,32 @@ export async function fetchPlansFromApi(): Promise<PlanFeature[]> {
     }
     const apiPlans = (res as any).data.plans as ApiPlan[];
     return apiPlans.map((p) => {
-      const tier = (p.tier || "free").toLowerCase().trim();
+      const planTier = normalizeApiTier(p.tier);
+      const staticPlan = PLAN_CONFIG[planTier];
       const normalizedId =
-        tier === "free" || tier === "starter" ? "starter"
-        : tier === "pro" || tier === "professional" ? "professional"
+        planTier === "free" ? "starter"
+        : planTier === "pro" ? "professional"
         : "enterprise";
       return {
         id: normalizedId,
-        name: p.name,
-        price: Number(p.price) || 0,
+        name: p.name || staticPlan.name,
+        price: Number(p.price) || staticPlan.price,
         currency: (p.currency as "GBP") || "GBP",
         period: (p.period as "month") || "month",
-        description: p.description || "",
-        features: Array.isArray(p.features) ? p.features : [],
-        popular: Boolean(p.popular),
-        color: p.color || "from-gray-600 to-gray-700",
-        icon: TIER_ICON[tier] || Shield,
+        description: p.description || staticPlan.description,
+        features: staticPlan.features,
+        popular: Boolean(p.popular ?? staticPlan.popular),
+        color: p.color || staticPlan.color,
+        icon: TIER_ICON[planTier] || Shield,
         limits: {
-          searches: p.limits?.searches ?? 20,
-          api_calls: p.limits?.api_calls ?? 0,
-          storage: p.limits?.storage ?? 1024 * 1024 * 1024,
+          searches: p.limits?.searches ?? staticPlan.limits.searches,
+          api_calls: p.limits?.api_calls ?? staticPlan.limits.api_calls,
+          storage: p.limits?.storage ?? staticPlan.limits.storage,
         },
-        trial: p.trial?.days != null ? { days: p.trial.days, trialPrice: p.trial.trialPrice ?? undefined } : undefined,
+        trial:
+          p.trial?.days != null
+            ? { days: p.trial.days, trialPrice: p.trial.trialPrice ?? undefined }
+            : staticPlan.trial,
       } satisfies PlanFeature;
     });
   } catch {
