@@ -18,6 +18,89 @@ import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/components/ui/use-toast";
 import { ArrowLeft, ArrowRight, Building2, Target, Share2, Sparkles } from "lucide-react";
+import { PLAN_CONFIG } from "@/lib/plans";
+import {
+  parsePlanTierFromPath,
+  resolveSelectedTier,
+  savePendingPlan,
+  trialLocationForTier,
+} from "@/lib/pending-plan";
+
+type ApiPayload = {
+  success?: boolean;
+  message?: string;
+  error?: string;
+};
+
+const apiSucceeded = (res: ApiPayload | null | undefined): boolean =>
+  Boolean(res?.success);
+
+const apiMessage = (res: ApiPayload | null | undefined, fallback: string): string =>
+  res?.message || res?.error || fallback;
+
+const withTimeout = async <T,>(promise: Promise<T>, ms: number, label: string): Promise<T> => {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`${label} timed out`)), ms);
+  });
+  try {
+    return await Promise.race([promise, timeout]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+};
+
+/** Create first workspace or rename/activate existing one (avoids 403 on duplicate create). */
+const syncWorkspaceForOnboarding = async (companyName: string) => {
+  const listRes = await withTimeout(
+    api.workspaces.list({ bootstrap: false }),
+    20000,
+    "Loading workspaces"
+  );
+  if (!apiSucceeded(listRes)) {
+    throw new Error(apiMessage(listRes, "Could not load workspaces"));
+  }
+
+  const workspaces = listRes?.data?.workspaces ?? [];
+  const activeId =
+    listRes?.data?.activeWorkspaceId ?? workspaces[0]?.id ?? null;
+
+  if (activeId) {
+    const updateRes = await withTimeout(
+      api.workspaces.update(activeId, companyName),
+      20000,
+      "Updating workspace"
+    );
+    if (!apiSucceeded(updateRes)) {
+      throw new Error(apiMessage(updateRes, "Could not update workspace"));
+    }
+    await api.workspaces.activate(activeId);
+    return;
+  }
+
+  try {
+    const createRes = await withTimeout(
+      api.workspaces.create(companyName),
+      20000,
+      "Creating workspace"
+    );
+    if (apiSucceeded(createRes)) return;
+    throw new Error(apiMessage(createRes, "Could not create workspace"));
+  } catch (err) {
+    const retryList = await api.workspaces.list({ bootstrap: true });
+    const retryWorkspaces = retryList?.data?.workspaces ?? [];
+    if (retryList?.success && retryWorkspaces.length > 0) {
+      const id = retryList.data?.activeWorkspaceId ?? retryWorkspaces[0].id;
+      const updateRes = await api.workspaces.update(id, companyName);
+      if (!apiSucceeded(updateRes)) {
+        throw new Error(apiMessage(updateRes, "Could not update workspace"));
+      }
+      await api.workspaces.activate(id);
+      return;
+    }
+    throw err;
+  }
+};
 
 type Interest = {
   id: string;
@@ -53,9 +136,9 @@ const STEP_META: Array<{
     description: "Company details to personalize your dashboard.",
     icon: Building2,
     image: {
-      src: "/registerphoto.png",
-      fallbackSrc: "/registerphoto.png",
-      alt: "Industrial workshop",
+      src: "/images/landing-cta-factory.png",
+      fallbackSrc: "/welcome_banner.png",
+      alt: "Industrial workspace and spare parts operations",
       kicker: "Set up once",
       caption: "Your company details help tailor insights and recommendations.",
     },
@@ -66,9 +149,9 @@ const STEP_META: Array<{
     description: "Tell us what you want to achieve first.",
     icon: Target,
     image: {
-      src: "/dashboard.png",
-      fallbackSrc: "/dashboard.png",
-      alt: "Analytics dashboard",
+      src: "/welcome_banner.png",
+      fallbackSrc: "/registerphoto.png",
+      alt: "SpareFinder workspace preview",
       kicker: "Personalized",
       caption: "We’ll adapt your experience based on what matters to you.",
     },
@@ -79,9 +162,9 @@ const STEP_META: Array<{
     description: "Help us understand how you found SpareFinder.",
     icon: Share2,
     image: {
-      src: "/registerphoto.png",
-      fallbackSrc: "/registerphoto.png",
-      alt: "Team collaboration",
+      src: "/welcome_banner.png",
+      fallbackSrc: "/images/landing-cta-factory.png",
+      alt: "Maintenance team using SpareFinder in the field",
       kicker: "Improve onboarding",
       caption: "Your feedback helps us invest in the best channels.",
     },
@@ -92,9 +175,9 @@ const STEP_META: Array<{
     description: "Confirm details before continuing.",
     icon: Sparkles,
     image: {
-      src: "/dashboard.png",
-      fallbackSrc: "/dashboard.png",
-      alt: "Technology abstract",
+      src: "/registerphoto.png",
+      fallbackSrc: "/images/landing-cta-factory.png",
+      alt: "AI-powered spare parts identification",
       kicker: "Almost there",
       caption: "Finish setup, then pick a plan and start identifying parts.",
     },
@@ -114,6 +197,21 @@ const OnboardingProfile: React.FC = () => {
     return typeof next === "string" && next.startsWith("/") ? next : "/dashboard/billing";
   }, [searchParams]);
 
+  const pendingTrialTier = useMemo(
+    () => resolveSelectedTier(null, nextPath),
+    [nextPath]
+  );
+
+  // Keep landing plan selection in sync when `plan` is only inside ?next=
+  useEffect(() => {
+    const tier = parsePlanTierFromPath(nextPath) ?? pendingTrialTier;
+    if (!tier) return;
+    savePendingPlan({
+      tier,
+      planName: PLAN_CONFIG[tier].name,
+    });
+  }, [nextPath, pendingTrialTier]);
+
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [company, setCompany] = useState("");
@@ -129,7 +227,11 @@ const OnboardingProfile: React.FC = () => {
   const activeStep = STEP_META[stepIndex];
   const progressValue = Math.round(((stepIndex + 1) / STEP_META.length) * 100);
 
-  const rightImageSrc = activeStep.image.src;
+  const [rightImageSrc, setRightImageSrc] = useState(activeStep.image.src);
+
+  useEffect(() => {
+    setRightImageSrc(activeStep.image.src);
+  }, [activeStep.id, activeStep.image.src]);
 
   // Instant prefill from auth user; enrich from profile API in background (non-blocking).
   useEffect(() => {
@@ -168,14 +270,28 @@ const OnboardingProfile: React.FC = () => {
     };
   }, [user]);
 
-  // Workspace already created — no need to repeat onboarding.
+  // Skip profile wizard only when workspace exists AND company profile is already set.
   useEffect(() => {
     if (isLoading || workspaceLoading) return;
     if (!user) return;
-    if (!needsSetup) {
-      navigate(nextPath, { replace: true });
+    const profileComplete = Boolean(user.company?.trim());
+    if (!needsSetup && profileComplete) {
+      const tier = pendingTrialTier ?? parsePlanTierFromPath(nextPath);
+      if (tier && nextPath.includes("/onboarding/trial")) {
+        navigate(trialLocationForTier(tier), { replace: true });
+      } else {
+        navigate(nextPath, { replace: true });
+      }
     }
-  }, [isLoading, workspaceLoading, user, needsSetup, nextPath, navigate]);
+  }, [
+    isLoading,
+    workspaceLoading,
+    user,
+    needsSetup,
+    nextPath,
+    navigate,
+    pendingTrialTier,
+  ]);
 
   const toggleInterest = (interestId: string) => {
     setSelectedInterests((prev) =>
@@ -217,26 +333,33 @@ const OnboardingProfile: React.FC = () => {
 
     setIsSubmitting(true);
     try {
-      await api.user.updateProfile({
-        company: trimmedCompany,
-        preferences: {
-          onboarding: {
-            role: role || undefined,
-            companySize: companySize || undefined,
-            primaryGoal: primaryGoal || undefined,
-            interests: selectedInterests.length ? selectedInterests : undefined,
-            referralSource: referralSource || undefined,
-            referralSourceOther: referralSourceOther || undefined,
-            completedAt: new Date().toISOString(),
+      const profileRes = await withTimeout(
+        api.user.updateProfile({
+          company: trimmedCompany,
+          preferences: {
+            onboarding: {
+              role: role || undefined,
+              companySize: companySize || undefined,
+              primaryGoal: primaryGoal || undefined,
+              interests: selectedInterests.length ? selectedInterests : undefined,
+              referralSource: referralSource || undefined,
+              referralSourceOther: referralSourceOther || undefined,
+              completedAt: new Date().toISOString(),
+            },
           },
-        },
-      });
+        }),
+        25000,
+        "Saving profile"
+      );
+      if (!apiSucceeded(profileRes)) {
+        throw new Error(apiMessage(profileRes, "Could not save your profile"));
+      }
 
-      await api.workspaces.create(trimmedCompany);
+      await syncWorkspaceForOnboarding(trimmedCompany);
 
-      // Store a dedicated record for admin analytics
-      try {
-        await api.user.submitOnboardingSurvey({
+      // Store a dedicated record for admin analytics (non-blocking)
+      void api.user
+        .submitOnboardingSurvey({
           company: trimmedCompany,
           role: role || undefined,
           companySize: companySize || undefined,
@@ -244,22 +367,29 @@ const OnboardingProfile: React.FC = () => {
           interests: selectedInterests.length ? selectedInterests : undefined,
           referralSource,
           referralSourceOther: referralSource === "other" ? referralSourceOther : undefined,
-        });
-      } catch (err) {
-        // Don't block onboarding completion if analytics insert fails; log + toast.
-        console.warn("Onboarding survey insert failed:", err);
-      }
+        })
+        .catch((err) => console.warn("Onboarding survey insert failed:", err));
 
-      await checkAuth();
-      await refreshWorkspaces();
-      navigate(nextPath, { replace: true });
+      await withTimeout(refreshWorkspaces(), 20000, "Refreshing workspace");
+      void checkAuth();
+
+      const tier = pendingTrialTier ?? parsePlanTierFromPath(nextPath);
+      if (tier && nextPath.includes("/onboarding/trial")) {
+        navigate(trialLocationForTier(tier), { replace: true });
+      } else {
+        navigate(nextPath, { replace: true });
+      }
       toast({ title: "All set", description: "Thanks — your preferences are saved." });
     } catch (err) {
       console.error("Onboarding save failed:", err);
+      const description =
+        err instanceof Error
+          ? err.message
+          : "We couldn’t save your profile. Check your connection and try again.";
       toast({
         variant: "destructive",
         title: "Could not save",
-        description: "We couldn’t save your profile. Check your connection and try again.",
+        description,
       });
     } finally {
       setIsSubmitting(false);
@@ -531,9 +661,14 @@ const OnboardingProfile: React.FC = () => {
                   <img
                     src={rightImageSrc}
                     alt={activeStep.image.alt}
-                    className="h-full w-full min-h-[100dvh] object-cover"
+                    className="h-full w-full min-h-[100dvh] object-cover object-center"
                     loading="eager"
                     decoding="async"
+                    onError={() => {
+                      if (rightImageSrc !== activeStep.image.fallbackSrc) {
+                        setRightImageSrc(activeStep.image.fallbackSrc);
+                      }
+                    }}
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/55 via-black/10 to-transparent" />
                   <div className="absolute bottom-6 left-6 right-6 text-white lg:bottom-10 lg:left-10 lg:right-10 xl:bottom-14 xl:left-14 xl:right-14">

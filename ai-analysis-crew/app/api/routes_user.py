@@ -89,9 +89,13 @@ async def update_user_profile(payload: dict[str, Any], user: CurrentUser = Depen
 
         # Merge preferences (deep-ish for onboarding)
         if "preferences" in updates:
-            # Fetch current preferences
+            # Fetch current preferences (maybe_single — profile row may be missing prefs)
             current = await run_in_threadpool(
-                lambda: supabase.table("profiles").select("preferences").eq("id", user.id).single().execute()
+                lambda: supabase.table("profiles")
+                .select("preferences")
+                .eq("id", user.id)
+                .maybe_single()
+                .execute()
             )
             current_prefs = _safe_dict((current.data or {}).get("preferences"))
             next_prefs = _safe_dict(updates.get("preferences"))
@@ -117,7 +121,7 @@ async def update_user_profile(payload: dict[str, Any], user: CurrentUser = Depen
             lambda: supabase.table("profiles").update(updates).eq("id", user.id).execute()
         )
         res = await run_in_threadpool(
-            lambda: supabase.table("profiles").select("*").eq("id", user.id).single().execute()
+            lambda: supabase.table("profiles").select("*").eq("id", user.id).maybe_single().execute()
         )
         profile = res.data if res and res.data else None
         if not profile:

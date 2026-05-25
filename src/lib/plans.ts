@@ -226,10 +226,13 @@ export async function fetchPlansFromApi(): Promise<PlanFeature[]> {
           api_calls: p.limits?.api_calls ?? staticPlan.limits.api_calls,
           storage: p.limits?.storage ?? staticPlan.limits.storage,
         },
-        trial:
-          p.trial?.days != null
-            ? { days: p.trial.days, trialPrice: p.trial.trialPrice ?? undefined }
-            : staticPlan.trial,
+        // Trial length is canonical in PLAN_CONFIG (DB trial_days may be stale)
+        trial: staticPlan.trial
+          ? {
+              days: staticPlan.trial.days,
+              trialPrice: staticPlan.trial.trialPrice,
+            }
+          : undefined,
       } satisfies PlanFeature;
     });
   } catch {

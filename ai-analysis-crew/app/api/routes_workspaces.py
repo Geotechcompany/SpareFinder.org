@@ -9,7 +9,7 @@ import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Any, Literal
 
-from fastapi import APIRouter, Depends, File, Query, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from pydantic import BaseModel, Field, field_validator
 from starlette.concurrency import run_in_threadpool
 
@@ -270,7 +270,7 @@ async def create_workspace(
     try:
         blocked = await assert_can_create_workspace(user)
         if blocked:
-            return api_error(blocked, status_code=403)
+            raise HTTPException(status_code=403, detail=blocked)
 
         supabase = get_supabase_admin()
         workspace = await _create_workspace_for_user(

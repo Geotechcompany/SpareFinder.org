@@ -2161,7 +2161,8 @@ export const api = {
           completedAt?: string;
         };
       };
-    }) => apiClient.put("/user/profile", profileData),
+    }) =>
+      apiClient.put("/user/profile", profileData).then((response) => response.data),
     changePassword: async (
       currentPassword: string,
       newPassword: string

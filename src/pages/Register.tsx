@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useMemo } from "react";
 import { Navigate } from "react-router-dom";
 import { SignUp } from "@clerk/clerk-react";
 import { Sparkles } from "lucide-react";
@@ -7,20 +7,51 @@ import { AuthShell } from "@/components/auth/auth-shell";
 import { authClerkAppearance } from "@/components/auth/clerk-appearance";
 import { Link } from "react-router-dom";
 import { useSearchParams } from "react-router-dom";
+import { PLAN_CONFIG } from "@/lib/plans";
+import {
+  buildProfileThenTrialPath,
+  getPendingPlan,
+  planParamToTier,
+  profileLocationWithTrialNext,
+  savePendingPlan,
+  trialLocationForTier,
+} from "@/lib/pending-plan";
 
 const PENDING_REFERRAL_KEY = "sparefinder_pending_referral";
 
 const Register = () => {
-  const { isLoading, isAuthenticated } = useAuth();
+  const { isLoading, isAuthenticated, user } = useAuth();
   const [searchParams] = useSearchParams();
   const isMigrate = searchParams.get("migrate") === "1";
   const migrateEmail = searchParams.get("email");
   const nextPath = searchParams.get("next");
+  const planParam = searchParams.get("plan");
 
-  const postSignupUrl =
-    nextPath && nextPath.startsWith("/") && !nextPath.startsWith("//")
-      ? nextPath
-      : "/onboarding/profile";
+  const selectedTier = useMemo(
+    () => planParamToTier(planParam) ?? getPendingPlan()?.tier ?? null,
+    [planParam]
+  );
+
+  useEffect(() => {
+    const tier = planParamToTier(planParam);
+    if (!tier) return;
+    savePendingPlan({
+      tier,
+      planName: PLAN_CONFIG[tier].name,
+    });
+  }, [planParam]);
+
+  const postSignupUrl = useMemo(() => {
+    if (nextPath && nextPath.startsWith("/") && !nextPath.startsWith("//")) {
+      return nextPath;
+    }
+    if (selectedTier) {
+      return buildProfileThenTrialPath(selectedTier);
+    }
+    return "/onboarding/profile";
+  }, [nextPath, selectedTier]);
+
+  const selectedPlanLabel = selectedTier ? PLAN_CONFIG[selectedTier].name : null;
 
   // Capture invite ref from URL so we can apply after signup
   const ref = searchParams.get("ref");
@@ -32,9 +63,23 @@ const Register = () => {
     }
   }
 
-  // After sign-up, Clerk authenticates immediately; send users to onboarding before the app shell.
-  // (ClerkProvider afterSignUpUrl also targets this path — this avoids racing to /dashboard from here.)
+  // Already signed in (e.g. returned from landing): skip Clerk UI, continue onboarding chain.
   if (!isLoading && isAuthenticated) {
+    const profileIncomplete = !user?.company?.trim();
+    if (profileIncomplete && selectedTier) {
+      return (
+        <Navigate
+          to={profileLocationWithTrialNext(selectedTier)}
+          replace
+        />
+      );
+    }
+    if (profileIncomplete) {
+      return <Navigate to={postSignupUrl} replace />;
+    }
+    if (selectedTier) {
+      return <Navigate to={trialLocationForTier(selectedTier)} replace />;
+    }
     return <Navigate to={postSignupUrl} replace />;
   }
 
@@ -80,6 +125,15 @@ const Register = () => {
         </div>
       }
     >
+      {selectedPlanLabel ? (
+        <div className="mb-4 rounded-2xl border border-brand/25 bg-gradient-to-r from-brand/10 via-violet-500/5 to-cyan-500/5 p-4 text-sm text-foreground">
+          <p className="font-semibold text-brand dark:text-brand-light">Plan selected</p>
+          <p className="mt-1 text-muted-foreground">
+            After you create your account, we&apos;ll take you to activate{" "}
+            <span className="font-semibold text-foreground">{selectedPlanLabel}</span>.
+          </p>
+        </div>
+      ) : null}
       {isMigrate ? (
         <div className="mb-4 rounded-2xl border border-emerald-500/25 bg-emerald-500/10 p-4 text-sm text-foreground">
           <p className="font-semibold">Linking your existing account</p>

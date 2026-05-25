@@ -44,6 +44,13 @@ import {
   getAllPlans,
   type PlanFeature,
 } from "@/lib/plans";
+import {
+  buildRegisterPath,
+  planFeatureIdToTier,
+  profileLocationWithTrialNext,
+  savePendingPlan,
+  trialLocationForTier,
+} from "@/lib/pending-plan";
 import { PricingSection } from "@/components/ui/pricing-section";
 
 interface FeatureItem {
@@ -70,21 +77,10 @@ const Landing = () => {
   const scaleX = useTransform(scrollYProgress, [0, 1], [0, 1]);
 
   const { toast } = useToast();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
   const navigate = useNavigate();
 
-  const planSignupPath = (plan: PlanFeature) => {
-    const tier =
-      plan.id === "enterprise"
-        ? "enterprise"
-        : plan.id === "professional"
-        ? "pro"
-        : "starter";
-    const next = encodeURIComponent("/onboarding/trial");
-    return `/register?plan=${tier}&next=${next}`;
-  };
-
-  // Pricing CTAs → sign up (then plan selection / trial onboarding)
+  // Pricing CTAs → sign up first (guests), then profile, then selected plan
   const handlePlanSelect = (plan: PlanFeature) => {
     if (plan.id === "enterprise") {
       toast({
@@ -97,12 +93,32 @@ const Landing = () => {
       return;
     }
 
-    if (isAuthenticated) {
-      navigate("/onboarding/trial");
+    const tier = planFeatureIdToTier(plan.id);
+    savePendingPlan({
+      tier,
+      planName: plan.name,
+      billingCycle,
+    });
+
+    // Guest: always show the sign-up page first
+    if (!isAuthenticated) {
+      navigate(buildRegisterPath(plan, billingCycle));
       return;
     }
 
-    navigate(planSignupPath(plan));
+    // Signed in but profile incomplete → finish profile, then plan trial
+    const profileIncomplete = !user?.company?.trim();
+    if (profileIncomplete) {
+      toast({
+        title: `Continue with ${plan.name}`,
+        description:
+          "Complete your workspace profile, then we'll activate the plan you selected.",
+      });
+      navigate(profileLocationWithTrialNext(tier));
+      return;
+    }
+
+    navigate(trialLocationForTier(tier));
   };
 
   const aiInterfaceImage =
@@ -247,14 +263,16 @@ const Landing = () => {
       {/* How It Works section */}
       <HowItWorks />
 
-      {/* Enhanced Pricing Section */}
-      <section className="relative overflow-hidden bg-gradient-to-b from-background via-muted/20 to-background py-20">
-        <div className="absolute inset-0">
-          <div className="absolute inset-0 bg-[url('/images/grid-pattern.svg')] bg-repeat opacity-5" />
-          <div className="absolute inset-0 bg-gradient-to-b from-background/80 via-[#F0F2F5]/90 to-[#E8EBF1]/95 opacity-95 dark:from-gray-900 dark:via-black dark:to-black" />
-        </div>
+      {/* Premium pricing */}
+      <section
+        id="pricing"
+        className="relative overflow-hidden bg-gradient-to-b from-background via-[#F4F6FA] to-background py-24 dark:via-slate-950/80"
+      >
+        <div className="pointer-events-none absolute inset-0 bg-[url('/images/grid-pattern.svg')] bg-repeat opacity-[0.04]" aria-hidden />
+        <div className="pointer-events-none absolute -left-32 top-1/4 h-72 w-72 rounded-full bg-brand/10 blur-3xl" aria-hidden />
+        <div className="pointer-events-none absolute -right-32 bottom-1/4 h-72 w-72 rounded-full bg-cyan-500/10 blur-3xl" aria-hidden />
 
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative">
+        <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <PricingSection
             plans={pricingPlans}
             billingCycle={billingCycle}
