@@ -129,7 +129,12 @@ def store_crew_analysis_to_database(
             'model_version': 'AI Crew v2.0 (GPT-4o Vision + CrewAI)',
             'mode': 'ai_crew_comprehensive',
             'image_url': image_url,
-            'query': {'keywords': keywords.split() if keywords else [], 'email': user_email},
+            'query': {
+                'keywords': keywords.split() if keywords else [],
+                'email': user_email,
+                'search_region': analysis_data.get('search_region'),
+                'search_currency': analysis_data.get('search_currency'),
+            },
             'suppliers': _extract_suppliers(report_text),
             'technical_data_sheet': _extract_technical_specs(report_text),
             'compatible_vehicles': _extract_compatible_vehicles(report_text),

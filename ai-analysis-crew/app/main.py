@@ -865,7 +865,7 @@ async def run_analysis_background(
     resolved_user_id = await asyncio.to_thread(
         resolve_user_id, user_id, user_email
     )
-    from .region_preferences import resolve_analysis_context
+    from .region_preferences import resolve_analysis_context, format_region_label
 
     user_country, user_region, user_currency = await asyncio.to_thread(
         resolve_analysis_context,
@@ -1001,12 +1001,19 @@ async def run_analysis_background(
 
         await _ensure_job_active(analysis_id)
 
+        region_label = format_region_label(user_country, user_region)
+        if region_label:
+            from .region_preferences import inject_search_region_into_report
+
+            result_text = inject_search_region_into_report(
+                result_text, region_label, user_currency
+            )
+
         # Detect no-regional-suppliers so we can flag job and email user
         no_regional_suppliers = (
             "[NO_REGIONAL_SUPPLIERS]" in result_text
             and (user_country or user_region)
         )
-        region_label = ", ".join(x for x in (user_country, user_region) if x) if (user_country or user_region) else ""
         if no_regional_suppliers:
             result_text = result_text.replace("[NO_REGIONAL_SUPPLIERS]", "").strip()
             logger.info(f"📌 No regional suppliers for {region_label}; will flag job and send follow-up email")
@@ -1049,6 +1056,8 @@ async def run_analysis_background(
                 "processing_time": 180,
                 "pdf_path": pdf_filename,
                 "pdf_url": pdf_public_url if pdf_public_url else pdf_filename,
+                "search_region": region_label or None,
+                "search_currency": user_currency or None,
             },
             image_url=None,
             keywords=keywords,
@@ -1075,6 +1084,10 @@ async def run_analysis_background(
         emit_progress("completion", "Analysis complete", "completed")
         pdf_url_for_completion = pdf_public_url if pdf_public_url else pdf_filename
         result_data = {"report_text": result_text}
+        if region_label:
+            result_data["search_region"] = region_label
+        if user_currency:
+            result_data["search_currency"] = user_currency
         if no_regional_suppliers:
             result_data["no_regional_suppliers"] = True
         completion_success = await asyncio.to_thread(

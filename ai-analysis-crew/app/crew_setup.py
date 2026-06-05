@@ -388,6 +388,8 @@ def setup_crew(
 
     region_block = ""
     region_expected = ""
+    region_report_block = ""
+    region_label = ""
     if user_country or user_region:
         parts = []
         if user_country:
@@ -395,6 +397,14 @@ def setup_crew(
         if user_region:
             parts.append(user_region)
         region_label = ", ".join(parts)
+        currency_line = (
+            f"\n        - **Currency:** {user_currency}" if user_currency else ""
+        )
+        region_report_block = f"""
+        ✅ **0. SEARCH REGION** (MUST appear at the VERY TOP of the report, before part details)
+        - **Region searched:** {region_label}
+        - **Supplier scope:** Suppliers in {region_label} only{currency_line}
+        """
         region_block = f"""
         **MANDATORY REGION — SEARCH ONLY IN USER'S SELECTED LOCATION: {region_label}.**
         - Search for and list ONLY suppliers physically located in or whose primary market is {region_label}.
@@ -431,7 +441,7 @@ def setup_crew(
     
     report_task = Task(
         description=f"""
-        Compile ALL information into a COMPREHENSIVE professional report using this EXACT structure:{currency_block}
+        Compile ALL information into a COMPREHENSIVE professional report using this EXACT structure:{currency_block}{region_report_block}
         
         **REPORT STRUCTURE:**
         

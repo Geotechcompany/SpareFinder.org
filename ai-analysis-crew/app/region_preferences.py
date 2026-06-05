@@ -81,3 +81,39 @@ def resolve_analysis_context(
         return country or None, region or None, currency or None
 
     return None, None, currency or None
+
+
+def format_region_label(
+    country: Optional[str] = None,
+    region: Optional[str] = None,
+) -> str:
+    """Build a display label e.g. 'Kenya, Nairobi County'."""
+    parts = [x.strip() for x in (country or "", region or "") if x and x.strip()]
+    return ", ".join(parts)
+
+
+def inject_search_region_into_report(
+    report_text: str,
+    region_label: str,
+    currency: Optional[str] = None,
+) -> str:
+    """
+    Prepend a SEARCH REGION section to the report when not already present.
+    Ensures PDF, email, and stored analysis show which area was searched.
+    """
+    text = (report_text or "").strip()
+    if not region_label or not text:
+        return report_text
+
+    if "region searched" in text.lower():
+        return text
+
+    currency_line = f"\n- **Currency:** {currency}" if currency else ""
+    header = (
+        "✅ **SEARCH REGION**\n\n"
+        f"- **Region searched:** {region_label}\n"
+        f"- **Supplier scope:** Suppliers located in or primarily serving "
+        f"{region_label} only{currency_line}\n\n"
+        "---\n\n"
+    )
+    return header + text

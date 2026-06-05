@@ -104,30 +104,27 @@ import { api, dashboardApi } from "@/lib/api";
 import { convertPriceText, formatPriceRange } from "@/lib/currency";
 import KeywordMarkdownResults from "@/components/KeywordMarkdownResults";
 import { ComprehensiveAnalysisModal } from "@/components/ComprehensiveAnalysisModal";
-import { useDetectedRegion } from "@/hooks/useDetectedRegion";
+import { useRegionPreference } from "@/hooks/useRegionPreference";
 import TiltedCard from "@/components/TiltedCard";
 // Pending jobs UI removed; redirect goes to History
+
+import { loadRegionPreference } from "@/lib/region-preference";
 
 async function fetchAnalysisRegionOptions(): Promise<
   | { userCountry?: string; userRegion?: string; userCurrency?: string }
   | undefined
 > {
   try {
-    const regionRes = await api.user.getRegionPreference();
-    const data = (regionRes as any)?.data ?? regionRes;
-    const useRegional = data?.useRegionalSuppliers;
-    const userCountry = (data?.userCountry ?? "").trim();
-    const userRegion = (data?.userRegion ?? "").trim();
-    const userCurrency = (data?.userCurrency ?? "").trim().toUpperCase();
+    const data = await loadRegionPreference();
     const options: {
       userCountry?: string;
       userRegion?: string;
       userCurrency?: string;
     } = {};
-    if (userCurrency) options.userCurrency = userCurrency;
-    if (useRegional && (userCountry || userRegion)) {
-      if (userCountry) options.userCountry = userCountry;
-      if (userRegion) options.userRegion = userRegion;
+    if (data.userCurrency) options.userCurrency = data.userCurrency;
+    if (data.useRegionalSuppliers && (data.userCountry || data.userRegion)) {
+      if (data.userCountry) options.userCountry = data.userCountry;
+      if (data.userRegion) options.userRegion = data.userRegion;
     }
     return Object.keys(options).length ? options : undefined;
   } catch {
@@ -933,17 +930,15 @@ const Upload = () => {
   const { user, isAdmin } = useAuth();
   const { isPlanActive, isLoading: subscriptionLoading } = useSubscription();
   const hasPlanAccess = isAdmin || isPlanActive;
-  const { regionLabel, userCurrency, isLoading: regionLoading, error: regionError } =
-    useDetectedRegion();
-  const REGION_PREFERENCE_KEY = "sparefinder_region_enabled";
-  const [regionEnabled, setRegionEnabled] = useState<boolean | null>(() => {
-    try {
-      const v = localStorage.getItem(REGION_PREFERENCE_KEY);
-      if (v === "1") return true;
-      if (v === "0") return false;
-    } catch {}
-    return null;
-  });
+  const {
+    useRegionalSuppliers,
+    regionLabel,
+    userCurrency,
+    isLoading: regionLoading,
+    isSaving: regionSaving,
+    savePreference,
+    detectAndSave,
+  } = useRegionPreference();
   const [showRegionModal, setShowRegionModal] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -3588,17 +3583,15 @@ const Upload = () => {
             transition={{ duration: 0.25 }}
             className="mt-3 flex flex-wrap items-center gap-2"
           >
-            {regionEnabled === true && (
+            {!regionLoading && useRegionalSuppliers && (
               <div className="inline-flex items-center gap-2 rounded-2xl border border-border bg-background/80 px-3 py-1.5 text-xs sm:text-sm text-muted-foreground shadow-sm dark:bg-white/5 dark:border-white/10">
                 <MapPin className="h-3.5 w-3.5 shrink-0 text-primary/80" />
-                {regionLoading ? (
-                  <span className="animate-pulse">Detecting your location…</span>
-                ) : regionLabel ? (
+                {regionLabel ? (
                   <span>
                     You're in <span className="font-medium text-foreground/90">{regionLabel}</span>
                   </span>
                 ) : (
-                  <span>Location unavailable</span>
+                  <span>Set your region in Settings</span>
                 )}
                 <Button
                   type="button"
@@ -3611,7 +3604,7 @@ const Upload = () => {
                 </Button>
               </div>
             )}
-            {regionEnabled === false && (
+            {!regionLoading && !useRegionalSuppliers && (
               <div className="inline-flex items-center gap-2 rounded-2xl border border-border bg-background/80 px-3 py-1.5 text-xs sm:text-sm text-muted-foreground shadow-sm dark:bg-white/5 dark:border-white/10">
                 <Globe className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
                 <span>Results: global</span>
@@ -3626,17 +3619,11 @@ const Upload = () => {
                 </Button>
               </div>
             )}
-            {regionEnabled === null && (
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="rounded-2xl border-border bg-background/80 shadow-sm dark:bg-white/5 dark:border-white/10"
-                onClick={() => setShowRegionModal(true)}
-              >
-                <MapPin className="mr-2 h-3.5 w-3.5 text-primary/80" />
-                Use my region for better results
-              </Button>
+            {regionLoading && (
+              <div className="inline-flex items-center gap-2 rounded-2xl border border-border bg-background/80 px-3 py-1.5 text-xs sm:text-sm text-muted-foreground shadow-sm dark:bg-white/5 dark:border-white/10">
+                <MapPin className="h-3.5 w-3.5 shrink-0 text-primary/80 animate-pulse" />
+                <span>Loading region preference…</span>
+              </div>
             )}
           </motion.div>
 
@@ -3651,41 +3638,63 @@ const Upload = () => {
                 <DialogDescription asChild>
                   <div className="space-y-3 pt-1 text-muted-foreground">
                     <p>
-                      When enabled, supplier search is limited to your selected country or region only. Prices are converted to your local currency. We do not store your precise location.
-                    </p>
-                    <p>
-                      Set your country and region in Settings → Preferences, or detect them automatically. Turn off to search suppliers globally.
+                      This uses the same setting as <strong>Settings → Preferences → Supplier region</strong>. When enabled, supplier search is limited to your selected country or region only, and prices use your local currency.
                     </p>
                   </div>
                 </DialogDescription>
               </DialogHeader>
+              {regionLabel && (
+                <p className="text-sm text-muted-foreground">
+                  Current: <span className="font-medium text-foreground">{regionLabel}</span>
+                  {userCurrency ? ` · ${userCurrency}` : ""}
+                </p>
+              )}
               <DialogFooter className="flex-col gap-2 sm:flex-row">
                 <Button
                   type="button"
                   variant="outline"
                   className="w-full sm:w-auto"
-                  onClick={() => {
-                    try {
-                      localStorage.setItem(REGION_PREFERENCE_KEY, "0");
-                    } catch {}
-                    setRegionEnabled(false);
+                  disabled={regionSaving}
+                  onClick={async () => {
+                    await savePreference({ useRegionalSuppliers: false });
                     setShowRegionModal(false);
+                    toast({
+                      title: "Global search enabled",
+                      description: "Supplier results will include all regions.",
+                    });
                   }}
                 >
                   Remain global
                 </Button>
                 <Button
                   type="button"
+                  variant="outline"
                   className="w-full sm:w-auto"
+                  disabled={regionSaving}
                   onClick={() => {
-                    try {
-                      localStorage.setItem(REGION_PREFERENCE_KEY, "1");
-                    } catch {}
-                    setRegionEnabled(true);
                     setShowRegionModal(false);
+                    navigate("/settings?tab=notifications");
                   }}
                 >
-                  Enable region
+                  Open Settings
+                </Button>
+                <Button
+                  type="button"
+                  className="w-full sm:w-auto"
+                  disabled={regionSaving}
+                  onClick={async () => {
+                    const ok = await detectAndSave();
+                    setShowRegionModal(false);
+                    toast({
+                      title: ok ? "Region enabled" : "Could not save region",
+                      description: ok
+                        ? "Your location is saved and synced with Settings."
+                        : "Try again from Settings → Preferences.",
+                      variant: ok ? "default" : "destructive",
+                    });
+                  }}
+                >
+                  {regionSaving ? "Saving…" : "Enable my region"}
                 </Button>
               </DialogFooter>
             </DialogContent>
