@@ -6,6 +6,7 @@ from datetime import datetime
 from typing import Any, Optional
 
 from fastapi import APIRouter, Depends, Query
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, EmailStr, Field, field_validator
 from starlette.concurrency import run_in_threadpool
 
@@ -47,6 +48,92 @@ def _normalize_part_search_id(value: str | None) -> str | None:
         return str(uuid.UUID(str(value).strip()))
     except (ValueError, AttributeError):
         return None
+
+
+def _exception_text(exc: Exception) -> str:
+    parts = [str(exc)]
+    for attr in ("message", "details", "hint", "code"):
+        val = getattr(exc, attr, None)
+        if val:
+            parts.append(str(val))
+    for arg in getattr(exc, "args", ()) or ():
+        if arg:
+            parts.append(str(arg))
+    return " ".join(parts).lower()
+
+
+def _insert_analysis_review_row(supabase: Any, row: dict[str, Any]) -> dict[str, Any] | None:
+    """Insert review row; avoid .single() which can fail with postgrest-py 2.x."""
+    res = supabase.table("analysis_reviews").insert([row]).execute()
+    data = res.data or []
+    if data and isinstance(data[0], dict):
+        return data[0]
+
+    lookup = (
+        supabase.table("analysis_reviews")
+        .select("*")
+        .eq("user_id", row["user_id"])
+        .eq("job_id", row["job_id"])
+        .limit(1)
+        .execute()
+    )
+    rows = lookup.data or []
+    return rows[0] if rows and isinstance(rows[0], dict) else None
+
+
+def _analysis_review_error_response(exc: Exception) -> JSONResponse:
+    msg = _exception_text(exc)
+    if "23505" in msg or "duplicate" in msg or "unique" in msg:
+        return JSONResponse(
+            status_code=409,
+            content={
+                "success": False,
+                "error": "duplicate",
+                "message": "You have already reviewed this analysis",
+            },
+        )
+    if "analysis_reviews" in msg and (
+        "does not exist" in msg
+        or "schema cache" in msg
+        or "42p01" in msg
+        or "pgrst205" in msg
+        or "could not find the table" in msg
+    ):
+        return JSONResponse(
+            status_code=503,
+            content={
+                "success": False,
+                "error": "reviews_not_configured",
+                "message": "Reviews are not configured on the server. Run docs/sql/create_analysis_reviews.sql in Supabase.",
+            },
+        )
+    if "23503" in msg or "foreign key" in msg:
+        return JSONResponse(
+            status_code=500,
+            content={
+                "success": False,
+                "error": "profile_link_failed",
+                "message": "Could not save review for your account. Please try again or contact support.",
+            },
+        )
+    if "23514" in msg or "check constraint" in msg:
+        return JSONResponse(
+            status_code=400,
+            content={
+                "success": False,
+                "error": "invalid_review",
+                "message": "Invalid review data. Please check your rating and try again.",
+            },
+        )
+    print(f"❌ create_analysis_review: {exc}")
+    return JSONResponse(
+        status_code=500,
+        content={
+            "success": False,
+            "error": "review_save_failed",
+            "message": "Failed to submit review",
+        },
+    )
 
 
 def _require_subscription_or_trial(*, user_id: str) -> None:
@@ -300,7 +387,7 @@ async def create_analysis_review(payload: AnalysisReviewCreateBody, user: Curren
     row = {
         "user_id": user.id,
         "job_id": payload.job_id.strip(),
-        "job_type": payload.job_type,
+        "job_type": _normalize_job_type(payload.job_type),
         "part_search_id": part_search_id,
         "rating": payload.rating,
         "comment": payload.comment,
@@ -311,35 +398,26 @@ async def create_analysis_review(payload: AnalysisReviewCreateBody, user: Curren
 
     try:
         inserted = await run_in_threadpool(
-            lambda: supabase.table("analysis_reviews")
-            .insert([row])
-            .select("*")
-            .single()
-            .execute()
-            .data
+            lambda: _insert_analysis_review_row(supabase, row)
         )
         if not inserted:
-            return api_error("Review was not saved", status_code=500)
-        return api_ok(status_code=201, message="Review submitted successfully!", data=inserted)
-    except Exception as e:
-        msg = str(e)
-        print(f"❌ create_analysis_review: {e}")
-        if "23505" in msg or "duplicate" in msg.lower() or "unique" in msg.lower():
-            return {
-                "success": False,
-                "error": "duplicate",
-                "message": "You have already reviewed this analysis",
-            }
-        if "analysis_reviews" in msg and (
-            "does not exist" in msg.lower()
-            or "schema cache" in msg.lower()
-            or "42P01" in msg
-        ):
-            return api_error(
-                "Reviews are not configured on the server. Run docs/sql/create_analysis_reviews.sql in Supabase.",
-                status_code=503,
+            return JSONResponse(
+                status_code=500,
+                content={
+                    "success": False,
+                    "error": "review_save_failed",
+                    "message": "Review was not saved",
+                },
             )
-        return api_error("Failed to submit review", status_code=500)
+        return JSONResponse(
+            status_code=201,
+            content=api_ok(
+                message="Review submitted successfully!",
+                data=inserted,
+            ),
+        )
+    except Exception as e:
+        return _analysis_review_error_response(e)
 
 
 @router.delete("/analysis/{reviewId}")

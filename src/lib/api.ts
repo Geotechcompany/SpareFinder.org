@@ -2119,7 +2119,7 @@ export const analysisReviewsApi = {
 
   create: async (payload: {
     job_id: string;
-    job_type: "image" | "keyword" | "both";
+    job_type: "image" | "keyword" | "both" | string;
     part_search_id?: string | null;
     rating: number;
     comment?: string | null;
@@ -2127,8 +2127,18 @@ export const analysisReviewsApi = {
     helpful_features?: string[] | null;
     improvement_suggestions?: string | null;
   }): Promise<ApiResponse> => {
-    const response = await apiClient.post("/reviews/analysis", payload);
-    return response.data;
+    try {
+      const response = await apiClient.post("/reviews/analysis", payload);
+      return response.data;
+    } catch (error) {
+      if (axios.isAxiosError(error) && error.response?.data) {
+        const data = error.response.data as ApiResponse;
+        if (data && typeof data === "object" && "success" in data) {
+          return data;
+        }
+      }
+      throw error;
+    }
   },
 
   remove: async (reviewId: string): Promise<ApiResponse> => {
