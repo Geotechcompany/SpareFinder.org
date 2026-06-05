@@ -13,6 +13,10 @@ import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/components/ui/use-toast";
 import { api } from "@/lib/api";
 import {
+  buildCheckoutSuccessUrl,
+  CHECKOUT_CANCEL_URL,
+} from "@/lib/billing-checkout";
+import {
   fetchPlansFromApi,
   getAllPlans,
   getPlan,
@@ -192,6 +196,7 @@ const Billing = () => {
   const [hoveredFeature, setHoveredFeature] = useState<string | null>(null);
   const [showPaymentSuccessBanner, setShowPaymentSuccessBanner] = useState(false);
   const [paymentSuccessTier, setPaymentSuccessTier] = useState<string | null>(null);
+  const [isVerifyingPayment, setIsVerifyingPayment] = useState(false);
   const [trialUsed, setTrialUsed] = useState(false);
 
   const handleToggleSidebar = () => {
@@ -202,9 +207,7 @@ const Billing = () => {
     setIsMobileMenuOpen(!isMobileMenuOpen);
   };
 
-  const PAYMENT_SUCCESS_STORAGE_KEY = "sparefinder_payment_success";
-
-  // Handle post-payment redirect (show banner; support sessionStorage when redirect loses URL params)
+  // Handle post-payment redirect — verify Stripe session before showing success modal
   useEffect(() => {
     const paymentSuccess = searchParams.get("payment_success");
     const paymentCancelled = searchParams.get("payment_cancelled");
@@ -212,55 +215,76 @@ const Billing = () => {
     const trialDeclined = searchParams.get("trial_declined");
     const tierFromUrl = searchParams.get("tier");
 
-    if (paymentSuccess === "true" || sessionId) {
-      const tier = tierFromUrl || (sessionId ? "pro" : "starter");
-      setShowPaymentSuccessBanner(true);
-      setPaymentSuccessTier(tier);
-      try {
-        sessionStorage.removeItem(PAYMENT_SUCCESS_STORAGE_KEY);
-      } catch {
-        /* ignore */
-      }
-    } else {
-      // No URL params: show banner once from sessionStorage if we just completed payment (e.g. after login redirect)
-      try {
-        const raw = sessionStorage.getItem(PAYMENT_SUCCESS_STORAGE_KEY);
-        if (raw) {
-          const { tier, at } = JSON.parse(raw);
-          if (at && Date.now() - at < 10 * 60 * 1000) {
-            setShowPaymentSuccessBanner(true);
-            setPaymentSuccessTier(tier || "pro");
-          }
-          sessionStorage.removeItem(PAYMENT_SUCCESS_STORAGE_KEY);
-        }
-      } catch {
-        /* ignore */
-      }
-    }
-
     if (paymentCancelled === "true") {
-      try {
-        sessionStorage.removeItem(PAYMENT_SUCCESS_STORAGE_KEY);
-      } catch {
-        /* ignore */
-      }
       toast({
         title: "Payment Cancelled",
         description:
           "Your payment was cancelled. You can try again at any time.",
         variant: "destructive",
       });
-
-      // Clear the URL parameters
       navigate("/dashboard/billing", { replace: true });
-    } else if (trialDeclined === "true") {
+      return;
+    }
+
+    if (trialDeclined === "true") {
       toast({
         title: "Trial skipped",
         description:
           "You can start your 7-day free trial anytime from Billing.",
       });
       navigate("/dashboard/billing", { replace: true });
+      return;
     }
+
+    if (paymentSuccess !== "true" || !sessionId) {
+      if (paymentSuccess === "true" && !sessionId) {
+        navigate("/dashboard/billing", { replace: true });
+      }
+      return;
+    }
+
+    let cancelled = false;
+    setIsVerifyingPayment(true);
+
+    void api.billing
+      .verifyCheckoutSession(sessionId)
+      .then((response) => {
+        if (cancelled) return;
+
+        type VerifyPayload = { verified?: boolean; tier?: string };
+        const res = response as { data?: VerifyPayload } & VerifyPayload;
+        const payload: VerifyPayload = res.data ?? res;
+
+        if (payload.verified) {
+          setShowPaymentSuccessBanner(true);
+          setPaymentSuccessTier(payload.tier || tierFromUrl || "pro");
+        } else {
+          toast({
+            title: "Payment not confirmed",
+            description:
+              "We could not confirm your payment. If you were charged, contact support.",
+            variant: "destructive",
+          });
+        }
+      })
+      .catch(() => {
+        if (cancelled) return;
+        toast({
+          title: "Payment verification failed",
+          description: "Please refresh Billing or contact support if you were charged.",
+          variant: "destructive",
+        });
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setIsVerifyingPayment(false);
+          navigate("/dashboard/billing", { replace: true });
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, [searchParams, navigate, toast]);
 
   useEffect(() => {
@@ -466,8 +490,8 @@ const Billing = () => {
           currency: starterPlan.currency.toUpperCase(),
           billing_cycle: "monthly",
           trial_days: trialDays,
-          success_url: `${window.location.origin}/dashboard/billing?payment_success=true&tier=starter`,
-          cancel_url: `${window.location.origin}/dashboard/billing?payment_cancelled=true`,
+          success_url: buildCheckoutSuccessUrl("starter"),
+          cancel_url: CHECKOUT_CANCEL_URL,
         })) as CheckoutResponse;
 
         if (checkoutResponse.success && checkoutResponse.data?.checkout_url) {
@@ -506,8 +530,8 @@ const Billing = () => {
           currency: "GBP",
           billing_cycle: "monthly",
           trial_days: trialDays,
-          success_url: `${window.location.origin}/dashboard/billing?payment_success=true&tier=${tierParam}&session_id={CHECKOUT_SESSION_ID}`,
-          cancel_url: `${window.location.origin}/dashboard/billing?payment_cancelled=true`,
+          success_url: buildCheckoutSuccessUrl(tierParam),
+          cancel_url: CHECKOUT_CANCEL_URL,
         })) as CheckoutResponse;
 
         if (checkoutResponse.data?.checkout_url) {
@@ -523,15 +547,6 @@ const Billing = () => {
             setTrialUsed(true);
             return;
           }
-          try {
-            sessionStorage.setItem(
-              PAYMENT_SUCCESS_STORAGE_KEY,
-              JSON.stringify({ tier: tierParam, at: Date.now() })
-            );
-          } catch {
-            /* ignore */
-          }
-          // Redirect to Stripe checkout
           window.location.href = checkoutResponse.data.checkout_url;
         } else {
           throw new Error("Failed to create checkout session");

@@ -48,6 +48,7 @@ import OnboardingGuide from "@/components/OnboardingGuide";
 import { CrewAnalysisProgress } from "@/components/CrewAnalysisProgress";
 import { getCrewJobDisplayName, getStageDisplayName } from "@/services/aiAnalysisCrew";
 import { AnalysisResultModal } from "@/components/AnalysisResultModal";
+import { normalizeReviewJobType } from "@/lib/review-job-type";
 import {
   Dialog,
   DialogContent,
@@ -2087,7 +2088,7 @@ const History = () => {
                 const jobId = currentViewedJob.id;
                 if (jobId) {
                   setReviewJobId(jobId);
-                  setReviewJobType(currentViewedJob.mode || "image");
+                  setReviewJobType(normalizeReviewJobType(currentViewedJob.mode));
                   setReviewPartSearchId(currentViewedJob.part_search_id);
                   setIsReviewModalOpen(true);
                 }
@@ -2121,7 +2122,6 @@ const History = () => {
               if (selectedAnalysisResult) {
                 setReviewJobId(selectedAnalysisResult.id);
 
-                // Determine job type based on keywords and image
                 if (
                   selectedAnalysisResult.keywords &&
                   selectedAnalysisResult.image_url
@@ -2130,7 +2130,9 @@ const History = () => {
                 } else if (selectedAnalysisResult.keywords) {
                   setReviewJobType("keyword");
                 } else {
-                  setReviewJobType("image");
+                  setReviewJobType(
+                    normalizeReviewJobType(selectedAnalysisResult.mode)
+                  );
                 }
 
                 // Set part search ID if available (for legacy compatibility)

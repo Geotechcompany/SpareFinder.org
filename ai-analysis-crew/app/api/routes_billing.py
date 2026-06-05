@@ -537,6 +537,72 @@ async def create_checkout_session(
         )
 
 
+@router.get("/checkout-session/verify")
+async def verify_checkout_session(
+    session_id: str = Query(..., min_length=8),
+    user: CurrentUser = Depends(get_current_user),
+):
+    """
+    Confirm a Stripe Checkout session completed successfully before showing purchase UI.
+    """
+    stripe_secret_key = _get_stripe_secret()
+    if not stripe_secret_key:
+        return api_error(
+            "Stripe is not configured. Please set STRIPE_SECRET_KEY environment variable.",
+            status_code=500,
+        )
+
+    try:
+        stripe.api_key = stripe_secret_key
+        session = stripe.checkout.Session.retrieve(session_id.strip())
+    except stripe.error.StripeError as e:
+        print(f"❌ Stripe error verifying checkout session: {e}")
+        return api_error("Invalid or expired checkout session", status_code=400)
+    except Exception as e:
+        print(f"❌ Error verifying checkout session: {e}")
+        return api_error("Failed to verify checkout session", status_code=500)
+
+    metadata = session.metadata or {}
+    session_user_id = str(metadata.get("user_id") or "").strip()
+    if session_user_id and session_user_id != user.id:
+        return api_error("Checkout session does not belong to this account", status_code=403)
+
+    if session.status != "complete":
+        return api_ok(
+            data={
+                "verified": False,
+                "reason": "incomplete",
+                "status": session.status,
+            }
+        )
+
+    payment_status = str(session.payment_status or "")
+    if payment_status not in ("paid", "no_payment_required"):
+        return api_ok(
+            data={
+                "verified": False,
+                "reason": "unpaid",
+                "payment_status": payment_status,
+            }
+        )
+
+    tier = str(metadata.get("tier") or "").strip().lower()
+    if not tier:
+        tier = _plan_to_tier(str(metadata.get("plan") or ""))
+    if tier == "free":
+        tier = "starter"
+
+    return api_ok(
+        data={
+            "verified": True,
+            "tier": tier,
+            "plan": metadata.get("plan"),
+            "payment_status": payment_status,
+            "session_id": session.id,
+        }
+    )
+
+
 def _plan_to_tier(plan: str) -> str:
     """Map Stripe metadata plan name to subscription tier."""
     if not plan:

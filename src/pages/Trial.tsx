@@ -11,6 +11,9 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Sparkles, Shield, CheckCircle2, Crown, Zap, ShieldCheck } from "lucide-react";
 import { api } from "@/lib/api";
+import {
+  buildCheckoutSuccessUrl,
+} from "@/lib/billing-checkout";
 import { PLAN_CONFIG, type PlanTier, isUnlimited } from "@/lib/plans";
 import {
   profileLocationWithTrialNext,
@@ -129,7 +132,7 @@ const Trial: React.FC = () => {
         currency: selectedPlan.currency.toUpperCase(),
         billing_cycle: "monthly",
         trial_days: trialDays,
-        success_url: `${window.location.origin}/dashboard/billing?payment_success=true&tier=${args.tier}`,
+        success_url: buildCheckoutSuccessUrl(args.tier),
         cancel_url: `${window.location.origin}/onboarding/trial?payment_cancelled=true`,
       })) as {
         success: boolean;

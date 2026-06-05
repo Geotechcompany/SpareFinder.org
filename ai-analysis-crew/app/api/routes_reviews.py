@@ -6,7 +6,7 @@ from datetime import datetime
 from typing import Any, Optional
 
 from fastapi import APIRouter, Depends, Query
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, field_validator
 from starlette.concurrency import run_in_threadpool
 
 from ..email_sender import send_basic_email_smtp, send_email_via_email_service
@@ -29,6 +29,15 @@ def _send_email(*, to_email: str, subject: str, html: str, text: str) -> bool:
     if ok:
         return True
     return send_email_via_email_service(to_email=to_email, subject=subject, html=html, text=text)
+
+
+def _normalize_job_type(value: str | None) -> str:
+    mode = (value or "image").lower().strip()
+    if mode == "both":
+        return "both"
+    if mode in ("keyword", "keywords", "keywords_only"):
+        return "keyword"
+    return "image"
 
 
 def _normalize_part_search_id(value: str | None) -> str | None:
@@ -248,13 +257,18 @@ async def submit_public_review(payload: PublicReviewBody, user: CurrentUser = De
 
 class AnalysisReviewCreateBody(BaseModel):
     job_id: str = Field(min_length=1, max_length=255)
-    job_type: str = Field(pattern=r"^(image|keyword|both)$")
+    job_type: str = Field(min_length=1, max_length=32)
     part_search_id: Optional[str] = None
     rating: int = Field(ge=1, le=5)
     comment: Optional[str] = None
     feedback_type: Optional[str] = None
     helpful_features: Optional[list[str]] = None
     improvement_suggestions: Optional[str] = None
+
+    @field_validator("job_type", mode="before")
+    @classmethod
+    def normalize_job_type(cls, value: Any) -> str:
+        return _normalize_job_type(str(value) if value is not None else None)
 
 
 @router.get("/analysis")

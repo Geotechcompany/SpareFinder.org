@@ -15,6 +15,7 @@ import { Star, Loader2, CheckCircle, X } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { api } from "@/lib/api";
+import { normalizeReviewJobType } from "@/lib/review-job-type";
 
 interface ReviewModalProps {
   isOpen: boolean;
@@ -44,12 +45,23 @@ const helpfulFeatures = [
 function reviewSubmitErrorMessage(error: unknown): string {
   if (axios.isAxiosError(error)) {
     const data = error.response?.data as
-      | { message?: string; error?: string; detail?: string | { message?: string } }
+      | {
+          message?: string;
+          error?: string;
+          detail?: string | { message?: string } | Array<{ msg?: string }>;
+        }
       | undefined;
     if (data?.error === "duplicate") return "duplicate";
     if (data?.message) return data.message;
     const detail = data?.detail;
     if (typeof detail === "string") return detail;
+    if (Array.isArray(detail)) {
+      const messages = detail
+        .map((item) => item?.msg)
+        .filter(Boolean)
+        .join(", ");
+      if (messages) return messages;
+    }
     if (detail && typeof detail === "object" && "message" in detail) {
       return String(detail.message);
     }
@@ -119,7 +131,7 @@ export const ReviewModal: React.FC<ReviewModalProps> = ({
     try {
       const result = await api.analysisReviews.create({
         job_id: jobIdTrimmed,
-        job_type: jobType,
+        job_type: normalizeReviewJobType(jobType),
         part_search_id: partSearchId || null,
         rating,
         comment: comment.trim() || null,

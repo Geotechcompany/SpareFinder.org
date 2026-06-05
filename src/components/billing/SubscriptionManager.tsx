@@ -5,6 +5,10 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
 import { api } from "@/lib/api";
+import {
+  buildCheckoutSuccessUrl,
+  CHECKOUT_CANCEL_URL,
+} from "@/lib/billing-checkout";
 import { PLAN_CONFIG, getPlan, PlanTier } from "@/lib/plans";
 import SubscriptionTrialModal from "./SubscriptionTrialModal";
 import { useAuth } from "@/contexts/AuthContext";
@@ -197,8 +201,8 @@ export const SubscriptionManager: React.FC = () => {
           currency: starterPlan.currency.toLowerCase(),
           billing_cycle: "monthly",
           trial_days: starterPlan.trial?.days || 7,
-          success_url: `${window.location.origin}/dashboard/billing?payment_success=true&tier=starter`,
-          cancel_url: `${window.location.origin}/dashboard/billing?payment_cancelled=true`,
+          success_url: buildCheckoutSuccessUrl("starter"),
+          cancel_url: CHECKOUT_CANCEL_URL,
         };
         const checkoutResponse = (await api.billing.createCheckoutSession(
           checkoutData
@@ -238,8 +242,8 @@ export const SubscriptionManager: React.FC = () => {
         currency: plan.currency.toLowerCase(),
         billing_cycle: "monthly",
         trial_days: planConfig.trial?.days ?? 0,
-        success_url: `${window.location.origin}/dashboard/billing?payment_success=true&tier=${tier}`,
-        cancel_url: `${window.location.origin}/dashboard/billing?payment_cancelled=true`,
+        success_url: buildCheckoutSuccessUrl(tier),
+        cancel_url: CHECKOUT_CANCEL_URL,
       };
 
       const checkoutResponse = (await api.billing.createCheckoutSession(

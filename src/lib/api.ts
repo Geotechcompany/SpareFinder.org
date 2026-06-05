@@ -1512,6 +1512,23 @@ export const billingApi = {
     return response.data;
   },
 
+  verifyCheckoutSession: async (
+    sessionId: string
+  ): Promise<
+    ApiResponse<{
+      verified: boolean;
+      tier?: string;
+      plan?: string;
+      reason?: string;
+      payment_status?: string;
+    }>
+  > => {
+    const response = await apiClient.get(
+      `/billing/checkout-session/verify?session_id=${encodeURIComponent(sessionId)}`
+    );
+    return response.data;
+  },
+
   // Pay-as-you-go credits purchase
   createCreditsCheckoutSession: async (options: {
     credits: number;
