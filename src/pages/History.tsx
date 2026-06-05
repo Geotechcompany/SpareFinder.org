@@ -351,9 +351,6 @@ const History = () => {
         // Background fetch: still abort after 20s so we don't hang; stats/history will retry via delayed full fetch
         timeoutId = setTimeout(() => abortControllerRef.current?.abort(), 20000);
       }
-
-      console.log("🔄 Starting comprehensive data fetch for user:", user?.id, background ? "(background)" : "");
-
       // Fetch stats and user's history in parallel (but controlled)
       const BACKEND_BASE = API_BASE_URL;
       const [historyResponse, crewJobsResponse] =
@@ -383,18 +380,6 @@ const History = () => {
         ]);
 
       // Handle history response
-      console.log("🔍 History API response:", {
-        status: historyResponse.status,
-        success:
-          historyResponse.status === "fulfilled" && historyResponse.value
-            ? (historyResponse.value as any).success
-            : false,
-        results:
-          historyResponse.status === "fulfilled" && historyResponse.value
-            ? (historyResponse.value as any).uploads?.length ?? 0
-            : 0,
-      });
-
       if (historyResponse.status === "fulfilled" && historyResponse.value) {
         // History response is expected to contain an `uploads` array from backend
         const historyData = historyResponse.value as any;
@@ -406,52 +391,21 @@ const History = () => {
 
         // Update pagination info from response
         if (responseData.pagination) {
-          console.log("📄 Pagination data from API:", responseData.pagination);
           setPagination(prev => ({
             ...prev,
             total: responseData.pagination.total || 0,
             hasMore: responseData.pagination.hasMore || false,
           }));
-        } else {
-          console.warn("⚠️ No pagination data in API response");
         }
-
-        console.log("🔄 User's history jobs:", userJobs.length, "jobs");
-        console.log("📄 Current pagination state after update:", {
-          page: pagination.page,
-          limit: pagination.limit,
-          total: responseData.pagination?.total || 0,
-        });
-        console.log(
-          "📊 Job details:",
-          userJobs.map((j: any) => ({
-            id: j.id,
-            filename: j.image_name,
-            status: j.analysis_status,
-            success: j.is_match,
-          }))
-        );
         setpastAnalysis(userJobs);
       } else {
-        console.warn("❌ Failed to fetch user history:", historyResponse);
         setpastAnalysis([]);
       }
 
       // Handle crew jobs response: merge with current state when in background so we don't wipe optimistic job
       if (crewJobsResponse.status === "fulfilled" && crewJobsResponse.value) {
         const crewAnalysisJobs = parseCrewJobsFromResponse(crewJobsResponse.value);
-        console.log("🤖 SpareFinder Research jobs:", crewAnalysisJobs.length, "jobs");
-
-        // Check for duplicate IDs
-        const uniqueIds = new Set(crewAnalysisJobs.map((j: any) => j.id));
-        if (uniqueIds.size !== crewAnalysisJobs.length) {
-          console.warn(
-            `⚠️ Found ${
-              crewAnalysisJobs.length - uniqueIds.size
-            } duplicate job(s) in crew jobs data`
-          );
-        }
-
+        // Check for duplicate IDs (dedupe handled by mergeCrewJobsFromApi)
         setCrewJobs((prev) => mergeCrewJobsFromApi(prev, crewAnalysisJobs));
 
         setPagination(prev => ({
@@ -460,7 +414,6 @@ const History = () => {
         }));
 
       } else {
-        console.warn("❌ Failed to fetch crew jobs:", crewJobsResponse);
         if (!background) {
           setCrewJobs([]);
           setPagination(prev => ({ ...prev, total: 0 }));
@@ -487,23 +440,7 @@ const History = () => {
             }
           );
 
-          const alreadyHaveImages = (pastAnalysis || []).filter(
-            (j: any) => j.image_url
-          ).length;
-          if (alreadyHaveImages > 0) {
-            console.log(
-              `✅ ${alreadyHaveImages} jobs already have images from Supabase Storage`
-            );
-          }
-
           if (!toFetch.length) {
-            if (alreadyHaveImages > 0) {
-              console.log(
-                `🎉 All ${
-                  pastAnalysis?.length || 0
-                } job images are ready for display`
-              );
-            }
             return;
           }
 
@@ -514,21 +451,11 @@ const History = () => {
               signal: AbortSignal.timeout(3000),
             });
             if (!healthRes.ok) {
-              console.log(
-                `❌ AI service health check failed: ${healthRes.status}`
-              );
               return; // Skip image fetching if service is down
             }
-            console.log(`✅ AI service is healthy`);
           } catch (healthError) {
-            console.log(`❌ AI service health check failed:`, healthError);
             return; // Skip image fetching if service is unreachable
           }
-
-          console.log(
-            `🖼️ Attempting to fetch images for ${toFetch.length} jobs`
-          );
-
           // Batch fetch images to avoid overwhelming the server
           const BATCH_SIZE = 10;
           const BATCH_DELAY = 500; // ms between batches
@@ -537,14 +464,6 @@ const History = () => {
 
           for (let i = 0; i < toFetch.length; i += BATCH_SIZE) {
             const batch = toFetch.slice(i, i + BATCH_SIZE);
-            console.log(
-              `📦 Processing batch ${
-                Math.floor(i / BATCH_SIZE) + 1
-              }/${Math.ceil(toFetch.length / BATCH_SIZE)} (${
-                batch.length
-              } jobs)`
-            );
-
             const batchResults = await Promise.all(
               batch.map(async (j: any) => {
                 try {
@@ -602,49 +521,10 @@ const History = () => {
 
             results.push(...batchResults);
 
-            // Log batch results
-            const batchSuccess = batchResults.filter((r) => r.url).length;
-            const batch404 = batchResults.filter(
-              (r) => r.error === "not_found"
-            ).length;
-
-            if (batchSuccess > 0) {
-              console.log(
-                `✅ Batch complete: ${batchSuccess}/${batch.length} images loaded`
-              );
-            } else if (batch404 === batch.length) {
-              console.log(
-                `ℹ️ Batch ${Math.floor(i / BATCH_SIZE) + 1}: All ${
-                  batch.length
-                } images not found in storage`
-              );
-            }
-
             // Delay between batches (except for the last one)
             if (i + BATCH_SIZE < toFetch.length) {
               await new Promise((resolve) => setTimeout(resolve, BATCH_DELAY));
             }
-          }
-
-          // Log final results summary
-          const successful = results.filter((r) => r.url).length;
-          const notFound = results.filter(
-            (r) => r.error === "not_found"
-          ).length;
-          const otherErrors = results.filter(
-            (r) => r.error && r.error !== "not_found"
-          ).length;
-
-          if (successful > 0) {
-            console.log(`✅ ${successful} images loaded successfully`);
-          }
-          if (notFound > 0) {
-            console.log(
-              `ℹ️ ${notFound} images not found (original uploads may be missing from AI service)`
-            );
-          }
-          if (otherErrors > 0) {
-            console.log(`❌ ${otherErrors} images failed with errors`);
           }
 
           setJobImages((prev) => {
@@ -671,15 +551,11 @@ const History = () => {
         return !status || status === 502 || status === 503 || status === 504;
       });
       if (transientRejected.length > 0) {
-        console.warn("History fetch: transient API error, will retry on next poll");
         setError("Connection is slow. History will refresh automatically.");
         return;
       }
-
-      console.log("✅ Data fetch completed successfully");
     } catch (error: any) {
       if (error.message === "Request aborted") {
-        console.log("🔄 Request was aborted");
         return;
       }
 
@@ -796,7 +672,6 @@ const History = () => {
       // Prevent duplicate requests within 1 second
       const now = Date.now();
       if (now - lastPollTime < 1000) {
-        console.log("🔄 Skipping duplicate poll request");
         return;
       }
       setLastPollTime(now);
@@ -841,9 +716,6 @@ const History = () => {
         });
 
         if (stuckJobs.length > 0) {
-          console.warn(
-            `Found ${stuckJobs.length} stuck job(s) - automatically marking as failed`
-          );
           // Mark stuck jobs as failed
           const updatedJobs = searches.map((job: any) => {
             if (stuckJobs.some((stuck: any) => stuck.id === job.id)) {
@@ -934,7 +806,6 @@ const History = () => {
         } catch {}
       }
     } catch (error) {
-      console.log("❌ Polling error:", error);
       // ignore transient polling errors
     } finally {
       setIsPolling(false);
@@ -964,8 +835,6 @@ const History = () => {
     );
 
     if (hasProcessingJobs) {
-      console.log("🔄 Processing jobs detected, starting intelligent polling");
-
       let pollCount = 0;
       const maxPolls = 20; // Maximum 20 polls before giving up
 
@@ -990,9 +859,6 @@ const History = () => {
             if (stillProcessing && pollCount < maxPolls) {
               setTimeout(intelligentPoll, nextInterval);
             } else if (pollCount >= maxPolls) {
-              console.log(
-                "⏰ Max polling attempts reached, switching to standard polling"
-              );
             }
           })
           .catch((error) => {
@@ -1126,7 +992,6 @@ const History = () => {
                       imageName.includes("crew_analysis");
     
     if (isCrewJob) {
-      console.warn("handleDownloadAnalysisPdf called for crew job, use crew-specific handler instead");
       toast({
         title: "Download not available",
         description: "PDF download for crew analysis jobs is handled separately.",
@@ -1205,7 +1070,6 @@ const History = () => {
                       imageName.includes("crew_analysis");
     
     if (isCrewJob) {
-      console.warn("handleViewJob called for crew job, use handleViewCrewAnalysis instead");
       return;
     }
     
@@ -1218,7 +1082,6 @@ const History = () => {
 
       // If job is completed and we have the data, show it immediately
       if (status === "completed" && existingData) {
-        console.log("✅ Using cached analysis data for", jobId);
         setSelectedImageJob(existingData);
         setIsImageOpen(true);
         return;
@@ -1272,7 +1135,6 @@ const History = () => {
     );
 
     if (pendingJobs.length > 0) {
-      console.log(`🔄 Found ${pendingJobs.length} pending jobs, backend will auto-start them`);
       // Backend auto-start service handles this, but we log for visibility
       // Frontend can also trigger start if needed as fallback
     }
@@ -1299,8 +1161,6 @@ const History = () => {
         window.history.replaceState(null, "", location.pathname);
         setIsLoading(false);
       }
-
-      console.log("📊 Refetching History data (landed on page) for user:", user.id);
       isInitializedRef.current = true;
 
       // One crew refresh + one full fetch (fetchAllData also loads crew jobs — deduped via in-flight ref)
@@ -1337,7 +1197,6 @@ const History = () => {
   // Refetch data when pagination changes (but only after initial load)
   useEffect(() => {
     if (isInitializedRef.current && isAuthenticated && user?.id) {
-      console.log("📄 Pagination changed, refetching data:", pagination.page);
       fetchAllData();
     }
   }, [pagination.page, pagination.limit]);
@@ -1357,17 +1216,11 @@ const History = () => {
           filter: `user_id=eq.${user.id}`,
         },
         (payload) => {
-          console.log("📡 Crew job update received:", payload);
-
           if (payload.eventType === "INSERT") {
             setCrewJobs((prev) => {
               // Prevent duplicate insertions
               const existingJob = prev.find((job) => job.id === payload.new.id);
               if (existingJob) {
-                console.log(
-                  "⚠️ Job already exists, skipping INSERT:",
-                  payload.new.id
-                );
                 return prev;
               }
               return [payload.new as any, ...prev];
@@ -1393,7 +1246,6 @@ const History = () => {
       )
       .subscribe((status) => {
         if (status === "SUBSCRIBED") {
-          console.log("✅ Real-time subscription active");
           setIsPolling(true);
         }
       });
@@ -1677,7 +1529,6 @@ const History = () => {
   // Toggle expanded state for a specific card using unique card identifier
   const toggleJobExpanded = (cardKey: string) => {
     if (!cardKey) {
-      console.warn("Cannot toggle expansion for card with undefined key");
       return;
     }
 

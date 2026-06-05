@@ -20,6 +20,9 @@ const RATES_FROM_USD: Record<string, number> = {
   HKD: 7.82,
   MXN: 17,
   BRL: 5,
+  KES: 129,
+  NGN: 1550,
+  GHS: 15.5,
 };
 
 const SYMBOL_TO_CODE: Record<string, string> = {
@@ -40,6 +43,8 @@ export function getCurrencySymbol(code: string): string {
     JPY: "¥",
     INR: "₹",
     ZAR: "R",
+    KES: "KSh",
+    NGN: "₦",
     CAD: "C$",
     AUD: "A$",
   };
@@ -68,13 +73,14 @@ function detectSourceCurrency(text: string): string {
   if (/\bUSD\b/i.test(text)) return "USD";
   if (/\bGBP\b/i.test(text)) return "GBP";
   if (/\bEUR\b/i.test(text)) return "EUR";
+  if (/KSh/.test(text) || /\bKES\b/i.test(text)) return "KES";
   if (/\$/.test(text)) return "USD";
   return "USD";
 }
 
 function formatConvertedAmount(amount: number, targetCurrency: string): string {
   const code = targetCurrency.toUpperCase();
-  if (code === "JPY" || code === "INR") {
+  if (code === "JPY" || code === "INR" || code === "KES" || code === "NGN") {
     return `${getCurrencySymbol(code)}${Math.round(amount).toLocaleString()}`;
   }
   return `${getCurrencySymbol(code)}${amount.toLocaleString(undefined, {
@@ -117,6 +123,50 @@ export function convertPriceText(
     result = `${result.trim()} (${target})`;
   }
   return result;
+}
+
+/** Resolve target currency from report metadata or SEARCH REGION block. */
+export function resolveReportCurrency(
+  reportText: string,
+  searchCurrency?: string | null
+): string {
+  if (searchCurrency?.trim()) return searchCurrency.trim().toUpperCase();
+  const match = reportText.match(/\*\*Currency:\*\*\s*([A-Z]{3})/i);
+  if (match) return match[1].toUpperCase();
+  const regionMatch = reportText.match(/\*\*Region searched:\*\*\s*([^,\n]+)/i);
+  if (regionMatch) {
+    const country = regionMatch[1].trim().toLowerCase();
+    if (country.includes("kenya")) return "KES";
+    if (country.includes("united kingdom") || country === "uk") return "GBP";
+    if (country.includes("united states") || country === "usa") return "USD";
+  }
+  return "GBP";
+}
+
+/** Convert all prices in a full analysis report markdown string. */
+export function convertReportPrices(
+  reportText: string,
+  targetCurrency: string
+): string {
+  if (!reportText?.trim() || !targetCurrency) return reportText;
+
+  const target = targetCurrency.toUpperCase();
+  let text = reportText.replace(
+    /\*\*Currency:\*\*\s*[A-Z]{3}/gi,
+    `**Currency:** ${target}`
+  );
+
+  text = text
+    .split("\n")
+    .map((line) => {
+      if (/[£$€₹]|KSh|\b(GBP|USD|EUR|KES)\b/i.test(line)) {
+        return convertPriceText(line, target);
+      }
+      return line;
+    })
+    .join("\n");
+
+  return text;
 }
 
 export function formatPriceRange(

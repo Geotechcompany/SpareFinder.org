@@ -1009,6 +1009,11 @@ async def run_analysis_background(
                 result_text, region_label, user_currency
             )
 
+        if user_currency:
+            from .currency_utils import convert_prices_in_report
+
+            result_text = convert_prices_in_report(result_text, user_currency)
+
         # Detect no-regional-suppliers so we can flag job and email user
         no_regional_suppliers = (
             "[NO_REGIONAL_SUPPLIERS]" in result_text

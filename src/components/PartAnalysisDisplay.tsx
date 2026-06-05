@@ -71,17 +71,6 @@ export const FlatPartAnalysisDisplay: React.FC<PartAnalysisDisplayProps> = ({
 }) => {
   const { userCurrency } = useDetectedRegion();
 
-  // Debug logging
-  console.log("📊 PartAnalysisDisplay - analysisData:", analysisData);
-  console.log("📝 Full analysis exists:", !!analysisData?.full_analysis);
-  if (analysisData?.full_analysis) {
-    console.log("📝 Full analysis length:", analysisData.full_analysis.length);
-    console.log(
-      "📝 Full analysis preview:",
-      analysisData.full_analysis.substring(0, 100)
-    );
-  }
-
   return (
     <div className={`space-y-6 ${className}`}>
       {/* Full AI Analysis - Rich Markdown Content */}

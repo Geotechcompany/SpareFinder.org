@@ -1,14 +1,8 @@
 /**
- * Analysis Result Modal Component
- *
- * Displays comprehensive analysis results in a modal with:
- * - Full analysis text
- * - Technical specifications
- * - Suppliers information
- * - Download PDF option
+ * Analysis Result Modal — full report view with regional currency conversion.
  */
 
-import React from "react";
+import React, { useMemo } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import {
@@ -28,17 +22,15 @@ import {
   FileText,
   CheckCircle,
   Package,
-  DollarSign,
-  MapPin,
-  Phone,
-  Mail,
-  Globe,
-  X,
   Search,
   Share2,
   RefreshCw,
   MapPinOff,
 } from "lucide-react";
+import {
+  convertReportPrices,
+  resolveReportCurrency,
+} from "@/lib/currency";
 
 interface AnalysisResultModalProps {
   isOpen: boolean;
@@ -46,8 +38,19 @@ interface AnalysisResultModalProps {
   analysis: any;
   onDownloadPDF?: () => void;
   onShare?: () => void;
-  /** When no suppliers were found in user region: retry same search without region (global). */
   onRetryGlobal?: (analysis: { id: string; keywords?: string }) => void;
+}
+
+function resolveTargetCurrency(
+  reportText: string,
+  resultData: Record<string, unknown> | undefined
+): string {
+  const region = String(resultData?.search_region ?? "");
+  if (/kenya/i.test(region)) return "KES";
+  return resolveReportCurrency(
+    reportText,
+    (resultData?.search_currency as string) ?? null
+  );
 }
 
 export const AnalysisResultModal: React.FC<AnalysisResultModalProps> = ({
@@ -60,25 +63,15 @@ export const AnalysisResultModal: React.FC<AnalysisResultModalProps> = ({
 }) => {
   if (!analysis) return null;
 
-  const resultData = analysis.result_data;
-  const reportText = resultData?.report_text || "";
+  const resultData = analysis.result_data as Record<string, unknown> | undefined;
+  const reportText = String(resultData?.report_text ?? "");
   const noRegionalSuppliers = !!resultData?.no_regional_suppliers;
 
-  // Parse sections from report text
-  const parseSection = (sectionName: string): string => {
-    const regex = new RegExp(
-      `#{1,4}\\s*${sectionName}[\\s\\S]*?(?=#{1,4}|$)`,
-      "i"
-    );
-    const match = reportText.match(regex);
-    return match ? match[0] : "";
-  };
-
-  const identifiedPart = parseSection("IDENTIFIED PART DETAILS");
-  const technicalSpecs = parseSection("TECHNICAL SPECIFICATIONS");
-  const suppliers = parseSection("TOP.*SUPPLIERS");
-  const alternatives = parseSection("ALTERNATIVE");
-  const conclusion = parseSection("CONCLUSION");
+  const displayReport = useMemo(() => {
+    if (!reportText) return "No report text available";
+    const target = resolveTargetCurrency(reportText, resultData);
+    return convertReportPrices(reportText, target);
+  }, [reportText, resultData]);
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -93,12 +86,10 @@ export const AnalysisResultModal: React.FC<AnalysisResultModalProps> = ({
                 Job ID: {analysis.id?.substring(0, 8)}...
               </DialogDescription>
             </div>
-            <div className="flex items-center gap-2">
-              <Badge className="bg-green-500 hover:bg-green-600 text-white border-green-600">
-                <CheckCircle className="h-3 w-3 mr-1" />
-                Completed
-              </Badge>
-            </div>
+            <Badge className="bg-green-500 hover:bg-green-600 text-white border-green-600">
+              <CheckCircle className="h-3 w-3 mr-1" />
+              Completed
+            </Badge>
           </div>
         </DialogHeader>
 
@@ -107,7 +98,6 @@ export const AnalysisResultModal: React.FC<AnalysisResultModalProps> = ({
           style={{ maxHeight: "calc(90vh - 180px)" }}
         >
           <div className="space-y-6">
-            {/* No regional suppliers: retry with global or change region */}
             {noRegionalSuppliers && (
               <div className="rounded-lg border border-amber-300 dark:border-amber-600 bg-amber-50 dark:bg-amber-950/50 p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                 <div className="flex items-start gap-3">
@@ -117,7 +107,8 @@ export const AnalysisResultModal: React.FC<AnalysisResultModalProps> = ({
                       No suppliers found in your region
                     </p>
                     <p className="text-sm text-amber-800 dark:text-amber-200 mt-1">
-                      You can retry with global search (ignore region) or change your region in Settings → Preferences.
+                      Retry with global search or change your region in Settings →
+                      Preferences.
                     </p>
                   </div>
                 </div>
@@ -126,7 +117,12 @@ export const AnalysisResultModal: React.FC<AnalysisResultModalProps> = ({
                     variant="outline"
                     size="sm"
                     className="shrink-0 border-amber-400 dark:border-amber-500 text-amber-800 dark:text-amber-200 hover:bg-amber-100 dark:hover:bg-amber-900/50"
-                    onClick={() => onRetryGlobal({ id: analysis.id, keywords: analysis.keywords })}
+                    onClick={() =>
+                      onRetryGlobal({
+                        id: analysis.id,
+                        keywords: analysis.keywords,
+                      })
+                    }
                   >
                     <RefreshCw className="h-4 w-4 mr-2" />
                     Retry without region
@@ -135,7 +131,6 @@ export const AnalysisResultModal: React.FC<AnalysisResultModalProps> = ({
               </div>
             )}
 
-            {/* Keywords Badge for keyword-only searches */}
             {!analysis.image_url && analysis.keywords && (
               <div className="bg-gradient-to-r from-blue-50 to-brand-50 dark:from-blue-950 dark:to-brand-dark border border-blue-200 dark:border-blue-800 rounded-lg p-4">
                 <div className="flex items-center gap-3">
@@ -157,10 +152,9 @@ export const AnalysisResultModal: React.FC<AnalysisResultModalProps> = ({
               </div>
             )}
 
-            {/* Image Section */}
             {analysis.image_url && (
               <div className="space-y-2">
-                <h3 className="text-lg font-semibold flex items-center gap-2">
+                <h3 className="text-lg font-semibold flex items-center gap-2 text-foreground">
                   <Package className="h-5 w-5" />
                   Analyzed Image
                 </h3>
@@ -168,94 +162,18 @@ export const AnalysisResultModal: React.FC<AnalysisResultModalProps> = ({
                   <img
                     src={analysis.image_url}
                     alt="Analyzed part"
-                    className="w-full h-auto max-h-64 object-contain bg-gray-50"
+                    className="w-full h-auto max-h-64 object-contain bg-gray-50 dark:bg-gray-900"
                   />
                 </div>
               </div>
             )}
 
-            {/* Identified Part Details */}
-            {identifiedPart && (
-              <div className="space-y-2">
-                <h3 className="text-lg font-semibold flex items-center gap-2">
-                  <FileText className="h-5 w-5" />
-                  Identified Part Details
-                </h3>
-                <div className="prose prose-sm max-w-none bg-gray-50 dark:bg-gray-900 p-4 rounded-lg">
-                  <pre className="whitespace-pre-wrap font-sans text-sm">
-                    {identifiedPart}
-                  </pre>
-                </div>
-              </div>
-            )}
-
-            {/* Technical Specifications */}
-            {technicalSpecs && (
-              <div className="space-y-2">
-                <h3 className="text-lg font-semibold flex items-center gap-2">
-                  <Package className="h-5 w-5" />
-                  Technical Specifications
-                </h3>
-                <div className="prose prose-sm max-w-none bg-blue-50 dark:bg-blue-950 p-4 rounded-lg">
-                  <pre className="whitespace-pre-wrap font-sans text-sm">
-                    {technicalSpecs}
-                  </pre>
-                </div>
-              </div>
-            )}
-
-            {/* Suppliers */}
-            {suppliers && (
-              <div className="space-y-2">
-                <h3 className="text-lg font-semibold flex items-center gap-2">
-                  <DollarSign className="h-5 w-5" />
-                  Suppliers
-                </h3>
-                <div className="prose prose-sm max-w-none bg-green-50 dark:bg-green-950 p-4 rounded-lg">
-                  <pre className="whitespace-pre-wrap font-sans text-sm">
-                    {suppliers}
-                  </pre>
-                </div>
-              </div>
-            )}
-
-            {/* Alternatives */}
-            {alternatives && (
-              <div className="space-y-2">
-                <h3 className="text-lg font-semibold flex items-center gap-2">
-                  <Package className="h-5 w-5" />
-                  Alternative Options
-                </h3>
-                <div className="prose prose-sm max-w-none bg-brand-50 dark:bg-brand-dark p-4 rounded-lg">
-                  <pre className="whitespace-pre-wrap font-sans text-sm">
-                    {alternatives}
-                  </pre>
-                </div>
-              </div>
-            )}
-
-            {/* Conclusion */}
-            {conclusion && (
-              <div className="space-y-2">
-                <h3 className="text-lg font-semibold flex items-center gap-2">
-                  <CheckCircle className="h-5 w-5" />
-                  Conclusion
-                </h3>
-                <div className="prose prose-sm max-w-none bg-amber-50 dark:bg-amber-950 p-4 rounded-lg">
-                  <pre className="whitespace-pre-wrap font-sans text-sm">
-                    {conclusion}
-                  </pre>
-                </div>
-              </div>
-            )}
-
-            {/* Full Report Section */}
             <div className="space-y-2">
-              <h3 className="text-lg font-semibold flex items-center gap-2">
+              <h3 className="text-lg font-semibold flex items-center gap-2 text-foreground">
                 <FileText className="h-5 w-5" />
-                📋 Full Analysis Report
+                Full Analysis Report
               </h3>
-              <div className="prose prose-sm max-w-none dark:prose-invert p-6 rounded-lg bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800 border border-gray-200 dark:border-gray-700">
+              <div className="prose prose-sm max-w-none dark:prose-invert p-6 rounded-lg bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100">
                 <ReactMarkdown
                   remarkPlugins={[remarkGfm]}
                   components={{
@@ -287,7 +205,7 @@ export const AnalysisResultModal: React.FC<AnalysisResultModalProps> = ({
                     ),
                     th: ({ node, ...props }) => (
                       <th
-                        className="px-6 py-4 text-left text-sm font-semibold uppercase tracking-wider"
+                        className="px-6 py-4 text-left text-sm font-semibold uppercase tracking-wider text-white"
                         {...props}
                       />
                     ),
@@ -311,58 +229,58 @@ export const AnalysisResultModal: React.FC<AnalysisResultModalProps> = ({
                     ),
                     h3: ({ node, ...props }) => (
                       <h3
-                        className="text-xl font-semibold mt-4 mb-2 text-gray-700 dark:text-gray-200"
+                        className="text-xl font-semibold mt-4 mb-2 text-gray-800 dark:text-gray-200"
                         {...props}
                       />
                     ),
                     p: ({ node, ...props }) => (
                       <p
-                        className="mb-4 text-gray-700 dark:text-gray-300 leading-relaxed"
+                        className="mb-4 text-gray-800 dark:text-gray-200 leading-relaxed"
                         {...props}
                       />
                     ),
                     ul: ({ node, ...props }) => (
                       <ul
-                        className="list-disc list-inside mb-4 space-y-2 text-gray-700 dark:text-gray-300"
+                        className="list-disc list-inside mb-4 space-y-2 text-gray-800 dark:text-gray-200"
                         {...props}
                       />
                     ),
                     ol: ({ node, ...props }) => (
                       <ol
-                        className="list-decimal list-inside mb-4 space-y-2 text-gray-700 dark:text-gray-300"
+                        className="list-decimal list-inside mb-4 space-y-2 text-gray-800 dark:text-gray-200"
                         {...props}
                       />
                     ),
                     li: ({ node, ...props }) => (
-                      <li className="ml-4" {...props} />
+                      <li className="ml-4 text-gray-800 dark:text-gray-200" {...props} />
                     ),
                     strong: ({ node, ...props }) => (
                       <strong
-                        className="font-bold text-blue-600 dark:text-blue-400"
+                        className="font-bold text-gray-900 dark:text-white"
                         {...props}
                       />
                     ),
                     em: ({ node, ...props }) => (
                       <em
-                        className="italic text-gray-600 dark:text-gray-400"
+                        className="italic text-gray-700 dark:text-gray-300"
                         {...props}
                       />
                     ),
                     code: ({ node, inline, ...props }: any) =>
                       inline ? (
                         <code
-                          className="bg-gray-200 dark:bg-gray-700 px-1 py-0.5 rounded text-sm font-mono text-red-600 dark:text-red-400"
+                          className="bg-gray-100 dark:bg-gray-800 px-1 py-0.5 rounded text-sm font-mono text-red-700 dark:text-red-400"
                           {...props}
                         />
                       ) : (
                         <code
-                          className="block bg-gray-200 dark:bg-gray-700 p-4 rounded-lg text-sm font-mono overflow-x-auto"
+                          className="block bg-gray-100 dark:bg-gray-800 p-4 rounded-lg text-sm font-mono overflow-x-auto text-gray-900 dark:text-gray-100"
                           {...props}
                         />
                       ),
                     blockquote: ({ node, ...props }) => (
                       <blockquote
-                        className="border-l-4 border-blue-500 pl-4 italic text-gray-600 dark:text-gray-400 my-4"
+                        className="border-l-4 border-blue-500 pl-4 italic text-gray-700 dark:text-gray-300 my-4"
                         {...props}
                       />
                     ),
@@ -374,30 +292,27 @@ export const AnalysisResultModal: React.FC<AnalysisResultModalProps> = ({
                     ),
                   }}
                 >
-                  {reportText || "No report text available"}
+                  {displayReport}
                 </ReactMarkdown>
               </div>
             </div>
 
-            {/* Metadata */}
             <Separator />
             <div className="grid grid-cols-2 gap-4 text-sm">
               <div>
                 <p className="text-gray-500 dark:text-gray-400">User Email</p>
-                <p className="font-medium">{analysis.user_email}</p>
+                <p className="font-medium text-foreground">{analysis.user_email}</p>
               </div>
               <div>
                 <p className="text-gray-500 dark:text-gray-400">Created At</p>
-                <p className="font-medium">
+                <p className="font-medium text-foreground">
                   {new Date(analysis.created_at).toLocaleString()}
                 </p>
               </div>
               {analysis.completed_at && (
                 <div>
-                  <p className="text-gray-500 dark:text-gray-400">
-                    Completed At
-                  </p>
-                  <p className="font-medium">
+                  <p className="text-gray-500 dark:text-gray-400">Completed At</p>
+                  <p className="font-medium text-foreground">
                     {new Date(analysis.completed_at).toLocaleString()}
                   </p>
                 </div>
@@ -405,7 +320,7 @@ export const AnalysisResultModal: React.FC<AnalysisResultModalProps> = ({
               {analysis.keywords && (
                 <div className="col-span-2">
                   <p className="text-gray-500 dark:text-gray-400">Keywords</p>
-                  <p className="font-medium">{analysis.keywords}</p>
+                  <p className="font-medium text-foreground">{analysis.keywords}</p>
                 </div>
               )}
             </div>
@@ -419,7 +334,7 @@ export const AnalysisResultModal: React.FC<AnalysisResultModalProps> = ({
                 <Button
                   variant="outline"
                   onClick={onDownloadPDF}
-                  className="flex items-center gap-2 hover:bg-blue-50 dark:hover:bg-blue-950 border-blue-200 dark:border-blue-800"
+                  className="flex items-center gap-2"
                 >
                   <Download className="h-4 w-4" />
                   Download PDF
@@ -429,18 +344,14 @@ export const AnalysisResultModal: React.FC<AnalysisResultModalProps> = ({
                 <Button
                   variant="outline"
                   onClick={onShare}
-                  className="flex items-center gap-2 hover:bg-green-50 dark:hover:bg-green-950 border-green-200 dark:border-green-800"
+                  className="flex items-center gap-2"
                 >
                   <Share2 className="h-4 w-4" />
                   Share Link
                 </Button>
               )}
             </div>
-            <Button
-              onClick={onClose}
-              variant="default"
-              className="bg-blue-600 hover:bg-blue-700"
-            >
+            <Button onClick={onClose} variant="default">
               Close
             </Button>
           </div>

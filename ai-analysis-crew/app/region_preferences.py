@@ -73,9 +73,10 @@ def resolve_analysis_context(
 
     country = (user_country or "").strip() or prefs.country
     region = (user_region or "").strip() or prefs.region
-    currency = (user_currency or prefs.currency or "").strip().upper()
-    if not currency and country:
+    if country:
         currency = currency_for_country(country)
+    else:
+        currency = (user_currency or prefs.currency or "").strip().upper()
 
     if prefs.use_regional and (country or region):
         return country or None, region or None, currency or None
