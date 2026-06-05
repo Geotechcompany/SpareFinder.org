@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 from typing import Annotated, Any, Optional
 
 import stripe
-from fastapi import APIRouter, Depends, Header, Request
+from fastapi import APIRouter, Depends, Header, Query, Request
 from pydantic import BaseModel
 
 from .auth_dependencies import CurrentUser, get_current_user
