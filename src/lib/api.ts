@@ -746,9 +746,9 @@ export const adminApi = {
     page: number = 1,
     limit: number = 50,
     search?: string,
-    roleFilter?: string
+    roleFilter?: string,
+    countryFilter?: string
   ): Promise<ApiResponse> => {
-    console.log("📋 Fetching users from API...");
     try {
       const params = new URLSearchParams();
       params.append("page", page.toString());
@@ -762,13 +762,32 @@ export const adminApi = {
         params.append("role", roleFilter);
       }
 
+      if (countryFilter && countryFilter !== "all") {
+        params.append("country", countryFilter);
+      }
+
       const response = await apiClient.get(`/admin/users?${params.toString()}`);
-      console.log("📋 Raw API response:", response.data);
       return response.data;
     } catch (error) {
-      console.error("📋 Failed to fetch users:", error);
+      console.error("Failed to fetch users:", error);
       throw error;
     }
+  },
+
+  getUsersLocationSummary: async (): Promise<
+    ApiResponse<{
+      countries: Array<{
+        country: string;
+        country_code?: string | null;
+        count: number;
+        regional_enabled: number;
+      }>;
+      unset_count: number;
+      total_with_location: number;
+    }>
+  > => {
+    const response = await apiClient.get("/admin/users/location-summary");
+    return response.data;
   },
 
   getAdminStats: async (): Promise<ApiResponse<AdminStatsApiResponse>> => {

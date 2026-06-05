@@ -45,6 +45,33 @@ def _count_from_response(res: Any, fallback: int) -> int:
     return int(getattr(res, "count", None) or fallback)
 
 
+def _safe_prefs(value: Any) -> dict[str, Any]:
+    return value if isinstance(value, dict) else {}
+
+
+def _enrich_user_location_fields(user: dict[str, Any]) -> None:
+    """Normalize region preference columns for admin user lists."""
+    prefs = _safe_prefs(user.get("preferences"))
+    country = (user.get("user_country") or prefs.get("userCountry") or "").strip()
+    region = (user.get("user_region") or prefs.get("userRegion") or "").strip()
+    use_regional = user.get("use_regional_suppliers")
+    if use_regional is None:
+        use_regional = bool(prefs.get("useRegionalSuppliers"))
+    currency = (prefs.get("userCurrency") or "").strip().upper()
+    if country and not currency:
+        from ..currency_utils import currency_for_country
+
+        currency = currency_for_country(country)
+    from ..currency_utils import country_to_iso2
+
+    user["user_country"] = country or None
+    user["user_region"] = region or None
+    user["use_regional_suppliers"] = bool(use_regional)
+    user["user_currency"] = currency or None
+    user["location_label"] = ", ".join(x for x in (country, region) if x) or None
+    user["country_code"] = country_to_iso2(country) if country else None
+
+
 def _group_system_settings(rows: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
     grouped: dict[str, dict[str, Any]] = {}
     for r in rows:
@@ -197,6 +224,7 @@ async def admin_get_users(
     limit: int = Query(default=50, ge=1, le=200),
     search: str | None = Query(default=None),
     role: str | None = Query(default=None),
+    country: str | None = Query(default=None, description="Filter by user_country (partial match)"),
     _admin: CurrentUser = Depends(require_roles("admin", "super_admin")),
 ):
     supabase = get_supabase_admin()
@@ -205,9 +233,14 @@ async def admin_get_users(
     q = supabase.table("profiles").select("*", count="exact").order("created_at", desc=True)
     if search and search.strip():
         s = search.strip()
-        q = q.or_(f"email.ilike.%{s}%,full_name.ilike.%{s}%,company.ilike.%{s}%")  # type: ignore[attr-defined]
+        q = q.or_(  # type: ignore[attr-defined]
+            f"email.ilike.%{s}%,full_name.ilike.%{s}%,company.ilike.%{s}%,"
+            f"user_country.ilike.%{s}%,user_region.ilike.%{s}%"
+        )
     if role and role != "all":
         q = q.eq("role", role)
+    if country and country.strip() and country.strip().lower() != "all":
+        q = q.ilike("user_country", f"%{country.strip()}%")
 
     res = q.range(offset, offset + limit - 1).execute()
     users = res.data or []
@@ -239,6 +272,7 @@ async def admin_get_users(
         except Exception:
             pass
     for u in users:
+        _enrich_user_location_fields(u)
         uid = u.get("id")
         sub = subscription_by_user.get(str(uid)) if uid else None
         u["subscription_tier"] = sub["tier"] if sub else None
@@ -251,6 +285,49 @@ async def admin_get_users(
         data={
             "users": users,
             "pagination": {"page": page, "limit": limit, "total": total, "pages": max(1, (total + limit - 1) // limit)},
+        }
+    )
+
+
+@router.get("/users/location-summary")
+async def admin_users_location_summary(
+    _admin: CurrentUser = Depends(require_roles("admin", "super_admin")),
+):
+    """Aggregate user counts by country for admin dashboards."""
+    supabase = get_supabase_admin()
+    res = (
+        supabase.table("profiles")
+        .select("user_country, user_region, use_regional_suppliers, preferences")
+        .execute()
+    )
+    rows = res.data or []
+    by_country: dict[str, dict[str, Any]] = {}
+    unset = 0
+    for row in rows:
+        _enrich_user_location_fields(row)
+        label = row.get("user_country") or ""
+        if not label:
+            unset += 1
+            continue
+        bucket = by_country.setdefault(
+            label,
+            {
+                "country": label,
+                "country_code": row.get("country_code"),
+                "count": 0,
+                "regional_enabled": 0,
+            },
+        )
+        bucket["count"] += 1
+        if row.get("use_regional_suppliers"):
+            bucket["regional_enabled"] += 1
+
+    countries = sorted(by_country.values(), key=lambda x: x["count"], reverse=True)
+    return api_ok(
+        data={
+            "countries": countries,
+            "unset_count": unset,
+            "total_with_location": sum(c["count"] for c in countries),
         }
     )
 

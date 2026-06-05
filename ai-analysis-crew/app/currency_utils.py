@@ -87,6 +87,59 @@ COUNTRY_TO_CURRENCY: dict[str, str] = {
     "czechia": "CZK",
 }
 
+COUNTRY_NAME_TO_ISO2: dict[str, str] = {
+    "united kingdom": "GB",
+    "uk": "GB",
+    "great britain": "GB",
+    "england": "GB",
+    "scotland": "GB",
+    "wales": "GB",
+    "northern ireland": "GB",
+    "united states": "US",
+    "usa": "US",
+    "us": "US",
+    "canada": "CA",
+    "australia": "AU",
+    "new zealand": "NZ",
+    "ireland": "IE",
+    "france": "FR",
+    "germany": "DE",
+    "spain": "ES",
+    "italy": "IT",
+    "netherlands": "NL",
+    "belgium": "BE",
+    "portugal": "PT",
+    "india": "IN",
+    "japan": "JP",
+    "south africa": "ZA",
+    "united arab emirates": "AE",
+    "uae": "AE",
+    "saudi arabia": "SA",
+    "switzerland": "CH",
+    "sweden": "SE",
+    "norway": "NO",
+    "denmark": "DK",
+    "singapore": "SG",
+    "hong kong": "HK",
+    "mexico": "MX",
+    "brazil": "BR",
+    "kenya": "KE",
+    "nigeria": "NG",
+    "ghana": "GH",
+    "tanzania": "TZ",
+    "uganda": "UG",
+    "egypt": "EG",
+    "china": "CN",
+    "south korea": "KR",
+    "thailand": "TH",
+    "malaysia": "MY",
+    "philippines": "PH",
+    "pakistan": "PK",
+    "poland": "PL",
+    "czech republic": "CZ",
+    "czechia": "CZ",
+}
+
 CURRENCY_SYMBOLS: dict[str, str] = {
     "GBP": "£",
     "USD": "$",
@@ -113,6 +166,21 @@ def currency_for_country(country: str) -> str:
         if name in key or key in name:
             return code
     return "GBP"
+
+
+def country_to_iso2(country: str) -> Optional[str]:
+    """Map a country name to ISO 3166-1 alpha-2 for flags."""
+    key = (country or "").strip().lower()
+    if not key:
+        return None
+    if key in COUNTRY_NAME_TO_ISO2:
+        return COUNTRY_NAME_TO_ISO2[key]
+    if len(key) == 2 and key.isalpha():
+        return key.upper()
+    for name, code in COUNTRY_NAME_TO_ISO2.items():
+        if name in key or key in name:
+            return code
+    return None
 
 
 def currency_instruction(currency: Optional[str]) -> str:

@@ -68,9 +68,14 @@ import {
   ChevronDown,
   Clock,
   UserCog,
+  MapPin,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { startImpersonationSession } from "@/lib/impersonation";
+import {
+  AdminUserLocation,
+  LocationSummaryChip,
+} from "@/components/admin/AdminUserLocation";
 
 interface UserData {
   id: string;
@@ -94,6 +99,19 @@ interface UserData {
   trial_days_remaining?: number | null;
   trial_ends_at?: string | null;
   clerk_user_id?: string | null;
+  user_country?: string | null;
+  user_region?: string | null;
+  user_currency?: string | null;
+  country_code?: string | null;
+  location_label?: string | null;
+  use_regional_suppliers?: boolean;
+}
+
+interface LocationSummaryCountry {
+  country: string;
+  country_code?: string | null;
+  count: number;
+  regional_enabled: number;
 }
 
 interface Pagination {
@@ -114,6 +132,10 @@ const UserManagement = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [roleFilter, setRoleFilter] = useState<string>("all");
+  const [countryFilter, setCountryFilter] = useState<string>("all");
+  const [locationSummary, setLocationSummary] = useState<LocationSummaryCountry[]>(
+    []
+  );
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkActionLoading, setBulkActionLoading] = useState(false);
   const [bulkDeleteDialogOpen, setBulkDeleteDialogOpen] = useState(false);
@@ -124,15 +146,25 @@ const UserManagement = () => {
   // Debounce search to avoid too many API calls
   useEffect(() => {
     const debounceTimer = setTimeout(() => {
-      // Reset to page 1 when search or filter changes
-      if (searchTerm || roleFilter !== "all") {
+      if (searchTerm || roleFilter !== "all" || countryFilter !== "all") {
         setPagination((prev) => ({ ...prev, page: 1 }));
       }
       fetchUsers();
-    }, 500); // 500ms debounce
+    }, 500);
 
     return () => clearTimeout(debounceTimer);
-  }, [searchTerm, roleFilter]);
+  }, [searchTerm, roleFilter, countryFilter]);
+
+  useEffect(() => {
+    void api.admin
+      .getUsersLocationSummary()
+      .then((res) => {
+        const payload = (res as { data?: { countries?: LocationSummaryCountry[] } })
+          ?.data;
+        if (payload?.countries) setLocationSummary(payload.countries);
+      })
+      .catch(() => {});
+  }, []);
 
   // Separate effect for pagination changes (no debounce needed)
   useEffect(() => {
@@ -142,28 +174,19 @@ const UserManagement = () => {
   const fetchUsers = async () => {
     try {
       setIsLoading(true);
-      console.log("🔍 Fetching users with filters:", {
-        searchTerm,
-        roleFilter,
-        page: pagination.page,
-      });
 
       const response = await api.admin.getUsers(
         pagination.page,
         pagination.limit,
         searchTerm,
-        roleFilter
+        roleFilter,
+        countryFilter
       );
-
-      console.log("📋 User fetch response:", response);
 
       if (response.success && response.data) {
         const data = response.data as any;
         const fetchedUsers = (data.users || []) as UserData[];
         const apiPagination = data.pagination || {};
-
-        console.log("📋 Fetched users from API:", fetchedUsers);
-        console.log("📋 Pagination from API:", apiPagination);
 
         const totalFromApi =
           typeof apiPagination.total === "number"
@@ -183,8 +206,6 @@ const UserManagement = () => {
           pages: pagesFromApi,
         }));
       } else {
-        console.warn("❌ Invalid response format:", response);
-        // Set empty users array if response is invalid
         setUsers([]);
         setPagination((prev) => ({
           ...prev,
@@ -529,6 +550,42 @@ const UserManagement = () => {
             }
           />
 
+          {/* Location summary */}
+          {locationSummary.length > 0 && (
+            <Card className="bg-card/95 backdrop-blur-xl border-border shadow-soft-elevated dark:bg-black/20 dark:border-white/10">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <MapPin className="h-4 w-4 text-primary" />
+                  <span className="text-sm font-medium text-foreground dark:text-white">
+                    Users by location
+                  </span>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <LocationSummaryChip
+                    country="All countries"
+                    count={pagination.total}
+                    active={countryFilter === "all"}
+                    onClick={() => setCountryFilter("all")}
+                  />
+                  {locationSummary.slice(0, 12).map((row) => (
+                    <LocationSummaryChip
+                      key={row.country}
+                      country={row.country}
+                      countryCode={row.country_code}
+                      count={row.count}
+                      active={countryFilter === row.country}
+                      onClick={() =>
+                        setCountryFilter(
+                          countryFilter === row.country ? "all" : row.country
+                        )
+                      }
+                    />
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
           {/* Filters */}
           <Card className="bg-card/95 backdrop-blur-xl border-border shadow-soft-elevated dark:bg-black/20 dark:border-white/10">
             <CardContent className="p-6">
@@ -715,6 +772,9 @@ const UserManagement = () => {
                             User
                           </TableHead>
                           <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                            Location
+                          </TableHead>
+                          <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                             Company
                           </TableHead>
                           <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
@@ -740,7 +800,7 @@ const UserManagement = () => {
                       <TableBody>
                         {users.length === 0 ? (
                           <TableRow>
-                              <TableCell colSpan={9} className="py-8 text-center">
+                              <TableCell colSpan={10} className="py-8 text-center">
                               <div className="text-muted-foreground">
                                 {searchTerm || roleFilter !== "all" ? (
                                   <div>
@@ -785,6 +845,9 @@ const UserManagement = () => {
                                       {user.email}
                                     </div>
                                   </div>
+                                </TableCell>
+                                <TableCell>
+                                  <AdminUserLocation user={user as unknown as Record<string, unknown>} />
                                 </TableCell>
                                 <TableCell className="text-sm text-muted-foreground dark:text-gray-300">
                                   {user.company || "N/A"}
