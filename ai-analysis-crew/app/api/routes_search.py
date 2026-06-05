@@ -22,6 +22,7 @@ class KeywordSearchRequest(BaseModel):
     user_email: Optional[str] = None
     user_country: Optional[str] = None
     user_region: Optional[str] = None
+    user_currency: Optional[str] = None
 
 
 @router.post("/keywords")
@@ -69,6 +70,7 @@ async def search_keywords(
 
         user_country = payload.user_country or None
         user_region = payload.user_region or None
+        user_currency = payload.user_currency or None
         job_id = str(uuid.uuid4())
 
         from ..notification_service import notify_analysis_started
@@ -105,6 +107,7 @@ async def search_keywords(
                     keywords,
                     user_country=user_country,
                     user_region=user_region,
+                    user_currency=user_currency,
                     user_id=user.id,
                     keywords_label=keywords,
                 )
@@ -146,6 +149,7 @@ async def schedule_keyword_search(
         user_email = body.get("user_email", "")
         user_country = body.get("user_country") or None
         user_region = body.get("user_region") or None
+        user_currency = body.get("user_currency") or None
 
         # Handle keywords as either string or array
         if isinstance(keywords_raw, list):
@@ -217,6 +221,8 @@ async def schedule_keyword_search(
                 keywords,
                 user_country=user_country,
                 user_region=user_region,
+                user_currency=user_currency,
+                user_id=user.id if user else None,
             )
         )
 

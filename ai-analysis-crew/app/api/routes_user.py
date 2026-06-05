@@ -51,6 +51,8 @@ async def get_user_profile(user: CurrentUser = Depends(get_current_user)):
             prefs["userCountry"] = (profile.get("user_country") or "").strip()
         if "user_region" in profile:
             prefs["userRegion"] = (profile.get("user_region") or "").strip()
+        if prefs.get("userCurrency"):
+            prefs["userCurrency"] = (prefs.get("userCurrency") or "").strip().upper()
         profile["preferences"] = prefs
 
         return api_ok(profile=profile)
@@ -113,6 +115,8 @@ async def update_user_profile(payload: dict[str, Any], user: CurrentUser = Depen
             updates["use_regional_suppliers"] = bool(merged_prefs.get("useRegionalSuppliers"))
             updates["user_country"] = (merged_prefs.get("userCountry") or "").strip() or None
             updates["user_region"] = (merged_prefs.get("userRegion") or "").strip() or None
+            if merged_prefs.get("userCurrency"):
+                merged_prefs["userCurrency"] = (merged_prefs.get("userCurrency") or "").strip().upper()
 
         updates["updated_at"] = datetime.utcnow().isoformat()
 
@@ -135,6 +139,8 @@ async def update_user_profile(payload: dict[str, Any], user: CurrentUser = Depen
             prefs["userCountry"] = (profile.get("user_country") or "").strip()
         if "user_region" in profile:
             prefs["userRegion"] = (profile.get("user_region") or "").strip()
+        if prefs.get("userCurrency"):
+            prefs["userCurrency"] = (prefs.get("userCurrency") or "").strip().upper()
         profile["preferences"] = prefs
 
         # Invalidate current-user cache so next /auth/current-user gets fresh profile
@@ -231,7 +237,7 @@ async def get_region_preference(user: CurrentUser = Depends(get_current_user)):
         )
         row = res.data if res and res.data else None
         if not row:
-            return api_ok(useRegionalSuppliers=False, userCountry="", userRegion="")
+            return api_ok(useRegionalSuppliers=False, userCountry="", userRegion="", userCurrency="")
 
         # Prefer dedicated columns; fallback to preferences for backward compatibility
         prefs = _safe_dict(row.get("preferences"))
@@ -244,11 +250,16 @@ async def get_region_preference(user: CurrentUser = Depends(get_current_user)):
         region = row.get("user_region")
         if region is None:
             region = prefs.get("userRegion") or ""
+        currency = (prefs.get("userCurrency") or "").strip().upper()
+        if not currency and country:
+            from ..currency_utils import currency_for_country
+            currency = currency_for_country(str(country))
 
         return api_ok(
             useRegionalSuppliers=bool(use_regional),
             userCountry=(country or "").strip(),
             userRegion=(region or "").strip(),
+            userCurrency=currency,
         )
     except Exception as e:
         print(f"❌ Error fetching region preference: {e}")

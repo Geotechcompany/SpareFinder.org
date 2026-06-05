@@ -110,6 +110,7 @@ const Settings = () => {
     useRegionalSuppliers: false,
     userCountry: "",
     userRegion: "",
+    userCurrency: "",
   });
 
   // New state for password change
@@ -314,6 +315,7 @@ const Settings = () => {
             useRegionalSuppliers: !!useRegionalSuppliers,
             userCountry: userCountry ?? "",
             userRegion: userRegion ?? "",
+            userCurrency: (prefs.userCurrency ?? "").trim().toUpperCase(),
           });
 
         }
@@ -361,6 +363,7 @@ const Settings = () => {
           useRegionalSuppliers: prefs.useRegionalSuppliers,
           userCountry: prefs.userCountry,
           userRegion: prefs.userRegion,
+          userCurrency: prefs.userCurrency,
         },
       });
       toast({
@@ -427,6 +430,7 @@ const Settings = () => {
         ...prev,
         userCountry: country,
         userRegion: region,
+        userCurrency: currency.toUpperCase(),
       }));
       // Persist detected location after state update (next tick)
       setTimeout(() => scheduleSaveRegionPreference(), 100);
@@ -517,6 +521,7 @@ const Settings = () => {
         useRegionalSuppliers: preferences.useRegionalSuppliers,
         userCountry: preferences.userCountry,
         userRegion: preferences.userRegion,
+        userCurrency: preferences.userCurrency,
       };
 
       const preferencesResponse = await api.user.updateProfile({
@@ -1639,7 +1644,7 @@ const Settings = () => {
                               Use my location for supplier results
                             </h4>
                             <p className="text-sm text-muted-foreground dark:text-gray-400">
-                              Prioritize suppliers in your country or region when running SpareFinder Research.
+                              Search suppliers only in your selected country or region. Prices are shown in your local currency.
                             </p>
                           </div>
                           <Switch
@@ -1690,11 +1695,11 @@ const Settings = () => {
                                       </span>
                                     </div>
                                   )}
-                                  {detectedCurrency && (
+                                  {(detectedCurrency || preferences.userCurrency) && (
                                     <div className="inline-flex items-center gap-1.5 rounded-lg bg-background/80 dark:bg-white/10 px-3 py-1.5 border border-border/60 dark:border-white/10">
                                       <DollarSign className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
                                       <span className="text-sm font-medium text-foreground dark:text-white">
-                                        {detectedCurrency}
+                                        {preferences.userCurrency || detectedCurrency}
                                       </span>
                                     </div>
                                   )}

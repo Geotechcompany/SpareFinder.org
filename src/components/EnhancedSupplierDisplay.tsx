@@ -23,6 +23,7 @@ import { toast } from "@/hooks/use-toast";
 import { motion } from "framer-motion";
 import { API_BASE_URL } from "@/lib/config";
 import SupplierContactScraper from "./SupplierContactScraper";
+import { convertPriceText } from "@/lib/currency";
 
 interface Supplier {
   name: string;
@@ -76,6 +77,7 @@ interface EnhancedSupplierDisplayProps {
   partName?: string;
   className?: string;
   showScraper?: boolean;
+  userCurrency?: string | null;
 }
 
 export const EnhancedSupplierDisplay: React.FC<
@@ -86,7 +88,13 @@ export const EnhancedSupplierDisplay: React.FC<
   partName = "this part",
   className = "",
   showScraper = true,
+  userCurrency = null,
 }) => {
+  const formatSupplierPrice = (value?: string) => {
+    if (!value?.trim()) return value;
+    if (!userCurrency) return value;
+    return convertPriceText(value, userCurrency);
+  };
   const [scrapedData, setScrapedData] = useState<
     Record<string, ScrapedContactData>
   >({});
@@ -264,7 +272,7 @@ export const EnhancedSupplierDisplay: React.FC<
                         <div className="flex items-center mt-1">
                           <DollarSign className="w-4 h-4 text-green-400 mr-1" />
                           <span className="text-green-300 text-sm">
-                            {supplier.price_range}
+                            {formatSupplierPrice(supplier.price_range)}
                           </span>
                         </div>
                       )}
@@ -569,7 +577,7 @@ export const EnhancedSupplierDisplay: React.FC<
                                   Price Information
                                 </Label>
                                 <p className="text-gray-200 text-sm mt-1">
-                                  {hasScrapedData.price_info}
+                                  {formatSupplierPrice(hasScrapedData.price_info)}
                                 </p>
                               </div>
                             )}

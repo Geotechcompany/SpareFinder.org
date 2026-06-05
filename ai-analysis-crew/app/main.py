@@ -845,6 +845,7 @@ async def run_analysis_background(
     keywords: Optional[str],
     user_country: Optional[str] = None,
     user_region: Optional[str] = None,
+    user_currency: Optional[str] = None,
     user_id: Optional[str] = None,
     image_name: Optional[str] = None,
     keywords_label: Optional[str] = None,
@@ -863,6 +864,15 @@ async def run_analysis_background(
 
     resolved_user_id = await asyncio.to_thread(
         resolve_user_id, user_id, user_email
+    )
+    from .region_preferences import resolve_analysis_context
+
+    user_country, user_region, user_currency = await asyncio.to_thread(
+        resolve_analysis_context,
+        resolved_user_id,
+        user_country,
+        user_region,
+        user_currency,
     )
     label_keywords = keywords_label or keywords
     crew_report_text: Optional[str] = None
@@ -916,6 +926,7 @@ async def run_analysis_background(
                 user_email,
                 user_country=user_country,
                 user_region=user_region,
+                user_currency=user_currency,
                 job_id=analysis_id,
                 vision_description=vision_text,
             )
@@ -928,6 +939,7 @@ async def run_analysis_background(
                 user_email,
                 user_country=user_country,
                 user_region=user_region,
+                user_currency=user_currency,
                 job_id=analysis_id,
             )
 

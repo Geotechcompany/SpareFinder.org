@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
 import EnhancedSupplierDisplay from "./EnhancedSupplierDisplay";
+import { useDetectedRegion } from "@/hooks/useDetectedRegion";
 
 interface FlatAnalysisData {
   success: boolean;
@@ -68,6 +69,8 @@ export const FlatPartAnalysisDisplay: React.FC<PartAnalysisDisplayProps> = ({
   imagePreview,
   className = "",
 }) => {
+  const { userCurrency } = useDetectedRegion();
+
   // Debug logging
   console.log("📊 PartAnalysisDisplay - analysisData:", analysisData);
   console.log("📝 Full analysis exists:", !!analysisData?.full_analysis);
@@ -171,6 +174,7 @@ export const FlatPartAnalysisDisplay: React.FC<PartAnalysisDisplayProps> = ({
             "this part"
           }
           showScraper={true}
+          userCurrency={userCurrency}
         />
       )}
 

@@ -101,11 +101,39 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { api, dashboardApi } from "@/lib/api";
+import { convertPriceText, formatPriceRange } from "@/lib/currency";
 import KeywordMarkdownResults from "@/components/KeywordMarkdownResults";
 import { ComprehensiveAnalysisModal } from "@/components/ComprehensiveAnalysisModal";
 import { useDetectedRegion } from "@/hooks/useDetectedRegion";
 import TiltedCard from "@/components/TiltedCard";
 // Pending jobs UI removed; redirect goes to History
+
+async function fetchAnalysisRegionOptions(): Promise<
+  | { userCountry?: string; userRegion?: string; userCurrency?: string }
+  | undefined
+> {
+  try {
+    const regionRes = await api.user.getRegionPreference();
+    const data = (regionRes as any)?.data ?? regionRes;
+    const useRegional = data?.useRegionalSuppliers;
+    const userCountry = (data?.userCountry ?? "").trim();
+    const userRegion = (data?.userRegion ?? "").trim();
+    const userCurrency = (data?.userCurrency ?? "").trim().toUpperCase();
+    const options: {
+      userCountry?: string;
+      userRegion?: string;
+      userCurrency?: string;
+    } = {};
+    if (userCurrency) options.userCurrency = userCurrency;
+    if (useRegional && (userCountry || userRegion)) {
+      if (userCountry) options.userCountry = userCountry;
+      if (userRegion) options.userRegion = userRegion;
+    }
+    return Object.keys(options).length ? options : undefined;
+  } catch {
+    return undefined;
+  }
+}
 
 // Enhanced CSS styles for technical data visibility
 const technicalDataStyles = `
@@ -905,7 +933,8 @@ const Upload = () => {
   const { user, isAdmin } = useAuth();
   const { isPlanActive, isLoading: subscriptionLoading } = useSubscription();
   const hasPlanAccess = isAdmin || isPlanActive;
-  const { regionLabel, isLoading: regionLoading, error: regionError } = useDetectedRegion();
+  const { regionLabel, userCurrency, isLoading: regionLoading, error: regionError } =
+    useDetectedRegion();
   const REGION_PREFERENCE_KEY = "sparefinder_region_enabled";
   const [regionEnabled, setRegionEnabled] = useState<boolean | null>(() => {
     try {
@@ -1024,17 +1053,7 @@ const Upload = () => {
 
   const formatPrice = (
     price?: { min: number; max: number; currency: string } | null
-  ) => {
-    if (
-      !price ||
-      typeof price.min === "undefined" ||
-      typeof price.max === "undefined"
-    ) {
-      return "Price not available";
-    }
-    const symbol = price.currency === "GBP" ? "£" : "$";
-    return `${symbol}${price.min} - ${symbol}${price.max}`;
-  };
+  ) => formatPriceRange(price, userCurrency ?? undefined);
 
   const extractCategory = (text: string): string => {
     const categoryMatches = text.match(/Category:\s*([^.\n]+)/i);
@@ -1048,7 +1067,9 @@ const Upload = () => {
 
   const extractPrice = (text: string): string => {
     const priceMatches = text.match(/Price\s*Range:\s*([^.\n]+)/i);
-    return priceMatches ? priceMatches[1].trim() : "Price not available";
+    const raw = priceMatches ? priceMatches[1].trim() : "Price not available";
+    if (raw === "Price not available" || !userCurrency) return raw;
+    return convertPriceText(raw, userCurrency);
   };
 
   // Wizard navigation functions
@@ -1162,21 +1183,7 @@ const Upload = () => {
       setSelectedPrediction(null);
       setOriginalAiResponse(null);
 
-      let regionOptions: { userCountry?: string; userRegion?: string } | undefined;
-      try {
-        const regionRes = await api.user.getRegionPreference();
-        const data = (regionRes as any)?.data ?? regionRes;
-        const useRegional = data?.useRegionalSuppliers;
-        const userCountry = data?.userCountry ?? "";
-        const userRegion = data?.userRegion ?? "";
-        if (useRegional && (userCountry || userRegion)) {
-          regionOptions = {};
-          if (userCountry) regionOptions.userCountry = userCountry;
-          if (userRegion) regionOptions.userRegion = userRegion;
-        }
-      } catch (_) {
-        // Ignore region-preference fetch failure; proceed without region
-      }
+      const regionOptions = await fetchAnalysisRegionOptions();
 
       // Schedule the keyword search for background processing
       const response = await dashboardApi.scheduleKeywordSearch(
@@ -1393,21 +1400,7 @@ const Upload = () => {
     setIsSubmittingCrewJob(true);
 
     try {
-      let regionOptions: { userCountry?: string; userRegion?: string } | undefined;
-      try {
-        const regionRes = await api.user.getRegionPreference();
-        const data = (regionRes as any)?.data ?? regionRes;
-        const useRegional = data?.useRegionalSuppliers;
-        const userCountry = data?.userCountry ?? "";
-        const userRegion = data?.userRegion ?? "";
-        if (useRegional && (userCountry || userRegion)) {
-          regionOptions = {};
-          if (userCountry) regionOptions.userCountry = userCountry;
-          if (userRegion) regionOptions.userRegion = userRegion;
-        }
-      } catch {
-        /* optional */
-      }
+      const regionOptions = await fetchAnalysisRegionOptions();
 
       const response = await api.upload.createCrewAnalysisJob(
         uploadedFile,
@@ -3658,10 +3651,10 @@ const Upload = () => {
                 <DialogDescription asChild>
                   <div className="space-y-3 pt-1 text-muted-foreground">
                     <p>
-                      When enabled, we use your country or region to prioritise suppliers near you. We do not store your precise location.
+                      When enabled, supplier search is limited to your selected country or region only. Prices are converted to your local currency. We do not store your precise location.
                     </p>
                     <p>
-                      This can improve the relevance of your results—for example, by surfacing local suppliers and availability in your area. You can switch to global results at any time.
+                      Set your country and region in Settings → Preferences, or detect them automatically. Turn off to search suppliers globally.
                     </p>
                   </div>
                 </DialogDescription>

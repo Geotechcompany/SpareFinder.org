@@ -176,6 +176,7 @@ async def create_crew_analysis_job(
     keywords: Optional[str] = Form(None),
     user_country: Optional[str] = Form(None),
     user_region: Optional[str] = Form(None),
+    user_currency: Optional[str] = Form(None),
     scope: WorkspaceScope = Depends(get_workspace_scope),
     user: CurrentUser = Depends(get_current_user),
 ):
@@ -332,6 +333,7 @@ async def create_crew_analysis_job(
                 keywords or "",
                 user_country=user_country or None,
                 user_region=user_region or None,
+                user_currency=user_currency or None,
                 user_id=user_id,
                 image_name=image.filename,
             )

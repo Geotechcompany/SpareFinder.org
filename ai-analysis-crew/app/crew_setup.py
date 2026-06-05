@@ -212,6 +212,7 @@ def setup_crew(
     user_email: str,
     user_country: Optional[str] = None,
     user_region: Optional[str] = None,
+    user_currency: Optional[str] = None,
     job_id: Optional[str] = None,
     vision_description: Optional[str] = None,
 ) -> Tuple[Crew, Task]:
@@ -222,12 +223,14 @@ def setup_crew(
         image_data: Optional image bytes
         keywords: Optional part keywords
         user_email: User's email address
-        user_country: Optional user country for regional supplier prioritization
-        user_region: Optional user region for regional supplier prioritization
+        user_country: Optional user country — restricts supplier search to this area
+        user_region: Optional user region — restricts supplier search to this area
+        user_currency: Optional ISO currency code for all quoted prices
 
     Returns:
         Configured Crew instance
     """
+    from .currency_utils import currency_instruction
     openai_api_key = os.getenv("OPENAI_API_KEY")
     if not openai_api_key:
         raise ValueError("OPENAI_API_KEY environment variable must be set")
@@ -315,6 +318,8 @@ def setup_crew(
     image_note = ""
     if image_data:
         image_note = f"\n\n**IMPORTANT**: Use your vision capabilities to analyze the uploaded image. The image is available for analysis."
+
+    currency_block = currency_instruction(user_currency)
     
     # Create tasks
     identify_task = Task(
@@ -335,8 +340,8 @@ def setup_crew(
     )
     
     research_task = Task(
-        description="""
-        Based on the part identification, conduct COMPREHENSIVE technical research:
+        description=f"""
+        Based on the part identification, conduct COMPREHENSIVE technical research:{currency_block}
         
         **REQUIRED SECTIONS:**
         
@@ -380,7 +385,7 @@ def setup_crew(
         expected_output="Comprehensive technical specifications, compatibility info, key features, alternative options with pricing, all well-organized",
         context=[identify_task]
     )
-    
+
     region_block = ""
     region_expected = ""
     if user_country or user_region:
@@ -391,17 +396,17 @@ def setup_crew(
             parts.append(user_region)
         region_label = ", ".join(parts)
         region_block = f"""
-        **MANDATORY REGION: User location is {region_label}.**
-        - List ONLY suppliers that are physically located in or primarily serve {region_label}. Their address or primary market must be in this country/region.
-        - Do NOT list suppliers that are merely "international" or "ship worldwide" (e.g. generic US/UK retailers) unless they have a physical presence or primary operations in {region_label}.
-        - If you cannot find at least 2 suppliers that clearly meet this criterion, then list those you find and add at most 1–2 worldwide options, clearly labeled as "Outside your region" with a note that they ship internationally.
-        - Prefer suppliers with complete contact details (address, phone, email, website) in the user's region.
-        - If you found NO supplier physically located in or primarily serving the user's region (i.e. you only listed "Outside your region" options), you MUST include exactly this line at the end of your output: [NO_REGIONAL_SUPPLIERS]
+        **MANDATORY REGION — SEARCH ONLY IN USER'S SELECTED LOCATION: {region_label}.**
+        - Search for and list ONLY suppliers physically located in or whose primary market is {region_label}.
+        - Every supplier address must be in {region_label}. Do NOT include international-only or worldwide-shipping retailers outside this area.
+        - Do NOT add fallback suppliers from other countries or regions. No "Outside your region" options.
+        - If you cannot find any supplier in {region_label}, state that clearly and include exactly this line at the end of your output: [NO_REGIONAL_SUPPLIERS]
+        - Prefer suppliers with complete contact details (address, phone, email, website) in {region_label}.
         """
-        region_expected = " All listed suppliers must be in or primarily serve the user's region unless labeled 'Outside your region'."
+        region_expected = f" All suppliers must be located in or primarily serve {region_label} only."
     supplier_task = Task(
         description=f"""
-        Find 2-3 TOP reliable suppliers for this part.{region_block}
+        Find 2-3 TOP reliable suppliers for this part.{region_block}{currency_block}
         
         For EACH supplier, provide:
         
@@ -426,7 +431,7 @@ def setup_crew(
     
     report_task = Task(
         description=f"""
-        Compile ALL information into a COMPREHENSIVE professional report using this EXACT structure:
+        Compile ALL information into a COMPREHENSIVE professional report using this EXACT structure:{currency_block}
         
         **REPORT STRUCTURE:**
         

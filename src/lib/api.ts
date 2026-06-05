@@ -600,19 +600,21 @@ export const dashboardApi = {
   scheduleKeywordSearch: async (
     keywords: string[] | string,
     userEmail?: string,
-    options?: { userCountry?: string; userRegion?: string }
+    options?: { userCountry?: string; userRegion?: string; userCurrency?: string }
   ): Promise<ApiResponse> => {
     const payload: {
       keywords: string[];
       user_email?: string;
       user_country?: string;
       user_region?: string;
+      user_currency?: string;
     } = {
       keywords: Array.isArray(keywords) ? keywords : [keywords],
     };
     if (userEmail) payload.user_email = userEmail;
     if (options?.userCountry) payload.user_country = options.userCountry;
     if (options?.userRegion) payload.user_region = options.userRegion;
+    if (options?.userCurrency) payload.user_currency = options.userCurrency;
 
     // Backend returns immediately with job_id; analysis runs in background.
     const response = await apiClient.post("/search/keywords", payload, {
@@ -1695,7 +1697,7 @@ export const uploadApi = {
   createCrewAnalysisJob: async (
     file: File,
     keywords: string = "",
-    options?: { userCountry?: string; userRegion?: string }
+    options?: { userCountry?: string; userRegion?: string; userCurrency?: string }
   ): Promise<ApiResponse<{ jobId: string; imageUrl: string }>> => {
     try {
       const formData = new FormData();
@@ -1708,6 +1710,9 @@ export const uploadApi = {
       }
       if (options?.userRegion) {
         formData.append("user_region", options.userRegion);
+      }
+      if (options?.userCurrency) {
+        formData.append("user_currency", options.userCurrency);
       }
 
       // Do not set Content-Type: let the browser set multipart/form-data with boundary
@@ -2103,9 +2108,14 @@ export const api = {
   profile: profileApi,
   user: {
     getProfile: () => apiClient.get("/user/profile"),
-    /** Lightweight: returns only region preference (useRegionalSuppliers, userCountry, userRegion) from DB. */
+    /** Lightweight: returns region preference and currency from DB. */
     getRegionPreference: async (): Promise<
-      ApiResponse<{ useRegionalSuppliers?: boolean; userCountry?: string; userRegion?: string }>
+      ApiResponse<{
+        useRegionalSuppliers?: boolean;
+        userCountry?: string;
+        userRegion?: string;
+        userCurrency?: string;
+      }>
     > => {
       const response = await apiClient.get("/user/region-preference");
       return response.data;
@@ -2151,6 +2161,7 @@ export const api = {
         useRegionalSuppliers?: boolean;
         userCountry?: string;
         userRegion?: string;
+        userCurrency?: string;
         onboarding?: {
           companySize?: string;
           role?: string;

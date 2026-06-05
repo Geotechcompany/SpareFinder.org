@@ -18,6 +18,8 @@ export interface DetectedRegionState {
   city: string | null;
   /** Country if available */
   country: string | null;
+  /** User's preferred ISO currency code (from settings or inferred from country) */
+  userCurrency: string | null;
   isLoading: boolean;
   error: boolean;
 }
@@ -34,6 +36,7 @@ export function useDetectedRegion(): DetectedRegionState {
     regionLabel: null,
     city: null,
     country: null,
+    userCurrency: null,
     isLoading: true,
     error: false,
   });
@@ -55,6 +58,7 @@ export function useDetectedRegion(): DetectedRegionState {
         const useRegional = data?.useRegionalSuppliers;
         const userCountry = (data?.userCountry ?? "").trim();
         const userRegion = (data?.userRegion ?? "").trim();
+        const userCurrency = (data?.userCurrency ?? "").trim().toUpperCase() || null;
         if (mounted && useRegional && (userCountry || userRegion)) {
           const label = [userCountry || null, userRegion || null]
             .filter(Boolean)
@@ -62,12 +66,21 @@ export function useDetectedRegion(): DetectedRegionState {
           setState({
             regionLabel: label || null,
             city: null,
-            country: null,
+            country: userCountry || null,
+            userCurrency,
             isLoading: false,
             error: false,
           });
           clearTimeout(t);
           return;
+        }
+        if (mounted && userCurrency) {
+          setState((s) => ({
+            ...s,
+            userCurrency,
+            isLoading: false,
+            error: false,
+          }));
         }
       } catch {
         // Ignore preference failures and fall back to IP lookup
@@ -86,13 +99,14 @@ export function useDetectedRegion(): DetectedRegionState {
           const country = data.country?.trim() || null;
           const parts = [city, country].filter(Boolean);
           const regionLabel = parts.length > 0 ? parts.join(", ") : null;
-          setState({
+          setState((s) => ({
             regionLabel,
             city: city || null,
             country: country || null,
+            userCurrency: s.userCurrency,
             isLoading: false,
             error: false,
-          });
+          }));
         })
         .catch(() => {
           if (mounted) {
