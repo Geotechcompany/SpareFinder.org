@@ -229,6 +229,132 @@ def _actor_ticket_from_clerk_response(data: dict[str, Any]) -> tuple[str | None,
     return token, redirect_url
 
 
+def _clerk_api_base() -> str:
+    return (os.getenv("CLERK_API_URL") or "https://api.clerk.com/v1").rstrip("/")
+
+
+def _format_clerk_api_error(resp: requests.Response) -> str:
+    """Return a short, human-readable message from a Clerk API error body."""
+    try:
+        payload = resp.json()
+        candidates: list[Any] = []
+        if isinstance(payload, dict):
+            candidates.append(payload)
+            errors = payload.get("errors")
+            if isinstance(errors, list):
+                candidates.extend(errors)
+        elif isinstance(payload, list):
+            candidates.extend(payload)
+
+        for item in candidates:
+            if not isinstance(item, dict):
+                continue
+            for key in ("long_message", "longMessage", "message", "short_message", "shortMessage"):
+                val = item.get(key)
+                if isinstance(val, str) and val.strip():
+                    return val.strip()
+    except Exception:
+        pass
+    return (resp.text or resp.reason or "Unknown Clerk error")[:300]
+
+
+def _clerk_user_exists(*, clerk_secret: str, clerk_user_id: str) -> bool:
+    if not clerk_user_id.startswith("user_"):
+        return False
+    try:
+        resp = requests.get(
+            f"{_clerk_api_base()}/users/{clerk_user_id}",
+            headers={"Authorization": f"Bearer {clerk_secret}"},
+            timeout=10,
+        )
+        return resp.status_code == 200
+    except requests.RequestException:
+        return False
+
+
+def _clerk_lookup_user_id_by_email(*, clerk_secret: str, email: str) -> str | None:
+    normalized = email.strip().lower()
+    if not normalized:
+        return None
+    try:
+        resp = requests.get(
+            f"{_clerk_api_base()}/users",
+            headers={"Authorization": f"Bearer {clerk_secret}"},
+            params=[("email_address[]", normalized)],
+            timeout=10,
+        )
+        if resp.status_code != 200:
+            return None
+        payload = resp.json()
+        users: list[Any]
+        if isinstance(payload, list):
+            users = payload
+        elif isinstance(payload, dict):
+            data = payload.get("data")
+            users = data if isinstance(data, list) else []
+        else:
+            users = []
+        for user in users:
+            if isinstance(user, dict):
+                user_id = user.get("id")
+                if isinstance(user_id, str) and user_id.strip().startswith("user_"):
+                    return user_id.strip()
+    except requests.RequestException:
+        return None
+    return None
+
+
+def _resolve_impersonation_clerk_user_id(
+    supabase: Any,
+    *,
+    profile: dict[str, Any],
+    clerk_secret: str,
+) -> tuple[str | None, dict[str, Any] | None]:
+    """
+    Resolve the Clerk user ID for impersonation.
+    Repairs stale profile.clerk_user_id values via email lookup when possible.
+    """
+    profile_id = profile.get("id")
+    stored_id = (profile.get("clerk_user_id") or "").strip()
+    email = (profile.get("email") or "").strip().lower()
+
+    if stored_id and _clerk_user_exists(clerk_secret=clerk_secret, clerk_user_id=stored_id):
+        return stored_id, None
+
+    if email:
+        resolved_id = _clerk_lookup_user_id_by_email(clerk_secret=clerk_secret, email=email)
+        if resolved_id:
+            if profile_id and resolved_id != stored_id:
+                try:
+                    supabase.table("profiles").update(
+                        {
+                            "clerk_user_id": resolved_id,
+                            "updated_at": datetime.utcnow().isoformat(),
+                        }
+                    ).eq("id", profile_id).execute()
+                except Exception:
+                    pass
+            return resolved_id, None
+
+    if stored_id and not stored_id.startswith("user_"):
+        return None, api_error(
+            "This profile has an invalid Clerk user ID. Ask the user to sign in once so their account links to Clerk.",
+            status_code=400,
+        )
+
+    if not email:
+        return None, api_error(
+            "This user has no Clerk account linked yet. They must sign in at least once.",
+            status_code=400,
+        )
+
+    return None, api_error(
+        f"No Clerk account found for {email}. "
+        "They may only exist in the database, or the API CLERK_SECRET_KEY may point to a different Clerk instance than the app.",
+        status_code=400,
+    )
+
+
 def _trial_info_from_subscription(
     tier: str, status: str, period_end_raw: Any
 ) -> dict[str, Any]:
@@ -458,14 +584,20 @@ async def admin_impersonate_user(
             status_code=403,
         )
 
-    target_clerk_id = (target.get("clerk_user_id") or "").strip()
+    target_clerk_id, resolve_error = _resolve_impersonation_clerk_user_id(
+        supabase,
+        profile=target,
+        clerk_secret=clerk_secret,
+    )
+    if resolve_error:
+        return resolve_error
     if not target_clerk_id:
         return api_error(
             "This user has no Clerk account linked yet. They must sign in at least once.",
             status_code=400,
         )
 
-    clerk_base = (os.getenv("CLERK_API_URL") or "https://api.clerk.com/v1").rstrip("/")
+    clerk_base = _clerk_api_base()
     payload = {
         "user_id": target_clerk_id,
         "expires_in_seconds": 3600,
@@ -485,9 +617,9 @@ async def admin_impersonate_user(
         return api_error(f"Failed to contact Clerk: {exc}", status_code=502)
 
     if resp.status_code not in (200, 201):
-        detail = resp.text[:500] if resp.text else resp.reason
+        detail = _format_clerk_api_error(resp)
         return api_error(
-            f"Clerk could not create an impersonation token ({resp.status_code}): {detail}",
+            f"Clerk could not create an impersonation token: {detail}",
             status_code=502,
         )
 
