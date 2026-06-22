@@ -27,8 +27,9 @@ def get_marketing_settings_row(supabase: Any) -> dict[str, Any]:
                 "scheduled_send_interval_sec": 0,
                 "scheduled_discover_max_queries": 3,
                 "scheduled_send_batch": 20,
-                # Auto re-sanitize leads stuck in sanitization_status=review (per send/discover cron); 0 = off.
-                "sanitize_review_batch": 25,
+                # Auto re-sanitize leads stuck in sanitization_status=review (per send/discover/sanitize cron); 0 = off.
+                "sanitize_review_batch": 100,
+                "scheduled_sanitize_interval_sec": 300,
             },
         }
     ).execute()
@@ -91,4 +92,4 @@ def sanitize_review_batch_cap(supabase: Any) -> int:
             n = int(raw)
     except (TypeError, ValueError):
         n = 25
-    return max(0, min(int(n), 100))
+    return max(0, min(int(n), 500))

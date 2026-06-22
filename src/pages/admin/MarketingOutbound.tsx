@@ -115,6 +115,14 @@ const SCHED_SEND_PRESETS: { label: string; value: number }[] = [
   { label: "Every 6 hours", value: 21600 },
 ];
 
+const SCHED_SANITIZE_PRESETS: { label: string; value: number }[] = [
+  { label: "Off", value: 0 },
+  { label: "Every 5 minutes (recommended)", value: 300 },
+  { label: "Every 15 minutes", value: 900 },
+  { label: "Every 30 minutes", value: 1800 },
+  { label: "Every hour", value: 3600 },
+];
+
 function parseSettingsInt(v: unknown, fallback: number): number {
   const n = Number(v);
   return Number.isFinite(n) ? Math.trunc(n) : fallback;
@@ -204,8 +212,9 @@ const MarketingOutbound: React.FC = () => {
   const [scheduledSendIntervalSec, setScheduledSendIntervalSec] = useState(0);
   const [scheduledDiscoverMaxQueries, setScheduledDiscoverMaxQueries] = useState(3);
   const [scheduledSendBatch, setScheduledSendBatch] = useState(20);
-  /** Leads stuck in sanitization review to auto-process per send/discover cron (0 = off). Default 25. */
-  const [sanitizeReviewBatch, setSanitizeReviewBatch] = useState(25);
+  /** Leads stuck in sanitization review to auto-process per sanitize batch (0 = off). Default 100. */
+  const [sanitizeReviewBatch, setSanitizeReviewBatch] = useState(100);
+  const [scheduledSanitizeIntervalSec, setScheduledSanitizeIntervalSec] = useState(300);
   const [leadCountryFilter, setLeadCountryFilter] = useState<string>("all");
   const [aiQueriesLoading, setAiQueriesLoading] = useState(false);
   const [newCampaignName, setNewCampaignName] = useState("Outbound — industrial buyers");
@@ -272,6 +281,7 @@ const MarketingOutbound: React.FC = () => {
           scheduled_discover_max_queries?: number;
           scheduled_send_batch?: number;
           sanitize_review_batch?: number;
+          scheduled_sanitize_interval_sec?: number;
         };
       })?.settings;
       const templates = st?.serp_query_templates;
@@ -290,7 +300,10 @@ const MarketingOutbound: React.FC = () => {
         Math.min(10, Math.max(1, parseSettingsInt(st?.scheduled_discover_max_queries, 3)))
       );
       setScheduledSendBatch(Math.min(200, Math.max(1, parseSettingsInt(st?.scheduled_send_batch, 20))));
-      setSanitizeReviewBatch(Math.min(100, Math.max(0, parseSettingsInt(st?.sanitize_review_batch, 25))));
+      setSanitizeReviewBatch(Math.min(500, Math.max(0, parseSettingsInt(st?.sanitize_review_batch, 100))));
+      setScheduledSanitizeIntervalSec(
+        Math.min(604800, Math.max(0, parseSettingsInt(st?.scheduled_sanitize_interval_sec, 300)))
+      );
     } catch (e) {
       console.error(e);
       toast({
@@ -491,6 +504,7 @@ const MarketingOutbound: React.FC = () => {
       scheduled_discover_max_queries: scheduledDiscoverMaxQueries,
       scheduled_send_batch: scheduledSendBatch,
       sanitize_review_batch: sanitizeReviewBatch,
+      scheduled_sanitize_interval_sec: scheduledSanitizeIntervalSec,
     });
     if (res.success)
       toast({
@@ -1719,11 +1733,37 @@ const MarketingOutbound: React.FC = () => {
                           </Select>
                         </div>
                         <div>
+                          <Label>Sanitize automation interval</Label>
+                          <p className="text-xs text-muted-foreground mb-2">
+                            Auto-accepts valid business emails stuck in &ldquo;needs review&rdquo;. Runs independently
+                            of discover/send crons.
+                          </p>
+                          <Select
+                            value={String(scheduledSanitizeIntervalSec)}
+                            onValueChange={(v) => setScheduledSanitizeIntervalSec(parseInt(v, 10) || 0)}
+                          >
+                            <SelectTrigger className="w-[220px]">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {SCHED_SANITIZE_PRESETS.map((p) => (
+                                <SelectItem key={p.value} value={String(p.value)}>
+                                  {p.label}
+                                </SelectItem>
+                              ))}
+                              {!SCHED_SANITIZE_PRESETS.some((p) => p.value === scheduledSanitizeIntervalSec) ? (
+                                <SelectItem value={String(scheduledSanitizeIntervalSec)}>
+                                  Custom ({scheduledSanitizeIntervalSec}s)
+                                </SelectItem>
+                              ) : null}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div>
                           <Label>Sanitize review batch</Label>
                           <p className="text-xs text-muted-foreground mb-2">
-                            Each <strong>marketing-send</strong> and <strong>marketing-discover</strong> cron re-runs AI
-                            sanitization on up to this many contacts stuck in &ldquo;needs review&rdquo;.{" "}
-                            <span className="font-medium text-foreground">0</span> turns it off.
+                            Contacts processed per sanitize cycle (each cycle may run multiple batches until the queue
+                            drains). <span className="font-medium text-foreground">0</span> turns automation off.
                           </p>
                           <Select
                             value={String(sanitizeReviewBatch)}
@@ -1733,12 +1773,12 @@ const MarketingOutbound: React.FC = () => {
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
-                              {[0, 10, 15, 20, 25, 35, 50, 75, 100].map((n) => (
+                              {[0, 25, 50, 100, 150, 200, 300, 500].map((n) => (
                                 <SelectItem key={n} value={String(n)}>
                                   {n === 0 ? "Off (0)" : String(n)}
                                 </SelectItem>
                               ))}
-                              {![0, 10, 15, 20, 25, 35, 50, 75, 100].includes(sanitizeReviewBatch) ? (
+                              {![0, 25, 50, 100, 150, 200, 300, 500].includes(sanitizeReviewBatch) ? (
                                 <SelectItem value={String(sanitizeReviewBatch)}>Custom ({sanitizeReviewBatch})</SelectItem>
                               ) : null}
                             </SelectContent>

@@ -18,6 +18,7 @@ from .marketing_crew import (
 from .marketing_merge import apply_merge, html_to_plain, lead_to_merge_dict
 from .marketing_outbound_defaults import default_campaign_id_for_new_leads, sanitize_review_batch_cap
 from .marketing_rules import is_disposable_domain, is_valid_email
+from .marketing_sanitize import finalize_sanitization_result, rule_based_sanitize_lead
 
 logger = logging.getLogger(__name__)
 
@@ -273,7 +274,7 @@ def run_marketing_sanitize_review_batch(
     Process leads stuck in sanitization_status=review: rule-check email, then re-run OpenAI sanitize.
     Called from marketing send/discover crons so the queue drains without manual admin actions.
     """
-    max_batch = max(0, min(int(max_batch), 100))
+    max_batch = max(0, min(int(max_batch), 500))
     if max_batch == 0:
         return {
             "ok": True,
@@ -331,7 +332,12 @@ def run_marketing_sanitize_review_batch(
                 patch["crew_trace"] = "cron_sanitize:disposable_domain"
                 status_out = "rejected"
             else:
-                sr = sanitize_lead_with_openai(raw, fast_path=True)
+                rule = rule_based_sanitize_lead(raw, email=email)
+                if rule.sanitization_status == "accepted":
+                    sr = rule
+                else:
+                    sr = sanitize_lead_with_openai(raw, fast_path=True)
+                    sr = finalize_sanitization_result(email=email, raw=raw, result=sr)
                 patch["sanitized_full_name"] = sr.sanitized_full_name or None
                 patch["sanitized_job_title"] = sr.sanitized_job_title or None
                 patch["sanitized_company_name"] = sr.sanitized_company_name or None
@@ -369,6 +375,62 @@ def run_marketing_sanitize_review_batch(
     }
 
 
+def run_marketing_sanitize_review_drain(
+    supabase: Any,
+    *,
+    batch_size: int = 100,
+    max_total: int = 500,
+) -> dict[str, Any]:
+    """Process the sanitization review queue in repeated batches until drained or max_total reached."""
+    batch_size = max(1, min(int(batch_size), 500))
+    max_total = max(0, min(int(max_total), 2000))
+    if max_total == 0:
+        return {
+            "ok": True,
+            "batches": 0,
+            "processed": 0,
+            "accepted": 0,
+            "rejected": 0,
+            "still_review": 0,
+            "errors": 0,
+        }
+
+    totals: dict[str, Any] = {
+        "ok": True,
+        "batches": 0,
+        "processed": 0,
+        "accepted": 0,
+        "rejected": 0,
+        "still_review": 0,
+        "errors": 0,
+    }
+    remaining = max_total
+
+    while remaining > 0:
+        chunk = min(batch_size, remaining)
+        result = run_marketing_sanitize_review_batch(supabase, max_batch=chunk)
+        if not result.get("ok"):
+            totals["ok"] = False
+            totals["error"] = result.get("error")
+            break
+
+        totals["batches"] += 1
+        processed = int(result.get("processed") or 0)
+        totals["processed"] += processed
+        totals["accepted"] += int(result.get("accepted") or 0)
+        totals["rejected"] += int(result.get("rejected") or 0)
+        totals["still_review"] += int(result.get("still_review") or 0)
+        totals["errors"] += int(result.get("errors") or 0)
+        remaining -= processed
+
+        if processed == 0:
+            break
+        if int(result.get("accepted") or 0) + int(result.get("rejected") or 0) == 0:
+            break
+
+    return totals
+
+
 def run_marketing_send_cron(
     supabase: Any,
     *,
@@ -391,9 +453,13 @@ def run_marketing_send_cron(
 
     sanitize_cap = sanitize_review_batch_cap(supabase)
     sanitize_review = (
-        run_marketing_sanitize_review_batch(supabase, max_batch=sanitize_cap)
+        run_marketing_sanitize_review_drain(
+            supabase,
+            batch_size=sanitize_cap,
+            max_total=max(sanitize_cap * 5, 500),
+        )
         if sanitize_cap > 0
-        else {"ok": True, "processed": 0, "accepted": 0, "rejected": 0, "still_review": 0, "errors": 0}
+        else {"ok": True, "batches": 0, "processed": 0, "accepted": 0, "rejected": 0, "still_review": 0, "errors": 0}
     )
 
     sent = 0

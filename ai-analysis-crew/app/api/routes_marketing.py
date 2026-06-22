@@ -22,7 +22,6 @@ from ..marketing_crew import (
     extract_lead_fields_from_csv_row,
     generate_email_with_openai,
     generate_serp_discovery_queries,
-    sanitize_lead_with_openai,
 )
 from ..marketing_discovery_queries import prepare_discovery_queries, record_discovery_queries_run
 from ..marketing_pipeline import (
@@ -32,8 +31,12 @@ from ..marketing_pipeline import (
     render_message_for_lead,
     run_marketing_admin_send_to_leads,
     run_marketing_send_cron,
-    run_marketing_sanitize_review_batch,
+    run_marketing_sanitize_review_drain,
     send_marketing_email,
+)
+from ..marketing_sanitize import (
+    apply_sanitize_result_to_payload,
+    sanitize_lead_for_storage,
 )
 from ..marketing_rules import (
     LeadInsertResult,
@@ -179,8 +182,9 @@ class MarketingSettingsBody(BaseModel):
     scheduled_send_interval_sec: int | None = Field(default=None, ge=0, le=604800)
     scheduled_discover_max_queries: int | None = Field(default=None, ge=1, le=10)
     scheduled_send_batch: int | None = Field(default=None, ge=1, le=200)
-    # Per cron: re-run AI sanitization on this many leads stuck in review (0 = off). Default 25 when unset.
-    sanitize_review_batch: int | None = Field(default=None, ge=0, le=100)
+    scheduled_sanitize_interval_sec: int | None = Field(default=None, ge=0, le=604800)
+    # Per cron: process this many leads stuck in review per batch (0 = off). Default 100 when unset.
+    sanitize_review_batch: int | None = Field(default=None, ge=0, le=500)
 
 
 class GenerateCampaignBody(BaseModel):
@@ -318,6 +322,8 @@ async def patch_marketing_settings(
         val["scheduled_discover_max_queries"] = max(1, min(int(body.scheduled_discover_max_queries), 10))
     if body.scheduled_send_batch is not None:
         val["scheduled_send_batch"] = max(1, min(int(body.scheduled_send_batch), 200))
+    if body.scheduled_sanitize_interval_sec is not None:
+        val["scheduled_sanitize_interval_sec"] = max(0, min(int(body.scheduled_sanitize_interval_sec), 604800))
     if body.sanitize_review_batch is not None:
         val["sanitize_review_batch"] = max(0, min(int(body.sanitize_review_batch), 100))
     supabase.table("marketing_settings").update(
@@ -825,25 +831,11 @@ def _insert_marketing_lead(
     }
 
     if email and is_valid_email(email):
-        if is_disposable_domain(email):
-            payload["sanitization_status"] = "rejected"
-            payload["crew_trace"] = "disposable_domain"
-        elif run_sanitize:
-            try:
-                sr = sanitize_lead_with_openai(raw, fast_path=True)
-                payload["sanitized_full_name"] = sr.sanitized_full_name or None
-                payload["sanitized_job_title"] = sr.sanitized_job_title or None
-                payload["sanitized_company_name"] = sr.sanitized_company_name or None
-                payload["sanitized_notes"] = sr.sanitized_notes or None
-                payload["sanitization_status"] = sr.sanitization_status
-                payload["crew_trace"] = sr.crew_trace
-            except Exception as e:
-                payload["sanitization_status"] = "review"
-                payload["crew_trace"] = f"sanitize_error:{e}"[:500]
-        else:
-            payload["sanitization_status"] = "accepted"
+        sr = sanitize_lead_for_storage(raw, email=email, run_sanitize=run_sanitize)
+        apply_sanitize_result_to_payload(payload, sr)
     else:
         payload["sanitization_status"] = "review"
+        payload["crew_trace"] = "missing_or_invalid_email"
 
     payload["unsubscribe_token"] = secrets.token_urlsafe(32)
 
@@ -1569,9 +1561,13 @@ def run_marketing_discover_cron_job(supabase: Any, max_queries: int = 2) -> dict
     )
     scap = sanitize_review_batch_cap(supabase)
     sanitize_review = (
-        run_marketing_sanitize_review_batch(supabase, max_batch=scap)
+        run_marketing_sanitize_review_drain(
+            supabase,
+            batch_size=scap,
+            max_total=max(scap * 5, 500),
+        )
         if scap > 0
-        else {"ok": True, "processed": 0, "accepted": 0, "rejected": 0, "still_review": 0, "errors": 0}
+        else {"ok": True, "batches": 0, "processed": 0, "accepted": 0, "rejected": 0, "still_review": 0, "errors": 0}
     )
     return {
         "ok": True,
@@ -1585,6 +1581,30 @@ def run_marketing_discover_cron_job(supabase: Any, max_queries: int = 2) -> dict
         "note": "Leads use default_outbound_campaign_id from settings, else highest-priority unpaused campaign (else any campaign). "
         "sanitize_review_queue uses Admin → Email campaigns → Find on Google → “Sanitize review batch” (marketing_settings.defaults).",
     }
+
+
+def run_marketing_sanitize_cron_job(supabase: Any, *, max_total: int | None = None) -> dict[str, Any]:
+    """Drain the sanitization review queue (used by scheduled loop and GET /cron/marketing-sanitize)."""
+    scap = sanitize_review_batch_cap(supabase)
+    if scap <= 0:
+        return {
+            "ok": True,
+            "batches": 0,
+            "processed": 0,
+            "accepted": 0,
+            "rejected": 0,
+            "still_review": 0,
+            "errors": 0,
+            "note": "sanitize_review_batch is 0 — enable in admin settings",
+        }
+    total_cap = max_total if max_total is not None else max(scap * 5, 500)
+    result = run_marketing_sanitize_review_drain(
+        supabase,
+        batch_size=scap,
+        max_total=max(1, min(int(total_cap), 2000)),
+    )
+    result["batch_size"] = scap
+    return result
 
 
 @cron_router.get("/cron/marketing-send")
@@ -1609,6 +1629,13 @@ async def cron_marketing_digest():
     except Exception as e:
         logger.error("cron marketing-digest: %s", e)
         return {"ok": False, "error": str(e)}
+
+
+@cron_router.get("/cron/marketing-sanitize")
+async def cron_marketing_sanitize(max_total: int = Query(default=500, ge=1, le=2000)):
+    """Auto-process leads stuck in sanitization review (valid emails → accepted)."""
+    supabase = get_supabase_admin()
+    return run_marketing_sanitize_cron_job(supabase, max_total=max_total)
 
 
 @cron_router.get("/cron/marketing-discover")

@@ -1151,8 +1151,10 @@ export const adminApi = {
     scheduled_send_interval_sec?: number;
     scheduled_discover_max_queries?: number;
     scheduled_send_batch?: number;
-    /** Per marketing-send/discover cron: max leads in sanitization review to re-run AI on (0 = off). Default 25 in DB. */
+    /** Per sanitize cycle: batch size (0 = off). Default 100 in DB. */
     sanitize_review_batch?: number;
+    /** Seconds between auto-sanitize runs. Default 300 in DB. */
+    scheduled_sanitize_interval_sec?: number;
   }): Promise<ApiResponse> => {
     const response = await apiClient.patch("/admin/marketing/settings", payload);
     return response.data;
