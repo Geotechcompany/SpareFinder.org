@@ -483,7 +483,7 @@ async def admin_update_user_plan(
     payload: UpdatePlanBody = Body(...),
     _admin: CurrentUser = Depends(require_roles("admin", "super_admin")),
 ):
-    """Update a user's subscription plan (tier). Use 'no_plan' to cancel and set to free."""
+    """Update a user's subscription plan (tier). Use cancel endpoint to cancel subscriptions."""
     supabase = get_supabase_admin()
     tier = payload.tier
     now = datetime.utcnow()
@@ -542,7 +542,7 @@ async def admin_update_user_plan(
         data_list = (updated_list.data or []) if hasattr(updated_list, "data") else []
         updated = pick_best_subscription_row(data_list)
         return api_ok(
-            message="User plan set to no plan." if is_no_plan else "User plan updated successfully",
+            message="User subscription cancelled." if is_no_plan else "User plan updated successfully",
             data={"subscription": updated},
         )
     if is_no_plan:
@@ -570,7 +570,7 @@ async def admin_update_user_plan(
     data_list = (inserted_list.data or []) if hasattr(inserted_list, "data") else []
     inserted = pick_best_subscription_row(data_list)
     return api_ok(
-        message="User plan set to no plan." if is_no_plan else "User plan set successfully",
+        message="User subscription cancelled." if is_no_plan else "User plan set successfully",
         data={"subscription": inserted},
     )
 

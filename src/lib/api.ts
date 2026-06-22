@@ -914,10 +914,17 @@ export const adminApi = {
 
   updateUserPlan: async (
     userId: string,
-    tier: "free" | "pro" | "enterprise" | "no_plan"
+    tier: "free" | "pro" | "enterprise"
   ): Promise<ApiResponse> => {
     const response = await apiClient.patch(`/admin/users/${userId}/plan`, {
       tier,
+    });
+    return response.data;
+  },
+
+  cancelUserSubscription: async (userId: string): Promise<ApiResponse> => {
+    const response = await apiClient.patch(`/admin/users/${userId}/plan`, {
+      tier: "no_plan",
     });
     return response.data;
   },

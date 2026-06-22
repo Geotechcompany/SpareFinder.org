@@ -69,6 +69,7 @@ import {
   Clock,
   UserCog,
   MapPin,
+  XCircle,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { startImpersonationSession } from "@/lib/impersonation";
@@ -139,6 +140,11 @@ const UserManagement = () => {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkActionLoading, setBulkActionLoading] = useState(false);
   const [bulkDeleteDialogOpen, setBulkDeleteDialogOpen] = useState(false);
+  const [bulkCancelDialogOpen, setBulkCancelDialogOpen] = useState(false);
+  const [cancelSubscriptionUser, setCancelSubscriptionUser] =
+    useState<UserData | null>(null);
+  const [cancelSubscriptionLoading, setCancelSubscriptionLoading] =
+    useState(false);
   const [impersonatingUserId, setImpersonatingUserId] = useState<string | null>(null);
   const { toast } = useToast();
   const { user: currentUser, isSuperAdmin } = useAuth();
@@ -258,31 +264,35 @@ const UserManagement = () => {
     }
   };
 
-  const VALID_TIERS = ["free", "pro", "enterprise", "no_plan"] as const;
+  const VALID_TIERS = ["free", "pro", "enterprise"] as const;
+
+  const isSubscriptionActive = (user: UserData) =>
+    Boolean(
+      user.subscription_status &&
+        user.subscription_status !== "canceled" &&
+        user.subscription_status !== "inactive"
+    );
 
   const handlePlanUpdate = async (
     userId: string,
-    newTier: "free" | "pro" | "enterprise" | "no_plan"
+    newTier: "free" | "pro" | "enterprise"
   ) => {
     if (!newTier || !VALID_TIERS.includes(newTier)) return;
     try {
       const response = await api.admin.updateUserPlan(userId, newTier);
 
       if (response.success) {
-        const isNoPlan = newTier === "no_plan";
         toast({
           title: "Plan Updated",
-          description: isNoPlan
-            ? "User has been set to no plan."
-            : "User plan has been updated successfully.",
+          description: "User plan has been updated successfully.",
         });
         setUsers((prev) =>
           prev.map((u) =>
             u.id === userId
               ? {
                   ...u,
-                  subscription_tier: isNoPlan ? "free" : newTier,
-                  subscription_status: isNoPlan ? "canceled" : "active",
+                  subscription_tier: newTier,
+                  subscription_status: "active",
                 }
               : u
           )
@@ -297,6 +307,51 @@ const UserManagement = () => {
         title: "Error",
         description: "Failed to update user plan. Please try again.",
       });
+    }
+  };
+
+  const handleCancelSubscription = async (userId: string) => {
+    setCancelSubscriptionLoading(true);
+    try {
+      const response = await api.admin.cancelUserSubscription(userId);
+
+      if (response.success) {
+        toast({
+          title: "Subscription Cancelled",
+          description:
+            "The user's subscription has been cancelled in Stripe and locally.",
+        });
+        setUsers((prev) =>
+          prev.map((u) =>
+            u.id === userId
+              ? {
+                  ...u,
+                  subscription_tier: "free",
+                  subscription_status: "canceled",
+                }
+              : u
+          )
+        );
+        setCancelSubscriptionUser(null);
+      } else {
+        throw new Error(
+          (response as any).message ||
+            (response as any).error ||
+            "Failed to cancel subscription"
+        );
+      }
+    } catch (error) {
+      console.error("Error cancelling subscription:", error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description:
+          error instanceof Error
+            ? error.message
+            : "Failed to cancel subscription. Please try again.",
+      });
+    } finally {
+      setCancelSubscriptionLoading(false);
     }
   };
 
@@ -374,7 +429,7 @@ const UserManagement = () => {
     });
   };
 
-  const handleBulkSetPlan = async (tier: "free" | "pro" | "enterprise" | "no_plan") => {
+  const handleBulkSetPlan = async (tier: "free" | "pro" | "enterprise") => {
     if (!VALID_TIERS.includes(tier)) return;
     const ids = Array.from(selectedIds);
     if (ids.length === 0) return;
@@ -397,8 +452,8 @@ const UserManagement = () => {
         ids.includes(u.id)
           ? {
               ...u,
-              subscription_tier: tier === "no_plan" ? "free" : tier,
-              subscription_status: tier === "no_plan" ? "canceled" : "active",
+              subscription_tier: tier,
+              subscription_status: "active",
             }
           : u
       )
@@ -407,6 +462,43 @@ const UserManagement = () => {
     toast({
       title: "Bulk plan update",
       description: `${ok} updated. ${err > 0 ? `${err} failed.` : ""}`,
+      variant: err > 0 ? "destructive" : "default",
+    });
+  };
+
+  const handleBulkCancelSubscriptions = async () => {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) return;
+    setBulkActionLoading(true);
+    let ok = 0;
+    let err = 0;
+    for (const userId of ids) {
+      try {
+        const res = await api.admin.cancelUserSubscription(userId);
+        if (res.success) ok++;
+        else err++;
+      } catch {
+        err++;
+      }
+    }
+    setBulkActionLoading(false);
+    setSelectedIds(new Set());
+    setBulkCancelDialogOpen(false);
+    setUsers((prev) =>
+      prev.map((u) =>
+        ids.includes(u.id)
+          ? {
+              ...u,
+              subscription_tier: "free",
+              subscription_status: "canceled",
+            }
+          : u
+      )
+    );
+    fetchUsers();
+    toast({
+      title: "Bulk subscription cancellation",
+      description: `${ok} cancelled. ${err > 0 ? `${err} failed.` : ""}`,
       variant: err > 0 ? "destructive" : "default",
     });
   };
@@ -678,9 +770,6 @@ const UserManagement = () => {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="start" className="w-48">
-                            <DropdownMenuItem onClick={() => handleBulkSetPlan("no_plan")}>
-                              No plan
-                            </DropdownMenuItem>
                             <DropdownMenuItem onClick={() => handleBulkSetPlan("free")}>
                               Starter
                             </DropdownMenuItem>
@@ -692,6 +781,15 @@ const UserManagement = () => {
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="border-red-500/50 text-red-600 hover:bg-red-500/10 hover:text-red-700 dark:text-red-400 dark:hover:bg-red-500/20"
+                          onClick={() => setBulkCancelDialogOpen(true)}
+                        >
+                          <XCircle className="w-4 h-4 mr-1" />
+                          Cancel subscriptions
+                        </Button>
                         <Button
                           variant="outline"
                           size="sm"
@@ -715,6 +813,79 @@ const UserManagement = () => {
                       )}
                     </div>
                   )}
+
+                  {/* Bulk cancel confirmation dialog */}
+                  <AlertDialog open={bulkCancelDialogOpen} onOpenChange={setBulkCancelDialogOpen}>
+                    <AlertDialogContent className="border border-border bg-background/95 text-foreground dark:bg-gray-900 dark:border-white/10 dark:text-white">
+                      <AlertDialogHeader>
+                        <AlertDialogTitle className="text-foreground dark:text-white">
+                          Cancel {selectedIds.size} subscription
+                          {selectedIds.size !== 1 ? "s" : ""}?
+                        </AlertDialogTitle>
+                        <AlertDialogDescription className="text-muted-foreground dark:text-gray-400">
+                          This immediately cancels each user&apos;s Stripe subscription (if
+                          one exists) and marks their plan as cancelled locally.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel className="border border-border bg-background/80 text-foreground hover:bg-accent dark:bg-white/5 dark:border-white/10 dark:text-white dark:hover:bg-white/10">
+                          Keep subscriptions
+                        </AlertDialogCancel>
+                        <AlertDialogAction
+                          onClick={handleBulkCancelSubscriptions}
+                          className="bg-red-600 hover:bg-red-700"
+                        >
+                          {bulkActionLoading ? (
+                            <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                          ) : null}
+                          Cancel subscriptions
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+
+                  {/* Single-user cancel confirmation dialog */}
+                  <AlertDialog
+                    open={Boolean(cancelSubscriptionUser)}
+                    onOpenChange={(open) => {
+                      if (!open) setCancelSubscriptionUser(null);
+                    }}
+                  >
+                    <AlertDialogContent className="border border-border bg-background/95 text-foreground dark:bg-gray-900 dark:border-white/10 dark:text-white">
+                      <AlertDialogHeader>
+                        <AlertDialogTitle className="text-foreground dark:text-white">
+                          Cancel subscription?
+                        </AlertDialogTitle>
+                        <AlertDialogDescription className="text-muted-foreground dark:text-gray-400">
+                          Cancel the subscription for{" "}
+                          <strong>
+                            {cancelSubscriptionUser?.full_name ||
+                              cancelSubscriptionUser?.email}
+                          </strong>
+                          ? This immediately cancels their Stripe subscription (if one
+                          exists) and marks their plan as cancelled.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel className="border border-border bg-background/80 text-foreground hover:bg-accent dark:bg-white/5 dark:border-white/10 dark:text-white dark:hover:bg-white/10">
+                          Keep subscription
+                        </AlertDialogCancel>
+                        <AlertDialogAction
+                          onClick={() => {
+                            if (cancelSubscriptionUser) {
+                              void handleCancelSubscription(cancelSubscriptionUser.id);
+                            }
+                          }}
+                          className="bg-red-600 hover:bg-red-700"
+                        >
+                          {cancelSubscriptionLoading ? (
+                            <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                          ) : null}
+                          Cancel subscription
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
 
                   {/* Bulk delete confirmation dialog */}
                   <AlertDialog open={bulkDeleteDialogOpen} onOpenChange={setBulkDeleteDialogOpen}>
@@ -862,39 +1033,50 @@ const UserManagement = () => {
                                   </Badge>
                                 </TableCell>
                                 <TableCell>
-                                  <Select
-                                    value={
-                                      !user.subscription_status ||
-                                      user.subscription_status === "canceled" ||
-                                      user.subscription_status === "inactive"
-                                        ? "no_plan"
-                                        : (user.subscription_tier || "free")
-                                    }
-                                    onValueChange={(value) =>
-                                      handlePlanUpdate(
-                                        user.id,
-                                        value as "free" | "pro" | "enterprise" | "no_plan"
-                                      )
-                                    }
-                                  >
-                                    <SelectTrigger className="w-32 h-8 text-xs bg-background/80 border-border text-foreground dark:bg-white/5 dark:border-white/10 dark:text-white">
-                                      <SelectValue placeholder="Plan" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      <SelectItem value="no_plan">
-                                        No plan
-                                      </SelectItem>
-                                      <SelectItem value="free">
-                                        Starter
-                                      </SelectItem>
-                                      <SelectItem value="pro">
-                                        Professional
-                                      </SelectItem>
-                                      <SelectItem value="enterprise">
-                                        Enterprise
-                                      </SelectItem>
-                                    </SelectContent>
-                                  </Select>
+                                  <div className="flex items-center gap-2">
+                                    <Select
+                                      value={user.subscription_tier || "free"}
+                                      onValueChange={(value) =>
+                                        handlePlanUpdate(
+                                          user.id,
+                                          value as "free" | "pro" | "enterprise"
+                                        )
+                                      }
+                                    >
+                                      <SelectTrigger className="w-32 h-8 text-xs bg-background/80 border-border text-foreground dark:bg-white/5 dark:border-white/10 dark:text-white">
+                                        <SelectValue placeholder="Plan" />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        <SelectItem value="free">
+                                          Starter
+                                        </SelectItem>
+                                        <SelectItem value="pro">
+                                          Professional
+                                        </SelectItem>
+                                        <SelectItem value="enterprise">
+                                          Enterprise
+                                        </SelectItem>
+                                      </SelectContent>
+                                    </Select>
+                                    {isSubscriptionActive(user) ? (
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        className="h-8 px-2 text-xs border-red-500/40 text-red-600 hover:bg-red-500/10 hover:text-red-700 dark:text-red-400 dark:hover:bg-red-500/20"
+                                        onClick={() => setCancelSubscriptionUser(user)}
+                                      >
+                                        <XCircle className="w-3.5 h-3.5 mr-1" />
+                                        Cancel
+                                      </Button>
+                                    ) : (
+                                      <Badge
+                                        variant="secondary"
+                                        className="h-8 px-2 text-xs bg-red-500/10 text-red-700 border-red-500/30 dark:text-red-400"
+                                      >
+                                        Cancelled
+                                      </Badge>
+                                    )}
+                                  </div>
                                 </TableCell>
                                 <TableCell className="text-sm">
                                   {user.is_on_trial ? (
