@@ -29,6 +29,47 @@ from .supabase_auth_admin import delete_supabase_auth_user
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
+_TIER_PLAN_LABELS = {
+    "free": "Starter",
+    "pro": "Professional",
+    "enterprise": "Enterprise",
+}
+
+
+def _tier_plan_label(tier: str) -> str:
+    key = (tier or "").strip().lower()
+    return _TIER_PLAN_LABELS.get(key, key or "subscription")
+
+
+def _send_admin_subscription_canceled_email(
+    supabase: Any,
+    *,
+    user_id: str,
+    canceled_tier: str,
+) -> None:
+    """Notify the user after an admin cancels their subscription."""
+    try:
+        profile_res = (
+            supabase.table("profiles")
+            .select("email")
+            .eq("id", user_id)
+            .limit(1)
+            .execute()
+        )
+        profile = (profile_res.data or [None])[0]
+        to_email = (profile.get("email") or "").strip() if profile else ""
+        if not to_email:
+            return
+        from ..email_sender import send_subscription_canceled_email
+
+        send_subscription_canceled_email(
+            to_email=to_email,
+            plan_name=_tier_plan_label(canceled_tier),
+            end_date=datetime.utcnow().strftime("%Y-%m-%d"),
+        )
+    except Exception as mail_err:
+        print(f"⚠️ Admin subscription canceled email error: {mail_err}")
+
 
 def _env(name: str, default: str = "") -> str:
     return (os.getenv(name) or default).strip()
@@ -500,6 +541,7 @@ async def admin_update_user_plan(
     )
     rows = (existing.data or []) if hasattr(existing, "data") else []
     if rows:
+        canceled_tier = str(rows[0].get("tier") or "free")
         if is_no_plan:
             stripe_subscription_id = str(rows[0].get("stripe_subscription_id") or "").strip()
             if stripe_subscription_id:
@@ -541,6 +583,12 @@ async def admin_update_user_plan(
         )
         data_list = (updated_list.data or []) if hasattr(updated_list, "data") else []
         updated = pick_best_subscription_row(data_list)
+        if is_no_plan:
+            _send_admin_subscription_canceled_email(
+                supabase,
+                user_id=userId,
+                canceled_tier=canceled_tier,
+            )
         return api_ok(
             message="User subscription cancelled." if is_no_plan else "User plan updated successfully",
             data={"subscription": updated},

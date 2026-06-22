@@ -1012,13 +1012,27 @@ async def stripe_webhook(request: Request):
         if end_ts:
             end_date = datetime.utcfromtimestamp(end_ts).strftime("%Y-%m-%d")
         customer_email = ""
+        already_canceled = False
+        try:
+            sub_row = (
+                supabase.table("subscriptions")
+                .select("id, status")
+                .eq("stripe_subscription_id", subscription.get("id"))
+                .limit(1)
+                .execute()
+            )
+            sub_data = (sub_row.data or [None])[0]
+            if sub_data:
+                already_canceled = str(sub_data.get("status") or "").lower() == "canceled"
+        except Exception:
+            pass
         if customer_id:
             try:
                 cust = stripe.Customer.retrieve(customer_id)
                 customer_email = (getattr(cust, "email", None) or (cust.get("email") if isinstance(cust, dict) else None) or "").strip()
             except Exception:
                 pass
-        if customer_email:
+        if customer_email and not already_canceled:
             try:
                 send_subscription_canceled_email(to_email=customer_email, plan_name=plan_name, end_date=end_date)
             except Exception as mail_err:

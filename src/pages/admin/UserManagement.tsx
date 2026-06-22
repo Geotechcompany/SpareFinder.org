@@ -266,12 +266,17 @@ const UserManagement = () => {
 
   const VALID_TIERS = ["free", "pro", "enterprise"] as const;
 
+  const isSubscriptionCancelled = (user: UserData) =>
+    user.subscription_status === "canceled" ||
+    user.subscription_status === "inactive";
+
   const isSubscriptionActive = (user: UserData) =>
-    Boolean(
-      user.subscription_status &&
-        user.subscription_status !== "canceled" &&
-        user.subscription_status !== "inactive"
-    );
+    Boolean(user.subscription_status) && !isSubscriptionCancelled(user);
+
+  const getPlanSelectValue = (user: UserData) => {
+    if (isSubscriptionCancelled(user)) return "no_active_plan";
+    return user.subscription_tier || "free";
+  };
 
   const handlePlanUpdate = async (
     userId: string,
@@ -1035,18 +1040,24 @@ const UserManagement = () => {
                                 <TableCell>
                                   <div className="flex items-center gap-2">
                                     <Select
-                                      value={user.subscription_tier || "free"}
-                                      onValueChange={(value) =>
+                                      value={getPlanSelectValue(user)}
+                                      onValueChange={(value) => {
+                                        if (value === "no_active_plan") return;
                                         handlePlanUpdate(
                                           user.id,
                                           value as "free" | "pro" | "enterprise"
-                                        )
-                                      }
+                                        );
+                                      }}
                                     >
-                                      <SelectTrigger className="w-32 h-8 text-xs bg-background/80 border-border text-foreground dark:bg-white/5 dark:border-white/10 dark:text-white">
+                                      <SelectTrigger className="w-36 h-8 text-xs bg-background/80 border-border text-foreground dark:bg-white/5 dark:border-white/10 dark:text-white">
                                         <SelectValue placeholder="Plan" />
                                       </SelectTrigger>
                                       <SelectContent>
+                                        {isSubscriptionCancelled(user) && (
+                                          <SelectItem value="no_active_plan" disabled>
+                                            No active plan
+                                          </SelectItem>
+                                        )}
                                         <SelectItem value="free">
                                           Starter
                                         </SelectItem>
@@ -1058,7 +1069,7 @@ const UserManagement = () => {
                                         </SelectItem>
                                       </SelectContent>
                                     </Select>
-                                    {isSubscriptionActive(user) ? (
+                                    {isSubscriptionActive(user) && (
                                       <Button
                                         variant="outline"
                                         size="sm"
@@ -1068,13 +1079,6 @@ const UserManagement = () => {
                                         <XCircle className="w-3.5 h-3.5 mr-1" />
                                         Cancel
                                       </Button>
-                                    ) : (
-                                      <Badge
-                                        variant="secondary"
-                                        className="h-8 px-2 text-xs bg-red-500/10 text-red-700 border-red-500/30 dark:text-red-400"
-                                      >
-                                        Cancelled
-                                      </Badge>
                                     )}
                                   </div>
                                 </TableCell>
