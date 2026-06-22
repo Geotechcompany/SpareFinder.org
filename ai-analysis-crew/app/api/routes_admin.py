@@ -23,7 +23,7 @@ from .errors import ApiError
 from .responses import api_error, api_ok
 from .support_ticket_email import format_ticket_message_html_for_email, format_ticket_message_plain_for_email
 from .support_ticket_thread import enrich_ticket_messages_authors, fetch_ticket_messages_raw
-from .subscription_utils import merge_subscription_by_user, pick_best_subscription_row
+from .subscription_utils import pick_best_subscription_row, pick_subscription_for_admin_display
 from .supabase_admin import get_supabase_admin
 from .supabase_auth_admin import delete_supabase_auth_user
 
@@ -424,10 +424,20 @@ async def admin_get_users(
                 .in_("user_id", user_ids)
                 .execute()
             )
-            merged = merge_subscription_by_user(subs_res.data or [])
-            for uid_s, row in merged.items():
+            subs_by_user: dict[str, list[dict[str, Any]]] = {}
+            for row in subs_res.data or []:
+                uid = row.get("user_id")
+                if not uid:
+                    continue
+                subs_by_user.setdefault(str(uid), []).append(row)
+            for uid_s, user_rows in subs_by_user.items():
+                row = pick_subscription_for_admin_display(user_rows)
+                if not row:
+                    continue
                 tier = row.get("tier") or "free"
-                status = row.get("status") or "inactive"
+                status = (row.get("status") or "inactive").lower().strip()
+                if status == "cancelled":
+                    status = "canceled"
                 period_end = row.get("current_period_end")
                 trial = _trial_info_from_subscription(tier, status, period_end)
                 subscription_by_user[uid_s] = {

@@ -44,6 +44,31 @@ def pick_best_subscription_row(rows: list[dict[str, Any]] | None) -> dict[str, A
     return max(pool, key=lambda r: sort_key(r))
 
 
+def pick_subscription_for_admin_display(
+    rows: list[dict[str, Any]] | None,
+) -> dict[str, Any] | None:
+    """
+    Choose the subscription row to show in admin user lists.
+    Prefer active/trialing when present; otherwise the most recently updated row.
+    """
+    if not rows:
+        return None
+
+    active_rows = [
+        r
+        for r in rows
+        if subscription_status_rank(r.get("status"))
+        <= subscription_status_rank("trialing")
+    ]
+    if active_rows:
+        return pick_best_subscription_row(active_rows)
+
+    def updated_key(row: dict[str, Any]) -> str:
+        return str(row.get("updated_at") or row.get("current_period_end") or "")
+
+    return max(rows, key=updated_key)
+
+
 def merge_subscription_by_user(
     rows: list[dict[str, Any]] | None,
 ) -> dict[str, dict[str, Any]]:

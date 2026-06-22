@@ -266,15 +266,28 @@ const UserManagement = () => {
 
   const VALID_TIERS = ["free", "pro", "enterprise"] as const;
 
+  const normalizeSubscriptionStatus = (status?: string | null) =>
+    (status || "").trim().toLowerCase();
+
+  const CANCELLED_STATUSES = new Set([
+    "canceled",
+    "cancelled",
+    "inactive",
+    "expired",
+  ]);
+
   const isSubscriptionCancelled = (user: UserData) =>
-    user.subscription_status === "canceled" ||
-    user.subscription_status === "inactive";
+    CANCELLED_STATUSES.has(normalizeSubscriptionStatus(user.subscription_status));
+
+  const hasNoActivePlan = (user: UserData) =>
+    isSubscriptionCancelled(user) ||
+    (!user.subscription_status && !user.subscription_tier);
 
   const isSubscriptionActive = (user: UserData) =>
     Boolean(user.subscription_status) && !isSubscriptionCancelled(user);
 
   const getPlanSelectValue = (user: UserData) => {
-    if (isSubscriptionCancelled(user)) return "no_active_plan";
+    if (hasNoActivePlan(user)) return "no_active_plan";
     return user.subscription_tier || "free";
   };
 
@@ -1053,7 +1066,7 @@ const UserManagement = () => {
                                         <SelectValue placeholder="Plan" />
                                       </SelectTrigger>
                                       <SelectContent>
-                                        {isSubscriptionCancelled(user) && (
+                                        {hasNoActivePlan(user) && (
                                           <SelectItem value="no_active_plan" disabled>
                                             No active plan
                                           </SelectItem>
