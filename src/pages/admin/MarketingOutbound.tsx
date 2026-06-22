@@ -519,25 +519,32 @@ const MarketingOutbound: React.FC = () => {
       if (res.success) {
         const qs = (res.data as { queries?: string[] })?.queries;
         if (Array.isArray(qs) && qs.length) {
-          setSettingsText((prev) => {
-            const seen = new Set(
-              prev
-                .split("\n")
-                .map((s) => s.trim().toLowerCase())
-                .filter(Boolean)
-            );
-            const novel = qs.filter((q) => {
-              const key = q.trim().toLowerCase();
-              return key && !seen.has(key);
+          const seen = new Set(
+            settingsText
+              .split("\n")
+              .map((s) => s.trim().toLowerCase())
+              .filter(Boolean)
+          );
+          const novel = qs.filter((q) => {
+            const key = q.trim().toLowerCase();
+            return key && !seen.has(key);
+          });
+          if (!novel.length) {
+            toast({
+              variant: "destructive",
+              title: "No new queries",
+              description: "AI returned only duplicates of lines already in the editor. Try again.",
             });
-            if (!novel.length) return prev;
+            return;
+          }
+          setSettingsText((prev) => {
             const base = prev.trim();
             const add = novel.join("\n");
             return base ? `${base}\n${add}` : add;
           });
           toast({
             title: "Queries generated",
-            description: `${qs.length} new line(s) added to the editor (duplicates skipped). Review, edit, then Save.`,
+            description: `${novel.length} new line(s) added to the editor. Review, edit, then Save.`,
           });
         } else {
           toast({ variant: "destructive", title: "No queries returned", description: "Try again." });
