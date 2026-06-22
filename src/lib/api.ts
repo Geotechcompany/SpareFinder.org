@@ -1284,6 +1284,7 @@ export const adminApi = {
     country_name?: string;
     count?: number;
     extra_context?: string;
+    exclude_queries?: string[];
   }): Promise<ApiResponse> => {
     const response = await apiClient.post("/admin/marketing/serp-queries/ai-generate", payload);
     return response.data;

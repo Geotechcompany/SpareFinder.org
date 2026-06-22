@@ -350,6 +350,7 @@ def generate_serp_discovery_queries(
     country_name: str,
     count: int = 8,
     extra_context: str | None = None,
+    exclude_queries: list[str] | None = None,
 ) -> list[str]:
     """
     AI-generated Google search strings for SerpAPI B2B discovery (SpareFinder / industrial parts).
@@ -360,25 +361,46 @@ def generate_serp_discovery_queries(
     cn = (country_name or "").strip()[:120] or cc.upper()
     n = max(5, min(int(count), 15))
     extra = (extra_context or "").strip()[:800]
+    excluded: list[str] = []
+    seen_exclude: set[str] = set()
+    for raw in exclude_queries or []:
+        s = str(raw).strip()
+        if not s:
+            continue
+        key = " ".join(s.lower().split())
+        if key in seen_exclude:
+            continue
+        seen_exclude.add(key)
+        excluded.append(s[:200])
+        if len(excluded) >= 40:
+            break
     user_obj = {
         "country_code": cc,
         "country_label": cn,
         "count": n,
         "product": "SpareFinder — identify industrial spare parts from photos and find suppliers faster.",
         "notes": extra,
+        "do_not_repeat_queries": excluded,
     }
+    exclude_hint = ""
+    if excluded:
+        exclude_hint = (
+            " Do NOT repeat or closely paraphrase any string in do_not_repeat_queries — invent new angles, "
+            "industries, job titles, and keyword combinations."
+        )
     system = (
         f"You produce {n} DISTINCT Google web search queries to find B2B leads (companies or roles) who care about "
         "industrial spare parts, MRO, maintenance, procurement, asset reliability, or fleet operations. "
         f"Geography focus: {cn} (region code hint: {cc}). "
         "Each query must be a short string suitable for Google's search box (no bullet prefixes). "
         "Mix angles: procurement + industry, maintenance + sector, OEM parts, plant engineering, distributors, etc. "
-        "Stay factual; no scams or illegal angles. "
+        "Stay factual; no scams or illegal angles."
+        f"{exclude_hint} "
         f'Return JSON ONLY: {{"queries": ["...", ...]}} with exactly {n} unique non-empty strings.'
     )
     resp = client.chat.completions.create(
         model=model,
-        temperature=0.55,
+        temperature=0.8,
         max_tokens=900,
         messages=[
             {"role": "system", "content": system},
@@ -397,7 +419,12 @@ def generate_serp_discovery_queries(
     out: list[str] = []
     for item in arr:
         s = str(item).strip()
-        if s and s not in out:
+        if not s:
+            continue
+        key = " ".join(s.lower().split())
+        if key in seen_exclude:
+            continue
+        if s not in out:
             out.append(s)
         if len(out) >= n:
             break

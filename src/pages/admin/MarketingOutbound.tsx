@@ -505,23 +505,39 @@ const MarketingOutbound: React.FC = () => {
     setAiQueriesLoading(true);
     try {
       const cc = serpCountryCode.trim().toLowerCase();
+      const existing = settingsText
+        .split("\n")
+        .map((s) => s.trim())
+        .filter(Boolean);
       const res = await adminApi.generateMarketingSerpQueriesAi({
         country_code: cc,
         country_name: cc ? marketingCountryLabel(cc) : "Global",
         count: 8,
         extra_context: "SpareFinder B2B outbound; industrial spare parts, MRO, procurement.",
+        exclude_queries: existing,
       });
       if (res.success) {
         const qs = (res.data as { queries?: string[] })?.queries;
         if (Array.isArray(qs) && qs.length) {
           setSettingsText((prev) => {
+            const seen = new Set(
+              prev
+                .split("\n")
+                .map((s) => s.trim().toLowerCase())
+                .filter(Boolean)
+            );
+            const novel = qs.filter((q) => {
+              const key = q.trim().toLowerCase();
+              return key && !seen.has(key);
+            });
+            if (!novel.length) return prev;
             const base = prev.trim();
-            const add = qs.join("\n");
+            const add = novel.join("\n");
             return base ? `${base}\n${add}` : add;
           });
           toast({
             title: "Queries generated",
-            description: `${qs.length} lines added to the editor. Review, edit, then Save queries.`,
+            description: `${qs.length} new line(s) added to the editor (duplicates skipped). Review, edit, then Save.`,
           });
         } else {
           toast({ variant: "destructive", title: "No queries returned", description: "Try again." });
@@ -1734,7 +1750,8 @@ const MarketingOutbound: React.FC = () => {
                         <span className="ml-2">AI-generate queries</span>
                       </Button>
                       <span className="text-xs text-muted-foreground">
-                        Appends lines to the editor from OpenAI (review before Save).
+                        Appends unique lines to the editor (skips duplicates). Scheduled crons auto-generate fresh
+                        queries each run; manual runs rotate through this list.
                       </span>
                     </div>
                     <Textarea

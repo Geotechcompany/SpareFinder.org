@@ -18,6 +18,8 @@ def get_marketing_settings_row(supabase: Any) -> dict[str, Any]:
             "setting_key": "defaults",
             "setting_value": {
                 "serp_query_templates": [],
+                "serp_query_rotation_offset": 0,
+                "serp_queries_recent": [],
                 "serp_results_per_query": 10,
                 "google_search_provider": "serper",
                 # In-process scheduler (see marketing_scheduled_tasks); 0 = off until set in admin.

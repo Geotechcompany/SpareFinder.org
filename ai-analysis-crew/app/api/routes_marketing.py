@@ -24,6 +24,7 @@ from ..marketing_crew import (
     generate_serp_discovery_queries,
     sanitize_lead_with_openai,
 )
+from ..marketing_discovery_queries import prepare_discovery_queries, record_discovery_queries_run
 from ..marketing_pipeline import (
     ensure_unsubscribe_token,
     frontend_base_url,
@@ -129,6 +130,7 @@ class GenerateSerpQueriesBody(BaseModel):
     country_name: str | None = Field(default=None, max_length=120)
     count: int = Field(default=8, ge=5, le=15)
     extra_context: str | None = Field(default=None, max_length=800)
+    exclude_queries: list[str] | None = None
 
 
 class LeadPatchBody(BaseModel):
@@ -336,6 +338,7 @@ async def ai_generate_serp_queries(
             country_name=body.country_name or body.country_code or "Global",
             count=body.count,
             extra_context=body.extra_context,
+            exclude_queries=body.exclude_queries,
         )
     except Exception as e:
         logger.exception("ai_generate_serp_queries")
@@ -1084,8 +1087,7 @@ async def import_leads_csv(
 def _run_google_serp_discovery(
     supabase: Any,
     *,
-    templates: list[str],
-    max_queries: int,
+    queries: list[str],
     key_override: str | None,
     per_q: int,
     gl_use: str | None,
@@ -1105,8 +1107,16 @@ def _run_google_serp_discovery(
     skipped_duplicate = 0
     errs: list[str] = []
     per_query: list[dict[str, Any]] = []
-    max_q = max(1, min(max_queries, 10))
-    slice_templates = templates[:max_q]
+    slice_templates = [str(q).strip() for q in queries if str(q).strip()]
+    if not slice_templates:
+        return {
+            "candidates_upserted": 0,
+            "candidates_skipped_duplicate": 0,
+            "errors": ["No discovery queries selected for this run"],
+            "queries_run": [],
+            "per_query": [],
+            "resolved_campaign_id": default_campaign_id_for_new_leads(supabase),
+        }
 
     for q in slice_templates:
         try:
@@ -1208,10 +1218,18 @@ async def discover_serpapi(
         prov_raw = str(val.get("google_search_provider") or os.getenv("MARKETING_GOOGLE_SEARCH_PROVIDER") or "serper").strip().lower()
     search_provider = "serper" if prov_raw in ("serper", "serper.dev", "google.serper") else "serpapi"
 
+    queries_to_run, next_offset, used_ai_fresh = prepare_discovery_queries(
+        templates=[str(t).strip() for t in templates if str(t).strip()],
+        max_queries=max_q,
+        settings_val=val,
+        prefer_ai_fresh=False,
+    )
+    if not queries_to_run:
+        return api_error("No discovery queries available for this run", status_code=400)
+
     data = _run_google_serp_discovery(
         supabase,
-        templates=templates,
-        max_queries=max_q,
+        queries=queries_to_run,
         key_override=key_override,
         per_q=per_q,
         gl_use=gl_use,
@@ -1220,6 +1238,13 @@ async def discover_serpapi(
         campaign_id=body.campaign_id,
         cron_style_organic_errors=False,
     )
+    record_discovery_queries_run(
+        supabase,
+        val,
+        queries_used=data.get("queries_run") or queries_to_run,
+        next_rotation_offset=next_offset,
+    )
+    data["queries_source"] = "ai_fresh" if used_ai_fresh else "rotated"
     return api_ok(data=data)
 
 
@@ -1516,10 +1541,18 @@ def run_marketing_discover_cron_job(supabase: Any, max_queries: int = 2) -> dict
     prov_raw = str(val.get("google_search_provider") or os.getenv("MARKETING_GOOGLE_SEARCH_PROVIDER") or "serper").strip().lower()
     search_provider = "serper" if prov_raw in ("serper", "serper.dev", "google.serper") else "serpapi"
 
-    data = _run_google_serp_discovery(
-        supabase,
+    queries_to_run, next_offset, used_ai_fresh = prepare_discovery_queries(
         templates=[str(t).strip() for t in templates if str(t).strip()],
         max_queries=max_queries,
+        settings_val=val,
+        prefer_ai_fresh=True,
+    )
+    if not queries_to_run:
+        return {"ok": False, "error": "No discovery queries available for this cron run"}
+
+    data = _run_google_serp_discovery(
+        supabase,
+        queries=queries_to_run,
         key_override=key_override,
         per_q=per_q,
         gl_use=gl_use,
@@ -1527,6 +1560,12 @@ def run_marketing_discover_cron_job(supabase: Any, max_queries: int = 2) -> dict
         search_provider=search_provider,
         campaign_id=None,
         cron_style_organic_errors=True,
+    )
+    record_discovery_queries_run(
+        supabase,
+        val,
+        queries_used=data.get("queries_run") or queries_to_run,
+        next_rotation_offset=next_offset,
     )
     scap = sanitize_review_batch_cap(supabase)
     sanitize_review = (
@@ -1538,6 +1577,8 @@ def run_marketing_discover_cron_job(supabase: Any, max_queries: int = 2) -> dict
         "ok": True,
         "candidates_upserted": data["candidates_upserted"],
         "errors": data["errors"],
+        "queries_run": data.get("queries_run"),
+        "queries_source": "ai_fresh" if used_ai_fresh else "rotated",
         "per_query": data["per_query"],
         "resolved_campaign_id": data.get("resolved_campaign_id"),
         "sanitize_review_queue": sanitize_review,
