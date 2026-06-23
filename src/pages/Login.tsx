@@ -9,6 +9,10 @@ import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { apiClient } from "@/lib/api";
+import {
+  consumeImpersonationTicket,
+  readImpersonationTicketFromSearch,
+} from "@/lib/impersonation";
 
 type LoginStep =
   | "credentials"
@@ -52,6 +56,12 @@ const Login = () => {
   const clerk = useClerk();
   const autoRedirectStarted = useRef(false);
   const redirectingRef = useRef(false);
+  const ticketConsumeStarted = useRef(false);
+
+  const impersonationTicket = useMemo(
+    () => readImpersonationTicketFromSearch(searchParams.toString()),
+    [searchParams]
+  );
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -140,13 +150,58 @@ const Login = () => {
     [checkAuth, clerk.session?.id, clerkSessionId, navigate, redirectTo, setActive]
   );
 
+  // Consume Clerk actor token (admin impersonation) before normal login redirect.
+  useEffect(() => {
+    if (!isLoaded || !signIn || !impersonationTicket || ticketConsumeStarted.current) return;
+
+    ticketConsumeStarted.current = true;
+    redirectingRef.current = true;
+    setIsRedirecting(true);
+    setErrorMessage(null);
+    setInfoMessage("Completing impersonation sign-in…");
+
+    void (async () => {
+      try {
+        await consumeImpersonationTicket(
+          {
+            signOut: () => clerk.signOut(),
+            signIn,
+            setActive,
+          },
+          impersonationTicket
+        );
+        await checkAuth();
+        navigate(redirectTo, { replace: true });
+      } catch (err) {
+        ticketConsumeStarted.current = false;
+        redirectingRef.current = false;
+        setIsRedirecting(false);
+        setErrorMessage(
+          err instanceof Error
+            ? err.message
+            : "Could not complete impersonation sign-in. Return to Admin → Users and try again."
+        );
+      }
+    })();
+  }, [
+    checkAuth,
+    clerk,
+    impersonationTicket,
+    isLoaded,
+    navigate,
+    redirectTo,
+    setActive,
+    signIn,
+  ]);
+
   // Auto-redirect when Clerk already has an active session (no manual banner).
   useEffect(() => {
+    if (impersonationTicket) return;
     if (!isLoaded || isLoading || user || isAuthenticated || !hasClerkSession) return;
     if (autoRedirectStarted.current) return;
     autoRedirectStarted.current = true;
     void redirectWithExistingSession();
-  }, [isLoaded, isLoading, user, isAuthenticated, hasClerkSession, redirectWithExistingSession]);
+  }, [impersonationTicket, isLoaded, isLoading, user, isAuthenticated, hasClerkSession, redirectWithExistingSession]);
 
   useEffect(() => {
     if (!hasClerkSession) {

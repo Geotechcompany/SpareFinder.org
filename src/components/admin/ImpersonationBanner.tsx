@@ -25,6 +25,11 @@ export function ImpersonationBanner() {
     user?.primaryEmailAddress?.emailAddress ||
     "this user";
 
+  const signedInEmail = user?.primaryEmailAddress?.emailAddress?.trim().toLowerCase();
+  const targetEmail = meta.targetEmail?.trim().toLowerCase();
+  const impersonationMismatch =
+    !!signedInEmail && !!targetEmail && signedInEmail !== targetEmail;
+
   const handleExit = async () => {
     const returnUrl = meta.returnUrl || "/admin/users";
     clearImpersonationMeta();
@@ -45,6 +50,11 @@ export function ImpersonationBanner() {
         <Eye className="h-4 w-4 shrink-0" aria-hidden />
         <span>
           Viewing as <strong>{displayName}</strong> (impersonation mode)
+          {impersonationMismatch ? (
+            <span className="ml-1 font-normal text-destructive">
+              — session mismatch; exit and impersonate again from Admin → Users.
+            </span>
+          ) : null}
         </span>
       </div>
       <Button

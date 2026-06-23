@@ -16,6 +16,7 @@ import { SpinningLogoLoader } from "@/components/brand/spinning-logo-loader";
 import { PageSEO } from "@/components/PageSEO";
 import { InstallPrompt } from "@/components/InstallPrompt";
 import { TermsUpdateNotice } from "@/components/TermsUpdateNotice";
+import { ImpersonationTicketRedirect } from "@/components/ImpersonationTicketRedirect";
 
 const Login = lazy(() => import("./pages/Login"));
 const Register = lazy(() => import("./pages/Register"));
@@ -83,6 +84,7 @@ const App = () => (
             <Sonner />
             <BrowserRouter>
               <PageSEO />
+              <ImpersonationTicketRedirect />
               <InstallPrompt />
               <TermsUpdateNotice />
               <Suspense fallback={<SpinningLogoLoader label="Loading page…" />}>

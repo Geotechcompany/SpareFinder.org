@@ -87,15 +87,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       const fallback = buildUserFromClerk(clerkUser);
       setUser((prev) => {
         if (!prev) return fallback;
-        const sameAccount =
-          prev.id === fallback.id ||
-          (!!prev.email && prev.email.toLowerCase() === fallback.email.toLowerCase());
-        if (!sameAccount) return fallback;
-        // API profile is source of truth; keep last known role if /current-user briefly failed.
+        const sameClerkIdentity =
+          prev.email &&
+          fallback.email &&
+          prev.email.toLowerCase() === fallback.email.toLowerCase();
+        if (!sameClerkIdentity) return fallback;
         return {
           ...fallback,
           id: prev.id || fallback.id,
-          role: isAdminAppRole(prev.role) ? prev.role : fallback.role,
+          role: fallback.role,
         };
       });
       return true;

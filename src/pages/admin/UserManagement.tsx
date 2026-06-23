@@ -72,7 +72,13 @@ import {
   XCircle,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
-import { startImpersonationSession } from "@/lib/impersonation";
+import { useClerk, useSignIn } from "@clerk/clerk-react";
+import {
+  consumeImpersonationTicket,
+  extractTicketFromRedirectUrl,
+  startImpersonationSession,
+  writeImpersonationMeta,
+} from "@/lib/impersonation";
 import {
   AdminUserLocation,
   LocationSummaryChip,
@@ -147,7 +153,9 @@ const UserManagement = () => {
     useState(false);
   const [impersonatingUserId, setImpersonatingUserId] = useState<string | null>(null);
   const { toast } = useToast();
-  const { user: currentUser, isSuperAdmin } = useAuth();
+  const { user: currentUser, isSuperAdmin, checkAuth } = useAuth();
+  const clerk = useClerk();
+  const { signIn, setActive, isLoaded: isSignInLoaded } = useSignIn();
 
   // Debounce search to avoid too many API calls
   useEffect(() => {
@@ -601,14 +609,29 @@ const UserManagement = () => {
         );
       }
       const targetMeta = response.data?.target;
-      startImpersonationSession(
-        { token, redirectUrl },
-        {
-          targetEmail: targetMeta?.email || target.email,
-          targetName: targetMeta?.full_name || target.full_name,
-          returnUrl: "/admin/users",
-        }
-      );
+      const meta = {
+        targetEmail: targetMeta?.email || target.email,
+        targetName: targetMeta?.full_name || target.full_name,
+        returnUrl: "/admin/users",
+      };
+      const ticket = token?.trim() || extractTicketFromRedirectUrl(redirectUrl);
+
+      if (ticket && isSignInLoaded && signIn && setActive) {
+        writeImpersonationMeta(meta);
+        await consumeImpersonationTicket(
+          {
+            signOut: () => clerk.signOut(),
+            signIn,
+            setActive,
+          },
+          ticket
+        );
+        await checkAuth();
+        window.location.href = "/dashboard";
+        return;
+      }
+
+      startImpersonationSession({ token, redirectUrl }, meta);
     } catch (error) {
       console.error("Impersonation error:", error);
       toast({
