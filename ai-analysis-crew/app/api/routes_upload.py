@@ -18,6 +18,7 @@ from .plan_enforcement import check_upload_limit, get_profile_role, get_user_tie
 from .workspace_dependencies import (
     WorkspaceScope,
     get_workspace_scope,
+    row_accessible_in_workspace_scope,
     workspace_isolation_enabled,
     workspace_select,
     workspace_update,
@@ -481,20 +482,26 @@ async def delete_crew_analysis_job(
     try:
         supabase = get_supabase_admin()
 
-        check_result = (
-            workspace_select(supabase, "crew_analysis_jobs", scope, "id,status")
+        lookup = (
+            supabase.table("crew_analysis_jobs")
+            .select("id,status,user_id,workspace_id")
             .eq("id", job_id)
             .limit(1)
             .execute()
         )
 
-        if not check_result.data:
+        if not lookup.data:
             return JSONResponse(
                 status_code=404,
                 content=api_error("Job not found or unauthorized", status_code=404),
             )
 
-        job = check_result.data[0]
+        job = lookup.data[0]
+        if not row_accessible_in_workspace_scope(job, scope):
+            return JSONResponse(
+                status_code=404,
+                content=api_error("Job not found or unauthorized", status_code=404),
+            )
 
         from ..crew_job_cancel import request_cancel_crew_job
 
@@ -503,7 +510,6 @@ async def delete_crew_analysis_job(
         if job_status in ("pending", "processing"):
             logger.info("Cancelling in-flight crew analysis before delete: %s", job_id)
 
-        # Authorized above — delete by primary key (admin client bypasses RLS).
         supabase.table("crew_analysis_jobs").delete().eq("id", job_id).execute()
 
         return api_ok(

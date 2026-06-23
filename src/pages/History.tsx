@@ -74,6 +74,7 @@ import { useLocation } from "react-router-dom";
 
 import {
   readCrewJobsCache,
+  removeCrewJobFromCache,
   writeCrewJobsCache,
 } from "@/lib/crew-jobs-cache";
 
@@ -93,7 +94,6 @@ function mergeCrewJobsFromApi(prev: any[], fromApi: any[]): any[] {
     ...j,
     _uniqueCardKey: j.id,
   }));
-  if (fromApiMapped.length === 0) return prev;
 
   const apiById = new Map(fromApiMapped.map((j) => [j.id, j]));
   const now = Date.now();
@@ -1336,32 +1336,41 @@ const History = () => {
   // Confirm delete crew job
   const confirmDeleteCrewJob = async () => {
     if (!crewJobToDelete) return;
+    const jobId = crewJobToDelete.id;
+
+    const removeLocal = () => {
+      setCrewJobs((prev) => prev.filter((job) => job.id !== jobId));
+      if (user?.id) removeCrewJobFromCache(user.id, jobId);
+    };
 
     try {
-      const response = await api.upload.deleteCrewAnalysisJob(
-        crewJobToDelete.id
-      );
+      const response = await api.upload.deleteCrewAnalysisJob(jobId);
 
       if (response.success) {
+        removeLocal();
         toast({
           title: "Success",
           description: "Analysis deleted successfully",
         });
-
-        // Remove from local state (real-time will also update)
-        setCrewJobs((prev) =>
-          prev.filter((job) => job.id !== crewJobToDelete.id)
-        );
       } else {
         throw new Error(response.message || "Failed to delete");
       }
-    } catch (error) {
-      console.error("Delete error:", error);
-      toast({
-        title: "Error",
-        description: "Failed to delete analysis",
-        variant: "destructive",
-      });
+    } catch (error: any) {
+      const status = error?.response?.status;
+      if (status === 404) {
+        removeLocal();
+        toast({
+          title: "Removed",
+          description: "This analysis is no longer available and was removed from your list.",
+        });
+      } else {
+        console.error("Delete error:", error);
+        toast({
+          title: "Error",
+          description: "Failed to delete analysis",
+          variant: "destructive",
+        });
+      }
     } finally {
       setDeleteCrewJobDialogOpen(false);
       setCrewJobToDelete(null);

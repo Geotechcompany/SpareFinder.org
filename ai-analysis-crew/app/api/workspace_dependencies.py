@@ -210,6 +210,30 @@ def workspace_or_filter(scope: WorkspaceScope, *, user_column: str = "user_id") 
     return f"workspace_id.eq.{wid},{legacy}"
 
 
+def row_accessible_in_workspace_scope(
+    row: dict[str, Any],
+    scope: WorkspaceScope,
+    *,
+    user_column: str = "user_id",
+) -> bool:
+    """Python-side access check (used when PostgREST or_/eq chains miss rows)."""
+    row_user = str(row.get(user_column) or "").strip()
+    if row_user == scope.user_id:
+        return True
+
+    member_ids = set(_scope_member_user_ids(scope))
+    if scope.user_id not in member_ids:
+        member_ids.add(scope.user_id)
+
+    if not workspace_isolation_enabled():
+        return row_user in member_ids
+
+    row_ws = str(row.get("workspace_id") or "").strip() or None
+    if row_ws:
+        return row_ws == scope.workspace_id and scope.user_id in member_ids
+    return row_user in member_ids
+
+
 def apply_workspace_filter(query: Any, scope: WorkspaceScope, *, user_column: str = "user_id"):
     """
     Apply workspace isolation to a Supabase filter builder (after .select/.delete/.update).

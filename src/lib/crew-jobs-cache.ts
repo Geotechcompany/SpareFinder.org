@@ -32,6 +32,15 @@ export function writeCrewJobsCache(userId: string, jobs: any[]) {
   }
 }
 
+export function removeCrewJobFromCache(userId: string, jobId: string) {
+  if (!userId || !jobId) return;
+  const cached = readCrewJobsCache(userId);
+  writeCrewJobsCache(
+    userId,
+    cached.filter((j) => j.id !== jobId)
+  );
+}
+
 export function prependCrewJobToCache(userId: string, job: any) {
   if (!userId || !job?.id) return;
   const cached = readCrewJobsCache(userId);
