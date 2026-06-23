@@ -124,6 +124,7 @@ from .api.routes_tickets import router as tickets_router
 from .api.routes_referrals import router as referrals_router
 from .api.routes_reports import router as reports_router
 from .api.routes_api_keys import router as api_keys_router
+from .api.error_handlers import register_error_handlers
 from .api.routes_marketing import admin_router as marketing_admin_router
 from .api.routes_marketing import cron_router as marketing_cron_router
 
@@ -147,6 +148,8 @@ app.include_router(reports_router, prefix="/api")
 app.include_router(api_keys_router, prefix="/api")
 app.include_router(marketing_admin_router, prefix="/api")
 app.include_router(marketing_cron_router, prefix="/api")
+
+register_error_handlers(app)
 
 print("All API routers registered successfully")
 logger.info("All API routers registered successfully")

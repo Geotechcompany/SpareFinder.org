@@ -352,6 +352,19 @@ def log_error(
         ).execute()
     except Exception as e:
         logger.error("log_error failed: %s", e)
+    try:
+        from .app_error_log import log_app_error
+
+        log_app_error(
+            supabase,
+            severity=severity,
+            message=message,
+            source="marketing",
+            area="admin",
+            context=context,
+        )
+    except Exception as e:
+        logger.warning("marketing app_error log failed: %s", e)
 
 
 def run_marketing_sanitize_review_batch(

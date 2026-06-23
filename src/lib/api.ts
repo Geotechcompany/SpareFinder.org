@@ -1155,6 +1155,8 @@ export const adminApi = {
     sanitize_review_batch?: number;
     /** Seconds between auto-sanitize runs. Default 300 in DB. */
     scheduled_sanitize_interval_sec?: number;
+    /** Dev email for immediate alerts when marketing jobs fail (empty = off). */
+    error_notify_email?: string | null;
   }): Promise<ApiResponse> => {
     const response = await apiClient.patch("/admin/marketing/settings", payload);
     return response.data;
@@ -1307,6 +1309,26 @@ export const adminApi = {
     if (params.campaign_id) q.append("campaign_id", params.campaign_id);
     if (params.status && params.status !== "all") q.append("status", params.status);
     const response = await apiClient.get(`/admin/marketing/sends?${q.toString()}`);
+    return response.data;
+  },
+  getAppErrors: async (params: {
+    page?: number;
+    limit?: number;
+    from?: string;
+    to?: string;
+    severity?: string;
+    area?: string;
+    source?: string;
+  }): Promise<ApiResponse> => {
+    const q = new URLSearchParams();
+    if (params.page) q.append("page", String(params.page));
+    if (params.limit) q.append("limit", String(params.limit));
+    if (params.from) q.append("from", params.from);
+    if (params.to) q.append("to", params.to);
+    if (params.severity && params.severity !== "all") q.append("severity", params.severity);
+    if (params.area && params.area !== "all") q.append("area", params.area);
+    if (params.source && params.source !== "all") q.append("source", params.source);
+    const response = await apiClient.get(`/admin/app-errors?${q.toString()}`);
     return response.data;
   },
   getMarketingErrors: async (params: {

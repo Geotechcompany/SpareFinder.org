@@ -1431,6 +1431,40 @@ async def admin_system_settings(_admin: CurrentUser = Depends(require_roles("adm
     return {"settings": _group_system_settings(rows)}
 
 
+@router.get("/app-errors")
+async def admin_app_errors(
+    from_: str | None = Query(None, alias="from"),
+    to: str | None = Query(None),
+    severity: str | None = None,
+    area: str | None = None,
+    source: str | None = None,
+    page: int = Query(default=1, ge=1),
+    limit: int = Query(default=50, ge=1, le=200),
+    _admin: CurrentUser = Depends(require_roles("admin", "super_admin")),
+):
+    supabase = get_supabase_admin()
+    offset = (page - 1) * limit
+    q = supabase.table("app_errors").select("*", count="exact").order("created_at", desc=True)
+    if from_:
+        q = q.gte("created_at", from_)
+    if to:
+        q = q.lte("created_at", to)
+    if severity and severity != "all":
+        q = q.eq("severity", severity)
+    if area and area != "all":
+        q = q.eq("area", area)
+    if source and source != "all":
+        q = q.eq("source", source)
+    res = q.range(offset, offset + limit - 1).execute()
+    total = _count_from_response(res, len(res.data or []))
+    return api_ok(
+        data={
+            "errors": res.data or [],
+            "pagination": {"page": page, "limit": limit, "total": total},
+        }
+    )
+
+
 @router.get("/audit-logs")
 async def admin_audit_logs(
     page: int = Query(default=1, ge=1),

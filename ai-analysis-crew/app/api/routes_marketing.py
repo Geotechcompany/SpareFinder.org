@@ -185,6 +185,8 @@ class MarketingSettingsBody(BaseModel):
     scheduled_sanitize_interval_sec: int | None = Field(default=None, ge=0, le=604800)
     # Per cron: process this many leads stuck in review per batch (0 = off). Default 100 when unset.
     sanitize_review_batch: int | None = Field(default=None, ge=0, le=500)
+    # Dev/ops inbox emailed on marketing error/critical log entries (empty = off).
+    error_notify_email: str | None = Field(default=None, max_length=320)
 
 
 class GenerateCampaignBody(BaseModel):
@@ -277,7 +279,17 @@ async def patch_campaign(
 async def get_marketing_settings(_admin: CurrentUser = Depends(require_roles("admin", "super_admin"))):
     supabase = get_supabase_admin()
     row = get_marketing_settings_row(supabase)
-    return api_ok(data={"settings": row.get("setting_value") or {}})
+    val = dict(row.get("setting_value") or {})
+    if not str(val.get("error_notify_email") or "").strip():
+        try:
+            from ..error_notify import resolve_error_notify_email
+
+            resolved = resolve_error_notify_email(supabase)
+            if resolved:
+                val["error_notify_email"] = resolved
+        except Exception:
+            pass
+    return api_ok(data={"settings": val})
 
 
 @admin_router.patch("/settings")
@@ -326,6 +338,30 @@ async def patch_marketing_settings(
         val["scheduled_sanitize_interval_sec"] = max(0, min(int(body.scheduled_sanitize_interval_sec), 604800))
     if body.sanitize_review_batch is not None:
         val["sanitize_review_batch"] = max(0, min(int(body.sanitize_review_batch), 100))
+    if body.error_notify_email is not None:
+        notify = body.error_notify_email.strip().lower()
+        if notify:
+            if not is_valid_email(notify):
+                raise HTTPException(status_code=400, detail="Invalid error notification email address")
+            val["error_notify_email"] = notify
+            supabase.table("system_settings").upsert(
+                {
+                    "category": "notifications",
+                    "setting_key": "error_notify_email",
+                    "setting_value": notify,
+                    "description": "Dev email for platform error alerts",
+                    "updated_at": datetime.now(timezone.utc).isoformat(),
+                },
+                on_conflict="category,setting_key",
+            ).execute()
+        else:
+            val.pop("error_notify_email", None)
+            try:
+                supabase.table("system_settings").delete().eq("category", "notifications").eq(
+                    "setting_key", "error_notify_email"
+                ).execute()
+            except Exception:
+                pass
     supabase.table("marketing_settings").update(
         {"setting_value": val, "updated_at": datetime.now(timezone.utc).isoformat()}
     ).eq("setting_key", "defaults").execute()

@@ -215,6 +215,8 @@ const MarketingOutbound: React.FC = () => {
   /** Leads stuck in sanitization review to auto-process per sanitize batch (0 = off). Default 100. */
   const [sanitizeReviewBatch, setSanitizeReviewBatch] = useState(100);
   const [scheduledSanitizeIntervalSec, setScheduledSanitizeIntervalSec] = useState(300);
+  const [errorNotifyEmail, setErrorNotifyEmail] = useState("");
+  const [errorNotifySaving, setErrorNotifySaving] = useState(false);
   const [leadCountryFilter, setLeadCountryFilter] = useState<string>("all");
   const [aiQueriesLoading, setAiQueriesLoading] = useState(false);
   const [newCampaignName, setNewCampaignName] = useState("Outbound — industrial buyers");
@@ -259,7 +261,7 @@ const MarketingOutbound: React.FC = () => {
         adminApi.getMarketingDashboard(),
         adminApi.getMarketingCampaigns(),
         adminApi.getMarketingSends({ page: 1, limit: 50 }),
-        adminApi.getMarketingErrors({ page: 1, limit: 50 }),
+        adminApi.getAppErrors({ page: 1, limit: 50 }),
         adminApi.getMarketingSettings(),
       ]);
       if (dash.success && dash.data) setDashboard(dash.data as Record<string, unknown>);
@@ -282,6 +284,7 @@ const MarketingOutbound: React.FC = () => {
           scheduled_send_batch?: number;
           sanitize_review_batch?: number;
           scheduled_sanitize_interval_sec?: number;
+          error_notify_email?: string;
         };
       })?.settings;
       const templates = st?.serp_query_templates;
@@ -304,6 +307,7 @@ const MarketingOutbound: React.FC = () => {
       setScheduledSanitizeIntervalSec(
         Math.min(604800, Math.max(0, parseSettingsInt(st?.scheduled_sanitize_interval_sec, 300)))
       );
+      setErrorNotifyEmail(typeof st?.error_notify_email === "string" ? st.error_notify_email.trim() : "");
     } catch (e) {
       console.error(e);
       toast({
@@ -513,6 +517,46 @@ const MarketingOutbound: React.FC = () => {
           "Queries, Serper options, and automation intervals are stored. The API re-reads schedules about once a minute — no restart required.",
       });
     else toast({ variant: "destructive", title: "Save failed" });
+  };
+
+  const saveErrorNotifyEmail = async () => {
+    const email = errorNotifyEmail.trim().toLowerCase();
+    if (email && !MARKETING_LEAD_EMAIL_RE.test(email)) {
+      toast({
+        variant: "destructive",
+        title: "Invalid email",
+        description: "Enter a valid address or leave the field empty to turn alerts off.",
+      });
+      return;
+    }
+    setErrorNotifySaving(true);
+    try {
+      const res = await adminApi.patchMarketingSettings({
+        error_notify_email: email || "",
+      });
+      if (res.success) {
+        toast({
+          title: "Error alerts saved",
+          description: email
+            ? `Platform failure notifications will be emailed to ${email}.`
+            : "Error email alerts are turned off.",
+        });
+      } else {
+        toast({
+          variant: "destructive",
+          title: "Save failed",
+          description: (res as { message?: string }).message || res.error || "Request failed",
+        });
+      }
+    } catch (e) {
+      toast({
+        variant: "destructive",
+        title: "Save failed",
+        description: e instanceof Error ? e.message : "Unknown error",
+      });
+    } finally {
+      setErrorNotifySaving(false);
+    }
   };
 
   const handleAiGenerateSerpQueries = async () => {
@@ -1878,19 +1922,67 @@ const MarketingOutbound: React.FC = () => {
               </TabsContent>
 
               <TabsContent value="errors">
+                <Card className="mb-4">
+                  <CardHeader>
+                    <CardTitle className="text-base">Error email alerts</CardTitle>
+                    <CardDescription>
+                      Get an immediate email when anything fails across the platform — admin API errors, user-facing
+                      failures (403, 5xx), marketing automation (Serper credits, SMTP forbidden), and cron issues.
+                      Duplicate alerts for the same issue are throttled to about once every 15 minutes. Leave empty to
+                      disable.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="flex flex-col gap-3 sm:flex-row sm:items-end">
+                    <div className="flex-1 space-y-2">
+                      <Label htmlFor="error-notify-email">Dev / notification email</Label>
+                      <Input
+                        id="error-notify-email"
+                        type="email"
+                        autoComplete="email"
+                        placeholder="dev@yourcompany.com"
+                        value={errorNotifyEmail}
+                        onChange={(e) => setErrorNotifyEmail(e.target.value)}
+                        disabled={errorNotifySaving}
+                      />
+                    </div>
+                    <Button type="button" onClick={() => void saveErrorNotifyEmail()} disabled={errorNotifySaving}>
+                      {errorNotifySaving ? <Loader2 className="h-4 w-4 animate-spin mr-2 inline" /> : null}
+                      Save alerts
+                    </Button>
+                  </CardContent>
+                </Card>
                 <Card>
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
-                      <AlertCircle className="h-5 w-5" /> Problems log
+                      <AlertCircle className="h-5 w-5" /> Platform problems log
                     </CardTitle>
+                    <CardDescription>
+                      Admin, user API, and marketing errors. Run{" "}
+                      <code className="text-xs">docs/sql/create_app_errors.sql</code> in Supabase if this list stays
+                      empty after failures.
+                    </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-2">
                     {(errors as Record<string, unknown>[]).map((row) => (
                       <div key={String(row.id)} className="rounded-lg border p-3 text-sm">
-                        <Badge variant="outline" className="mb-1">
-                          {String(row.severity)}
-                        </Badge>
+                        <div className="flex flex-wrap gap-1 mb-1">
+                          <Badge variant="outline">{String(row.severity ?? "—")}</Badge>
+                          {row.area ? (
+                            <Badge variant="secondary">{String(row.area)}</Badge>
+                          ) : null}
+                          {row.source ? (
+                            <Badge variant="secondary">{String(row.source)}</Badge>
+                          ) : null}
+                          {row.http_status ? (
+                            <Badge variant="outline">HTTP {String(row.http_status)}</Badge>
+                          ) : null}
+                        </div>
                         <p>{String(row.message)}</p>
+                        {row.http_method || row.http_path ? (
+                          <p className="text-xs text-muted-foreground mt-1 font-mono">
+                            {[row.http_method, row.http_path].filter(Boolean).join(" ")}
+                          </p>
+                        ) : null}
                         <p className="text-xs text-muted-foreground mt-1">{String(row.created_at)}</p>
                       </div>
                     ))}

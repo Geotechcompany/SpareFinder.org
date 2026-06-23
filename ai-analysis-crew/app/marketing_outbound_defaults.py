@@ -30,6 +30,7 @@ def get_marketing_settings_row(supabase: Any) -> dict[str, Any]:
                 # Auto re-sanitize leads stuck in sanitization_status=review (per send/discover/sanitize cron); 0 = off.
                 "sanitize_review_batch": 100,
                 "scheduled_sanitize_interval_sec": 300,
+                "error_notify_email": "",
             },
         }
     ).execute()
