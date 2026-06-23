@@ -10,7 +10,7 @@ from typing import Annotated, Any
 
 from fastapi import Depends, Header, HTTPException, status
 from jose import jwt, JWTError
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from starlette.concurrency import run_in_threadpool
 
 from .supabase_admin import get_supabase_admin
@@ -28,6 +28,16 @@ def _sb(query: Any) -> Any:
 ONLINE_NOTIFY_TTL_SECONDS = 900
 
 
+def normalize_role(role: Any) -> str:
+    """Canonical profile role for auth checks (Supabase may store mixed case)."""
+    r = str(role or "user").strip().lower()
+    if r in ("super_admin", "superadmin", "super-admin"):
+        return "super_admin"
+    if r in ("admin", "administrator"):
+        return "admin"
+    return "user"
+
+
 class CurrentUser(BaseModel):
     """Current authenticated user."""
     id: str
@@ -38,6 +48,11 @@ class CurrentUser(BaseModel):
     company: str | None = None
     avatar_url: str | None = None
     created_at: str | None = None
+
+    @field_validator("role", mode="before")
+    @classmethod
+    def _coerce_role(cls, value: Any) -> str:
+        return normalize_role(value)
 
 
 def _avatar_from_profile(profile: dict[str, Any]) -> str | None:

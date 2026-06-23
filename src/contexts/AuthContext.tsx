@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { useAuth as useClerkAuth, useUser as useClerkUser } from "@clerk/clerk-react";
 import { type ApiResponse, api, setAuthFailureHandler, setAuthTokenProvider, tokenStorage } from "@/lib/api";
+import { isAdminAppRole, isSuperAdminAppRole, normalizeAppRole } from "@/lib/roles";
 
 interface User {
   id: string;
@@ -50,10 +51,11 @@ function buildUserFromClerk(clerkUser: NonNullable<ReturnType<typeof useClerkUse
     clerkUser.primaryEmailAddress?.emailAddress ||
     clerkUser.emailAddresses?.[0]?.emailAddress ||
     "";
-  const role =
+  const role = normalizeAppRole(
     typeof clerkUser.publicMetadata?.role === "string"
       ? clerkUser.publicMetadata.role
-      : "user";
+      : "user"
+  );
 
   return {
     id: clerkUser.id,
@@ -82,7 +84,20 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const applyClerkFallbackUser = () => {
     if (clerkUser) {
-      setUser(buildUserFromClerk(clerkUser));
+      const fallback = buildUserFromClerk(clerkUser);
+      setUser((prev) => {
+        if (!prev) return fallback;
+        const sameAccount =
+          prev.id === fallback.id ||
+          (!!prev.email && prev.email.toLowerCase() === fallback.email.toLowerCase());
+        if (!sameAccount) return fallback;
+        // API profile is source of truth; keep last known role if /current-user briefly failed.
+        return {
+          ...fallback,
+          id: prev.id || fallback.id,
+          role: isAdminAppRole(prev.role) ? prev.role : fallback.role,
+        };
+      });
       return true;
     }
     setUser(null);
@@ -133,7 +148,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       }
 
       if (response?.success && response.data?.user) {
-        setUser(response.data.user);
+        const profile = response.data.user;
+        setUser({
+          ...profile,
+          role: normalizeAppRole(profile.role),
+        });
         // Apply pending referral code (from invite link) if any
         try {
           const pendingRef = sessionStorage.getItem("sparefinder_pending_referral");
@@ -271,8 +290,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       user,
       isLoading,
       isAuthenticated,
-      isAdmin: user?.role === "admin" || user?.role === "super_admin",
-      isSuperAdmin: user?.role === "super_admin",
+      isAdmin: isAdminAppRole(user?.role),
+      isSuperAdmin: isSuperAdminAppRole(user?.role),
       login,
       signup,
       logout,

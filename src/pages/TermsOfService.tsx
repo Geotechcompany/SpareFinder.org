@@ -36,7 +36,7 @@ const TermsOfService = () => {
               Terms of Use
             </h1>
             <p className="mt-4 text-lg text-muted-foreground">Sparefinder.org</p>
-            <p className="mt-2 text-sm text-muted-foreground/80">Last updated: January 9, 2026</p>
+            <p className="mt-2 text-sm text-muted-foreground/80">Last updated: 22 June 2026</p>
           </motion.div>
         </div>
       </section>
@@ -219,12 +219,43 @@ const TermsOfService = () => {
           >
             <div className="flex items-center gap-3 mb-4">
               {sectionNum(8)}
-              <h2 className="text-xl font-bold text-foreground">Termination and suspension</h2>
+              <h2 className="text-xl font-bold text-foreground">Subscription cancellation</h2>
             </div>
+            <p className="text-muted-foreground mb-4 leading-relaxed">
+              SpareFinder allows users to cancel paid subscriptions through the Billing section of their account.
+            </p>
             <ul className="space-y-2 text-muted-foreground">
-              <li><strong className="text-foreground">8.1</strong> We may suspend or terminate access immediately if you breach these Terms.</li>
-              <li><strong className="text-foreground">8.2</strong> Upon termination, your right to use the Service ceases.</li>
-              <li><strong className="text-foreground">8.3</strong> Clauses relating to IP, liability, and disputes shall survive termination.</li>
+              <li>
+                <strong className="text-foreground">8.1</strong> You may cancel your subscription by self-service via{" "}
+                <strong className="text-foreground">Account → Billing</strong>. If you cannot access your account,
+                contact us at{" "}
+                <a href={`mailto:${CONTACT_EMAIL}`} className="text-primary hover:underline">
+                  {CONTACT_EMAIL}
+                </a>
+                .
+              </li>
+              <li>
+                <strong className="text-foreground">8.2</strong> Cancellation takes effect at the end of your current paid
+                billing period (or trial period, if applicable). You will retain access to paid features until that date.
+              </li>
+              <li>
+                <strong className="text-foreground">8.3</strong> If you have scheduled a cancellation, you may reactivate
+                your subscription before the end of the current billing period via Billing.
+              </li>
+              <li>
+                <strong className="text-foreground">8.4</strong> Free trials are limited to one per account. To avoid
+                charges, cancel before the trial ends. If you do not cancel, your subscription may convert to a paid plan
+                at the end of the trial.
+              </li>
+              <li>
+                <strong className="text-foreground">8.5</strong> Fees are non-refundable except where required by applicable
+                UK law (for example, where a valid statutory cooling-off right applies and has not been waived).
+              </li>
+              <li>
+                <strong className="text-foreground">8.6</strong> When you subscribe or start a trial, you may be asked to
+                confirm that you request immediate access to the Service and acknowledge that, where permitted by law,
+                you may lose your applicable 72-hour cancellation right once digital content or the service is supplied.
+              </li>
             </ul>
           </motion.article>
 
@@ -237,12 +268,12 @@ const TermsOfService = () => {
           >
             <div className="flex items-center gap-3 mb-4">
               {sectionNum(9)}
-              <h2 className="text-xl font-bold text-foreground">Dispute resolution</h2>
+              <h2 className="text-xl font-bold text-foreground">Termination and suspension</h2>
             </div>
             <ul className="space-y-2 text-muted-foreground">
-              <li><strong className="text-foreground">9.1</strong> We encourage informal resolution in the first instance.</li>
-              <li><strong className="text-foreground">9.2</strong> These Terms are governed by the laws of England and Wales.</li>
-              <li><strong className="text-foreground">9.3</strong> The courts of England and Wales have exclusive jurisdiction.</li>
+              <li><strong className="text-foreground">9.1</strong> We may suspend or terminate access immediately if you breach these Terms.</li>
+              <li><strong className="text-foreground">9.2</strong> Upon termination, your right to use the Service ceases.</li>
+              <li><strong className="text-foreground">9.3</strong> Clauses relating to IP, liability, and disputes shall survive termination.</li>
             </ul>
           </motion.article>
 
@@ -255,10 +286,13 @@ const TermsOfService = () => {
           >
             <div className="flex items-center gap-3 mb-4">
               {sectionNum(10)}
-              <h2 className="text-xl font-bold text-foreground">Copyright complaints</h2>
+              <h2 className="text-xl font-bold text-foreground">Dispute resolution</h2>
             </div>
-            <p className="text-muted-foreground"><strong className="text-foreground">10.1</strong> If you believe content infringes your copyright, contact: <a href={`mailto:${CONTACT_EMAIL}`} className="text-primary hover:underline">{CONTACT_EMAIL}</a></p>
-            <p className="mt-2 text-muted-foreground"><strong className="text-foreground">10.2</strong> Include: identification of the copyrighted work, description of the infringement, and your contact details.</p>
+            <ul className="space-y-2 text-muted-foreground">
+              <li><strong className="text-foreground">10.1</strong> We encourage informal resolution in the first instance.</li>
+              <li><strong className="text-foreground">10.2</strong> These Terms are governed by the laws of England and Wales.</li>
+              <li><strong className="text-foreground">10.3</strong> The courts of England and Wales have exclusive jurisdiction.</li>
+            </ul>
           </motion.article>
 
           {/* Section 11 */}
@@ -270,12 +304,27 @@ const TermsOfService = () => {
           >
             <div className="flex items-center gap-3 mb-4">
               {sectionNum(11)}
+              <h2 className="text-xl font-bold text-foreground">Copyright complaints</h2>
+            </div>
+            <p className="text-muted-foreground"><strong className="text-foreground">11.1</strong> If you believe content infringes your copyright, contact: <a href={`mailto:${CONTACT_EMAIL}`} className="text-primary hover:underline">{CONTACT_EMAIL}</a></p>
+            <p className="mt-2 text-muted-foreground"><strong className="text-foreground">11.2</strong> Include: identification of the copyrighted work, description of the infringement, and your contact details.</p>
+          </motion.article>
+
+          {/* Section 12 */}
+          <motion.article
+            initial={{ opacity: 0, y: 12 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            className="rounded-2xl border border-border bg-card/80 p-6 shadow-lg shadow-black/5 dark:bg-card/50 dark:shadow-none dark:ring-1 dark:ring-white/5"
+          >
+            <div className="flex items-center gap-3 mb-4">
+              {sectionNum(12)}
               <h2 className="text-xl font-bold text-foreground">General terms</h2>
             </div>
             <ul className="space-y-2 text-muted-foreground">
-              <li><strong className="text-foreground">11.1</strong> We may update these Terms from time to time.</li>
-              <li><strong className="text-foreground">11.2</strong> If any provision is found unenforceable, the remainder shall remain in force.</li>
-              <li><strong className="text-foreground">11.3</strong> No waiver shall be deemed a waiver of any subsequent breach.</li>
+              <li><strong className="text-foreground">12.1</strong> We may update these Terms from time to time.</li>
+              <li><strong className="text-foreground">12.2</strong> If any provision is found unenforceable, the remainder shall remain in force.</li>
+              <li><strong className="text-foreground">12.3</strong> No waiver shall be deemed a waiver of any subsequent breach.</li>
             </ul>
           </motion.article>
 

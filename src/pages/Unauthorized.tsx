@@ -3,19 +3,34 @@ import { motion } from 'framer-motion'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { ShieldX, ArrowLeft, Home, Lock } from 'lucide-react'
+import { ShieldX, ArrowLeft, Home, Lock, RefreshCw } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
+import { normalizeAppRole } from '@/lib/roles'
 
 const Unauthorized = () => {
-  const { user } = useAuth()
+  const { user, checkAuth } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
+  const [refreshing, setRefreshing] = React.useState(false)
 
   const requiredRole = (location.state as any)?.requiredRole as
     | 'admin'
     | 'super_admin'
     | 'user'
     | undefined
+
+  const handleRefreshPermissions = async () => {
+    setRefreshing(true)
+    try {
+      await checkAuth()
+      const from = (location.state as { from?: { pathname?: string } } | null)?.from?.pathname
+      navigate(from || '/admin/dashboard', { replace: true })
+    } finally {
+      setRefreshing(false)
+    }
+  }
+
+  const displayRole = user ? normalizeAppRole(user.role) : 'user'
 
   return (
     <div className="min-h-screen bg-black relative overflow-hidden flex items-center justify-center">
@@ -72,13 +87,16 @@ const Unauthorized = () => {
                       <Lock className="w-5 h-5 flex-shrink-0" />
                       <div className="text-left">
                         <p className="font-medium">Signed in as: {user.email}</p>
-                        <p className="text-sm text-red-400">Role: {user.role}</p>
+                        <p className="text-sm text-red-400">Role: {displayRole}</p>
                         <p className="text-sm text-gray-400 mt-1">
                           {requiredRole === 'super_admin'
                             ? 'This area requires super admin privileges.'
                             : requiredRole === 'admin'
                             ? 'This area requires administrator privileges.'
                             : 'You do not have permission to access this page.'}
+                        </p>
+                        <p className="text-xs text-gray-500 mt-2">
+                          If an admin just changed your role, refresh your session below or sign out and back in.
                         </p>
                       </div>
                     </div>
@@ -99,6 +117,16 @@ const Unauthorized = () => {
                 transition={{ delay: 0.4, duration: 0.6 }}
                 className="space-y-4"
               >
+                <Button
+                  onClick={() => void handleRefreshPermissions()}
+                  variant="outline"
+                  disabled={refreshing}
+                  className="w-full h-12 bg-white/5 border-white/20 text-white hover:bg-white/10 hover:border-white/30 rounded-xl"
+                >
+                  <RefreshCw className={`w-5 h-5 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
+                  Refresh permissions
+                </Button>
+
                 <Button
                   onClick={() => navigate(-1)}
                   variant="outline"

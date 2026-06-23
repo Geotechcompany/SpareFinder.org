@@ -513,6 +513,40 @@ class UpdateRoleBody(BaseModel):
     role: str = Field(pattern=r"^(user|admin|super_admin)$")
 
 
+def _invalidate_profile_auth_cache(profile: dict[str, Any]) -> None:
+    try:
+        from ..redis_client import cache_delete, is_redis_configured
+
+        if not is_redis_configured():
+            return
+        uid = str(profile.get("id") or "").strip()
+        clerk_id = str(profile.get("clerk_user_id") or "").strip()
+        if uid:
+            cache_delete(f"user:id:{uid}")
+        if clerk_id:
+            cache_delete(f"user:clerk:{clerk_id}")
+    except Exception:
+        pass
+
+
+def _sync_clerk_public_role(*, clerk_user_id: str, role: str) -> None:
+    clerk_secret = (os.getenv("CLERK_SECRET_KEY") or "").strip()
+    if not clerk_secret or not clerk_user_id.startswith("user_"):
+        return
+    try:
+        requests.patch(
+            f"{_clerk_api_base()}/users/{clerk_user_id}",
+            headers={
+                "Authorization": f"Bearer {clerk_secret}",
+                "Content-Type": "application/json",
+            },
+            json={"public_metadata": {"role": role}},
+            timeout=10,
+        )
+    except requests.RequestException:
+        pass
+
+
 @router.patch("/users/{userId}/role")
 async def admin_update_user_role(
     userId: str = Path(...),
@@ -531,6 +565,10 @@ async def admin_update_user_role(
     updated = rows[0] if rows else None
     if not updated:
         return api_error("User not found", status_code=404)
+    _invalidate_profile_auth_cache(updated)
+    clerk_id = str(updated.get("clerk_user_id") or "").strip()
+    if clerk_id:
+        _sync_clerk_public_role(clerk_user_id=clerk_id, role=payload.role)
     return api_ok(message="User role updated successfully", data={"user": updated})
 
 
