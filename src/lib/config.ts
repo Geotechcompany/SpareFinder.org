@@ -1,21 +1,45 @@
 /**
  * Centralized API Configuration
  * Single source of truth for all backend API URLs
- * 
+ *
  * We have ONE backend: ai-analysis-crew (Python FastAPI)
- * All API calls go to http://localhost:8000 (dev) or production URL
+ * Dev: http://localhost:8000 (or PORT from .env)
+ * Production: same-origin /api proxy on sparefinder.org (Netlify _redirects)
  */
 
-// Backend API Base URL — ai-analysis-crew (Python FastAPI). VITE_API_URL must match the uvicorn port (8000 by default).
-export const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL ||
+/** Direct Render/backend URL from env (used for WebSockets and server-side proxy target). */
+export const DIRECT_BACKEND_URL = (
   import.meta.env.VITE_API_URL ||
-  "http://localhost:8000";
+  import.meta.env.VITE_API_BASE_URL ||
+  ""
+).replace(/\/$/, "");
 
-// WebSocket URL for AI Crew
+function shouldUseSameOriginApiProxy(): boolean {
+  if (typeof window === "undefined" || !import.meta.env.PROD) return false;
+  const host = window.location.hostname;
+  return (
+    host === "sparefinder.org" ||
+    host === "www.sparefinder.org" ||
+    host.endsWith(".netlify.app")
+  );
+}
+
+function resolveApiBaseUrl(): string {
+  if (shouldUseSameOriginApiProxy()) {
+    // Netlify proxies /api/* → Render (see scripts/generate-netlify-redirects.mjs)
+    return window.location.origin;
+  }
+  return DIRECT_BACKEND_URL || "http://localhost:8000";
+}
+
+export const API_BASE_URL = resolveApiBaseUrl();
+
+// WebSockets are not proxied by Netlify — always use the direct Render URL in production.
 export const AI_CREW_WS_URL =
   import.meta.env.VITE_AI_CREW_WS_URL ||
-  API_BASE_URL.replace(/^http/, "ws");
+  (DIRECT_BACKEND_URL
+    ? DIRECT_BACKEND_URL.replace(/^http/, "ws")
+    : API_BASE_URL.replace(/^http/, "ws"));
 
 /** Public address for support and general inquiries (shown sitewide). */
 export const CONTACT_EMAIL = "email@sparefinder.org";
@@ -23,15 +47,15 @@ export const CONTACT_EMAIL = "email@sparefinder.org";
 // Upload Configuration
 export const config = {
   upload: {
-    maxFiles: 10, // Maximum number of files that can be uploaded at once
-    maxSizePerFile: 10 * 1024 * 1024, // 10MB per file
+    maxFiles: 10,
+    maxSizePerFile: 10 * 1024 * 1024,
   },
 };
 
-// Log configuration on startup (only in development)
 if (import.meta.env.DEV) {
   console.log("🔧 API Configuration (Single Backend - ai-analysis-crew):", {
     API_BASE_URL,
+    DIRECT_BACKEND_URL: DIRECT_BACKEND_URL || "(unset)",
     AI_CREW_WS_URL,
     environment: import.meta.env.MODE,
   });

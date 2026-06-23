@@ -8,7 +8,7 @@ import { API_BASE_URL } from "../lib/config";
 class KeepAliveService {
   private intervalId: NodeJS.Timeout | null = null;
   private readonly pingInterval = 5 * 60 * 1000; // 5 minutes in milliseconds
-  private readonly healthEndpoint = `${API_BASE_URL}/health`;
+  private readonly healthEndpoint = `${API_BASE_URL}/api/health`;
 
   /**
    * Start the keep-alive service

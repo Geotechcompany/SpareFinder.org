@@ -51,8 +51,7 @@ from pydantic import BaseModel
 from fastapi import FastAPI, File, Form, UploadFile, WebSocket, WebSocketDisconnect, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from starlette.middleware.base import BaseHTTPMiddleware
-from starlette.responses import Response
+from starlette.types import ASGIApp, Receive, Scope, Send
 from datetime import datetime
 import json
 import uvicorn
@@ -106,24 +105,38 @@ _cors_origin_regex = r"https://[\w.-]+\.netlify\.app|https://([\w-]+\.)?sparefin
 _HEALTH_PATHS = frozenset({"/health", "/api/health", "/ping"})
 
 
-class HealthPreflightMiddleware(BaseHTTPMiddleware):
-    """Answer OPTIONS on public health routes before strict CORS can return 400."""
+class HealthPreflightMiddleware:
+    """Pure ASGI middleware — OPTIONS on health routes (avoids BaseHTTPMiddleware + CORS conflicts)."""
 
-    async def dispatch(self, request, call_next):
-        if request.method == "OPTIONS" and request.url.path in _HEALTH_PATHS:
-            headers: dict[str, str] = {
-                "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
-                "Access-Control-Max-Age": "86400",
-            }
-            origin = request.headers.get("origin")
-            if origin:
-                headers["Access-Control-Allow-Origin"] = origin
-                headers["Vary"] = "Origin"
-            requested_headers = request.headers.get("access-control-request-headers")
-            if requested_headers:
-                headers["Access-Control-Allow-Headers"] = requested_headers
-            return Response(status_code=200, headers=headers)
-        return await call_next(request)
+    def __init__(self, app: ASGIApp) -> None:
+        self.app = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http" or scope.get("method") != "OPTIONS":
+            await self.app(scope, receive, send)
+            return
+        if scope.get("path") not in _HEALTH_PATHS:
+            await self.app(scope, receive, send)
+            return
+
+        headers_raw = dict(scope.get("headers") or [])
+        origin = headers_raw.get(b"origin", b"").decode() or None
+        req_headers = headers_raw.get(b"access-control-request-headers", b"").decode() or None
+
+        response_headers: list[tuple[bytes, bytes]] = [
+            (b"access-control-allow-methods", b"GET, HEAD, OPTIONS"),
+            (b"access-control-max-age", b"86400"),
+        ]
+        if origin:
+            response_headers.append((b"access-control-allow-origin", origin.encode()))
+            response_headers.append((b"vary", b"Origin"))
+        if req_headers:
+            response_headers.append(
+                (b"access-control-allow-headers", req_headers.encode())
+            )
+
+        await send({"type": "http.response.start", "status": 200, "headers": response_headers})
+        await send({"type": "http.response.body", "body": b"", "more_body": False})
 
 
 app.add_middleware(

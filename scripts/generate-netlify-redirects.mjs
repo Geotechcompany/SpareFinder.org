@@ -27,6 +27,7 @@ const lines = [];
 if (apiBase) {
   lines.push("# Proxy API + marketing tracking to ai-analysis-crew (Render)");
   lines.push(`/api/*  ${apiBase}/api/:splat  200!`);
+  lines.push(`/health  ${apiBase}/health  200!`);
   lines.push(`/unsubscribe/*  ${apiBase}/unsubscribe/:splat  200!`);
   lines.push("");
 } else {
