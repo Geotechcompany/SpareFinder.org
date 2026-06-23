@@ -10,6 +10,10 @@ import {
   CHECKOUT_CANCEL_URL,
 } from "@/lib/billing-checkout";
 import { PLAN_CONFIG, getPlan, PlanTier } from "@/lib/plans";
+import {
+  normalizeInvoices,
+  type NormalizedInvoice,
+} from "@/lib/invoice-utils";
 import SubscriptionTrialModal from "./SubscriptionTrialModal";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
@@ -106,16 +110,7 @@ export const SubscriptionManager: React.FC = () => {
   const [billingData, setBillingData] = useState<BillingData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isUpdating, setIsUpdating] = useState<string | null>(null);
-  const [invoices, setInvoices] = useState<
-    Array<{
-      id: string;
-      amount: number;
-      currency: string;
-      status: string;
-      created_at: string;
-      invoice_url?: string;
-    }>
-  >([]);
+  const [invoices, setInvoices] = useState<NormalizedInvoice[]>([]);
   const { user } = useAuth();
   const [trialOpen, setTrialOpen] = useState(false);
   const [trialPlan, setTrialPlan] = useState<{
@@ -139,25 +134,25 @@ export const SubscriptionManager: React.FC = () => {
       if (response.success && response.data) {
         setBillingData(response.data as BillingData);
 
-        // Use invoices returned by the billing endpoint
-        const preloaded = (response.data as BillingData)
-          .invoices as BillingResponse["invoices"];
-        if (Array.isArray(preloaded)) {
-          const normalized = preloaded
-            .map((inv) => ({
-              id: inv.id,
-              amount: Number(inv.amount ?? inv.total ?? 0),
-              currency: String(inv.currency || "GBP").toUpperCase(),
-              status: inv.status || "paid",
-              created_at:
-                inv.created_at || inv.created || new Date().toISOString(),
-              invoice_url: (inv.invoice_url || inv.hosted_invoice_url || "").trim(),
-            }))
-            .filter((inv) => inv.invoice_url); // Only include invoices with valid URLs
-          setInvoices(normalized);
-        } else {
-          setInvoices([]);
+        const preloaded = (response.data as BillingData).invoices;
+        let nextInvoices = Array.isArray(preloaded)
+          ? normalizeInvoices(preloaded)
+          : [];
+
+        if (nextInvoices.length === 0) {
+          try {
+            const invoicesResponse = await api.billing.getInvoices();
+            const raw =
+              (invoicesResponse as any)?.data?.invoices ??
+              (invoicesResponse as any)?.invoices ??
+              (Array.isArray(invoicesResponse) ? invoicesResponse : []);
+            nextInvoices = normalizeInvoices(raw);
+          } catch (invoiceError) {
+            console.warn("Failed to fetch invoices:", invoiceError);
+          }
         }
+
+        setInvoices(nextInvoices);
       } else {
         toast.error("Failed to fetch billing details");
       }
@@ -893,9 +888,9 @@ export const SubscriptionManager: React.FC = () => {
                   className="flex items-center justify-between p-3 border rounded-lg"
                 >
                   <div>
-                    <p className="font-medium">Invoice #{inv.id}</p>
+                    <p className="font-medium">{inv.description}</p>
                     <p className="text-sm text-muted-foreground">
-                      {new Date(inv.created_at).toLocaleDateString()}
+                      {inv.date}
                     </p>
                   </div>
                   <div className="flex items-center gap-3">
@@ -905,23 +900,17 @@ export const SubscriptionManager: React.FC = () => {
                       {inv.status}
                     </Badge>
                     <span className="font-medium">
-                      {inv.currency} {inv.amount}
+                      {inv.currency} {inv.amount.toFixed(2)}
                     </span>
-                    {inv.invoice_url ? (
-                      <Button 
-                        size="sm" 
-                        variant="outline"
-                        onClick={() => {
-                          if (inv.invoice_url) {
-                            window.open(inv.invoice_url, '_blank', 'noopener,noreferrer');
-                          }
-                        }}
-                      >
-                        View invoice
-                      </Button>
-                    ) : (
-                      <span className="text-xs text-muted-foreground">No invoice URL</span>
-                    )}
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        window.open(inv.invoiceUrl, "_blank", "noopener,noreferrer");
+                      }}
+                    >
+                      View invoice
+                    </Button>
                   </div>
                 </div>
               ))}

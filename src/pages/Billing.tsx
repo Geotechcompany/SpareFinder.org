@@ -25,6 +25,11 @@ import {
   isUnlimited,
   type PlanFeature,
 } from "@/lib/plans";
+import {
+  normalizeInvoices,
+  type NormalizedInvoice,
+  type RawInvoice,
+} from "@/lib/invoice-utils";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import {
   CreditCard,
@@ -87,18 +92,8 @@ interface BillingData {
   };
 }
 
-interface Invoice {
-  id: string;
+interface Invoice extends RawInvoice {
   date?: string;
-  amount?: number;
-  total?: number;
-  status: string;
-  currency?: string;
-  created_at?: string;
-  created?: string;
-  invoice_url?: string;
-  hosted_invoice_url?: string;
-  description?: string;
   invoice?: string;
   raw?: Record<string, unknown>;
 }
@@ -186,7 +181,7 @@ const Billing = () => {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [billingData, setBillingData] = useState<BillingData | null>(null);
-  const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [invoices, setInvoices] = useState<NormalizedInvoice[]>([]);
   const [plansFromApi, setPlansFromApi] = useState<PlanFeature[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -314,6 +309,7 @@ const Billing = () => {
           // But it might also be wrapped in { success: true, data: {...} } or just be the data directly
           
           let nextBillingData: BillingData;
+          // Prefer real invoices from billing; fall back to dedicated endpoint.
           let invoicesFromResponse: Invoice[] | undefined;
           
           // Check if response is wrapped in ApiResponse format
@@ -332,8 +328,6 @@ const Billing = () => {
           }
           
           console.log("📄 Extracted invoices:", invoicesFromResponse);
-          console.log("📄 Is array?", Array.isArray(invoicesFromResponse));
-          console.log("📄 Length:", invoicesFromResponse?.length);
 
           setBillingData(nextBillingData);
           const sub = nextBillingData.subscription;
@@ -346,35 +340,19 @@ const Billing = () => {
           setCurrentPlan(isActive ? normalizedTier : "none");
           setTrialUsed(Boolean((billingResponse as any).data?.trial_used ?? (billingResponse as any).trial_used ?? nextBillingData.trial_used));
 
-          // If the billing info already contains invoices, use them first
-          let hasInvoicesFromBilling = false;
-          if (invoicesFromResponse && Array.isArray(invoicesFromResponse) && invoicesFromResponse.length > 0) {
-            console.log("✅ Processing invoices from billing response:", invoicesFromResponse.length);
-            const normalized = invoicesFromResponse.map((inv: Invoice) => ({
-              id: inv.id,
-              amount: Number(inv.amount ?? inv.total ?? 0),
-              currency: String(inv.currency || "GBP").toUpperCase(),
-              status: inv.status || "paid",
-              date: inv.created_at || inv.created || new Date().toISOString(),
-              invoice: inv.invoice_url || inv.hosted_invoice_url || "",
-              description: inv.description || `Invoice ${inv.id}`,
-            }));
-            console.log("✅ Normalized invoices:", normalized);
-            setInvoices(normalized);
-            hasInvoicesFromBilling = true;
-          } else {
-            console.warn("⚠️ No invoices found in billing response or empty array");
-          }
+          const billingInvoices = invoicesFromResponse
+            ? normalizeInvoices(invoicesFromResponse)
+            : [];
 
-          // Fetch invoices separately only if we didn't get them from billing info
-          if (!hasInvoicesFromBilling) {
+          if (billingInvoices.length > 0) {
+            setInvoices(billingInvoices);
+          } else {
             try {
               const invoicesResponse = await api.billing.getInvoices({
                 signal: controller.signal,
               });
 
               if (isMounted && invoicesResponse) {
-                // Handle different response structures
                 let raw: Invoice[] = [];
                 if ((invoicesResponse as any).data?.invoices) {
                   raw = (invoicesResponse as any).data.invoices;
@@ -384,21 +362,9 @@ const Billing = () => {
                   raw = invoicesResponse as Invoice[];
                 }
 
-                if (raw && raw.length > 0) {
-                  const normalized = raw.map((inv: Invoice) => ({
-                    id: inv.id,
-                    amount: Number(inv.amount ?? inv.total ?? 0),
-                    currency: String(inv.currency || "GBP").toUpperCase(),
-                    status: inv.status || "paid",
-                    date: inv.created_at || inv.created || new Date().toISOString(),
-                    invoice: inv.invoice_url || inv.hosted_invoice_url || "",
-                    description: inv.description || `Invoice ${inv.id}`,
-                  }));
-                  setInvoices(normalized);
-                }
+                setInvoices(normalizeInvoices(raw));
               }
             } catch (invoiceError) {
-              // If getInvoices fails, we still have invoices from getBillingInfo (if any)
               console.warn("Failed to fetch invoices separately:", invoiceError);
             }
           }
@@ -1307,9 +1273,6 @@ const Billing = () => {
                                 <div className="text-xs text-muted-foreground dark:text-gray-400">
                                   {item.date}
                                 </div>
-                                <div className="text-xs text-muted-foreground/80 dark:text-gray-500">
-                                  {item.invoice}
-                                </div>
                               </div>
                               <div className="text-right">
                                 <div className="font-bold text-foreground dark:text-white">
@@ -1328,16 +1291,14 @@ const Billing = () => {
                                 </Badge>
                               </div>
                             </div>
-                            {item.invoice && (
-                              <a
-                                href={item.invoice}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-xs text-blue-500 underline dark:text-blue-400"
-                              >
-                                View invoice
-                              </a>
-                            )}
+                            <a
+                              href={item.invoiceUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-xs text-blue-500 underline dark:text-blue-400"
+                            >
+                              View invoice
+                            </a>
                           </motion.div>
                         ))
                       ) : (

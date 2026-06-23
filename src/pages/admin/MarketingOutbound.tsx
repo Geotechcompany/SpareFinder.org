@@ -246,6 +246,7 @@ const MarketingOutbound: React.FC = () => {
   const [bulkSendMaxInput, setBulkSendMaxInput] = useState("25");
   const [bulkSendSubmitting, setBulkSendSubmitting] = useState(false);
   const [sendLogView, setSendLogView] = useState<Record<string, unknown> | null>(null);
+  const [appErrorView, setAppErrorView] = useState<Record<string, unknown> | null>(null);
   const [leadsPage, setLeadsPage] = useState(1);
   const [leadsLimit, setLeadsLimit] = useState(25);
   const [leadsSearchInput, setLeadsSearchInput] = useState("");
@@ -1963,29 +1964,55 @@ const MarketingOutbound: React.FC = () => {
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-2">
-                    {(errors as Record<string, unknown>[]).map((row) => (
-                      <div key={String(row.id)} className="rounded-lg border p-3 text-sm">
-                        <div className="flex flex-wrap gap-1 mb-1">
-                          <Badge variant="outline">{String(row.severity ?? "—")}</Badge>
-                          {row.area ? (
-                            <Badge variant="secondary">{String(row.area)}</Badge>
+                    {(errors as Record<string, unknown>[]).map((row) => {
+                      const context =
+                        row.context && typeof row.context === "object" && !Array.isArray(row.context)
+                          ? (row.context as Record<string, unknown>)
+                          : {};
+                      const contextKeys = Object.keys(context);
+                      const createdAt = row.created_at ? String(row.created_at) : "—";
+
+                      return (
+                        <div key={String(row.id)} className="rounded-lg border p-3 text-sm">
+                          <div className="flex flex-wrap items-start justify-between gap-2">
+                            <div className="flex flex-wrap gap-1">
+                              <Badge variant="outline">{String(row.severity ?? "—")}</Badge>
+                              {row.area ? (
+                                <Badge variant="secondary">{String(row.area)}</Badge>
+                              ) : null}
+                              {row.source ? (
+                                <Badge variant="secondary">{String(row.source)}</Badge>
+                              ) : null}
+                              {row.http_status ? (
+                                <Badge variant="outline">HTTP {String(row.http_status)}</Badge>
+                              ) : null}
+                            </div>
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              className="h-7 shrink-0 text-xs"
+                              onClick={() => setAppErrorView(row)}
+                            >
+                              View details
+                            </Button>
+                          </div>
+                          <p className="mt-2">{String(row.message)}</p>
+                          {row.http_method || row.http_path ? (
+                            <p className="mt-1 font-mono text-xs text-muted-foreground">
+                              {[row.http_method, row.http_path].filter(Boolean).join(" ")}
+                            </p>
                           ) : null}
-                          {row.source ? (
-                            <Badge variant="secondary">{String(row.source)}</Badge>
+                          {contextKeys.length > 0 ? (
+                            <p className="mt-1 text-xs text-muted-foreground">
+                              Context: {contextKeys.slice(0, 4).join(", ")}
+                              {contextKeys.length > 4 ? ` +${contextKeys.length - 4} more` : ""}
+                            </p>
                           ) : null}
-                          {row.http_status ? (
-                            <Badge variant="outline">HTTP {String(row.http_status)}</Badge>
-                          ) : null}
+                          <p className="mt-1 text-xs text-muted-foreground">{createdAt}</p>
                         </div>
-                        <p>{String(row.message)}</p>
-                        {row.http_method || row.http_path ? (
-                          <p className="text-xs text-muted-foreground mt-1 font-mono">
-                            {[row.http_method, row.http_path].filter(Boolean).join(" ")}
-                          </p>
-                        ) : null}
-                        <p className="text-xs text-muted-foreground mt-1">{String(row.created_at)}</p>
-                      </div>
-                    ))}
+                      );
+                    })}
                     {!errors.length && (
                       <p className="text-muted-foreground text-sm">No errors logged.</p>
                     )}
@@ -2144,6 +2171,95 @@ const MarketingOutbound: React.FC = () => {
             <Button type="button" onClick={() => void submitBulkLeadDialog()} disabled={bulkLeadSubmitting}>
               {bulkLeadSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-2 inline" /> : null}
               Apply to selected
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={!!appErrorView}
+        onOpenChange={(open) => {
+          if (!open) setAppErrorView(null);
+        }}
+      >
+        <DialogContent className="max-h-[92vh] flex flex-col gap-0 overflow-hidden sm:max-w-3xl">
+          <DialogHeader className="shrink-0 space-y-2 pr-2">
+            <DialogTitle className="text-left line-clamp-3">
+              {appErrorView ? String(appErrorView.message || "Error details") : "Error details"}
+            </DialogTitle>
+            <DialogDescription asChild>
+              <div className="space-y-1 text-left text-sm text-muted-foreground">
+                <p>
+                  <span className="font-medium text-foreground">When:</span>{" "}
+                  {appErrorView ? String(appErrorView.created_at || "—") : "—"}
+                </p>
+                <p>
+                  <span className="font-medium text-foreground">Request:</span>{" "}
+                  {appErrorView
+                    ? [appErrorView.http_method, appErrorView.http_path].filter(Boolean).join(" ") || "—"
+                    : "—"}
+                  {appErrorView?.http_status ? ` · HTTP ${String(appErrorView.http_status)}` : ""}
+                </p>
+                <p>
+                  <span className="font-medium text-foreground">Source:</span>{" "}
+                  {[appErrorView?.severity, appErrorView?.area, appErrorView?.source]
+                    .filter(Boolean)
+                    .map(String)
+                    .join(" · ") || "—"}
+                </p>
+              </div>
+            </DialogDescription>
+          </DialogHeader>
+          <div className="min-h-0 flex-1 overflow-y-auto rounded-md border bg-muted/30 p-3">
+            <div className="space-y-4 text-sm">
+              <div>
+                <p className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  Message
+                </p>
+                <p className="whitespace-pre-wrap break-words">
+                  {appErrorView ? String(appErrorView.message || "—") : "—"}
+                </p>
+              </div>
+              <div>
+                <p className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  Context
+                </p>
+                <pre className="max-h-[min(45vh,420px)] overflow-auto rounded-md border bg-background p-3 text-xs leading-relaxed">
+                  {appErrorView?.context && typeof appErrorView.context === "object"
+                    ? JSON.stringify(appErrorView.context, null, 2)
+                    : appErrorView?.context
+                      ? String(appErrorView.context)
+                      : "{}"}
+                </pre>
+              </div>
+              <div>
+                <p className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  Record
+                </p>
+                <pre className="max-h-[min(30vh,280px)] overflow-auto rounded-md border bg-background p-3 text-xs leading-relaxed">
+                  {appErrorView
+                    ? JSON.stringify(
+                        {
+                          id: appErrorView.id,
+                          severity: appErrorView.severity,
+                          area: appErrorView.area,
+                          source: appErrorView.source,
+                          http_status: appErrorView.http_status,
+                          http_method: appErrorView.http_method,
+                          http_path: appErrorView.http_path,
+                          created_at: appErrorView.created_at,
+                        },
+                        null,
+                        2
+                      )
+                    : "{}"}
+                </pre>
+              </div>
+            </div>
+          </div>
+          <DialogFooter className="shrink-0 pt-4">
+            <Button type="button" variant="outline" onClick={() => setAppErrorView(null)}>
+              Close
             </Button>
           </DialogFooter>
         </DialogContent>

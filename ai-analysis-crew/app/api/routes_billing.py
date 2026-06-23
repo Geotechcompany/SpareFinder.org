@@ -69,6 +69,102 @@ PLAN_PRICING = {
 }
 
 
+def _is_valid_invoice_url(url: str | None) -> bool:
+    if not url or not isinstance(url, str):
+        return False
+    trimmed = url.strip().lower()
+    return trimmed.startswith("http://") or trimmed.startswith("https://")
+
+
+def _map_stripe_invoice(inv: Any) -> dict[str, Any]:
+    invoice_url = inv.hosted_invoice_url or inv.invoice_pdf
+    return {
+        "id": inv.id,
+        "amount": (inv.amount_paid or inv.amount_due or 0) / 100,
+        "currency": (inv.currency or "gbp").upper(),
+        "status": inv.status or "open",
+        "created_at": datetime.utcfromtimestamp(inv.created).isoformat() + "Z" if inv.created else None,
+        "invoice_url": invoice_url if _is_valid_invoice_url(invoice_url) else None,
+        "description": (inv.description or "").strip() or f"Invoice {inv.id}",
+    }
+
+
+def _normalize_db_invoice(row: dict[str, Any]) -> dict[str, Any] | None:
+    invoice_url = row.get("invoice_url") or row.get("hosted_invoice_url")
+    if not _is_valid_invoice_url(invoice_url):
+        return None
+    amount = row.get("amount")
+    if amount is None:
+        amount = row.get("total")
+    created_at = row.get("created_at") or row.get("created")
+    invoice_id = row.get("id") or row.get("stripe_invoice_id") or "unknown"
+    return {
+        "id": invoice_id,
+        "amount": float(amount or 0),
+        "currency": str(row.get("currency") or "gbp").upper(),
+        "status": row.get("status") or "paid",
+        "created_at": created_at,
+        "invoice_url": invoice_url,
+        "description": (row.get("description") or "").strip() or f"Invoice {invoice_id}",
+    }
+
+
+def _fetch_user_invoices(
+    supabase,
+    user_id: str,
+    *,
+    limit: int = 10,
+    offset: int = 0,
+) -> list[dict[str, Any]]:
+    """Load invoices from Supabase first, then Stripe for the user's customer."""
+    try:
+        inv_result = (
+            supabase.table("invoices")
+            .select("*")
+            .eq("user_id", user_id)
+            .order("created_at", desc=True)
+            .range(offset, offset + limit - 1)
+            .execute()
+        )
+        if inv_result.data:
+            mapped = [
+                normalized
+                for row in inv_result.data
+                if (normalized := _normalize_db_invoice(row)) is not None
+            ]
+            if mapped:
+                return mapped
+    except Exception:
+        pass
+
+    stripe_secret = os.getenv("STRIPE_SECRET_KEY") or os.getenv("STRIPE_API_KEY")
+    if not stripe_secret:
+        return []
+
+    stripe.api_key = stripe_secret
+    sub_result = (
+        supabase.table("subscriptions")
+        .select("stripe_customer_id")
+        .eq("user_id", user_id)
+        .limit(1)
+        .execute()
+    )
+    customer_id = None
+    if sub_result.data and len(sub_result.data) > 0:
+        customer_id = (sub_result.data[0] or {}).get("stripe_customer_id")
+    if not customer_id:
+        return []
+
+    try:
+        invs = stripe.Invoice.list(customer=customer_id, limit=limit)
+        if not invs or not invs.data:
+            return []
+        mapped = [_map_stripe_invoice(inv) for inv in invs.data]
+        return [inv for inv in mapped if inv.get("invoice_url")]
+    except stripe.error.StripeError:
+        return []
+
+
 def _mark_trial_used(supabase, user_id: str) -> None:
     """Persist one-trial-per-user flag (best-effort if column missing)."""
     try:
@@ -252,20 +348,7 @@ async def get_billing_info(
         if user.role in ("admin", "super_admin"):
             limits = SUBSCRIPTION_LIMITS["enterprise"]
 
-        # Mock invoices (in production, fetch from Stripe)
-        invoices = []
-        if user_subscription["status"] != "inactive":
-            tier_pricing = PLAN_PRICING.get(tier, PLAN_PRICING["free"])
-            invoices = [
-                {
-                    "id": "inv_001",
-                    "amount": tier_pricing["amount"],
-                    "currency": tier_pricing["currency"].upper(),
-                    "status": "paid",
-                    "created_at": now.isoformat(),
-                    "invoice_url": "#",
-                }
-            ]
+        invoices = _fetch_user_invoices(supabase, billing_user_id, limit=10)
 
         return api_ok(
             data={
@@ -319,68 +402,12 @@ async def get_invoices(
         user_id = user.id
         offset = (page - 1) * limit
 
-        # Try stored invoices from DB first
-        try:
-            inv_result = (
-                supabase.table("invoices")
-                .select("*")
-                .eq("user_id", user_id)
-                .order("created_at", desc=True)
-                .range(offset, offset + limit - 1)
-                .execute()
-            )
-            if inv_result.data and len(inv_result.data) > 0:
-                return api_ok(
-                    data={
-                        "invoices": inv_result.data,
-                        "pagination": {"page": page, "limit": limit, "total": len(inv_result.data)},
-                    }
-                )
-        except Exception:
-            pass
-
-        # Fallback: fetch from Stripe if we have a subscription with stripe_customer_id
-        stripe_secret = os.getenv("STRIPE_SECRET_KEY") or os.getenv("STRIPE_API_KEY")
-        if stripe_secret:
-            stripe.api_key = stripe_secret
-            sub_result = (
-                supabase.table("subscriptions")
-                .select("stripe_customer_id")
-                .eq("user_id", user_id)
-                .limit(1)
-                .execute()
-            )
-            customer_id = None
-            if sub_result.data and len(sub_result.data) > 0:
-                customer_id = (sub_result.data[0] or {}).get("stripe_customer_id")
-            if customer_id:
-                try:
-                    invs = stripe.Invoice.list(customer=customer_id, limit=limit)
-                    if invs and invs.data:
-                        mapped = [
-                            {
-                                "id": inv.id,
-                                "amount": (inv.amount_paid or inv.amount_due or 0) / 100,
-                                "currency": (inv.currency or "gbp").upper(),
-                                "status": inv.status or "open",
-                                "created_at": datetime.utcfromtimestamp(inv.created).isoformat() + "Z" if inv.created else None,
-                                "invoice_url": inv.hosted_invoice_url or inv.invoice_pdf,
-                            }
-                            for inv in invs.data
-                        ]
-                        return api_ok(
-                            data={
-                                "invoices": mapped,
-                                "pagination": {"page": page, "limit": limit, "total": len(mapped)},
-                            }
-                        )
-                except stripe.error.StripeError:
-                    pass
+        invoices = _fetch_user_invoices(supabase, user_id, limit=limit, offset=offset)
 
         return api_ok(
             data={
-                "invoices": [],
-                "pagination": {"page": page, "limit": limit, "total": 0},
+                "invoices": invoices,
+                "pagination": {"page": page, "limit": limit, "total": len(invoices)},
             }
         )
     except Exception as e:
