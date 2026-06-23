@@ -18,7 +18,6 @@ from .plan_enforcement import check_upload_limit, get_profile_role, get_user_tie
 from .workspace_dependencies import (
     WorkspaceScope,
     get_workspace_scope,
-    workspace_delete,
     workspace_isolation_enabled,
     workspace_select,
     workspace_update,
@@ -483,35 +482,40 @@ async def delete_crew_analysis_job(
         supabase = get_supabase_admin()
 
         check_result = (
-            workspace_select(supabase, "crew_analysis_jobs", scope, "id")
+            workspace_select(supabase, "crew_analysis_jobs", scope, "id,status")
             .eq("id", job_id)
-            .single()
+            .limit(1)
             .execute()
         )
 
         if not check_result.data:
-            return api_error("Job not found or unauthorized", status_code=404)
+            return JSONResponse(
+                status_code=404,
+                content=api_error("Job not found or unauthorized", status_code=404),
+            )
+
+        job = check_result.data[0]
 
         from ..crew_job_cancel import request_cancel_crew_job
 
         request_cancel_crew_job(job_id)
-        job_status = str(check_result.data.get("status") or "").lower()
+        job_status = str(job.get("status") or "").lower()
         if job_status in ("pending", "processing"):
             logger.info("Cancelling in-flight crew analysis before delete: %s", job_id)
 
-        delete_result = (
-            workspace_delete(supabase, "crew_analysis_jobs", scope)
-            .eq("id", job_id)
-            .execute()
-        )
+        # Authorized above — delete by primary key (admin client bypasses RLS).
+        supabase.table("crew_analysis_jobs").delete().eq("id", job_id).execute()
 
         return api_ok(
             data={"message": "Job deleted successfully", "id": job_id}
         )
 
     except Exception as e:
-        print(f"❌ Failed to delete crew analysis job: {e}")
-        return api_error("Failed to delete job", status_code=500)
+        logger.exception("Failed to delete crew analysis job %s", job_id)
+        return JSONResponse(
+            status_code=500,
+            content=api_error("Failed to delete job", status_code=500),
+        )
 
 
 @router.patch("/crew-analysis/{job_id}")

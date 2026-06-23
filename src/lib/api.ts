@@ -49,10 +49,14 @@ export type AdminStatsApiResponse = {
 // Import centralized configuration
 import { API_BASE_URL } from "./config";
 
-console.log("🔧 API Client Config:", {
-  baseURL: API_BASE_URL,
-  environment: import.meta.env.MODE,
-});
+const IS_DEV = import.meta.env.DEV;
+
+if (IS_DEV) {
+  console.log("🔧 API Client Config:", {
+    baseURL: API_BASE_URL,
+    environment: import.meta.env.MODE,
+  });
+}
 
 const isCanceledRequest = (err: any) => {
   // Axios v1 uses AbortController and throws CanceledError with code "ERR_CANCELED"
@@ -170,15 +174,20 @@ apiClient.interceptors.request.use(
     }
 
     // Check if this is a public endpoint that doesn't require a token
+    const method = config.method?.toLowerCase() ?? "get";
+    const url = config.url ?? "";
+    const isPublicReviewsGet =
+      method === "get" &&
+      (/^\/reviews\/?(\?|$)/.test(url) ||
+        /^\/reviews\/stats\/?(\?|$)/.test(url));
     const isPublicEndpoint =
-      config.url &&
-      (config.url.includes("/auth/register") ||
-        config.url.includes("/auth/login") ||
-        config.url.includes("/auth/refresh") ||
-        config.url.includes("/auth/reset-password") ||
-        (config.url.includes("/reviews") &&
-          config.method?.toLowerCase() === "get") ||
-        config.url.includes("/health"));
+      url &&
+      (url.includes("/auth/register") ||
+        url.includes("/auth/login") ||
+        url.includes("/auth/refresh") ||
+        url.includes("/auth/reset-password") ||
+        isPublicReviewsGet ||
+        url.includes("/health"));
 
     // For public endpoints, skip token logic
     if (isPublicEndpoint) {
@@ -195,25 +204,13 @@ apiClient.interceptors.request.use(
       token = await getAuthToken();
     }
 
-    const hasToken = !!token;
-
-    // Only log detailed info for debugging when needed
-    if (process.env.NODE_ENV === 'development') {
-      console.log("🔍 Request interceptor:", {
-        url: config.url,
-        hasToken,
-        tokenPreview: token ? token.substring(0, 20) + "..." : "NO TOKEN",
-        timestamp: new Date().toISOString(),
-      });
-    }
-
     if (token) {
       config.headers["Authorization"] = `Bearer ${token}`;
-    } else {
-      // Don't log error for /auth/current-user as it's expected during initial load
-      if (!config.url?.includes("/auth/current-user")) {
-        console.warn("⚠️ No token available for request:", config.url);
-      }
+    } else if (
+      IS_DEV &&
+      !config.url?.includes("/auth/current-user")
+    ) {
+      console.warn("⚠️ No token available for request:", config.url);
     }
 
     const workspaceId = workspaceIdProvider?.() ?? null;
@@ -297,7 +294,7 @@ apiClient.interceptors.response.use(
                                error.response?.data?.requires_refresh === true;
         
         if (isExpiredError && !originalRequest._retry) {
-          console.warn("🔄 Clerk token expired - attempting to refresh...");
+          if (IS_DEV) console.warn("🔄 Clerk token expired - attempting to refresh...");
           originalRequest._retry = true;
           
           try {
@@ -305,7 +302,7 @@ apiClient.interceptors.response.use(
             const freshToken = await authTokenProvider?.();
             
             if (freshToken) {
-              console.log("✅ Clerk token refreshed successfully");
+              if (IS_DEV) console.log("✅ Clerk token refreshed successfully");
               // Update the authorization header with the fresh token
               originalRequest.headers["Authorization"] = `Bearer ${freshToken}`;
               // Retry the original request with the fresh token
@@ -316,7 +313,9 @@ apiClient.interceptors.response.use(
           } catch (refreshError) {
             // Only redirect to login if it's a truly invalid session (not just expired token)
             // For expired tokens, we'll try to continue with the request
-            console.warn("⚠️ Clerk token refresh failed, but continuing request:", refreshError);
+            if (IS_DEV) {
+              console.warn("⚠️ Clerk token refresh failed, but continuing request:", refreshError);
+            }
             // Don't redirect - let the request fail naturally, user can retry
             return Promise.reject(error);
           }
@@ -324,23 +323,25 @@ apiClient.interceptors.response.use(
         
         // For other Clerk auth errors, try one more refresh attempt before giving up
         if (!originalRequest._retry) {
-          console.warn("🔒 Unauthorized (Clerk) - attempting token refresh...");
+          if (IS_DEV) console.warn("🔒 Unauthorized (Clerk) - attempting token refresh...");
           originalRequest._retry = true;
           
           try {
             const freshToken = await authTokenProvider?.();
             if (freshToken) {
-              console.log("✅ Clerk token refreshed on retry");
+              if (IS_DEV) console.log("✅ Clerk token refreshed on retry");
               originalRequest.headers["Authorization"] = `Bearer ${freshToken}`;
               return apiClient(originalRequest);
             }
           } catch (refreshError) {
-            console.warn("⚠️ Token refresh failed:", refreshError);
+            if (IS_DEV) console.warn("⚠️ Token refresh failed:", refreshError);
           }
         }
         
         // Do not hard-redirect while the session may still be valid (busy server / slow network)
-        console.warn("🔒 Unauthorized (Clerk) after refresh attempts — not forcing logout");
+        if (IS_DEV) {
+          console.warn("🔒 Unauthorized (Clerk) after refresh attempts — not forcing logout");
+        }
         return Promise.reject(error);
       }
 
@@ -559,16 +560,10 @@ type DashboardAnalyticsPoint = {
 
 export const dashboardApi = {
   getStats: async (options?: { signal?: AbortSignal }): Promise<ApiResponse<DashboardStats>> => {
-    console.log("📊 Fetching dashboard stats...");
     try {
       const response = await apiClient.get("/dashboard/stats", {
         signal: options?.signal,
       });
-      console.log("📊 Stats response:", response.data);
-      console.log("📊 Stats response URL:", response.config.url);
-      console.log("📊 Stats response status:", response.status);
-      console.log("📊 Stats response headers:", response.headers);
-      console.log("📊 Stats response config:", response.config);
       return response.data as ApiResponse<DashboardStats>;
     } catch (error) {
       if (!isCanceledRequest(error)) {
@@ -644,12 +639,10 @@ export const dashboardApi = {
   getRecentUploads: async (
     limit: number = 5
   ): Promise<ApiResponse<{ uploads: any[] }>> => {
-    console.log("📋 Fetching recent uploads...");
     try {
       const response = await apiClient.get(
         `/dashboard/recent-uploads?limit=${limit}`
       );
-      console.log("📋 Recent uploads response:", response.data);
       return response.data;
     } catch (error) {
       console.error("📋 Failed to fetch recent uploads:", error);
@@ -661,13 +654,11 @@ export const dashboardApi = {
     limit: number = 5,
     options?: { signal?: AbortSignal }
   ): Promise<ApiResponse> => {
-    console.log("🔄 Fetching recent activities...");
     try {
       const response = await apiClient.get(
         `/dashboard/recent-activities?limit=${limit}`,
         { signal: options?.signal }
       );
-      console.log("🔄 Recent activities response:", response.data);
       return response.data;
     } catch (error) {
       if (!isCanceledRequest(error)) {
@@ -678,12 +669,10 @@ export const dashboardApi = {
   },
 
   getPerformanceMetrics: async (options?: { signal?: AbortSignal }): Promise<ApiResponse> => {
-    console.log("📈 Fetching performance metrics...");
     try {
       const response = await apiClient.get("/dashboard/performance-metrics", {
         signal: options?.signal,
       });
-      console.log("📈 Performance metrics response:", response.data);
       return response.data;
     } catch (error) {
       if (!isCanceledRequest(error)) {

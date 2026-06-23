@@ -60,8 +60,10 @@ class KeepAliveService {
       clearTimeout(timeoutId);
 
       if (response.ok) {
-        const data = await response.json();
-        console.log('AI service keep-alive ping successful:', data.status);
+        if (import.meta.env.DEV) {
+          const data = await response.json();
+          console.log('AI service keep-alive ping successful:', data.status);
+        }
       } else {
         console.warn('AI service keep-alive ping failed:', response.status);
       }

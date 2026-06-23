@@ -411,10 +411,6 @@ const Dashboard = () => {
       // If the requests fail transiently, keep last successful list rather than wiping.
       const allActivities = [...activitiesMapped, ...aiJobsMapped];
 
-      console.log(
-        `📊 Activities mapped: ${activitiesMapped.length}, AI jobs: ${aiJobsMapped.length}, Total: ${allActivities.length}`
-      );
-
       // Sort by time (most recent first) and take top 3
       const mergedActivities = allActivities
         .sort((a, b) => {
@@ -424,11 +420,6 @@ const Dashboard = () => {
           return timeB - timeA; // Descending order
         })
         .slice(0, 3);
-
-      console.log(
-        `✅ Setting ${mergedActivities.length} recent activities:`,
-        mergedActivities
-      );
 
       const activitiesFetchFailed =
         activitiesResponse.status === "rejected" || crewJobsResponse.status === "rejected";
