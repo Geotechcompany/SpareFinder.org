@@ -19,6 +19,7 @@ from .marketing_merge import apply_merge, html_to_plain, lead_to_merge_dict
 from .marketing_outbound_defaults import default_campaign_id_for_new_leads, sanitize_review_batch_cap
 from .marketing_rules import is_disposable_domain, is_valid_email
 from .marketing_sanitize import finalize_sanitization_result, rule_based_sanitize_lead
+from .sparefinder_contact import CONTACT_EMAIL
 
 logger = logging.getLogger(__name__)
 
@@ -88,6 +89,33 @@ def count_sends_today(supabase: Any, campaign_id: str) -> int:
         return 0
 
 
+def marketing_support_email(campaign: dict[str, Any] | None = None) -> str:
+    """Support address shown in outbound mail (campaign reply-to, then env, then default)."""
+    if campaign:
+        reply = str(campaign.get("reply_to_email") or "").strip()
+        if reply and "@" in reply:
+            return reply
+    return _env("CONTACT_TO_EMAIL") or _env("SUPPORT_EMAIL") or CONTACT_EMAIL
+
+
+def build_support_contact_html(ctx: dict[str, str]) -> str:
+    email = (ctx.get("support_email") or "").strip()
+    if not email or "@" not in email:
+        return ""
+    return (
+        '<p style="font-size:13px;color:#64748b;margin:20px 0 0;">'
+        f'Questions? Reach us at <a href="mailto:{email}" '
+        f'style="color:#6366f1;text-decoration:none;">{email}</a>.</p>'
+    )
+
+
+def build_support_contact_plain(ctx: dict[str, str]) -> str:
+    email = (ctx.get("support_email") or "").strip()
+    if not email or "@" not in email:
+        return ""
+    return f"\n\nQuestions? Reach us at {email}."
+
+
 def build_compliance_footer_html(campaign: dict[str, Any], ctx: dict[str, str]) -> str:
     addr = apply_merge(campaign.get("compliance_address") or "", ctx)
     disc = apply_merge(campaign.get("compliance_disclosure") or "", ctx)
@@ -106,6 +134,53 @@ def build_compliance_footer_html(campaign: dict[str, Any], ctx: dict[str, str]) 
     return "\n".join(parts)
 
 
+def build_compliance_footer_plain(campaign: dict[str, Any], ctx: dict[str, str]) -> str:
+    disc = apply_merge(campaign.get("compliance_disclosure") or "", ctx)
+    reason = apply_merge(campaign.get("compliance_reason") or "", ctx)
+    addr = apply_merge(campaign.get("compliance_address") or "", ctx)
+    unsub = ctx.get("unsubscribe_url") or ""
+    parts: list[str] = []
+    if disc:
+        parts.append(disc)
+    if reason:
+        parts.append(reason)
+    if addr:
+        parts.append(addr)
+    if unsub:
+        parts.append(f"Unsubscribe: {unsub}")
+    if not parts:
+        return ""
+    return "\n\n" + "\n".join(parts)
+
+
+def build_email_tail_html(campaign: dict[str, Any], ctx: dict[str, str]) -> str:
+    support = build_support_contact_html(ctx)
+    compliance = build_compliance_footer_html(campaign, ctx)
+    return "\n".join(part for part in (support, compliance) if part)
+
+
+def build_email_tail_plain(campaign: dict[str, Any], ctx: dict[str, str]) -> str:
+    return build_support_contact_plain(ctx) + build_compliance_footer_plain(campaign, ctx)
+
+
+def _attach_email_tail(
+    html_body: str,
+    text_body: str | None,
+    *,
+    campaign: dict[str, Any],
+    ctx: dict[str, str],
+) -> tuple[str, str]:
+    tail_html = build_email_tail_html(campaign, ctx)
+    html_out = (html_body or "").strip()
+    if tail_html:
+        html_out = f"{html_out}\n{tail_html}"
+    if text_body and text_body.strip():
+        text_out = text_body.strip() + build_email_tail_plain(campaign, ctx)
+    else:
+        text_out = html_to_plain(html_out)
+    return html_out, text_out
+
+
 def render_message_for_lead(
     *,
     lead: dict[str, Any],
@@ -116,8 +191,13 @@ def render_message_for_lead(
     """Returns subject, html, text."""
     fe = frontend_base_url()
     token = ensure_unsubscribe_token(lead)
-    ctx = lead_to_merge_dict(lead, frontend_url=fe, unsubscribe_token=token)
-
+    support = marketing_support_email(campaign)
+    ctx = lead_to_merge_dict(
+        lead,
+        frontend_url=fe,
+        unsubscribe_token=token,
+        extra={"support_email": support},
+    )
     compliance_footer = build_compliance_footer_html(campaign, ctx)
 
     if use_ai:
@@ -145,20 +225,29 @@ def render_message_for_lead(
                 )
             # Always merge: AI output may still contain {{frontend_url}} etc. even when
             # it omits unsubscribe placeholders (previously we skipped merge in that case).
-            html_out = apply_merge((body.html or "").strip(), ctx) + "\n" + compliance_footer
+            html_body = apply_merge((body.html or "").strip(), ctx)
             subj = apply_merge(body.subject or "", ctx)
-            if body.text and body.text.strip():
-                text_out = apply_merge(body.text.strip(), ctx)
-            else:
-                text_out = html_to_plain(html_out)
+            text_body = apply_merge(body.text.strip(), ctx) if body.text and body.text.strip() else None
+            html_out, text_out = _attach_email_tail(
+                html_body,
+                text_body,
+                campaign=campaign,
+                ctx=ctx,
+            )
             return subj, html_out, text_out
         except Exception as e:
             logger.warning("AI generation failed, falling back to template: %s", e)
 
     subj = apply_merge(campaign.get("subject_template") or "", ctx)
-    html_out = apply_merge(campaign.get("html_template") or "", ctx) + "\n" + compliance_footer
+    html_body = apply_merge(campaign.get("html_template") or "", ctx)
     text_tpl = campaign.get("text_template") or ""
-    text_out = apply_merge(text_tpl, ctx) if text_tpl.strip() else html_to_plain(html_out)
+    text_body = apply_merge(text_tpl, ctx) if text_tpl.strip() else None
+    html_out, text_out = _attach_email_tail(
+        html_body,
+        text_body,
+        campaign=campaign,
+        ctx=ctx,
+    )
     return subj, html_out, text_out
 
 

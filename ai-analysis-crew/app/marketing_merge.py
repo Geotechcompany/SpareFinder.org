@@ -51,6 +51,7 @@ def lead_to_merge_dict(
         "unsubscribe_token": unsubscribe_token,
         "unsubscribe_url": f"{link_base}/unsubscribe/marketing?token={unsubscribe_token}",
     }
+    # Caller may pass support_email (and other tokens) via extra.
     if extra:
         base.update({k: str(v) for k, v in extra.items()})
     return base
