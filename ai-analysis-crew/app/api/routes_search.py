@@ -12,6 +12,7 @@ from starlette.concurrency import run_in_threadpool
 from pydantic import BaseModel
 
 from .auth_dependencies import CurrentUser, get_current_user
+from .plan_enforcement import get_user_tier_and_limits
 from .responses import api_ok, api_error
 
 router = APIRouter(prefix="/search", tags=["search"])
@@ -73,6 +74,35 @@ async def search_keywords(
         user_currency = payload.user_currency or None
         job_id = str(uuid.uuid4())
 
+        from .supabase_admin import get_supabase_admin
+        from ..credit_service import charge_analysis_credit
+
+        supabase = get_supabase_admin()
+        tier, _ = await get_user_tier_and_limits(user.id, user.role)
+        credit_ok, balance_after, credit_err, credit_skipped = await run_in_threadpool(
+            lambda: charge_analysis_credit(
+                supabase,
+                user.id,
+                job_id=job_id,
+                role=user.role,
+                tier=tier,
+            )
+        )
+        if not credit_ok:
+            return JSONResponse(
+                status_code=402,
+                content={
+                    "success": False,
+                    "error": credit_err or "insufficient_credits",
+                    "message": "You do not have enough credits to perform this search.",
+                    "current_credits": balance_after,
+                    "required_credits": 1,
+                    "upgrade_required": True,
+                },
+            )
+
+        credit_charged = credit_ok and not credit_skipped
+
         from ..notification_service import notify_analysis_started
 
         await run_in_threadpool(
@@ -110,6 +140,8 @@ async def search_keywords(
                     user_currency=user_currency,
                     user_id=user.id,
                     keywords_label=keywords,
+                    credit_charged=credit_charged,
+                    billing_user_id=user.id,
                 )
             )
 
@@ -121,6 +153,7 @@ async def search_keywords(
                 "job_id": job_id,
                 "message": "Keyword search scheduled successfully",
                 "status": "processing",
+                "credits_remaining": balance_after if not credit_skipped else None,
             },
         )
         return JSONResponse(content=body, status_code=202)

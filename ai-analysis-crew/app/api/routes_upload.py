@@ -14,7 +14,7 @@ from fastapi.responses import JSONResponse
 from starlette.concurrency import run_in_threadpool
 
 from .auth_dependencies import CurrentUser, get_current_user, require_roles
-from .plan_enforcement import check_upload_limit
+from .plan_enforcement import check_upload_limit, get_profile_role, get_user_tier_and_limits
 from .workspace_dependencies import (
     WorkspaceScope,
     get_workspace_scope,
@@ -225,8 +225,41 @@ async def create_crew_analysis_job(
                 status_code=403,
             )
 
-        # Generate job ID (use UUID if database doesn't auto-generate)
+        billing_user_id = getattr(scope, "billing_user_id", None) or user_id
+        billing_role = user.role
+        if billing_user_id != user_id:
+            billing_role = await get_profile_role(billing_user_id)
+
+        tier, _ = await get_user_tier_and_limits(billing_user_id, billing_role)
+
+        # Generate job ID before credit charge (used in transaction metadata)
         job_id = str(uuid.uuid4())
+
+        from ..credit_service import charge_analysis_credit, refund_analysis_credit
+
+        credit_ok, balance_after, credit_err, credit_skipped = await run_in_threadpool(
+            lambda: charge_analysis_credit(
+                supabase,
+                billing_user_id,
+                job_id=job_id,
+                role=billing_role,
+                tier=tier,
+            )
+        )
+        if not credit_ok:
+            return JSONResponse(
+                status_code=402,
+                content={
+                    "success": False,
+                    "error": credit_err or "insufficient_credits",
+                    "message": "You do not have enough credits to perform this analysis.",
+                    "current_credits": balance_after,
+                    "required_credits": 1,
+                    "upgrade_required": True,
+                },
+            )
+
+        credit_charged = credit_ok and not credit_skipped
 
         # Upload image to Supabase Storage
         import os
@@ -307,6 +340,15 @@ async def create_crew_analysis_job(
         )
 
         if not result.data:
+            if credit_charged:
+                await run_in_threadpool(
+                    lambda: refund_analysis_credit(
+                        supabase,
+                        billing_user_id,
+                        job_id=job_id,
+                        reason="Job create failed — credit refunded",
+                    )
+                )
             return api_error("Failed to create job", status_code=500)
 
         job = result.data[0]
@@ -336,6 +378,8 @@ async def create_crew_analysis_job(
                 user_currency=user_currency or None,
                 user_id=user_id,
                 image_name=image.filename,
+                credit_charged=credit_charged,
+                billing_user_id=billing_user_id,
             )
         )
 
@@ -344,6 +388,7 @@ async def create_crew_analysis_job(
                 "jobId": job_id,
                 "imageUrl": image_url,
                 "job": job,
+                "credits_remaining": balance_after if not credit_skipped else None,
             },
             message="Crew analysis job created and started successfully"
         )

@@ -51,6 +51,8 @@ from pydantic import BaseModel
 from fastapi import FastAPI, File, Form, UploadFile, WebSocket, WebSocketDisconnect, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.responses import Response
 from datetime import datetime
 import json
 import uvicorn
@@ -92,18 +94,49 @@ _cors_origins = [
     "http://127.0.0.1:5173",
     "https://sparefinder.org",
     "https://www.sparefinder.org",
+    "https://sparefinder.netlify.app",
 ]
 _extra = (os.getenv("CORS_ORIGINS") or "").strip()
 if _extra:
     _cors_origins.extend(o.strip() for o in _extra.split(",") if o.strip())
 
+# Netlify deploy previews + sparefinder subdomains
+_cors_origin_regex = r"https://[\w.-]+\.netlify\.app|https://([\w-]+\.)?sparefinder\.org"
+
+_HEALTH_PATHS = frozenset({"/health", "/api/health", "/ping"})
+
+
+class HealthPreflightMiddleware(BaseHTTPMiddleware):
+    """Answer OPTIONS on public health routes before strict CORS can return 400."""
+
+    async def dispatch(self, request, call_next):
+        if request.method == "OPTIONS" and request.url.path in _HEALTH_PATHS:
+            headers: dict[str, str] = {
+                "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
+                "Access-Control-Max-Age": "86400",
+            }
+            origin = request.headers.get("origin")
+            if origin:
+                headers["Access-Control-Allow-Origin"] = origin
+                headers["Vary"] = "Origin"
+            requested_headers = request.headers.get("access-control-request-headers")
+            if requested_headers:
+                headers["Access-Control-Allow-Headers"] = requested_headers
+            return Response(status_code=200, headers=headers)
+        return await call_next(request)
+
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_cors_origins,
+    allow_origin_regex=_cors_origin_regex,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    allow_private_network=True,
 )
+# Outermost: intercept health OPTIONS before CORSMiddleware rejects unknown origins.
+app.add_middleware(HealthPreflightMiddleware)
 
 # Import and register API routers
 from .api.routes_auth import router as auth_router
@@ -1170,6 +1203,23 @@ async def run_analysis_background(
                 )
         else:
             await _update_job_async(analysis_id, "failed", "error", 0, str(e))
+        if credit_charged and billing_user_id:
+            try:
+                from .api.supabase_admin import get_supabase_admin
+                from .credit_service import refund_analysis_credit
+
+                await asyncio.to_thread(
+                    refund_analysis_credit,
+                    get_supabase_admin(),
+                    billing_user_id,
+                    job_id=analysis_id,
+                )
+            except Exception as refund_err:
+                logger.warning(
+                    "Could not refund analysis credit for job %s: %s",
+                    analysis_id,
+                    refund_err,
+                )
         if resolved_user_id and not crew_report_text:
             await asyncio.to_thread(
                 notify_analysis_failed,

@@ -5,6 +5,12 @@ import { Coins, AlertTriangle, RefreshCw, Loader2 } from "lucide-react";
 import { api } from "@/lib/api";
 import { toast } from "sonner";
 
+export const CREDITS_CHANGED_EVENT = "sparefinder:credits-changed";
+
+export function notifyCreditsChanged(): void {
+  window.dispatchEvent(new CustomEvent(CREDITS_CHANGED_EVENT));
+}
+
 interface CreditsDisplayProps {
   className?: string;
   size?: "small" | "medium" | "large";
@@ -61,9 +67,19 @@ export const CreditsDisplay: React.FC<CreditsDisplayProps> = ({
     fetchCredits();
   }, []);
 
+  useEffect(() => {
+    const onCreditsChanged = () => {
+      void fetchCredits();
+    };
+    window.addEventListener(CREDITS_CHANGED_EVENT, onCreditsChanged);
+    return () => window.removeEventListener(CREDITS_CHANGED_EVENT, onCreditsChanged);
+  }, []);
+
   const getStatusColor = () => {
     if (credits === null)
       return "from-gray-500/20 to-gray-600/20 border-gray-500/30";
+    if (credits === "unlimited")
+      return "from-emerald-500/20 to-green-500/20 border-green-500/40";
     if (credits === 0) return "from-red-500/20 to-red-600/20 border-red-500/40";
     if (credits <= 3)
       return "from-orange-500/20 to-yellow-500/20 border-orange-500/40";

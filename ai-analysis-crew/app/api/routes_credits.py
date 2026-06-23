@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends
 from .auth_dependencies import CurrentUser, get_current_user
 from .responses import api_ok
 from .supabase_admin import get_supabase_admin
+from ..credit_service import get_user_credit_balance
 from .supabase_helpers import get_plans_limits_from_db
 
 router = APIRouter(prefix="/credits", tags=["credits"])
@@ -45,21 +46,8 @@ async def get_balance(user: CurrentUser = Depends(get_current_user)):
                 "plan_active": False
             }
 
-        # Get credits: try user_credits.balance, then profiles.credits
-        credits = 0
-        try:
-            credits_result = supabase.table("user_credits").select("*").eq("user_id", user.id).execute()
-            if credits_result.data and len(credits_result.data) > 0:
-                credits = credits_result.data[0].get("balance", 0) or 0
-        except Exception:
-            pass
-        if credits <= 0:
-            try:
-                prof = supabase.table("profiles").select("credits").eq("id", user.id).limit(1).execute()
-                if prof.data and len(prof.data) > 0 and (prof.data[0].get("credits") or 0) > 0:
-                    credits = int(prof.data[0]["credits"])
-            except Exception:
-                pass
+        # Get credits from profiles / user_credits
+        credits = get_user_credit_balance(supabase, user.id)
 
         # Plan limits: cap displayed balance from DB plans or fallback
         db_caps = get_plans_limits_from_db()

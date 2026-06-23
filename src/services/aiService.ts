@@ -387,11 +387,24 @@ class AIPartService {
   }
 
   async checkHealth(): Promise<{ status: string; timestamp: number }> {
-    return this.makeRequest('/health');
+    // Simple GET without Authorization avoids a CORS preflight on /health.
+    const response = await fetch(`${this.baseUrl}/health`, {
+      headers: { Accept: 'application/json' },
+    });
+    if (!response.ok) {
+      throw new Error(`Health check failed: ${response.status}`);
+    }
+    return response.json();
   }
 
   async checkReadiness(): Promise<{ status: string; models_loaded: boolean }> {
-    return this.makeRequest('/health/ready');
+    const response = await fetch(`${this.baseUrl}/health/ready`, {
+      headers: { Accept: 'application/json' },
+    });
+    if (!response.ok) {
+      throw new Error(`Readiness check failed: ${response.status}`);
+    }
+    return response.json();
   }
 
   async getAvailableProviders(): Promise<string[]> {

@@ -92,6 +92,7 @@ import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
 import { parseAIResponse } from "@/lib/markdown-parser";
 import CreditsDisplay from "@/components/CreditsDisplay";
+import { notifyCreditsChanged } from "@/components/CreditsDisplay";
 import {
   Dialog,
   DialogContent,
@@ -1446,6 +1447,8 @@ const Upload = () => {
       if (user?.id && historyJob) {
         prependCrewJobToCache(user.id, historyJob);
       }
+
+      notifyCreditsChanged();
 
       showAnalysisStartedToast({
         imageName: uploadedFile.name,
