@@ -25,10 +25,10 @@ from ..marketing_crew import (
 )
 from ..marketing_discovery_queries import prepare_discovery_queries, record_discovery_queries_run
 from ..marketing_pipeline import (
-    ensure_unsubscribe_token,
     frontend_base_url,
     log_error,
     render_message_for_lead,
+    sync_lead_unsubscribe_token,
     run_marketing_admin_send_to_leads,
     run_marketing_send_cron,
     run_marketing_sanitize_review_drain,
@@ -1479,7 +1479,7 @@ async def preview_email(
     if not campaign:
         raise HTTPException(status_code=404, detail="Campaign not found")
 
-    token = ensure_unsubscribe_token(lead)
+    sync_lead_unsubscribe_token(supabase, lead)
     subj, html, text = render_message_for_lead(
         lead=lead,
         campaign=campaign,
@@ -1503,18 +1503,42 @@ async def test_send(
     if not campaign:
         raise HTTPException(status_code=404, detail="Campaign not found")
 
-    token = secrets.token_urlsafe(32)
+    lr = supabase.table("marketing_leads").select("*").eq("email", to_email).limit(1).execute()
+    if lr.data:
+        lead = lr.data[0]
+    else:
+        ins = supabase.table("marketing_leads").insert(
+            {
+                "email": to_email,
+                "full_name": _admin.full_name or "Test User",
+                "company_name": "Example Corp",
+                "job_title": "Procurement",
+                "sanitized_full_name": _admin.full_name or "Test User",
+                "sanitized_company_name": "Example Corp",
+                "sanitized_job_title": "Procurement",
+                "platform": "test_send",
+                "source": "test_send",
+                "campaign_id": body.campaign_id,
+                "raw_payload": {"test_send": True},
+                "unsubscribe_token": secrets.token_urlsafe(32),
+                "sanitization_status": "accepted",
+                "lead_status_internal": "pending",
+            }
+        ).execute()
+        lead = (ins.data or [None])[0]
+        if not lead:
+            raise HTTPException(status_code=500, detail="Could not create test lead for unsubscribe tracking")
+
+    sync_lead_unsubscribe_token(supabase, lead)
     fake_lead: dict[str, Any] = {
-        "email": to_email,
-        "full_name": _admin.full_name or "Test User",
-        "company_name": "Example Corp",
-        "job_title": "Procurement",
-        "sanitized_full_name": _admin.full_name,
-        "sanitized_company_name": "Example Corp",
-        "sanitized_job_title": "Procurement",
-        "platform": "test_send",
-        "raw_payload": {},
-        "unsubscribe_token": token,
+        **lead,
+        "full_name": lead.get("full_name") or _admin.full_name or "Test User",
+        "company_name": lead.get("company_name") or "Example Corp",
+        "job_title": lead.get("job_title") or "Procurement",
+        "sanitized_full_name": lead.get("sanitized_full_name") or _admin.full_name or "Test User",
+        "sanitized_company_name": lead.get("sanitized_company_name") or "Example Corp",
+        "sanitized_job_title": lead.get("sanitized_job_title") or "Procurement",
+        "platform": lead.get("platform") or "test_send",
     }
 
     try:

@@ -753,11 +753,21 @@ async def unsubscribe_marketing_cold_email(token: str, reason: str | None = None
     """
     One-click unsubscribe for cold marketing leads (non-user accounts).
     """
+    from fastapi.responses import HTMLResponse
+
+    invalid_link_html = """<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Unsubscribe link</title></head>
+<body style="font-family:system-ui;max-width:520px;margin:48px auto;padding:24px;">
+<h1>This link is not valid</h1>
+<p>It may have expired or already been used. If you still receive marketing email from us, reply with
+<strong>unsubscribe</strong> or contact support.</p>
+<p><a href="https://sparefinder.org">Return to SpareFinder</a></p></body></html>"""
+
     try:
         from .api.supabase_admin import get_supabase_admin
 
+        token = (token or "").strip()
         if not token or len(token) < 8:
-            raise HTTPException(status_code=400, detail="Invalid token")
+            return HTMLResponse(content=invalid_link_html, status_code=404)
         supabase = get_supabase_admin()
         res = (
             supabase.table("marketing_leads")
@@ -768,10 +778,10 @@ async def unsubscribe_marketing_cold_email(token: str, reason: str | None = None
         )
         rows = res.data or []
         if not rows:
-            raise HTTPException(status_code=400, detail="Invalid unsubscribe link")
+            return HTMLResponse(content=invalid_link_html, status_code=404)
         email = (rows[0].get("email") or "").strip().lower()
         if not email or "@" not in email:
-            raise HTTPException(status_code=400, detail="No email for this lead")
+            return HTMLResponse(content=invalid_link_html, status_code=404)
         supabase.table("marketing_unsubscribes").upsert(
             {"email": email, "source": "link"},
             on_conflict="email",
@@ -779,7 +789,6 @@ async def unsubscribe_marketing_cold_email(token: str, reason: str | None = None
         supabase.table("marketing_leads").update(
             {"lead_status_internal": "opt_out", "updated_at": datetime.utcnow().isoformat()}
         ).eq("id", rows[0]["id"]).execute()
-        from fastapi.responses import HTMLResponse
 
         return HTMLResponse(
             content="""<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Unsubscribed</title></head>
@@ -787,8 +796,6 @@ async def unsubscribe_marketing_cold_email(token: str, reason: str | None = None
 <h1>You’re unsubscribed</h1><p>We will not send further marketing messages to this address.</p>
 <p><a href="https://sparefinder.org">Return to SpareFinder</a></p></body></html>"""
         )
-    except HTTPException:
-        raise
     except Exception as e:
         logger.error("marketing unsubscribe failed: %s", e)
         raise HTTPException(status_code=500, detail="Could not process unsubscribe")

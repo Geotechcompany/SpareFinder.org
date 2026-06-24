@@ -39,6 +39,20 @@ def ensure_unsubscribe_token(lead: dict[str, Any]) -> str:
     return secrets.token_urlsafe(32)
 
 
+def sync_lead_unsubscribe_token(supabase: Any, lead: dict[str, Any]) -> str:
+    """Ensure the lead has an unsubscribe token persisted before rendering or sending email."""
+    token = ensure_unsubscribe_token(lead)
+    lead_id = lead.get("id")
+    if not lead_id or lead.get("unsubscribe_token") == token:
+        return token
+    try:
+        supabase.table("marketing_leads").update({"unsubscribe_token": token}).eq("id", lead_id).execute()
+        lead["unsubscribe_token"] = token
+    except Exception as e:
+        logger.warning("Failed to persist unsubscribe_token for lead %s: %s", lead_id, e)
+    return token
+
+
 def is_suppressed(supabase: Any, email: str | None) -> bool:
     if not email or "@" not in email:
         return True
@@ -673,15 +687,7 @@ def run_marketing_send_cron(
                 )
                 continue
 
-            token = ensure_unsubscribe_token(lead)
-            if token != lead.get("unsubscribe_token"):
-                try:
-                    supabase.table("marketing_leads").update({"unsubscribe_token": token}).eq(
-                        "id", lead["id"]
-                    ).execute()
-                    lead["unsubscribe_token"] = token
-                except Exception:
-                    pass
+            sync_lead_unsubscribe_token(supabase, lead)
 
             use_ai = bool(campaign.get("use_ai"))
             use_crew = bool(campaign.get("use_crew_ai"))
@@ -901,13 +907,7 @@ def run_marketing_admin_send_to_leads(
             )
             continue
 
-        token = ensure_unsubscribe_token(lead)
-        if token != lead.get("unsubscribe_token"):
-            try:
-                supabase.table("marketing_leads").update({"unsubscribe_token": token}).eq("id", lead["id"]).execute()
-                lead["unsubscribe_token"] = token
-            except Exception:
-                pass
+        sync_lead_unsubscribe_token(supabase, lead)
 
         use_ai = bool(campaign.get("use_ai"))
         use_crew = bool(campaign.get("use_crew_ai"))
