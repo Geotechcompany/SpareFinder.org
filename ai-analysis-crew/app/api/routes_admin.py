@@ -23,6 +23,7 @@ from .errors import ApiError
 from .responses import api_error, api_ok
 from .support_ticket_email import format_ticket_message_html_for_email, format_ticket_message_plain_for_email
 from .support_ticket_thread import enrich_ticket_messages_authors, fetch_ticket_messages_raw
+from .plan_enforcement import _normalize_tier, canonical_trial_days_for_tier
 from .subscription_utils import pick_best_subscription_row, pick_subscription_for_admin_display
 from .supabase_admin import get_supabase_admin
 from .supabase_auth_admin import delete_supabase_auth_user
@@ -356,23 +357,32 @@ def _resolve_impersonation_clerk_user_id(
 
 
 def _trial_info_from_subscription(
-    tier: str, status: str, period_end_raw: Any
+    tier: str, status: str, period_end_raw: Any, period_start_raw: Any = None
 ) -> dict[str, Any]:
-    """Match billing UI: trialing status, or Starter (free) with a future period end."""
+    """Trialing status, or Starter/Pro with a future period end (admin-assigned trials)."""
     status_l = (status or "").lower()
-    tier_l = (tier or "free").lower()
+    tier_norm = _normalize_tier(tier)
+    canonical_days = canonical_trial_days_for_tier(tier_norm)
     end = _parse_iso_datetime(period_end_raw)
+    start = _parse_iso_datetime(period_start_raw)
     now = datetime.now(timezone.utc)
 
     is_on_trial = status_l == "trialing" or (
-        tier_l == "free" and end is not None and end > now
+        canonical_days > 0
+        and status_l in ("active", "trialing")
+        and end is not None
+        and end > now
     )
 
     days_remaining: int | None = None
     trial_ends_at: str | None = None
 
     if is_on_trial:
-        trial_ends_at = str(period_end_raw) if period_end_raw else None
+        if start and canonical_days > 0:
+            capped_end = start + timedelta(days=canonical_days)
+            if end is None or end > capped_end:
+                end = capped_end
+        trial_ends_at = end.isoformat() if end else (str(period_end_raw) if period_end_raw else None)
         if end:
             days_remaining = max(0, math.ceil((end - now).total_seconds() / 86400))
         else:
@@ -420,7 +430,7 @@ async def admin_get_users(
         try:
             subs_res = (
                 supabase.table("subscriptions")
-                .select("user_id, tier, status, current_period_end")
+                .select("user_id, tier, status, current_period_start, current_period_end")
                 .in_("user_id", user_ids)
                 .execute()
             )
@@ -439,7 +449,8 @@ async def admin_get_users(
                 if status == "cancelled":
                     status = "canceled"
                 period_end = row.get("current_period_end")
-                trial = _trial_info_from_subscription(tier, status, period_end)
+                period_start = row.get("current_period_start") or row.get("updated_at")
+                trial = _trial_info_from_subscription(tier, status, period_end, period_start)
                 subscription_by_user[uid_s] = {
                     "tier": tier,
                     "status": status,
@@ -708,10 +719,15 @@ async def admin_update_user_plan(
     supabase = get_supabase_admin()
     tier = payload.tier
     now = datetime.utcnow()
-    period_end = now + timedelta(days=30)
+    tier_norm = _normalize_tier(tier)
+    trial_days = canonical_trial_days_for_tier(tier_norm)
     is_no_plan = tier == "no_plan"
     if is_no_plan:
         tier = "free"
+    elif trial_days > 0:
+        period_end = now + timedelta(days=trial_days)
+    else:
+        period_end = now + timedelta(days=30)
 
     existing = (
         supabase.table("subscriptions")
@@ -746,7 +762,7 @@ async def admin_update_user_plan(
 
         payload_update = {
             "tier": tier,
-            "status": "canceled" if is_no_plan else "active",
+            "status": "canceled" if is_no_plan else ("trialing" if trial_days > 0 else "active"),
             "cancel_at_period_end": False if is_no_plan else bool(rows[0].get("cancel_at_period_end")),
             "updated_at": now.isoformat() + "Z",
         }
@@ -785,7 +801,7 @@ async def admin_update_user_plan(
         supabase.table("subscriptions").insert({
             "user_id": userId,
             "tier": tier,
-            "status": "active",
+            "status": "trialing" if trial_days > 0 else "active",
             "current_period_start": now.isoformat() + "Z",
             "current_period_end": period_end.isoformat() + "Z",
         }).execute()

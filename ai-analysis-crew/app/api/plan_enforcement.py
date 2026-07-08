@@ -108,14 +108,27 @@ def resolve_trial_days_for_plan(supabase, plan_name: str) -> int:
     return canonical_trial_days_for_plan_name(plan_name)
 
 
+# Legacy plans.trial_days before Starter 7d / Pro 3d policy.
+LEGACY_TRIAL_DAYS_BY_TIER: dict[str, int] = {
+    "free": 30,
+    "pro": 7,
+}
+
+
 def trial_days_for_plan_row(tier: str | None, trial_days: int | None) -> int:
-    """Public plans API: DB value when set, else canonical default."""
+    """Public plans API: admin DB override when set, else canonical default."""
+    normalized = _normalize_tier(tier)
+    canonical = canonical_trial_days_for_tier(normalized)
     if trial_days is not None:
         try:
-            return max(0, int(trial_days))
+            stored = max(0, int(trial_days))
+            legacy = LEGACY_TRIAL_DAYS_BY_TIER.get(normalized)
+            if stored > 0 and legacy is not None and stored == legacy:
+                return canonical
+            return stored
         except (TypeError, ValueError):
             pass
-    return canonical_trial_days_for_tier(_normalize_tier(tier))
+    return canonical
 
 
 def _normalize_tier(tier: str | None) -> str:

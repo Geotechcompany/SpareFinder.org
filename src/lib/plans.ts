@@ -15,6 +15,32 @@ export const getCanonicalTrialDays = (tier: PlanTier): number | null => {
   return CANONICAL_TRIAL_DAYS[tier];
 };
 
+/** Legacy DB values from before trial-length policy (Starter 7d, Pro 3d). */
+const LEGACY_TRIAL_DAYS: Partial<Record<PlanTier, number>> = {
+  free: 30,
+  pro: 7,
+};
+
+/** Trial badge/CTA: admin DB override when set, else canonical plan config. */
+export const resolvePlanTrial = (
+  tier: PlanTier,
+  apiTrial: { days?: number; trialPrice?: number } | null | undefined,
+  staticTrial: PlanFeature["trial"],
+): PlanFeature["trial"] => {
+  const apiDays = apiTrial?.days;
+  const legacyDays = LEGACY_TRIAL_DAYS[tier];
+  const hasAdminOverride =
+    apiDays != null && apiDays > 0 && apiDays !== legacyDays;
+  const days = hasAdminOverride
+    ? apiDays
+    : staticTrial?.days ?? getCanonicalTrialDays(tier) ?? undefined;
+  if (!days) return undefined;
+  return {
+    days,
+    trialPrice: apiTrial?.trialPrice ?? staticTrial?.trialPrice,
+  };
+};
+
 // Annual billing discount (derived from current monthly prices)
 export const ANNUAL_DISCOUNT_PERCENT = 20;
 export const ANNUAL_DISCOUNT_FACTOR = 1 - ANNUAL_DISCOUNT_PERCENT / 100;
@@ -237,14 +263,8 @@ export async function fetchPlansFromApi(): Promise<PlanFeature[]> {
           api_calls: p.limits?.api_calls ?? staticPlan.limits.api_calls,
           storage: p.limits?.storage ?? staticPlan.limits.storage,
         },
-        // Trial length from API (admin plans.trial_days), with static fallback.
-        trial:
-          p.trial?.days && p.trial.days > 0
-            ? {
-                days: p.trial.days,
-                trialPrice: p.trial.trialPrice ?? staticPlan.trial?.trialPrice,
-              }
-            : staticPlan.trial,
+        // Trial length: canonical defaults; ignore legacy DB 30d/7d unless admin overrides.
+        trial: resolvePlanTrial(planTier, p.trial, staticPlan.trial),
       } satisfies PlanFeature;
     });
   } catch {
