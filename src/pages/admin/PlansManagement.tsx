@@ -24,6 +24,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { api } from "@/lib/api";
+import { CANONICAL_TRIAL_DAYS, normalizeApiTier } from "@/lib/plans";
 import { SpinningLogoLoader } from "@/components/brand/spinning-logo-loader";
 import { Loader2, Pencil } from "lucide-react";
 
@@ -48,6 +49,18 @@ interface DbPlan {
   created_at?: string;
   updated_at?: string;
 }
+
+const formatTrialLabel = (plan: DbPlan): string => {
+  if (plan.trial_days != null) {
+    return plan.trial_days > 0 ? `${plan.trial_days} days` : "No trial";
+  }
+  const defaultDays = CANONICAL_TRIAL_DAYS[normalizeApiTier(plan.tier)];
+  return defaultDays ? `Default (${defaultDays} days)` : "No trial";
+};
+
+const resolveTrialDaysForForm = (plan: DbPlan): number | null => {
+  return plan.trial_days ?? null;
+};
 
 const PlansManagement = () => {
   const [plans, setPlans] = useState<DbPlan[]>([]);
@@ -91,7 +104,7 @@ const PlansManagement = () => {
       limits_searches: plan.limits_searches,
       limits_api_calls: plan.limits_api_calls,
       limits_storage_mb: plan.limits_storage_mb,
-      trial_days: plan.trial_days,
+      trial_days: resolveTrialDaysForForm(plan),
       trial_price: plan.trial_price != null ? (typeof plan.trial_price === "string" ? parseFloat(plan.trial_price) : plan.trial_price) : undefined,
       display_order: plan.display_order,
       active: plan.active,
@@ -116,7 +129,10 @@ const PlansManagement = () => {
       if (form.limits_searches !== undefined) payload.limits_searches = form.limits_searches;
       if (form.limits_api_calls !== undefined) payload.limits_api_calls = form.limits_api_calls;
       if (form.limits_storage_mb !== undefined) payload.limits_storage_mb = form.limits_storage_mb;
-      if (form.trial_days !== undefined) payload.trial_days = form.trial_days;
+      if (form.trial_days !== undefined) {
+        payload.trial_days =
+          form.trial_days == null ? null : Math.max(0, Math.floor(Number(form.trial_days)));
+      }
       if (form.trial_price !== undefined) payload.trial_price = form.trial_price;
       if (form.display_order !== undefined) payload.display_order = form.display_order;
       if (form.active !== undefined) payload.active = form.active;
@@ -160,6 +176,7 @@ const PlansManagement = () => {
                     <TableHead>Tier</TableHead>
                     <TableHead>Name</TableHead>
                     <TableHead>Price</TableHead>
+                    <TableHead>Trial</TableHead>
                     <TableHead>Searches</TableHead>
                     <TableHead>Active</TableHead>
                     <TableHead className="w-[80px]"></TableHead>
@@ -173,6 +190,7 @@ const PlansManagement = () => {
                       <TableCell>
                         £{typeof plan.price === "string" ? parseFloat(plan.price).toFixed(2) : Number(plan.price).toFixed(2)}/{plan.period}
                       </TableCell>
+                      <TableCell>{formatTrialLabel(plan)}</TableCell>
                       <TableCell>{plan.limits_searches === -1 ? "Unlimited" : plan.limits_searches}</TableCell>
                       <TableCell>{plan.active ? "Yes" : "No"}</TableCell>
                       <TableCell>
@@ -275,6 +293,66 @@ const PlansManagement = () => {
                     value={form.limits_storage_mb ?? ""}
                     onChange={(e) => setForm((f) => ({ ...f, limits_storage_mb: parseInt(e.target.value, 10) || 0 }))}
                     placeholder="-1 = unlimited"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div className="grid gap-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <Label>Trial days</Label>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 px-2 text-xs"
+                      onClick={() => setForm((f) => ({ ...f, trial_days: null }))}
+                    >
+                      Clear override
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 px-2 text-xs"
+                      onClick={() => {
+                        const tier = normalizeApiTier((form.tier ?? editing.tier ?? "").toString());
+                        setForm((f) => ({ ...f, trial_days: CANONICAL_TRIAL_DAYS[tier] ?? 0 }));
+                      }}
+                    >
+                      Set default
+                    </Button>
+                  </div>
+                  <Input
+                    type="number"
+                    min={0}
+                    step={1}
+                    value={form.trial_days ?? ""}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      setForm((f) => ({
+                        ...f,
+                        trial_days: value === "" ? null : Math.max(0, parseInt(value, 10) || 0),
+                      }));
+                    }}
+                    placeholder="Empty = tier default"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Set a number to override. Empty uses defaults (Starter 7, Professional 3). 0 disables trial.
+                  </p>
+                </div>
+                <div className="grid gap-2">
+                  <Label>Trial price (£)</Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={form.trial_price ?? ""}
+                    onChange={(e) =>
+                      setForm((f) => ({
+                        ...f,
+                        trial_price: e.target.value === "" ? undefined : parseFloat(e.target.value) || 0,
+                      }))
+                    }
+                    placeholder="Optional"
                   />
                 </div>
               </div>

@@ -4,6 +4,17 @@ import { api } from "@/lib/api";
 // Centralized plan configuration to ensure consistency across the entire app
 export type PlanTier = "free" | "pro" | "enterprise";
 
+/** Canonical trial length per tier (Starter 7 days, Professional 3 days). */
+export const CANONICAL_TRIAL_DAYS: Record<PlanTier, number | null> = {
+  free: 7,
+  pro: 3,
+  enterprise: null,
+};
+
+export const getCanonicalTrialDays = (tier: PlanTier): number | null => {
+  return CANONICAL_TRIAL_DAYS[tier];
+};
+
 // Annual billing discount (derived from current monthly prices)
 export const ANNUAL_DISCOUNT_PERCENT = 20;
 export const ANNUAL_DISCOUNT_FACTOR = 1 - ANNUAL_DISCOUNT_PERCENT / 100;
@@ -119,7 +130,7 @@ export const PLAN_CONFIG: Record<PlanTier, PlanFeature> = {
       storage: 1 * 1024 * 1024 * 1024, // 1GB
     },
     trial: {
-      days: 7,
+      days: CANONICAL_TRIAL_DAYS.free!,
       trialPrice: 15, // Special trial pricing
     },
   },
@@ -140,7 +151,7 @@ export const PLAN_CONFIG: Record<PlanTier, PlanFeature> = {
       storage: 25 * 1024 * 1024 * 1024, // 25GB
     },
     trial: {
-      days: 3,
+      days: CANONICAL_TRIAL_DAYS.pro!,
     },
   },
   enterprise: {
@@ -226,13 +237,14 @@ export async function fetchPlansFromApi(): Promise<PlanFeature[]> {
           api_calls: p.limits?.api_calls ?? staticPlan.limits.api_calls,
           storage: p.limits?.storage ?? staticPlan.limits.storage,
         },
-        // Trial length is canonical in PLAN_CONFIG (DB trial_days may be stale)
-        trial: staticPlan.trial
-          ? {
-              days: staticPlan.trial.days,
-              trialPrice: staticPlan.trial.trialPrice,
-            }
-          : undefined,
+        // Trial length from API (admin plans.trial_days), with static fallback.
+        trial:
+          p.trial?.days && p.trial.days > 0
+            ? {
+                days: p.trial.days,
+                trialPrice: p.trial.trialPrice ?? staticPlan.trial?.trialPrice,
+              }
+            : staticPlan.trial,
       } satisfies PlanFeature;
     });
   } catch {

@@ -11,7 +11,12 @@ from fastapi import APIRouter, Depends, Header, Query, Request
 from pydantic import BaseModel
 
 from .auth_dependencies import CurrentUser, get_current_user
-from .plan_enforcement import get_profile_role, get_user_tier_and_limits, resolve_billing_user_id
+from .plan_enforcement import (
+    get_profile_role,
+    get_user_tier_and_limits,
+    resolve_billing_user_id,
+    resolve_trial_days_for_plan,
+)
 from .responses import api_error, api_ok
 from .subscription_utils import pick_best_subscription_row
 from .supabase_admin import get_supabase_admin
@@ -446,9 +451,10 @@ async def create_checkout_session(
         stripe.api_key = stripe_secret_key
         supabase = get_supabase_admin()
 
-        # Enforce one trial per user: if they already used a trial, do not grant another
+        # Trial length: admin plans.trial_days when set, else canonical defaults.
         trial_requested = int(payload.trial_days or 0)
-        trial_days = trial_requested
+        configured_trial_days = resolve_trial_days_for_plan(supabase, payload.plan)
+        trial_days = configured_trial_days if trial_requested > 0 and configured_trial_days > 0 else 0
         trial_used = False
         if trial_days > 0:
             trial_used = _user_has_used_trial(supabase, user.id)

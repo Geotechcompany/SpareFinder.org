@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter
 
+from .plan_enforcement import _normalize_tier, trial_days_for_plan_row
 from .responses import api_ok
 from .supabase_admin import get_supabase_admin
 
@@ -57,9 +58,10 @@ async def list_plans():
                 },
                 "trial": None,
             })
-            if r.get("trial_days") is not None:
+            trial_days = trial_days_for_plan_row(r.get("tier"), r.get("trial_days"))
+            if trial_days > 0:
                 plans[-1]["trial"] = {
-                    "days": r["trial_days"],
+                    "days": trial_days,
                     "trialPrice": float(r["trial_price"]) if r.get("trial_price") is not None else None,
                 }
         return api_ok(data={"plans": plans})

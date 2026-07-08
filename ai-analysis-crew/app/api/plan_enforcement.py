@@ -39,6 +39,84 @@ WORKSPACE_LIMITS_BY_TIER: dict[str, int] = {
     "enterprise": -1,
 }
 
+# Canonical free-trial length per tier (matches src/lib/plans.ts).
+CANONICAL_TRIAL_DAYS_BY_TIER: dict[str, int] = {
+    "free": 7,
+    "pro": 3,
+}
+
+
+def canonical_trial_days_for_tier(tier: str | None) -> int:
+    """Return allowed trial days for a tier (0 when no trial)."""
+    normalized = _normalize_tier(tier)
+    return CANONICAL_TRIAL_DAYS_BY_TIER.get(normalized, 0)
+
+
+def canonical_trial_days_for_plan_name(plan_name: str | None) -> int:
+    """Map checkout plan label to canonical trial days."""
+    if not plan_name:
+        return 0
+    normalized = plan_name.lower()
+    if "enterprise" in normalized:
+        return 0
+    if "pro" in normalized or "professional" in normalized or "business" in normalized:
+        return CANONICAL_TRIAL_DAYS_BY_TIER["pro"]
+    if "starter" in normalized or "basic" in normalized or "free" in normalized:
+        return CANONICAL_TRIAL_DAYS_BY_TIER["free"]
+    return 0
+
+
+def _plan_name_to_tier_guess(plan_name: str | None) -> str:
+    if not plan_name:
+        return "free"
+    normalized = plan_name.lower()
+    if "enterprise" in normalized:
+        return "enterprise"
+    if "pro" in normalized or "professional" in normalized or "business" in normalized:
+        return "pro"
+    return "free"
+
+
+def resolve_trial_days_for_plan(supabase, plan_name: str) -> int:
+    """
+    Trial length for checkout: admin `plans.trial_days` when set, else canonical defaults.
+    """
+    normalized_name = (plan_name or "").strip().lower()
+    tier_guess = _plan_name_to_tier_guess(plan_name)
+    try:
+        result = supabase.table("plans").select("tier,name,trial_days").execute()
+        rows = result.data or []
+        for row in rows:
+            row_name = (row.get("name") or "").strip().lower()
+            row_tier = _normalize_tier(row.get("tier"))
+            name_match = (
+                bool(normalized_name)
+                and (row_name == normalized_name or normalized_name in row_name or row_name in normalized_name)
+            )
+            tier_match = row_tier == tier_guess
+            if not name_match and not tier_match:
+                continue
+            raw_days = row.get("trial_days")
+            if raw_days is not None:
+                try:
+                    return max(0, int(raw_days))
+                except (TypeError, ValueError):
+                    pass
+            return canonical_trial_days_for_tier(row_tier)
+    except Exception as e:
+        print(f"⚠️ resolve_trial_days_for_plan failed: {e}")
+    return canonical_trial_days_for_plan_name(plan_name)
+
+
+def trial_days_for_plan_row(tier: str | None, trial_days: int | None) -> int:
+    """Public plans API: DB value when set, else canonical default."""
+    if trial_days is not None:
+        try:
+            return max(0, int(trial_days))
+        except (TypeError, ValueError):
+            pass
+    return canonical_trial_days_for_tier(_normalize_tier(tier))
+
 
 def _normalize_tier(tier: str | None) -> str:
     if not tier:

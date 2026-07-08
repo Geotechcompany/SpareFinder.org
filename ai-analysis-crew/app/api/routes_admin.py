@@ -870,15 +870,19 @@ async def admin_update_plan(
     supabase = get_supabase_admin()
     # Build update dict from non-None fields
     raw = payload.model_dump(exclude_unset=True)
+    nullable_fields = frozenset({"trial_days", "trial_price", "description", "color"})
     updates = {}
     for k, v in raw.items():
-        if v is None:
+        if v is None and k not in nullable_fields:
             continue
         if k == "tier":
             v = str(v).strip() if v else ""
             if not v:
                 continue  # skip empty tier
         updates[k] = v
+    if "trial_days" in updates:
+        td = updates["trial_days"]
+        updates["trial_days"] = None if td is None else max(0, int(td))
     if not updates:
         return api_error("No fields to update", code="no_fields", status_code=400)
     updates["updated_at"] = datetime.utcnow().isoformat()
