@@ -21,19 +21,23 @@ const LEGACY_TRIAL_DAYS: Partial<Record<PlanTier, number>> = {
   pro: 7,
 };
 
-/** Trial badge/CTA: admin DB override when set, else canonical plan config. */
+/** Trial badge/CTA: canonical defaults unless admin set a custom non-legacy value. */
 export const resolvePlanTrial = (
   tier: PlanTier,
-  apiTrial: { days?: number; trialPrice?: number } | null | undefined,
+  apiTrial: { days?: number | string; trialPrice?: number } | null | undefined,
   staticTrial: PlanFeature["trial"],
 ): PlanFeature["trial"] => {
-  const apiDays = apiTrial?.days;
-  const legacyDays = LEGACY_TRIAL_DAYS[tier];
-  const hasAdminOverride =
-    apiDays != null && apiDays > 0 && apiDays !== legacyDays;
-  const days = hasAdminOverride
-    ? apiDays
-    : staticTrial?.days ?? getCanonicalTrialDays(tier) ?? undefined;
+  const canonical = staticTrial?.days ?? getCanonicalTrialDays(tier) ?? undefined;
+  const apiDays = Number(apiTrial?.days);
+  const legacy = LEGACY_TRIAL_DAYS[tier];
+
+  const isCustomAdminTrial =
+    Number.isFinite(apiDays) &&
+    apiDays > 0 &&
+    apiDays !== legacy &&
+    apiDays !== canonical;
+
+  const days = isCustomAdminTrial ? apiDays : canonical;
   if (!days) return undefined;
   return {
     days,

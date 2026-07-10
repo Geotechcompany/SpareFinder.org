@@ -90,7 +90,14 @@ const App = () => (
               <Suspense fallback={<SpinningLogoLoader label="Loading page…" />}>
                 <Routes>
                   <Route path="/" element={<Landing />} />
-                  <Route path="/api-docs" element={<ApiDocs />} />
+                  <Route
+                    path="/api-docs"
+                    element={
+                      <ProtectedRoute>
+                        <ApiDocs />
+                      </ProtectedRoute>
+                    }
+                  />
 
                   {/* Clerk OAuth/SAML callback routes (required for social sign-in) */}
                   <Route path="/login/sso-callback" element={<ClerkSsoCallback />} />

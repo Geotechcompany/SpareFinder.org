@@ -31,7 +31,6 @@ const ROUTES = [
   { path: "/reviews", file: "reviews/index.html" },
   { path: "/privacy-policy", file: "privacy-policy/index.html" },
   { path: "/terms-of-service", file: "terms-of-service/index.html" },
-  { path: "/api-docs", file: "api-docs/index.html" },
   { path: "/help", file: "help/index.html" },
   { path: "/invite/workspace", file: "invite/workspace/index.html" },
 ];

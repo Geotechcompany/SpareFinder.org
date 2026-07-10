@@ -107,9 +107,8 @@ const pageConfigs: PageSEOConfig = {
   "/api-docs": {
     title: "Developer API Documentation - SpareFinder",
     description:
-      "SpareFinder Developer API documentation for Pro/Enterprise: create API keys, authenticate with x-api-key, and integrate with ERP/CMMS systems.",
-    keywords:
-      "SpareFinder API, spare parts API, ERP integration, CMMS integration, industrial parts API, x-api-key authentication",
+      "SpareFinder Developer API documentation for Pro/Enterprise subscribers.",
+    noindex: true,
     type: "website",
   },
   "/share/:token": {

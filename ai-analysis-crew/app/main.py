@@ -251,6 +251,38 @@ async def cron_reminders(
         return {"ok": False, "error": str(e)}
 
 
+@app.get("/api/cron/stuck-jobs")
+async def cron_stuck_jobs(
+    stuck_minutes: int | None = None,
+    max_progress: int | None = None,
+    limit: int = 100,
+    action: str | None = None,
+):
+    """
+    Close crew analysis jobs stuck in pending/processing (e.g. 5% at starting).
+
+    Call from cron-job.org or rely on in-process croniter (STUCK_JOBS_CRON, default */5 * * * *).
+    Query: ?stuck_minutes=5&max_progress=15&action=fail
+    """
+    try:
+        from .api.supabase_admin import get_supabase_admin
+        from .cron_stuck_jobs import run_stuck_jobs_cron
+
+        supabase = get_supabase_admin()
+        summary = await asyncio.to_thread(
+            run_stuck_jobs_cron,
+            supabase,
+            stuck_minutes=stuck_minutes,
+            max_progress=max_progress,
+            limit=limit,
+            action=action,
+        )
+        return summary
+    except Exception as e:
+        logger.error("❌ Cron stuck-jobs failed: %s", e)
+        return {"ok": False, "error": str(e)}
+
+
 # WebSocket connections manager
 class ConnectionManager:
     def __init__(self):
@@ -496,6 +528,13 @@ async def startup_event():
         start_marketing_scheduled_tasks()
     except Exception as e:
         logger.warning("Marketing scheduled tasks not started: %s", e)
+
+    try:
+        from .cron_stuck_jobs import start_stuck_jobs_scheduler
+
+        start_stuck_jobs_scheduler()
+    except Exception as e:
+        logger.warning("Stuck-jobs scheduler not started: %s", e)
 
     # Redis Pub/Sub: subscribe to crew_job_updates and broadcast to WebSocket clients
     try:
