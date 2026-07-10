@@ -256,26 +256,25 @@ async def cron_stuck_jobs(
     stuck_minutes: int | None = None,
     max_progress: int | None = None,
     limit: int = 100,
-    action: str | None = None,
+    max_restarts: int | None = None,
 ):
     """
-    Close crew analysis jobs stuck in pending/processing (e.g. 5% at starting).
+    Restart crew analysis jobs stuck in pending/processing (e.g. 5% at starting).
 
     Call from cron-job.org or rely on in-process croniter (STUCK_JOBS_CRON, default */5 * * * *).
-    Query: ?stuck_minutes=5&max_progress=15&action=fail
+    Query: ?stuck_minutes=5&max_progress=15&max_restarts=3
     """
     try:
         from .api.supabase_admin import get_supabase_admin
-        from .cron_stuck_jobs import run_stuck_jobs_cron
+        from .cron_stuck_jobs import run_stuck_jobs_recovery
 
         supabase = get_supabase_admin()
-        summary = await asyncio.to_thread(
-            run_stuck_jobs_cron,
+        summary = await run_stuck_jobs_recovery(
             supabase,
             stuck_minutes=stuck_minutes,
             max_progress=max_progress,
             limit=limit,
-            action=action,
+            max_restarts=max_restarts,
         )
         return summary
     except Exception as e:
@@ -380,6 +379,53 @@ async def _update_job_async(
     )
 
 
+async def kickoff_crew_analysis_job(
+    job_id: str,
+    user_email: str,
+    *,
+    keywords: Optional[str] = None,
+    image_url: Optional[str] = None,
+    image_data: Optional[bytes] = None,
+    image_name: Optional[str] = None,
+    user_id: Optional[str] = None,
+    cancel_existing: bool = False,
+    reset_status: bool = True,
+) -> None:
+    """Start or restart a crew analysis job (auto-start and stuck-job recovery)."""
+    import httpx
+
+    if cancel_existing:
+        request_cancel_crew_job(job_id)
+
+    if reset_status:
+        await _update_job_async(job_id, "processing", "starting", 5)
+
+    if image_data is None and image_url and not str(image_url).startswith("placeholder_url"):
+        try:
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                img_response = await client.get(image_url)
+                if img_response.status_code == 200:
+                    image_data = img_response.content
+                    logger.info(
+                        "Fetched image for job %s (%s bytes)",
+                        job_id,
+                        len(image_data),
+                    )
+        except Exception as img_error:
+            logger.warning("Failed to fetch image for job %s: %s", job_id, img_error)
+
+    asyncio.create_task(
+        run_analysis_background(
+            job_id,
+            user_email,
+            image_data,
+            keywords or "",
+            user_id=user_id,
+            image_name=image_name,
+        )
+    )
+
+
 async def auto_start_pending_jobs():
     """Background task to automatically start pending analysis jobs."""
     # Import here to avoid circular imports at module level
@@ -393,8 +439,6 @@ async def auto_start_pending_jobs():
             logger.error("Failed to import get_supabase_admin - auto-start disabled")
             return
 
-    import httpx
-
     while True:
         try:
             await asyncio.sleep(10)  # Check every 10 seconds
@@ -405,7 +449,7 @@ async def auto_start_pending_jobs():
             def _fetch_pending():
                 return (
                     supabase.table("crew_analysis_jobs")
-                    .select("id, user_email, keywords, image_url, image_name")
+                    .select("id, user_email, keywords, image_url, image_name, user_id")
                     .eq("status", "pending")
                     .limit(10)
                     .execute()
@@ -428,32 +472,14 @@ async def auto_start_pending_jobs():
                     continue
                 
                 try:
-                    # Update status to processing immediately
-                    update_crew_job_status(job_id, "processing", "starting", 5)
-                    
-                    # Fetch image if URL is provided and not a placeholder
-                    image_data = None
-                    if image_url and not image_url.startswith("placeholder_url"):
-                        try:
-                            async with httpx.AsyncClient(timeout=30.0) as client:
-                                img_response = await client.get(image_url)
-                                if img_response.status_code == 200:
-                                    image_data = img_response.content
-                                    logger.info(f"Fetched image for job {job_id} ({len(image_data)} bytes)")
-                        except Exception as img_error:
-                            logger.warning(f"Failed to fetch image for job {job_id}: {img_error}")
-                            # Continue without image - analysis can still proceed with keywords
-                    
-                    # Start analysis in background
-                    asyncio.create_task(
-                        run_analysis_background(
-                            job_id,
-                            user_email,
-                            image_data,
-                            keywords
-                        )
+                    await kickoff_crew_analysis_job(
+                        job_id,
+                        user_email,
+                        keywords=keywords,
+                        image_url=image_url,
+                        image_name=job.get("image_name"),
+                        user_id=job.get("user_id"),
                     )
-                    
                     logger.info(f"Started pending job {job_id} for {user_email}")
                     
                 except Exception as job_error:
