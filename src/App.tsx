@@ -67,6 +67,7 @@ const ForgotPassword = lazy(() => import("@/pages/ForgotPassword"));
 const Contact = lazy(() => import("@/pages/Contact"));
 const PublicReviews = lazy(() => import("@/pages/PublicReviews"));
 const Status = lazy(() => import("@/pages/Status"));
+const Security = lazy(() => import("@/pages/Security"));
 const SharedAnalysis = lazy(() => import("@/pages/SharedAnalysis"));
 import WorkspaceInviteAccept from "./pages/WorkspaceInviteAccept";
 const ClerkSsoCallback = lazy(() => import("@/pages/ClerkSsoCallback"));
@@ -246,6 +247,7 @@ const App = () => (
                   <Route path="/contact" element={<Contact />} />
                   <Route path="/reviews" element={<PublicReviews />} />
                   <Route path="/status" element={<Status />} />
+                  <Route path="/security" element={<Security />} />
                   <Route path="/unauthorized" element={<Unauthorized />} />
                   <Route path="/share/:token" element={<SharedAnalysis />} />
                   <Route
