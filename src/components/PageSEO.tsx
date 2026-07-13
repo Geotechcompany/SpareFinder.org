@@ -99,9 +99,9 @@ const pageConfigs: PageSEOConfig = {
     description: "Check current SpareFinder service availability and incident updates.",
     type: "website",
   },
-  "/security": {
-    title: "Information Security - SpareFinder",
-    description: "Read SpareFinder.org's information security commitment and ISO 27001 roadmap.",
+  "/compliance": {
+    title: "Compliance - SpareFinder",
+    description: "Read SpareFinder.org's ISO 27001 compliance roadmap and information security commitment.",
     type: "website",
   },
   "/privacy-policy": {

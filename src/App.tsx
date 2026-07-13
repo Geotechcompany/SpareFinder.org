@@ -247,7 +247,7 @@ const App = () => (
                   <Route path="/contact" element={<Contact />} />
                   <Route path="/reviews" element={<PublicReviews />} />
                   <Route path="/status" element={<Status />} />
-                  <Route path="/security" element={<Security />} />
+                  <Route path="/compliance" element={<Security />} />
                   <Route path="/unauthorized" element={<Unauthorized />} />
                   <Route path="/share/:token" element={<SharedAnalysis />} />
                   <Route

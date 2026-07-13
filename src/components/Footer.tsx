@@ -266,10 +266,10 @@ const Footer = () => {
                 Terms of Service
               </Link>
               <Link
-                to="/security"
+                to="/compliance"
                 className="text-sm font-medium text-muted-foreground transition-colors duration-300 hover:text-primary dark:text-gray-500 dark:hover:text-brand-light"
               >
-                Security
+                Compliance
               </Link>
               <Link
                 to="/status"
