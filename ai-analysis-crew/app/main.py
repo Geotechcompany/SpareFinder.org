@@ -169,6 +169,7 @@ from .api.routes_tickets import router as tickets_router
 from .api.routes_referrals import router as referrals_router
 from .api.routes_reports import router as reports_router
 from .api.routes_api_keys import router as api_keys_router
+from .api.routes_status import router as status_router
 from .api.error_handlers import register_error_handlers
 from .api.routes_marketing import admin_router as marketing_admin_router
 from .api.routes_marketing import cron_router as marketing_cron_router
@@ -191,6 +192,7 @@ app.include_router(tickets_router, prefix="/api")
 app.include_router(referrals_router, prefix="/api")
 app.include_router(reports_router, prefix="/api")
 app.include_router(api_keys_router, prefix="/api")
+app.include_router(status_router, prefix="/api")
 app.include_router(marketing_admin_router, prefix="/api")
 app.include_router(marketing_cron_router, prefix="/api")
 
@@ -248,6 +250,14 @@ async def cron_reminders(
         return {"ok": True, **summary}
     except Exception as e:
         logger.error(f"❌ Cron reminders failed: {e}")
+        from .app_error_log import schedule_log_app_error
+        schedule_log_app_error(
+            severity="error",
+            message=f"Cron reminders failed: {e}",
+            source="cron",
+            http_path="/api/cron/reminders",
+            context={"reminder_type": type},
+        )
         return {"ok": False, "error": str(e)}
 
 
@@ -279,6 +289,13 @@ async def cron_stuck_jobs(
         return summary
     except Exception as e:
         logger.error("❌ Cron stuck-jobs failed: %s", e)
+        from .app_error_log import schedule_log_app_error
+        schedule_log_app_error(
+            severity="error",
+            message=f"Cron stuck-jobs failed: {e}",
+            source="cron",
+            http_path="/api/cron/stuck-jobs",
+        )
         return {"ok": False, "error": str(e)}
 
 

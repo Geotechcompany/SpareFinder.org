@@ -94,6 +94,11 @@ const pageConfigs: PageSEOConfig = {
     description: "Get in touch with SpareFinder for support, sales inquiries, or partnership opportunities.",
     type: "website",
   },
+  "/status": {
+    title: "System Status - SpareFinder",
+    description: "Check current SpareFinder service availability and incident updates.",
+    type: "website",
+  },
   "/privacy-policy": {
     title: "Data Protection & Privacy Policy - SpareFinder",
     description: "Sparefinder.org Data Protection & Privacy Policy. How we collect, use, store, and protect your personal data under UK GDPR and the Data Protection Act 2018.",

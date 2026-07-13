@@ -29,6 +29,9 @@ services:
         value: PLAIN
       - key: EMAIL_SERVICE_URL
         sync: false
+      # Comma-separated platform error alert recipients.
+      - key: ERROR_NOTIFY_EMAIL
+        value: email@sparefinder.org,tps@tpsinternational.co.uk
       - key: PORT
         value: 8000
       - key: OTEL_SDK_DISABLED

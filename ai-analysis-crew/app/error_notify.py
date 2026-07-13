@@ -76,6 +76,17 @@ def resolve_error_notify_email(supabase: Any) -> str:
     return ""
 
 
+def resolve_error_notify_recipients(supabase: Any) -> list[str]:
+    """Resolve a comma or semicolon separated, de-duplicated recipient list."""
+    raw = resolve_error_notify_email(supabase)
+    recipients: list[str] = []
+    for candidate in raw.replace(";", ",").split(","):
+        email = candidate.strip().lower()
+        if email and "@" in email and email not in recipients:
+            recipients.append(email)
+    return recipients
+
+
 def _fingerprint(*, severity: str, message: str, source: str = "", path: str = "") -> str:
     raw = f"{source}:{path}:{severity}:{message[:500]}"
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()[:16]
@@ -105,8 +116,8 @@ def send_error_notify_email(
     if sev not in ("warning", "error", "critical"):
         return False
 
-    to_email = resolve_error_notify_email(supabase)
-    if not to_email:
+    recipients = resolve_error_notify_recipients(supabase)
+    if not recipients:
         return False
 
     fp = _fingerprint(severity=sev, message=message, source=source, path=http_path or "")
@@ -146,12 +157,17 @@ def send_error_notify_email(
     )
     subject = f"[SpareFinder {area_label} {sev}] {message[:100]}"
 
-    ok = send_basic_email_smtp(to_email=to_email, subject=subject, html=body_html, text=text)
-    if ok:
-        return True
-    return bool(
-        send_email_via_email_service(to_email=to_email, subject=subject, html=body_html, text=text)
-    )
+    delivered = False
+    for to_email in recipients:
+        ok = send_basic_email_smtp(to_email=to_email, subject=subject, html=body_html, text=text)
+        if not ok:
+            ok = bool(
+                send_email_via_email_service(
+                    to_email=to_email, subject=subject, html=body_html, text=text
+                )
+            )
+        delivered = delivered or ok
+    return delivered
 
 # Backward-compatible alias
 notify_marketing_error = send_error_notify_email

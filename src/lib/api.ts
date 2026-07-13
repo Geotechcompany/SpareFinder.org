@@ -1361,6 +1361,29 @@ export const adminApi = {
     const response = await apiClient.post("/admin/notifications/broadcast", payload);
     return response.data;
   },
+
+  getIncidents: async (): Promise<ApiResponse> => {
+    const response = await apiClient.get("/admin/incidents");
+    return response.data;
+  },
+
+  createIncident: async (payload: {
+    title: string;
+    message: string;
+    severity: "minor" | "major" | "critical";
+    status: "investigating" | "identified" | "monitoring" | "resolved";
+  }): Promise<ApiResponse> => {
+    const response = await apiClient.post("/admin/incidents", payload);
+    return response.data;
+  },
+
+  updateIncident: async (
+    incidentId: string,
+    payload: { message: string; status: "investigating" | "identified" | "monitoring" | "resolved" }
+  ): Promise<ApiResponse> => {
+    const response = await apiClient.post(`/admin/incidents/${incidentId}/updates`, payload);
+    return response.data;
+  },
 };
 
 // Tickets API (user support)

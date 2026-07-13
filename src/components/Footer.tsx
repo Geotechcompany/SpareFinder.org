@@ -271,6 +271,12 @@ const Footer = () => {
               >
                 Security
               </Link>
+              <Link
+                to="/status"
+                className="text-sm font-medium text-muted-foreground transition-colors duration-300 hover:text-primary dark:text-gray-500 dark:hover:text-brand-light"
+              >
+                System Status
+              </Link>
             </div>
           </motion.div>
 
