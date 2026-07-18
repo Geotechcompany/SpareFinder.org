@@ -173,6 +173,7 @@ from .api.routes_status import router as status_router
 from .api.error_handlers import register_error_handlers
 from .api.routes_marketing import admin_router as marketing_admin_router
 from .api.routes_marketing import cron_router as marketing_cron_router
+from .api.routes_gmail import router as gmail_marketing_router
 
 app.include_router(auth_router, prefix="/api")
 app.include_router(billing_router, prefix="/api")
@@ -195,6 +196,7 @@ app.include_router(api_keys_router, prefix="/api")
 app.include_router(status_router, prefix="/api")
 app.include_router(marketing_admin_router, prefix="/api")
 app.include_router(marketing_cron_router, prefix="/api")
+app.include_router(gmail_marketing_router, prefix="/api")
 
 register_error_handlers(app)
 

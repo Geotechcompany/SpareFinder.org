@@ -121,7 +121,12 @@ def _group_system_settings(rows: list[dict[str, Any]]) -> dict[str, dict[str, An
         key = str(r.get("setting_key") or "")
         if not key:
             continue
-        grouped.setdefault(cat, {})[key] = r.get("setting_value")
+        value = r.get("setting_value")
+        # Never expose Gmail OAuth client secret via the generic settings dump.
+        if cat == "gmail" and key == "client_secret":
+            grouped.setdefault(cat, {})["client_secret_set"] = bool(str(value or "").strip())
+            continue
+        grouped.setdefault(cat, {})[key] = value
     return grouped
 
 
@@ -1487,6 +1492,117 @@ async def admin_system_settings(_admin: CurrentUser = Depends(require_roles("adm
     supabase = get_supabase_admin()
     rows = supabase.table("system_settings").select("*").order("category", desc=False).execute().data or []
     return {"settings": _group_system_settings(rows)}
+
+
+class GmailOauthSettingsBody(BaseModel):
+    client_id: str = Field(default="", max_length=512)
+    # Empty / omitted secret keeps the existing stored secret (same pattern as password updates).
+    client_secret: str | None = Field(default=None, max_length=512)
+    redirect_uri: str = Field(default="", max_length=1024)
+
+
+@router.get("/gmail-oauth-settings")
+async def admin_get_gmail_oauth_settings(_admin: CurrentUser = Depends(require_roles("admin", "super_admin"))):
+    from ..gmail_oauth import (
+        default_gmail_redirect_uri,
+        gmail_oauth_public_config,
+        load_gmail_settings_from_db,
+        not_configured_message,
+    )
+
+    supabase = get_supabase_admin()
+    db = load_gmail_settings_from_db(supabase)
+    cfg = gmail_oauth_public_config(db=db)
+    stored_redirect = (db.get("redirect_uri") or "").strip()
+    payload = {
+        **cfg,
+        # Prefer DB-stored redirect for the form; fall back to computed default for prefills.
+        "redirect_uri": stored_redirect or cfg.get("redirect_uri") or default_gmail_redirect_uri(),
+        "default_redirect_uri": default_gmail_redirect_uri(),
+        "message": None if cfg.get("configured") else not_configured_message(),
+    }
+    return api_ok(payload)
+
+
+@router.post("/gmail-oauth-settings")
+async def admin_save_gmail_oauth_settings(
+    body: GmailOauthSettingsBody,
+    _admin: CurrentUser = Depends(require_roles("admin", "super_admin")),
+):
+    from ..gmail_oauth import (
+        GMAIL_SETTING_CLIENT_ID,
+        GMAIL_SETTING_CLIENT_SECRET,
+        GMAIL_SETTING_REDIRECT_URI,
+        GMAIL_SETTINGS_CATEGORY,
+        default_gmail_redirect_uri,
+        gmail_oauth_public_config,
+        load_gmail_settings_from_db,
+    )
+
+    client_id = (body.client_id or "").strip()
+    redirect_uri = (body.redirect_uri or "").strip() or default_gmail_redirect_uri()
+    secret_in = body.client_secret
+    secret_trim = (secret_in or "").strip() if secret_in is not None else ""
+
+    supabase = get_supabase_admin()
+    existing = load_gmail_settings_from_db(supabase)
+    existing_secret = (existing.get(GMAIL_SETTING_CLIENT_SECRET) or "").strip()
+
+    if not client_id:
+        return api_error("Google Client ID is required", code="validation_error", status_code=400)
+
+    # Blank secret on update = keep existing; require a secret on first save (or env fallback later).
+    if not secret_trim and not existing_secret:
+        # Allow save of client_id/redirect alone when env still provides the secret.
+        if not (os.getenv("GOOGLE_GMAIL_CLIENT_SECRET") or "").strip():
+            return api_error(
+                "Google Client Secret is required (enter it once; leave blank later to keep it).",
+                code="validation_error",
+                status_code=400,
+            )
+
+    now = datetime.utcnow().isoformat()
+    rows = [
+        {
+            "category": GMAIL_SETTINGS_CATEGORY,
+            "setting_key": GMAIL_SETTING_CLIENT_ID,
+            "setting_value": client_id,
+            "description": "Google OAuth Client ID for Gmail lead extraction",
+            "updated_at": now,
+        },
+        {
+            "category": GMAIL_SETTINGS_CATEGORY,
+            "setting_key": GMAIL_SETTING_REDIRECT_URI,
+            "setting_value": redirect_uri,
+            "description": "Google OAuth redirect URI for Gmail connect callback",
+            "updated_at": now,
+        },
+    ]
+    if secret_trim:
+        rows.append(
+            {
+                "category": GMAIL_SETTINGS_CATEGORY,
+                "setting_key": GMAIL_SETTING_CLIENT_SECRET,
+                "setting_value": secret_trim,
+                "description": "Google OAuth Client Secret for Gmail lead extraction",
+                "updated_at": now,
+            }
+        )
+
+    for r in rows:
+        supabase.table("system_settings").upsert(r, on_conflict="category,setting_key").execute()
+
+    db = load_gmail_settings_from_db(supabase)
+    cfg = gmail_oauth_public_config(db=db)
+    return api_ok(
+        {
+            **cfg,
+            "redirect_uri": (db.get(GMAIL_SETTING_REDIRECT_URI) or "").strip() or cfg.get("redirect_uri"),
+            "default_redirect_uri": default_gmail_redirect_uri(),
+            "message": "Gmail OAuth settings saved",
+        },
+        message="Gmail OAuth settings saved",
+    )
 
 
 @router.get("/app-errors")

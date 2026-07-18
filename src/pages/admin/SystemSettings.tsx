@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
+import { Link } from 'react-router-dom';
 import { AdminPageHeader, AdminPageHeaderToolbar } from '@/components/admin/AdminPageHeader';
 import { AdminPageContent } from "@/components/admin/AdminPageContent";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -9,8 +10,19 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/components/ui/use-toast';
-import { apiClient } from '@/lib/api';
-import { Settings, Shield, Lock, Mail, Bell, Server, Database, Key, Globe, Save, Loader2, AlertTriangle } from 'lucide-react';
+import { adminApi } from '@/lib/api';
+import {
+  Shield,
+  Mail,
+  Bell,
+  Server,
+  Save,
+  Loader2,
+  AlertTriangle,
+  CheckCircle2,
+  Eye,
+  EyeOff,
+} from 'lucide-react';
 
 interface SystemSettings {
   security: {
@@ -43,24 +55,110 @@ const SystemSettings = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  
+
+  const [gmailClientId, setGmailClientId] = useState('');
+  const [gmailClientSecret, setGmailClientSecret] = useState('');
+  const [gmailRedirectUri, setGmailRedirectUri] = useState('');
+  const [gmailDefaultRedirect, setGmailDefaultRedirect] = useState('');
+  const [gmailHasSecret, setGmailHasSecret] = useState(false);
+  const [gmailConfigured, setGmailConfigured] = useState(false);
+  const [gmailSource, setGmailSource] = useState<string>('none');
+  const [gmailMessage, setGmailMessage] = useState<string | null>(null);
+  const [gmailLoading, setGmailLoading] = useState(true);
+  const [gmailSaving, setGmailSaving] = useState(false);
+  const [gmailShowSecret, setGmailShowSecret] = useState(false);
+  const [gmailError, setGmailError] = useState<string | null>(null);
+
   const { toast } = useToast();
 
   useEffect(() => {
     fetchSystemSettings();
+    fetchGmailOauthSettings();
   }, []);
+
+  const fetchGmailOauthSettings = async () => {
+    try {
+      setGmailLoading(true);
+      setGmailError(null);
+      const response = await adminApi.getGmailOauthSettings();
+      const d = (response as any)?.data ?? response;
+      setGmailClientId(String(d?.client_id || ''));
+      setGmailRedirectUri(String(d?.redirect_uri || d?.default_redirect_uri || ''));
+      setGmailDefaultRedirect(String(d?.default_redirect_uri || ''));
+      setGmailHasSecret(Boolean(d?.has_client_secret || d?.client_secret_set));
+      setGmailConfigured(Boolean(d?.configured));
+      setGmailSource(String(d?.source || 'none'));
+      setGmailMessage(typeof d?.message === 'string' ? d.message : null);
+      setGmailClientSecret('');
+    } catch (err) {
+      console.error('Error fetching Gmail OAuth settings:', err);
+      setGmailError(err instanceof Error ? err.message : 'Failed to load Gmail OAuth settings');
+    } finally {
+      setGmailLoading(false);
+    }
+  };
+
+  const saveGmailOauthSettings = async () => {
+    const clientId = gmailClientId.trim();
+    const redirectUri = gmailRedirectUri.trim() || gmailDefaultRedirect.trim();
+    if (!clientId) {
+      setGmailError('Client ID is required.');
+      return;
+    }
+    if (!gmailHasSecret && !gmailClientSecret.trim()) {
+      setGmailError('Client Secret is required on first save.');
+      return;
+    }
+
+    try {
+      setGmailSaving(true);
+      setGmailError(null);
+      const payload: { client_id: string; redirect_uri: string; client_secret?: string } = {
+        client_id: clientId,
+        redirect_uri: redirectUri,
+      };
+      if (gmailClientSecret.trim()) {
+        payload.client_secret = gmailClientSecret.trim();
+      }
+      const response = await adminApi.saveGmailOauthSettings(payload);
+      if ((response as any)?.success === false) {
+        throw new Error((response as any)?.message || 'Failed to save Gmail OAuth settings');
+      }
+      const d = (response as any)?.data ?? response;
+      setGmailClientId(String(d?.client_id || clientId));
+      setGmailRedirectUri(String(d?.redirect_uri || redirectUri));
+      setGmailDefaultRedirect(String(d?.default_redirect_uri || gmailDefaultRedirect));
+      setGmailHasSecret(Boolean(d?.has_client_secret || d?.client_secret_set || gmailHasSecret || Boolean(payload.client_secret)));
+      setGmailConfigured(Boolean(d?.configured));
+      setGmailSource(String(d?.source || 'settings'));
+      setGmailMessage(null);
+      setGmailClientSecret('');
+      toast({
+        title: 'Gmail OAuth saved',
+        description: 'Google credentials are stored server-side. Connect Gmail from Email campaigns → Gmail leads.',
+      });
+    } catch (err) {
+      console.error('Error saving Gmail OAuth settings:', err);
+      const msg = err instanceof Error ? err.message : 'Failed to save Gmail OAuth settings';
+      setGmailError(msg);
+      toast({
+        variant: 'destructive',
+        title: 'Save failed',
+        description: msg,
+      });
+    } finally {
+      setGmailSaving(false);
+    }
+  };
 
   const fetchSystemSettings = async () => {
     try {
       setIsLoading(true);
       setError(null);
 
-      // For now, we'll use default settings since the backend might not have this endpoint yet
-      // In a real implementation, you would call: const response = await apiClient.getSystemSettings();
-      
-      // Simulating API call with default settings
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
+      // Legacy mock block for non-Gmail cards (not wired to API yet).
+      await new Promise(resolve => setTimeout(resolve, 400));
+
       setSettings({
         security: {
           passwordMinLength: 8,
@@ -104,13 +202,7 @@ const SystemSettings = () => {
 
     try {
       setIsSaving(true);
-      
-      // In a real implementation, you would call:
-      // const response = await apiClient.updateSystemSettings(settings);
-      
-      // Simulating API call
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
+      await new Promise(resolve => setTimeout(resolve, 800));
       toast({
         title: "Settings saved",
         description: "System settings have been updated successfully.",
@@ -129,7 +221,7 @@ const SystemSettings = () => {
 
   const updateSetting = (category: keyof SystemSettings, key: string, value: any) => {
     if (!settings) return;
-    
+
     setSettings(prev => ({
       ...prev!,
       [category]: {
@@ -193,6 +285,149 @@ const SystemSettings = () => {
             </CardContent>
           </Card>
         )}
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Mail className="h-5 w-5" />
+              Gmail OAuth (inbound leads)
+            </CardTitle>
+            <CardDescription>
+              Google Cloud OAuth credentials for Admin → Email campaigns → Gmail leads.
+              The client secret is stored server-side and never returned after save.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {gmailLoading ? (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Loading Gmail OAuth settings…
+              </div>
+            ) : (
+              <>
+                <div className="flex flex-wrap items-center gap-2">
+                  {gmailConfigured ? (
+                    <Badge variant="secondary" className="gap-1">
+                      <CheckCircle2 className="h-3 w-3" />
+                      Configured
+                    </Badge>
+                  ) : (
+                    <Badge variant="outline">Not configured</Badge>
+                  )}
+                  {gmailHasSecret ? (
+                    <Badge variant="outline">Client secret saved</Badge>
+                  ) : null}
+                  {gmailSource && gmailSource !== 'none' ? (
+                    <Badge variant="outline">Source: {gmailSource}</Badge>
+                  ) : null}
+                </div>
+
+                {!gmailConfigured && (gmailMessage || gmailError) ? (
+                  <p className="text-sm text-amber-700 dark:text-amber-400 flex gap-2">
+                    <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+                    {gmailError || gmailMessage}
+                  </p>
+                ) : null}
+
+                {gmailError && gmailConfigured ? (
+                  <p className="text-sm text-destructive flex gap-2">
+                    <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+                    {gmailError}
+                  </p>
+                ) : null}
+
+                <div className="space-y-2">
+                  <Label htmlFor="gmail-client-id">Client ID</Label>
+                  <Input
+                    id="gmail-client-id"
+                    value={gmailClientId}
+                    onChange={(e) => setGmailClientId(e.target.value)}
+                    placeholder="xxxx.apps.googleusercontent.com"
+                    autoComplete="off"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="gmail-client-secret">Client Secret</Label>
+                  <div className="flex gap-2">
+                    <Input
+                      id="gmail-client-secret"
+                      type={gmailShowSecret ? 'text' : 'password'}
+                      value={gmailClientSecret}
+                      onChange={(e) => setGmailClientSecret(e.target.value)}
+                      placeholder={
+                        gmailHasSecret
+                          ? 'Leave blank to keep the saved secret'
+                          : 'Enter Google client secret'
+                      }
+                      autoComplete="new-password"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      onClick={() => setGmailShowSecret((v) => !v)}
+                      aria-label={gmailShowSecret ? 'Hide secret' : 'Show secret'}
+                    >
+                      {gmailShowSecret ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {gmailHasSecret
+                      ? 'A secret is already stored. Enter a new value only when rotating credentials.'
+                      : 'Required once. After save, the secret is not shown again.'}
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="gmail-redirect-uri">Redirect URI</Label>
+                  <Input
+                    id="gmail-redirect-uri"
+                    value={gmailRedirectUri}
+                    onChange={(e) => setGmailRedirectUri(e.target.value)}
+                    placeholder={gmailDefaultRedirect || 'https://sparefinder.org/api/admin/marketing/gmail/callback'}
+                    autoComplete="off"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Must match an Authorized redirect URI in Google Cloud Console.
+                    {gmailDefaultRedirect ? (
+                      <>
+                        {' '}
+                        Suggested:{' '}
+                        <button
+                          type="button"
+                          className="underline underline-offset-2"
+                          onClick={() => setGmailRedirectUri(gmailDefaultRedirect)}
+                        >
+                          {gmailDefaultRedirect}
+                        </button>
+                      </>
+                    ) : null}
+                  </p>
+                </div>
+
+                <div className="flex flex-wrap gap-2 pt-1">
+                  <Button onClick={saveGmailOauthSettings} disabled={gmailSaving}>
+                    {gmailSaving ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Saving…
+                      </>
+                    ) : (
+                      <>
+                        <Save className="mr-2 h-4 w-4" />
+                        Save Gmail OAuth
+                      </>
+                    )}
+                  </Button>
+                  <Button variant="secondary" asChild>
+                    <Link to="/admin/marketing-outbound?tab=gmail">Open Gmail leads</Link>
+                  </Button>
+                </div>
+              </>
+            )}
+          </CardContent>
+        </Card>
 
         {settings && (
           <motion.div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
@@ -273,6 +508,13 @@ const SystemSettings = () => {
                     onCheckedChange={(checked) => updateSetting('email', 'smtpSecure', checked)}
                   />
                 </motion.div>
+                <p className="text-xs text-muted-foreground">
+                  For live SMTP credentials, use{' '}
+                  <Link to="/admin/email-smtp" className="underline underline-offset-2">
+                    Outgoing email
+                  </Link>
+                  .
+                </p>
               </CardContent>
             </Card>
 
@@ -352,4 +594,4 @@ const SystemSettings = () => {
   );
 };
 
-export default SystemSettings; 
+export default SystemSettings;

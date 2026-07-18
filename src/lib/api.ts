@@ -973,6 +973,20 @@ export const adminApi = {
     return { success: true, data: response.data };
   },
 
+  getGmailOauthSettings: async (): Promise<ApiResponse> => {
+    const response = await apiClient.get("/admin/gmail-oauth-settings");
+    return response.data;
+  },
+
+  saveGmailOauthSettings: async (payload: {
+    client_id: string;
+    client_secret?: string;
+    redirect_uri: string;
+  }): Promise<ApiResponse> => {
+    const response = await apiClient.post("/admin/gmail-oauth-settings", payload);
+    return response.data;
+  },
+
   saveSmtpSettings: async (smtpConfig: {
     host: string;
     port: number;
@@ -1280,6 +1294,32 @@ export const adminApi = {
     exclude_queries?: string[];
   }): Promise<ApiResponse> => {
     const response = await apiClient.post("/admin/marketing/serp-queries/ai-generate", payload);
+    return response.data;
+  },
+  getGmailConnectionStatus: async (): Promise<ApiResponse> => {
+    const response = await apiClient.get("/admin/marketing/gmail/status");
+    return response.data;
+  },
+  startGmailConnect: async (): Promise<ApiResponse> => {
+    const response = await apiClient.get("/admin/marketing/gmail/connect");
+    return response.data;
+  },
+  disconnectGmail: async (): Promise<ApiResponse> => {
+    const response = await apiClient.post("/admin/marketing/gmail/disconnect");
+    return response.data;
+  },
+  extractGmailLeads: async (payload: {
+    max_messages?: number;
+    newer_than_days?: number;
+    query?: string;
+    campaign_id?: string | null;
+    only_lead_like?: boolean;
+    run_sanitize?: boolean;
+    dry_run?: boolean;
+  }): Promise<ApiResponse> => {
+    const response = await apiClient.post("/admin/marketing/gmail/extract", payload, {
+      timeout: 300000,
+    });
     return response.data;
   },
   getMarketingSends: async (params: {

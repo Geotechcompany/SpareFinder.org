@@ -42,7 +42,7 @@ import {
 import { adminApi } from "@/lib/api";
 import { MARKETING_SERP_COUNTRIES, marketingCountryLabel } from "@/lib/marketingCountries";
 import { useToast } from "@/components/ui/use-toast";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams, Link } from "react-router-dom";
 import {
   Tooltip,
   TooltipContent,
@@ -66,6 +66,7 @@ import {
   ChevronRight,
   Users,
   Download,
+  Unplug,
 } from "lucide-react";
 import { API_BASE_URL } from "@/lib/config";
 
@@ -76,6 +77,7 @@ const MARKETING_TAB_VALUES = [
   "leads",
   "import",
   "serp",
+  "gmail",
   "logs",
   "errors",
 ] as const;
@@ -254,6 +256,36 @@ const MarketingOutbound: React.FC = () => {
   const [leadsTotal, setLeadsTotal] = useState(0);
   const [leadsLoading, setLeadsLoading] = useState(false);
   const [isExportingLeads, setIsExportingLeads] = useState(false);
+  const [gmailConfigured, setGmailConfigured] = useState(false);
+  const [gmailTableReady, setGmailTableReady] = useState(true);
+  const [gmailConnection, setGmailConnection] = useState<{
+    id?: string;
+    email?: string;
+    status?: string;
+    last_sync_at?: string | null;
+    last_extract_summary?: Record<string, unknown>;
+    last_error?: string | null;
+    connected_at?: string | null;
+  } | null>(null);
+  const [gmailStatusMessage, setGmailStatusMessage] = useState<string | null>(null);
+  const [gmailLoading, setGmailLoading] = useState(false);
+  const [gmailConnecting, setGmailConnecting] = useState(false);
+  const [gmailDisconnecting, setGmailDisconnecting] = useState(false);
+  const [gmailExtracting, setGmailExtracting] = useState(false);
+  const [gmailMaxMessages, setGmailMaxMessages] = useState("40");
+  const [gmailNewerThanDays, setGmailNewerThanDays] = useState("60");
+  const [gmailOnlyLeadLike, setGmailOnlyLeadLike] = useState(true);
+  const [gmailRunSanitize, setGmailRunSanitize] = useState(false);
+  const [gmailCampaignId, setGmailCampaignId] = useState("__auto__");
+  const [gmailExtractResult, setGmailExtractResult] = useState<{
+    scanned?: number;
+    created?: number;
+    duplicates?: number;
+    skipped_message?: number;
+    failed?: number;
+    dry_run?: boolean;
+    preview?: Array<Record<string, unknown>>;
+  } | null>(null);
 
   const loadGlobal = useCallback(async () => {
     setLoading(true);
@@ -351,6 +383,36 @@ const MarketingOutbound: React.FC = () => {
     }
   }, [toast, leadsPage, leadsLimit, leadsSearch, leadCountryFilter]);
 
+  const loadGmailStatus = useCallback(async () => {
+    setGmailLoading(true);
+    try {
+      const res = await adminApi.getGmailConnectionStatus();
+      const d = (res.data || {}) as {
+        configured?: boolean;
+        table_ready?: boolean;
+        message?: string;
+        connection?: {
+          id?: string;
+          email?: string;
+          status?: string;
+          last_sync_at?: string | null;
+          last_extract_summary?: Record<string, unknown>;
+          last_error?: string | null;
+          connected_at?: string | null;
+        } | null;
+      };
+      setGmailConfigured(Boolean(d.configured));
+      setGmailTableReady(d.table_ready !== false);
+      setGmailConnection(d.connection || null);
+      setGmailStatusMessage(typeof d.message === "string" ? d.message : null);
+    } catch (e) {
+      console.error(e);
+      setGmailStatusMessage(formatMarketingApiError(e));
+    } finally {
+      setGmailLoading(false);
+    }
+  }, []);
+
   const loadAll = useCallback(async () => {
     await Promise.all([loadGlobal(), loadLeads()]);
   }, [loadGlobal, loadLeads]);
@@ -362,6 +424,41 @@ const MarketingOutbound: React.FC = () => {
   useEffect(() => {
     void loadLeads();
   }, [loadLeads]);
+
+  useEffect(() => {
+    if (marketingTab === "gmail") void loadGmailStatus();
+  }, [marketingTab, loadGmailStatus]);
+
+  useEffect(() => {
+    const gmailFlag = (searchParams.get("gmail") || "").trim();
+    const gmailErr = (searchParams.get("gmail_error") || "").trim();
+    if (!gmailFlag && !gmailErr) return;
+
+    if (gmailFlag === "connected") {
+      toast({
+        title: "Gmail connected",
+        description: "You can extract inbound inquiry emails into marketing leads.",
+      });
+      void loadGmailStatus();
+    } else if (gmailErr) {
+      toast({
+        variant: "destructive",
+        title: "Gmail connection failed",
+        description: gmailErr,
+      });
+    }
+
+    setSearchParams(
+      (prev) => {
+        const p = new URLSearchParams(prev);
+        p.delete("gmail");
+        p.delete("gmail_error");
+        if (!p.get("tab")) p.set("tab", "gmail");
+        return p;
+      },
+      { replace: true }
+    );
+  }, [searchParams, setSearchParams, toast, loadGmailStatus]);
 
   useEffect(() => {
     setSelectedLeadIds([]);
@@ -557,6 +654,111 @@ const MarketingOutbound: React.FC = () => {
       });
     } finally {
       setErrorNotifySaving(false);
+    }
+  };
+
+  const connectGmailAccount = async () => {
+    setGmailConnecting(true);
+    try {
+      const res = await adminApi.startGmailConnect();
+      const url = (res.data as { authorize_url?: string } | undefined)?.authorize_url;
+      if (!res.success || !url) {
+        toast({
+          variant: "destructive",
+          title: "Cannot start Gmail connect",
+          description:
+            (res as { message?: string }).message ||
+            gmailStatusMessage ||
+            "Check Google OAuth under Admin → Site settings.",
+        });
+        return;
+      }
+      window.location.assign(url);
+    } catch (e) {
+      toast({
+        variant: "destructive",
+        title: "Gmail connect failed",
+        description: formatMarketingApiError(e),
+      });
+    } finally {
+      setGmailConnecting(false);
+    }
+  };
+
+  const disconnectGmailAccount = async () => {
+    setGmailDisconnecting(true);
+    try {
+      const res = await adminApi.disconnectGmail();
+      if (!res.success) {
+        toast({
+          variant: "destructive",
+          title: "Disconnect failed",
+          description: (res as { message?: string }).message || "Request failed",
+        });
+        return;
+      }
+      toast({ title: "Gmail disconnected" });
+      setGmailExtractResult(null);
+      await loadGmailStatus();
+    } catch (e) {
+      toast({
+        variant: "destructive",
+        title: "Disconnect failed",
+        description: formatMarketingApiError(e),
+      });
+    } finally {
+      setGmailDisconnecting(false);
+    }
+  };
+
+  const runGmailExtract = async (dryRun: boolean) => {
+    const maxMessages = Math.min(100, Math.max(1, Number.parseInt(gmailMaxMessages, 10) || 40));
+    const newerThan = Math.min(365, Math.max(1, Number.parseInt(gmailNewerThanDays, 10) || 60));
+    setGmailExtracting(true);
+    try {
+      const res = await adminApi.extractGmailLeads({
+        max_messages: maxMessages,
+        newer_than_days: newerThan,
+        only_lead_like: gmailOnlyLeadLike,
+        run_sanitize: gmailRunSanitize,
+        campaign_id: gmailCampaignId === "__auto__" ? null : gmailCampaignId,
+        dry_run: dryRun,
+      });
+      if (!res.success) {
+        toast({
+          variant: "destructive",
+          title: dryRun ? "Preview failed" : "Extract failed",
+          description: (res as { message?: string }).message || "Request failed",
+        });
+        return;
+      }
+      const summary = (res.data || {}) as {
+        scanned?: number;
+        created?: number;
+        duplicates?: number;
+        skipped_message?: number;
+        failed?: number;
+        dry_run?: boolean;
+        preview?: Array<Record<string, unknown>>;
+      };
+      setGmailExtractResult(summary);
+      toast({
+        title: dryRun ? "Gmail preview ready" : "Gmail extract finished",
+        description: dryRun
+          ? `Found ${summary.scanned ?? 0} candidate message(s).`
+          : `Created ${summary.created ?? 0} lead(s); ${summary.duplicates ?? 0} duplicate email(s); ${summary.skipped_message ?? 0} already imported.`,
+      });
+      if (!dryRun) {
+        await Promise.all([loadGmailStatus(), loadLeads()]);
+      }
+    } catch (e) {
+      toast({
+        variant: "destructive",
+        title: dryRun ? "Preview failed" : "Extract failed",
+        description: formatMarketingApiError(e),
+      });
+    } finally {
+      setGmailExtracting(false);
     }
   };
 
@@ -1022,6 +1224,7 @@ const MarketingOutbound: React.FC = () => {
                 <TabsTrigger value="leads">Leads</TabsTrigger>
                 <TabsTrigger value="import">Import spreadsheet</TabsTrigger>
                 <TabsTrigger value="serp">Find on Google</TabsTrigger>
+                <TabsTrigger value="gmail">Gmail leads</TabsTrigger>
                 <TabsTrigger value="logs">Sent emails</TabsTrigger>
                 <TabsTrigger value="errors">Issues</TabsTrigger>
               </TabsList>
@@ -1858,6 +2061,238 @@ const MarketingOutbound: React.FC = () => {
                         Run discovery now
                       </Button>
                     </div>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              <TabsContent value="gmail">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Mail className="h-5 w-5" /> Gmail inbound leads
+                    </CardTitle>
+                    <CardDescription>
+                      Connect a Gmail inbox (read-only) and pull messages that look like buyer inquiries into marketing
+                      leads (<code className="text-xs">source=gmail_inbox</code>). Refresh tokens stay on the API
+                      server. Configure Google OAuth under{" "}
+                      <Link to="/admin/system-settings" className="underline underline-offset-2">
+                        Admin → Site settings
+                      </Link>
+                      , then run <code className="text-xs">docs/sql/gmail_oauth_connections.sql</code> if needed.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-6">
+                    {gmailLoading ? (
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Checking Gmail connection…
+                      </div>
+                    ) : (
+                      <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-3">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="text-sm font-medium">Connection</p>
+                          {gmailConnection?.email ? (
+                            <Badge variant="secondary">{gmailConnection.email}</Badge>
+                          ) : (
+                            <Badge variant="outline">Not connected</Badge>
+                          )}
+                          {gmailConnection?.status ? (
+                            <Badge variant={gmailConnection.status === "connected" ? "default" : "destructive"}>
+                              {gmailConnection.status}
+                            </Badge>
+                          ) : null}
+                        </div>
+                        {!gmailConfigured ? (
+                          <p className="text-sm text-amber-700 dark:text-amber-400 flex gap-2">
+                            <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+                            <span>
+                              {gmailStatusMessage ||
+                                "Gmail OAuth is not configured. Add Google Client ID and Client Secret under Admin → Site settings."}{" "}
+                              <Link to="/admin/system-settings" className="underline underline-offset-2">
+                                Open Site settings
+                              </Link>
+                            </span>
+                          </p>
+                        ) : null}
+                        {!gmailTableReady ? (
+                          <p className="text-sm text-amber-700 dark:text-amber-400 flex gap-2">
+                            <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+                            Run <code className="text-xs">docs/sql/gmail_oauth_connections.sql</code> in Supabase
+                            before connecting.
+                          </p>
+                        ) : null}
+                        {gmailConnection?.last_error ? (
+                          <p className="text-sm text-destructive">{gmailConnection.last_error}</p>
+                        ) : null}
+                        {gmailConnection?.last_sync_at ? (
+                          <p className="text-xs text-muted-foreground">
+                            Last extract: {String(gmailConnection.last_sync_at)}
+                            {gmailConnection.last_extract_summary?.created != null
+                              ? ` · created ${String(gmailConnection.last_extract_summary.created)}`
+                              : ""}
+                          </p>
+                        ) : null}
+                        <div className="flex flex-wrap gap-2">
+                          <Button
+                            type="button"
+                            onClick={() => void connectGmailAccount()}
+                            disabled={!gmailConfigured || !gmailTableReady || gmailConnecting}
+                          >
+                            {gmailConnecting ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <Mail className="h-4 w-4" />
+                            )}
+                            <span className="ml-2">
+                              {gmailConnection?.email ? "Reconnect Gmail" : "Connect Gmail"}
+                            </span>
+                          </Button>
+                          {gmailConnection?.email ? (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              onClick={() => void disconnectGmailAccount()}
+                              disabled={gmailDisconnecting}
+                            >
+                              {gmailDisconnecting ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <Unplug className="h-4 w-4" />
+                              )}
+                              <span className="ml-2">Disconnect</span>
+                            </Button>
+                          ) : null}
+                          <Button type="button" variant="ghost" size="sm" onClick={() => void loadGmailStatus()}>
+                            <RefreshCw className="h-4 w-4" />
+                            <span className="ml-2">Refresh status</span>
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <div>
+                        <Label htmlFor="gmail-max-messages">Max messages to scan</Label>
+                        <Input
+                          id="gmail-max-messages"
+                          value={gmailMaxMessages}
+                          onChange={(e) => setGmailMaxMessages(e.target.value)}
+                          inputMode="numeric"
+                          className="max-w-[140px]"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="gmail-newer-days">Look back (days)</Label>
+                        <Input
+                          id="gmail-newer-days"
+                          value={gmailNewerThanDays}
+                          onChange={(e) => setGmailNewerThanDays(e.target.value)}
+                          inputMode="numeric"
+                          className="max-w-[140px]"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <Label>Campaign for new leads</Label>
+                      <Select value={gmailCampaignId} onValueChange={setGmailCampaignId}>
+                        <SelectTrigger className="max-w-md">
+                          <SelectValue placeholder="Campaign" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="__auto__">Auto (default / highest-priority active)</SelectItem>
+                          {campaigns.map((c) => (
+                            <SelectItem key={c.id} value={c.id}>
+                              {c.name}
+                              {c.is_paused ? " (paused)" : ""}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="flex flex-col gap-2">
+                      <label className="flex items-center gap-2 text-sm">
+                        <input
+                          type="checkbox"
+                          checked={gmailOnlyLeadLike}
+                          onChange={(e) => setGmailOnlyLeadLike(e.target.checked)}
+                        />
+                        Only import messages that look like inquiries (quote, RFQ, parts, etc.)
+                      </label>
+                      <label className="flex items-center gap-2 text-sm">
+                        <input
+                          type="checkbox"
+                          checked={gmailRunSanitize}
+                          onChange={(e) => setGmailRunSanitize(e.target.checked)}
+                        />
+                        Run AI sanitize on new leads
+                      </label>
+                    </div>
+
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        disabled={!gmailConnection?.email || gmailExtracting}
+                        onClick={() => void runGmailExtract(true)}
+                      >
+                        {gmailExtracting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Eye className="h-4 w-4" />}
+                        <span className="ml-2">Preview candidates</span>
+                      </Button>
+                      <Button
+                        type="button"
+                        disabled={!gmailConnection?.email || gmailExtracting}
+                        onClick={() => void runGmailExtract(false)}
+                      >
+                        {gmailExtracting ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <UserPlus className="h-4 w-4" />
+                        )}
+                        <span className="ml-2">Extract leads</span>
+                      </Button>
+                    </div>
+
+                    {gmailExtractResult ? (
+                      <div className="space-y-3">
+                        <p className="text-sm text-muted-foreground">
+                          Scanned {gmailExtractResult.scanned ?? 0}
+                          {gmailExtractResult.dry_run
+                            ? " (preview only)"
+                            : ` · created ${gmailExtractResult.created ?? 0} · duplicates ${gmailExtractResult.duplicates ?? 0} · already imported ${gmailExtractResult.skipped_message ?? 0} · failed ${gmailExtractResult.failed ?? 0}`}
+                        </p>
+                        {(gmailExtractResult.preview?.length ?? 0) > 0 ? (
+                          <div className="overflow-x-auto rounded-md border border-border">
+                            <table className="w-full text-sm">
+                              <thead>
+                                <tr className="border-b text-left bg-muted/40">
+                                  <th className="p-2">Email</th>
+                                  <th className="p-2">Name</th>
+                                  <th className="p-2">Subject</th>
+                                  <th className="p-2">Status</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {(gmailExtractResult.preview || []).map((row, idx) => (
+                                  <tr
+                                    key={String(row.gmail_message_id || idx)}
+                                    className="border-b border-border/60"
+                                  >
+                                    <td className="p-2">{String(row.email || "—")}</td>
+                                    <td className="p-2">{String(row.full_name || "—")}</td>
+                                    <td className="p-2 max-w-xs truncate">{String(row.subject || "—")}</td>
+                                    <td className="p-2 text-xs text-muted-foreground">
+                                      {String(row.status || (row.looks_like_lead ? "candidate" : "other"))}
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        ) : null}
+                      </div>
+                    ) : null}
                   </CardContent>
                 </Card>
               </TabsContent>

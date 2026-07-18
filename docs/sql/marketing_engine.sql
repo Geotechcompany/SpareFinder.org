@@ -187,3 +187,4 @@ CREATE TRIGGER marketing_settings_updated_at
     FOR EACH ROW EXECUTE FUNCTION set_marketing_updated_at();
 
 -- Optional: open/click columns on marketing_sends — see marketing_sends_tracking.sql
+-- Optional: Gmail OAuth token storage — see gmail_oauth_connections.sql (source=gmail_inbox on marketing_leads)
